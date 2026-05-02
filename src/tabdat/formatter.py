@@ -3,7 +3,15 @@
 from collections.abc import Iterable
 from pathlib import Path
 
-from tabdat.models import DescribeResult, LoadResult, Result, SummarizeResult
+from tabdat.models import (
+  CodebookResult,
+  CountResult,
+  DescribeResult,
+  LoadResult,
+  PreviewResult,
+  Result,
+  SummarizeResult,
+)
 
 
 def format_result(result: Result) -> str:
@@ -44,6 +52,29 @@ def format_result(result: Result) -> str:
     )
     return "\n".join(_table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), rows))
 
+  if isinstance(result, CodebookResult):
+    rows = (
+      (
+        row.variable,
+        row.data_type,
+        str(row.nonmissing),
+        str(row.missing),
+        str(row.distinct),
+        ", ".join(_format_cell(value) for value in row.examples) or ".",
+      )
+      for row in result.rows
+    )
+    return "\n".join(
+      _table(("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"), rows)
+    )
+
+  if isinstance(result, CountResult):
+    return f"Rows: {result.row_count}"
+
+  if isinstance(result, PreviewResult):
+    rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
+    return "\n".join(_table(result.columns, rows))
+
   raise TypeError(f"Unsupported result: {type(result).__name__}")
 
 
@@ -67,6 +98,14 @@ def _format_number(value: float | int | None) -> str:
   if isinstance(value, int):
     return str(value)
   return f"{value:.6g}"
+
+
+def _format_cell(value: object) -> str:
+  if value is None:
+    return "."
+  if isinstance(value, float):
+    return _format_number(value)
+  return str(value)
 
 
 def _display_path(path: Path) -> str:

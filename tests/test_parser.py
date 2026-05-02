@@ -5,15 +5,19 @@ import pytest
 from tabdat.errors import ParseError
 from tabdat.models import (
   BinaryExpression,
+  CodebookCommand,
   CommandOption,
+  CountCommand,
   DescribeCommand,
   ExitCommand,
   FunctionCallExpression,
+  HeadCommand,
   IdentifierExpression,
   NumberExpression,
   ParsedCommand,
   StringExpression,
   SummarizeCommand,
+  TailCommand,
   UseCommand,
 )
 from tabdat.parser import parse_command, parse_expression
@@ -39,6 +43,17 @@ def test_parse_summarize_preserves_punctuated_variable_names() -> None:
 
 def test_parse_summarize_command_without_variables() -> None:
   assert parse_command("summarize") == SummarizeCommand(())
+
+
+def test_parse_phase_3_inspection_commands() -> None:
+  assert parse_command("codebook") == CodebookCommand(())
+  assert parse_command("codebook age sex") == CodebookCommand(("age", "sex"))
+  assert parse_command("count") == CountCommand()
+  assert parse_command("head") == HeadCommand(5)
+  assert parse_command("head 10") == HeadCommand(10)
+  assert parse_command("head 0") == HeadCommand(0)
+  assert parse_command("tail") == TailCommand(5)
+  assert parse_command("tail 2") == TailCommand(2)
 
 
 def test_parse_summarize_with_if_as_structured_phase_2_command() -> None:
@@ -139,6 +154,20 @@ def test_parse_exit_aliases() -> None:
     "summarize age,",
     "summarize age, limit=",
     "summarize age, limit 10",
+    "codebook age if age > 18",
+    "codebook age, detail",
+    "count age",
+    "count if age > 18",
+    "head 1 2",
+    "head -1",
+    "head 1.5",
+    "head five",
+    "head, limit=10",
+    "tail 1 2",
+    "tail -1",
+    "tail 1.5",
+    "tail five",
+    "tail if age > 18",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],

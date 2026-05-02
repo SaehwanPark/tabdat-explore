@@ -71,6 +71,26 @@ class SummarizeCommand:
 
 
 @dataclass(frozen=True)
+class CodebookCommand:
+  variables: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CountCommand:
+  pass
+
+
+@dataclass(frozen=True)
+class HeadCommand:
+  limit: int = 5
+
+
+@dataclass(frozen=True)
+class TailCommand:
+  limit: int = 5
+
+
+@dataclass(frozen=True)
 class ExitCommand:
   pass
 
@@ -84,7 +104,17 @@ class ParsedCommand:
   expression: Expression | None = None
 
 
-Command = UseCommand | DescribeCommand | SummarizeCommand | ExitCommand | ParsedCommand
+Command = (
+  UseCommand
+  | DescribeCommand
+  | SummarizeCommand
+  | CodebookCommand
+  | CountCommand
+  | HeadCommand
+  | TailCommand
+  | ExitCommand
+  | ParsedCommand
+)
 
 
 @dataclass(frozen=True)
@@ -129,4 +159,32 @@ class SummarizeResult:
   rows: tuple[SummaryRow, ...]
 
 
-Result = LoadResult | DescribeResult | SummarizeResult
+@dataclass(frozen=True)
+class CodebookRow:
+  variable: str
+  data_type: str
+  nonmissing: int
+  missing: int
+  distinct: int
+  examples: tuple[object, ...]
+
+
+@dataclass(frozen=True)
+class CodebookResult:
+  rows: tuple[CodebookRow, ...]
+
+
+@dataclass(frozen=True)
+class CountResult:
+  row_count: int
+
+
+@dataclass(frozen=True)
+class PreviewResult:
+  columns: tuple[str, ...]
+  rows: tuple[tuple[object, ...], ...]
+
+
+Result = (
+  LoadResult | DescribeResult | SummarizeResult | CodebookResult | CountResult | PreviewResult
+)

@@ -7,22 +7,36 @@ from typing import Literal
 from tabdat.errors import ParseError
 from tabdat.models import (
   BinaryExpression,
+  CodebookCommand,
   Command,
   CommandOption,
+  CountCommand,
   DescribeCommand,
   ExitCommand,
   Expression,
   FunctionCallExpression,
+  HeadCommand,
   IdentifierExpression,
   NumberExpression,
   ParsedCommand,
   StringExpression,
   SummarizeCommand,
+  TailCommand,
   UnaryExpression,
   UseCommand,
 )
 
-_EXECUTABLE_COMMANDS = {"use", "describe", "summarize", "exit", "quit"}
+_EXECUTABLE_COMMANDS = {
+  "use",
+  "describe",
+  "summarize",
+  "codebook",
+  "count",
+  "head",
+  "tail",
+  "exit",
+  "quit",
+}
 _PARSED_ONLY_COMMANDS = {"keep", "drop", "generate", "replace"}
 _BINARY_PRECEDENCE = {
   "==": 1,
@@ -85,6 +99,30 @@ def parse_command(text: str) -> Command:
       options=parts.options,
     )
 
+  if parts.name == "codebook":
+    if parts.expression is not None:
+      raise ParseError("codebook does not accept assignment syntax")
+    if parts.condition is not None or parts.options:
+      raise ParseError("codebook does not accept if clauses or options")
+    return CodebookCommand(variables=parts.arguments)
+
+  if parts.name == "count":
+    has_unsupported_parts = (
+      parts.arguments
+      or parts.condition is not None
+      or parts.options
+      or parts.expression is not None
+    )
+    if has_unsupported_parts:
+      raise ParseError("count does not accept arguments, if clauses, options, or assignment syntax")
+    return CountCommand()
+
+  if parts.name == "head":
+    return HeadCommand(limit=_parse_preview_limit(parts, "head"))
+
+  if parts.name == "tail":
+    return TailCommand(limit=_parse_preview_limit(parts, "tail"))
+
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError(f"{parts.name} does not accept arguments, if clauses, or options")
@@ -118,6 +156,24 @@ def _parse_use(text: str) -> UseCommand:
   if len(parts) != 2:
     raise ParseError("use expects exactly one path: use <path>")
   return UseCommand(path=Path(parts[1]))
+
+
+def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError(f"{command_name} does not accept if clauses, options, or assignment syntax")
+  if len(parts.arguments) > 1:
+    raise ParseError(f"{command_name} accepts at most one row limit")
+  if not parts.arguments:
+    return 5
+
+  limit_text = parts.arguments[0]
+  try:
+    limit = int(limit_text)
+  except ValueError as exc:
+    raise ParseError(f"{command_name} row limit must be a non-negative integer") from exc
+  if str(limit) != limit_text or limit < 0:
+    raise ParseError(f"{command_name} row limit must be a non-negative integer")
+  return limit
 
 
 def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
