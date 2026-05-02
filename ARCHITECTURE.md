@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has begun Phase 3 with executable inspection commands. This document records the
-implemented core skeleton, command-language model, inspection slice, and the boundaries future
-phases should preserve.
+TabDat-Explore has completed the roadmap Phase 3 core EDA surface. This document records the
+implemented core skeleton, command-language model, active DuckDB relation model, and the boundaries
+future phases should preserve.
 
 ## Runtime Flow
 
@@ -37,10 +37,10 @@ unsupported-command execution error until a later command contract defines execu
 
 ### DuckDB Backend
 
-Owns data access and query execution. Parquet is the primary initial format. Backend operations
-should avoid unnecessary materialization where practical. Current backend operations inspect Parquet
-metadata, summarize numeric columns, profile columns for `codebook`, return row counts from
-metadata, and preview rows for `head`/`tail`.
+Owns data access and query execution. Parquet is the primary initial format. Loading creates a
+session-local active DuckDB table. Transformations replace that active table in the current session,
+so later inspection, summary, tabulation, and grouping commands see prior command results. No
+persistent write/save behavior exists yet.
 
 ### Formatter
 
@@ -56,13 +56,16 @@ display formatting.
 - Runtime modules live under `src/tabdat/`.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
-- Phase 2 parser models include command options and expression ASTs for future command execution.
-- Phase 3 inspection commands are executable: `codebook`, `count`, `head`, and `tail`.
+- Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
+- Phase 3 commands are executable: `codebook`, `count`, `head`, `tail`, `keep`, `drop`, `select`,
+  `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
+- The supported `by:` child commands are `summarize` and `count`.
 
 ## Development Boundaries
 
 - Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
 - Do not add broad command grammar before a command contract needs it.
 - Keep public behavior documented before implementation.
+- Keep transformation state session-local until a save/write command is explicitly designed.
 - Use 2-space tab size across project files.
 - Run configured linting and formatting proactively before commits.

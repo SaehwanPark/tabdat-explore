@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Completed the roadmap Phase 3 core EDA surface with executable transformations (`keep`, `drop`,
+  `select`, `rename`, `generate`, `replace`), grouping (`by:` and `collapse`), and `tabulate`.
+- Added session-local active DuckDB table state so transformations feed subsequent inspection and
+  summary commands.
 - Added the Phase 3 inspection slice with executable `codebook`, `count`, `head`, and `tail`
   commands over the active Parquet dataset.
 - Added the Phase 2 parser foundation with structured command options, `if` clauses, expression

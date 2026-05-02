@@ -1,4 +1,4 @@
-# Phase 3 Inspection Implementation Report
+# Full Phase 3 Implementation Report
 
 ## Contract Consumed
 
@@ -20,16 +20,18 @@
 
 ## Implementation Notes
 
-- Added executable command models for `codebook`, `count`, `head`, and `tail`.
-- Added structured results for codebook profiles, row counts, and row previews.
-- Extended the parser to accept Phase 3 inspection syntax and reject filters/options outside this
-  slice.
-- Added executor dispatch while preserving one active dataset as the only runtime state.
-- Added DuckDB-backed codebook profiling and head/tail previews over `read_parquet(?)`.
-- Added formatter output for compact codebook tables, row counts, and preview rows.
-- Added parser, executor/backend, and CLI smoke coverage.
-- Updated SDD state files to mark the inspection slice complete and keep broader Phase 3 work in
-  progress.
+- Added typed command models for `keep`, `drop`, `select`, `rename`, `generate`, `replace`,
+  `tabulate`, `collapse`, and `by:`.
+- Extended parsing for Phase 3 transformation syntax, `replace ... if ...`, `by group: command`,
+  and `collapse ..., by(group_vars)`.
+- Changed backend execution from path-only reads to a session-local active DuckDB table so
+  transformations feed later commands.
+- Added expression-to-DuckDB-SQL compilation for identifiers, literals, arithmetic, comparisons,
+  unary minus, and a small supported function set.
+- Added executor dispatch for transformations, tabulations, grouped summaries, and collapse.
+- Added generic table formatting plus transformation acknowledgements.
+- Added parser, executor/backend, and CLI smoke coverage for the full Phase 3 flow.
+- Updated SDD files to mark Phase 3 complete and preserve remaining future phases.
 
 ## Validation
 
@@ -39,7 +41,7 @@
 
 ## Known Gaps
 
-- No row filters for `count`, `head`, `tail`, or `codebook`.
-- Transformations, grouping, SQL, visualization, scripting, prompt-toolkit UX, and lazy execution
-  optimization remain future work.
-- `tail` uses DuckDB row-number ordering over the active local Parquet scan.
+- Transformations are session-local and are not written back to disk.
+- `by:` supports only `summarize` and `count` in Phase 3.
+- SQL integration, prompt-toolkit UX, visualization, scripting, non-Parquet loading, and Phase 7
+  lazy optimization remain future work.

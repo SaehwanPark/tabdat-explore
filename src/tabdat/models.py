@@ -52,7 +52,7 @@ Expression = (
 @dataclass(frozen=True)
 class CommandOption:
   name: str
-  value: str | int | float | bool = True
+  value: str | int | float | bool | tuple[str, ...] = True
 
 
 @dataclass(frozen=True)
@@ -91,6 +91,63 @@ class TailCommand:
 
 
 @dataclass(frozen=True)
+class KeepCommand:
+  variables: tuple[str, ...] = ()
+  condition: Expression | None = None
+
+
+@dataclass(frozen=True)
+class DropCommand:
+  variables: tuple[str, ...] = ()
+  condition: Expression | None = None
+
+
+@dataclass(frozen=True)
+class SelectCommand:
+  variables: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RenameCommand:
+  old_name: str
+  new_name: str
+
+
+@dataclass(frozen=True)
+class GenerateCommand:
+  variable: str
+  expression: Expression
+
+
+@dataclass(frozen=True)
+class ReplaceCommand:
+  variable: str
+  expression: Expression
+  condition: Expression | None = None
+
+
+@dataclass(frozen=True)
+class TabulateCommand:
+  variables: tuple[str, ...]
+  row_percent: bool = False
+  column_percent: bool = False
+  include_missing: bool = False
+
+
+@dataclass(frozen=True)
+class CollapseCommand:
+  statistic: Literal["count", "mean", "sum", "min", "max"]
+  variables: tuple[str, ...]
+  groups: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class ByCommand:
+  groups: tuple[str, ...]
+  command: "Command"
+
+
+@dataclass(frozen=True)
 class ExitCommand:
   pass
 
@@ -112,6 +169,15 @@ Command = (
   | CountCommand
   | HeadCommand
   | TailCommand
+  | KeepCommand
+  | DropCommand
+  | SelectCommand
+  | RenameCommand
+  | GenerateCommand
+  | ReplaceCommand
+  | TabulateCommand
+  | CollapseCommand
+  | ByCommand
   | ExitCommand
   | ParsedCommand
 )
@@ -185,6 +251,25 @@ class PreviewResult:
   rows: tuple[tuple[object, ...], ...]
 
 
+@dataclass(frozen=True)
+class TransformResult:
+  message: str
+  dataset: DatasetInfo
+
+
+@dataclass(frozen=True)
+class TableResult:
+  headers: tuple[str, ...]
+  rows: tuple[tuple[object, ...], ...]
+
+
 Result = (
-  LoadResult | DescribeResult | SummarizeResult | CodebookResult | CountResult | PreviewResult
+  LoadResult
+  | DescribeResult
+  | SummarizeResult
+  | CodebookResult
+  | CountResult
+  | PreviewResult
+  | TransformResult
+  | TableResult
 )

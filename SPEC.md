@@ -27,25 +27,26 @@ This file tracks feature state for spec-driven development. Product intent lives
     and function calls
   - user-facing parse diagnostics for malformed Phase 2 syntax
   - focused parser coverage while preserving Phase 1 executable behavior
-- Began Phase 3 with the inspection command slice:
+- Implemented the full Phase 3 core EDA command surface:
   - `codebook [varlist]` compact column profiling
   - `count` active dataset row counts
   - `head [n]` and `tail [n]` row previews
-  - DuckDB-backed execution, deterministic terminal formatting, and focused parser/executor/CLI
-    tests
+  - `keep`, `drop`, and `select` column projection and row filtering
+  - `rename`, `generate`, and `replace` session-local transformations
+  - `tabulate` one-way and two-way frequency tables
+  - `collapse` grouped aggregate datasets
+  - `by group_vars: summarize` and `by group_vars: count`
+  - DuckDB-backed active relation execution, deterministic terminal formatting, and focused
+    parser/executor/CLI tests
 
 ## Present
 
-- Phase 3 remains in progress beyond the first inspection slice. Transformations and grouping are
-  not implemented yet.
-- Parsed-only forms such as `keep if ...` and `generate ... = ...` are represented but
-  intentionally not executed yet.
+- Phase 3 is complete for the roadmap's core EDA command surface.
 - The current runtime does not yet include prompt-toolkit UX, scripts, SQL, visualization, or lazy
   execution optimization.
 
 ## Future
 
-- Phase 3: transformation and grouping commands from the v0 glossary.
 - Phase 4: SQL escape hatch over the active dataset.
 - Phase 5: prompt-toolkit UX with highlighting, history, and autocomplete.
 - Phase 6: artifact-based visualization.

@@ -1,92 +1,90 @@
-# Phase 3 Inspection Command Contract
+# Full Phase 3 Command Contract
 
 ## Request Summary
 
-Implement the first Phase 3 core EDA slice: executable inspection commands over the active local
-Parquet dataset. Existing Phase 1 and Phase 2 parser behavior must continue to work.
+Complete the full roadmap Phase 3 core EDA surface over the active local Parquet dataset. Existing
+Phase 1, Phase 2, and Phase 3 inspection behavior must continue to work.
 
 ## Roadmap Phase
 
 Phase 3: Core EDA Functionality.
 
-## Command Syntax
+## Existing Inspection Syntax
 
-### `codebook`
+- `codebook [varlist]`
+- `count`
+- `head [n]`
+- `tail [n]`
 
-```text
-codebook [varlist]
-```
+Existing output and error behavior are preserved.
 
-Shows compact column-level profiling for the active dataset. With no varlist, profile every column.
-With a varlist, profile only the requested columns in requested order.
-
-Output columns:
-
-- `Variable`
-- `Type`
-- `Nonmissing`
-- `Missing`
-- `Distinct`
-- `Examples`
-
-Examples should be deterministic, non-null values from the dataset scan order, limited to a compact
-display string.
-
-### `count`
+## Transformation Syntax
 
 ```text
-count
+keep varlist
+keep if <expr>
+drop varlist
+drop if <expr>
+select varlist
+rename old new
+generate new = <expr>
+replace existing = <expr> [if <expr>]
 ```
 
-Shows the number of rows in the active dataset.
+- `keep varlist`, `drop varlist`, and `select varlist` update the active columns.
+- `keep if <expr>` and `drop if <expr>` filter active rows.
+- `rename old new` renames one column while preserving values and type.
+- `generate` adds a new column and rejects existing column names.
+- `replace` updates an existing column. With `if`, nonmatching rows keep the old value.
 
-### `head`
+## Grouping And Tabulation Syntax
 
 ```text
-head [n]
+tabulate var
+tabulate var1 var2 [, row col missing]
+collapse stat varlist, by(group_vars)
+by group_vars: summarize [varlist]
+by group_vars: count
 ```
 
-Shows the first `n` rows from the active dataset. `n` defaults to 5 and must be a non-negative
-integer.
-
-### `tail`
-
-```text
-tail [n]
-```
-
-Shows the last `n` rows from the active dataset using the backend's stable row-number ordering for
-the active local Parquet scan. `n` defaults to 5 and must be a non-negative integer.
+- One-way `tabulate` outputs `Value`, `Count`, and `Percent`.
+- Two-way `tabulate` outputs long-form rows with `var1`, `var2`, `Count`, and optional `Row %` or
+  `Col %` columns.
+- `missing` includes null values; otherwise null values are excluded.
+- `collapse` replaces the active dataset with grouped aggregate output. Supported stats are
+  `count`, `mean`, `sum`, `min`, and `max`. Aggregate columns are named `<stat>_<variable>`.
+- `by:` grouped commands do not change the active dataset.
 
 ## Error Behavior
 
-- All commands require an active dataset and should say to run `use <path>` first.
-- `codebook` rejects unknown variables.
-- `count` rejects arguments, `if` clauses, and options.
-- `head` and `tail` reject more than one argument, non-integer limits, negative limits, `if`
-  clauses, and options.
-- `codebook`, `head`, and `tail` do not support filters or comma options in this slice.
+- All active-data commands require an active dataset and should say to run `use <path>` first.
+- Commands reject unknown columns, duplicate output names, malformed arity, unsupported options, and
+  unsupported expressions with user-facing errors.
+- `generate` rejects existing target columns; `replace` rejects missing target columns.
+- `collapse` requires exactly one supported stat and a nonempty `by(...)` option.
+- `by:` supports `summarize` and `count` in this phase; other child commands are rejected.
 
 ## Data Assumptions
 
-- The active dataset remains a single local `.parquet` file loaded by `use`.
-- Backend operations use DuckDB queries over `read_parquet(?)`.
-- Preview rows may contain scalars, strings, or nulls; formatter renders null as `.`.
+- The active dataset starts as a single local `.parquet` file loaded by `use`.
+- Backend operations use DuckDB SQL over the current active relation query.
+- Transformations are session-local and do not write a new file.
+- Formatter renders null as `.`.
 
 ## Non-Goals
 
-- No row filters for `count`, `head`, `tail`, or `codebook`.
-- No transformations, grouping, SQL, scripting, visualization, prompt-toolkit UX, non-Parquet
-  loading, remote paths, or lazy execution optimization.
+- No SQL command, scripting, visualization, prompt-toolkit UX, config, remote paths, non-Parquet
+  loading, or persistent writes.
+- No Phase 7 lazy execution optimization beyond DuckDB query composition.
 - No full Stata compatibility.
 
 ## Acceptance Criteria
 
-- Parser tests cover valid and invalid forms for `codebook`, `count`, `head`, and `tail`.
-- Executor/backend tests cover successful command execution and missing-dataset or missing-column
-  failures.
-- CLI smoke tests show the new commands running after `use`.
-- Existing Phase 1/2 tests continue to pass.
+- Parser tests cover valid and invalid forms for all new Phase 3 commands.
+- Executor/backend tests cover command sequencing after transformations, grouped summaries,
+  tabulations, collapse, and failure cases.
+- CLI smoke tests show a first-pass EDA flow after `use`.
+- Existing Phase 1/2/inspection tests continue to pass.
 - Validation passes:
   - `uv run pytest`
   - `uv run ruff check .`

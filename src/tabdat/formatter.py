@@ -11,6 +11,8 @@ from tabdat.models import (
   PreviewResult,
   Result,
   SummarizeResult,
+  TableResult,
+  TransformResult,
 )
 
 
@@ -74,6 +76,14 @@ def format_result(result: Result) -> str:
   if isinstance(result, PreviewResult):
     rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
     return "\n".join(_table(result.columns, rows))
+
+  if isinstance(result, TransformResult):
+    dataset = result.dataset
+    return f"{result.message}: {dataset.row_count} rows, {dataset.column_count} columns"
+
+  if isinstance(result, TableResult):
+    rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
+    return "\n".join(_table(result.headers, rows))
 
   raise TypeError(f"Unsupported result: {type(result).__name__}")
 

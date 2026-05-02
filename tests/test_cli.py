@@ -59,6 +59,42 @@ def test_cli_runs_phase_3_inspection_commands(sample_parquet: Path, capsys) -> N
   assert captured.err == ""
 
 
+def test_cli_runs_full_phase_3_eda_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "keep if age >= 42",
+      "-c",
+      "generate age2 = age * 2",
+      "-c",
+      "replace cost = 0 if sex == 'F'",
+      "-c",
+      "tabulate sex",
+      "-c",
+      "by sex: summarize age",
+      "-c",
+      "collapse mean age cost, by(sex)",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Kept matching rows: 2 rows, 4 columns" in captured.out
+  assert "Generated age2: 2 rows, 5 columns" in captured.out
+  assert "Replaced cost: 2 rows, 5 columns" in captured.out
+  assert "sex  Count  Percent" in captured.out
+  assert "F    1      50" in captured.out
+  assert "sex  mean_age" in captured.out
+  assert "Collapsed dataset: 2 rows, 3 columns" in captured.out
+  assert "sex  mean_age  mean_cost" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_prints_command_errors(capsys) -> None:
   exit_code = main(["-c", "describe"])
 

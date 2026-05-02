@@ -7,20 +7,29 @@ from typing import Literal
 from tabdat.errors import ParseError
 from tabdat.models import (
   BinaryExpression,
+  ByCommand,
   CodebookCommand,
+  CollapseCommand,
   Command,
   CommandOption,
   CountCommand,
   DescribeCommand,
+  DropCommand,
   ExitCommand,
   Expression,
   FunctionCallExpression,
+  GenerateCommand,
   HeadCommand,
   IdentifierExpression,
+  KeepCommand,
   NumberExpression,
   ParsedCommand,
+  RenameCommand,
+  ReplaceCommand,
+  SelectCommand,
   StringExpression,
   SummarizeCommand,
+  TabulateCommand,
   TailCommand,
   UnaryExpression,
   UseCommand,
@@ -34,10 +43,19 @@ _EXECUTABLE_COMMANDS = {
   "count",
   "head",
   "tail",
+  "keep",
+  "drop",
+  "select",
+  "rename",
+  "generate",
+  "replace",
+  "tabulate",
+  "collapse",
   "exit",
   "quit",
 }
-_PARSED_ONLY_COMMANDS = {"keep", "drop", "generate", "replace"}
+_PARSED_ONLY_COMMANDS: set[str] = set()
+_COLLAPSE_STATS = {"count", "mean", "sum", "min", "max"}
 _BINARY_PRECEDENCE = {
   "==": 1,
   "!=": 1,
@@ -78,6 +96,8 @@ def parse_command(text: str) -> Command:
 
   if command_name == "use":
     return _parse_use(stripped)
+  if command_name == "by":
+    return _parse_by(stripped)
 
   tokens = _tokenize(stripped)
   parts = _parse_command_parts(tokens)
@@ -123,6 +143,50 @@ def parse_command(text: str) -> Command:
   if parts.name == "tail":
     return TailCommand(limit=_parse_preview_limit(parts, "tail"))
 
+  if parts.name == "keep":
+    return _parse_keep_or_drop(parts, "keep")
+
+  if parts.name == "drop":
+    return _parse_keep_or_drop(parts, "drop")
+
+  if parts.name == "select":
+    if parts.condition is not None or parts.options or parts.expression is not None:
+      raise ParseError("select only accepts a variable list")
+    if not parts.arguments:
+      raise ParseError("select expects at least one variable")
+    return SelectCommand(variables=parts.arguments)
+
+  if parts.name == "rename":
+    if parts.condition is not None or parts.options or parts.expression is not None:
+      raise ParseError("rename expects exactly two variables: rename old new")
+    if len(parts.arguments) != 2:
+      raise ParseError("rename expects exactly two variables: rename old new")
+    return RenameCommand(old_name=parts.arguments[0], new_name=parts.arguments[1])
+
+  if parts.name == "generate":
+    if parts.condition is not None or parts.options:
+      raise ParseError("generate does not accept if clauses or options")
+    if len(parts.arguments) != 1 or parts.expression is None:
+      raise ParseError("generate expects syntax: generate new = expression")
+    return GenerateCommand(variable=parts.arguments[0], expression=parts.expression)
+
+  if parts.name == "replace":
+    if parts.options:
+      raise ParseError("replace does not accept options")
+    if len(parts.arguments) != 1 or parts.expression is None:
+      raise ParseError("replace expects syntax: replace existing = expression")
+    return ReplaceCommand(
+      variable=parts.arguments[0],
+      expression=parts.expression,
+      condition=parts.condition,
+    )
+
+  if parts.name == "tabulate":
+    return _parse_tabulate(parts)
+
+  if parts.name == "collapse":
+    return _parse_collapse(parts)
+
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError(f"{parts.name} does not accept arguments, if clauses, or options")
@@ -156,6 +220,82 @@ def _parse_use(text: str) -> UseCommand:
   if len(parts) != 2:
     raise ParseError("use expects exactly one path: use <path>")
   return UseCommand(path=Path(parts[1]))
+
+
+def _parse_by(text: str) -> ByCommand:
+  before, separator, after = text.partition(":")
+  if not separator:
+    raise ParseError("by expects syntax: by group_vars: command")
+  groups = tuple(before.split()[1:])
+  if not groups:
+    raise ParseError("by expects at least one grouping variable")
+  if not after.strip():
+    raise ParseError("by expects a command after :")
+  command = parse_command(after.strip())
+  if isinstance(command, ByCommand):
+    raise ParseError("nested by commands are not supported")
+  return ByCommand(groups=groups, command=command)
+
+
+def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand | DropCommand:
+  if parts.options or parts.expression is not None:
+    raise ParseError(f"{command_name} does not accept options or assignment syntax")
+  if parts.condition is not None and parts.arguments:
+    raise ParseError(f"{command_name} cannot combine a variable list with an if clause")
+  if parts.condition is None and not parts.arguments:
+    raise ParseError(f"{command_name} expects a variable list or if clause")
+  if command_name == "keep":
+    return KeepCommand(variables=parts.arguments, condition=parts.condition)
+  return DropCommand(variables=parts.arguments, condition=parts.condition)
+
+
+def _parse_tabulate(parts: _CommandParts) -> TabulateCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("tabulate does not accept if clauses or assignment syntax")
+  if len(parts.arguments) not in {1, 2}:
+    raise ParseError("tabulate expects one or two variables")
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"row", "col", "missing"}
+  if unsupported:
+    raise ParseError(f"tabulate unsupported option: {', '.join(sorted(unsupported))}")
+  for option in parts.options:
+    if option.value is not True:
+      raise ParseError(f"tabulate option {option.name} does not accept a value")
+
+  if len(parts.arguments) == 1 and option_names & {"row", "col"}:
+    raise ParseError("one-way tabulate does not accept row or col options")
+
+  return TabulateCommand(
+    variables=parts.arguments,
+    row_percent="row" in option_names,
+    column_percent="col" in option_names,
+    include_missing="missing" in option_names,
+  )
+
+
+def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("collapse does not accept if clauses or assignment syntax")
+  if len(parts.arguments) < 2:
+    raise ParseError("collapse expects syntax: collapse stat varlist, by(group_vars)")
+
+  statistic = parts.arguments[0].lower()
+  if statistic not in _COLLAPSE_STATS:
+    raise ParseError(f"collapse unsupported statistic: {parts.arguments[0]}")
+
+  by_options = tuple(option for option in parts.options if option.name == "by")
+  if len(by_options) != 1 or len(parts.options) != 1:
+    raise ParseError("collapse expects exactly one by(group_vars) option")
+  groups = by_options[0].value
+  if not isinstance(groups, tuple) or not groups:
+    raise ParseError("collapse by() expects at least one grouping variable")
+
+  return CollapseCommand(
+    statistic=statistic,
+    variables=parts.arguments[1:],
+    groups=groups,
+  )
 
 
 def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
@@ -212,7 +352,14 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
       if not arguments:
         raise ParseError(f"{name} assignment requires a target before =")
       stream.consume()
-      expression_tokens, option_tokens = _split_expression_and_options(stream.remaining())
+      if name == "replace":
+        expression_tokens, condition_tokens, option_tokens = _split_replace_expression(
+          stream.remaining()
+        )
+        if condition_tokens:
+          condition = _ExpressionParser(condition_tokens).parse_all()
+      else:
+        expression_tokens, option_tokens = _split_expression_and_options(stream.remaining())
       if not expression_tokens:
         raise ParseError(f"{name} assignment requires an expression after =")
       expression = _ExpressionParser(expression_tokens).parse_all()
@@ -264,6 +411,23 @@ def _split_expression_and_options(
   return tokens, ()
 
 
+def _split_replace_expression(
+  tokens: tuple[_Token, ...],
+) -> tuple[tuple[_Token, ...], tuple[_Token, ...], tuple[_Token, ...]]:
+  depth = 0
+  for index, token in enumerate(tokens):
+    if token.text == "(":
+      depth += 1
+    elif token.text == ")":
+      depth -= 1
+    elif token.kind == "identifier" and token.text.lower() == "if" and depth == 0:
+      condition_tokens, option_tokens = _split_expression_and_options(tokens[index + 1 :])
+      return tokens[:index], condition_tokens, option_tokens
+    elif token.text == "," and depth == 0:
+      return tokens[:index], (), tokens[index + 1 :]
+  return tokens, (), ()
+
+
 def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
   if not tokens:
     raise ParseError("comma must be followed by at least one option")
@@ -274,7 +438,21 @@ def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
     name = stream.consume()
     if name.kind != "identifier":
       raise ParseError("option names must be identifiers")
-    value: str | int | float | bool = True
+    value: str | int | float | bool | tuple[str, ...] = True
+    if not stream.at_end and stream.peek.text == "(":
+      stream.consume()
+      values: list[str] = []
+      while not stream.at_end and stream.peek.text != ")":
+        token = stream.consume()
+        if token.kind != "identifier":
+          raise ParseError(f"option {name.text} values must be identifiers")
+        values.append(token.text)
+      if stream.at_end:
+        raise ParseError(f"option {name.text} is missing closing )")
+      stream.consume()
+      if not values:
+        raise ParseError(f"option {name.text} expects at least one value")
+      value = tuple(values)
     if not stream.at_end and stream.peek.text == "=":
       stream.consume()
       if stream.at_end:
@@ -337,7 +515,7 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
       tokens.append(_Token("symbol", two_char, index, index + 2))
       index += 2
       continue
-    if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")"}:
+    if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")", ":"}:
       tokens.append(_Token("symbol", char, index, index + 1))
       index += 1
       continue

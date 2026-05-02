@@ -5,18 +5,27 @@ import pytest
 from tabdat.errors import ParseError
 from tabdat.models import (
   BinaryExpression,
+  ByCommand,
   CodebookCommand,
+  CollapseCommand,
   CommandOption,
   CountCommand,
   DescribeCommand,
+  DropCommand,
   ExitCommand,
   FunctionCallExpression,
+  GenerateCommand,
   HeadCommand,
   IdentifierExpression,
+  KeepCommand,
   NumberExpression,
   ParsedCommand,
+  RenameCommand,
+  ReplaceCommand,
+  SelectCommand,
   StringExpression,
   SummarizeCommand,
+  TabulateCommand,
   TailCommand,
   UseCommand,
 )
@@ -94,25 +103,70 @@ def test_parse_condition_and_options() -> None:
   )
 
 
-def test_parse_future_keep_command() -> None:
-  assert parse_command("keep if age >= 18") == ParsedCommand(
-    name="keep",
+def test_parse_phase_3_transformation_commands() -> None:
+  assert parse_command("keep age bmi") == KeepCommand(variables=("age", "bmi"))
+  assert parse_command("keep if age >= 18") == KeepCommand(
     condition=BinaryExpression(
       left=IdentifierExpression("age"),
       operator=">=",
       right=NumberExpression(18),
     ),
   )
+  assert parse_command("drop cost") == DropCommand(variables=("cost",))
+  assert parse_command("drop if sex == 'F'") == DropCommand(
+    condition=BinaryExpression(
+      left=IdentifierExpression("sex"),
+      operator="==",
+      right=StringExpression("F"),
+    ),
+  )
+  assert parse_command("select age sex") == SelectCommand(("age", "sex"))
+  assert parse_command("rename sex gender") == RenameCommand("sex", "gender")
 
 
-def test_parse_future_generate_command() -> None:
-  assert parse_command("generate log_cost = log(cost)") == ParsedCommand(
-    name="generate",
-    arguments=("log_cost",),
+def test_parse_phase_3_generate_and_replace_commands() -> None:
+  assert parse_command("generate log_cost = log(cost)") == GenerateCommand(
+    variable="log_cost",
     expression=FunctionCallExpression(
       name="log",
       arguments=(IdentifierExpression("cost"),),
     ),
+  )
+  assert parse_command("replace cost = cost * 2 if sex == 'F'") == ReplaceCommand(
+    variable="cost",
+    expression=BinaryExpression(
+      left=IdentifierExpression("cost"),
+      operator="*",
+      right=NumberExpression(2),
+    ),
+    condition=BinaryExpression(
+      left=IdentifierExpression("sex"),
+      operator="==",
+      right=StringExpression("F"),
+    ),
+  )
+
+
+def test_parse_phase_3_grouping_commands() -> None:
+  assert parse_command("tabulate sex") == TabulateCommand(("sex",))
+  assert parse_command("tabulate sex age, row col missing") == TabulateCommand(
+    variables=("sex", "age"),
+    row_percent=True,
+    column_percent=True,
+    include_missing=True,
+  )
+  assert parse_command("collapse mean age cost, by(sex)") == CollapseCommand(
+    statistic="mean",
+    variables=("age", "cost"),
+    groups=("sex",),
+  )
+  assert parse_command("by sex: summarize age cost") == ByCommand(
+    groups=("sex",),
+    command=SummarizeCommand(("age", "cost")),
+  )
+  assert parse_command("by sex age: count") == ByCommand(
+    groups=("sex", "age"),
+    command=CountCommand(),
   )
 
 
@@ -170,6 +224,28 @@ def test_parse_exit_aliases() -> None:
     "tail 1.5",
     "tail five",
     "tail if age > 18",
+    "keep",
+    "keep age if age > 18",
+    "drop",
+    "drop age = 1",
+    "select",
+    "select age if age > 18",
+    "rename age",
+    "rename age years now",
+    "generate new",
+    "generate new = age if age > 18",
+    "replace cost",
+    "replace cost = cost * 2, force",
+    "tabulate",
+    "tabulate age bmi sex",
+    "tabulate age, row",
+    "tabulate age bmi, exact",
+    "collapse median age, by(sex)",
+    "collapse mean age",
+    "collapse mean age, by()",
+    "by: summarize age",
+    "by sex:",
+    "by sex: by age: count",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],
