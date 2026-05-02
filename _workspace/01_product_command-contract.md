@@ -1,125 +1,136 @@
-# Phase 1 Command Contract
+# Phase 2 Command Contract
 
 ## Request Summary
 
-Implement the Phase 1 core skeleton: a minimal `tabdat` CLI that supports loading one local
-Parquet dataset and running `describe` and `summarize` through the CLI -> parser -> executor ->
-DuckDB pipeline.
+Implement the Phase 2 parser foundation: richer command grammar, structured condition and
+expression parsing, and clearer user-facing parse errors. Existing Phase 1 commands must continue
+to execute through the CLI -> parser -> executor -> DuckDB pipeline.
 
 ## Roadmap Phase
 
-Phase 1: Core Skeleton (Vertical Slice).
+Phase 2: Command Language & Parser.
 
-## Commands
+## Grammar
+
+Supported general command shape:
+
+```text
+command [varlist] [if expression] [, option [option=value ...]]
+```
+
+Rules:
+
+- Command names are case-insensitive.
+- Varlist items are identifiers after the command and before `if` or `,`.
+- Options appear after one comma and are whitespace-separated.
+- Options may be boolean flags (`detail`) or key/value pairs (`limit=10`).
+- `if` introduces one expression and must not appear more than once.
+- `if` expressions may appear before comma options.
+- Quoted string literals are supported in expressions.
+- Paths for `use` remain a single whitespace-free path argument in Phase 2.
+
+Examples:
+
+```text
+summarize age bmi
+summarize age bmi if age >= 18
+summarize age bmi, detail limit=10
+summarize age if sex == "F", detail
+generate log_cost = log(cost)
+```
+
+## Expression Syntax
+
+Expression parser support:
+
+- identifiers: `age`, `cost`, `sex`
+- numbers: `18`, `22.5`
+- strings: `"F"`, `'M'`
+- unary minus: `-cost`
+- arithmetic: `+`, `-`, `*`, `/`
+- comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- parentheses for grouping
+- function calls: `log(cost)`, `sqrt(age + 1)`
+
+Unsupported expression syntax must fail during parsing with a command-language error, not a
+backend error.
+
+## Executable Commands
+
+The following Phase 1 commands remain executable:
 
 ### `use`
-
-Syntax:
 
 ```text
 use <path>
 ```
 
-Behavior:
-
-- Loads a local `.parquet` file into the single active dataset slot.
-- Replaces any previously active dataset.
-- Prints a confirmation with path, row count, and column count.
-- Errors when the path is missing, the file extension is not `.parquet`, or DuckDB cannot read
-  the file.
-
-Example:
-
-```text
-tabdat> use patients.parquet
-Loaded: patients.parquet (3 rows, 4 columns)
-```
+Loads one local `.parquet` file into the active dataset.
 
 ### `describe`
-
-Syntax:
 
 ```text
 describe
 ```
 
-Behavior:
-
-- Requires an active dataset.
-- Prints dataset path, row count, column count, and one line per column with the DuckDB type name.
-- Does not accept a varlist or options in Phase 1.
-
-Example:
-
-```text
-tabdat> describe
-Dataset: patients.parquet
-Rows: 3
-Columns: 4
-
-Variable  Type
-age       BIGINT
-bmi       DOUBLE
-sex       VARCHAR
-cost      DOUBLE
-```
+Prints active dataset structure. Varlist, `if`, and options are still invalid for executable
+`describe`.
 
 ### `summarize`
-
-Syntax:
 
 ```text
 summarize [varlist]
 ```
 
-Behavior:
+Summarizes numeric columns exactly as in Phase 1. The parser may accept structured Phase 2 forms
+for future commands, but executor support for `summarize if ...` or `summarize, detail` is not part
+of this slice.
 
-- Requires an active dataset.
-- With no varlist, summarizes all numeric columns.
-- With a varlist, summarizes exactly the requested columns.
-- Prints variable, non-null count, mean, standard deviation, minimum, and maximum.
-- Errors when any requested column is missing or non-numeric.
-- Errors when no numeric columns are available for the no-varlist form.
+### `exit` / `quit`
 
-Example:
+Exit aliases accept no arguments, `if`, or options.
+
+## Parsed-Only Commands
+
+The parser should be able to represent future command-language forms such as:
 
 ```text
-tabdat> summarize age bmi
-Variable  Count  Mean  Std Dev  Min  Max
-age       3      42.0  12.0     30   54
-bmi       3      25.1  2.1      22.8 27.0
+keep if age >= 18
+generate log_cost = log(cost)
 ```
 
-## Parser Rules
+These are parsed for grammar coverage only. The executor should return an unsupported-command
+execution error if such parsed commands are sent to it.
 
-- Parse only whitespace-separated Phase 1 commands.
-- Supported commands are `use`, `describe`, `summarize`, `exit`, and `quit`.
-- Reject unknown commands with a command-level error.
-- Reject unsupported extra arguments for `describe`, `exit`, and `quit`.
-- Options, quoted paths with spaces, `if` clauses, and comma syntax are future work.
+## Error Behavior
 
-## Data Assumptions
+Parse errors should name the problem and give the smallest useful correction. Required cases:
 
-- The active dataset is a local Parquet file.
-- DuckDB is the primary execution backend.
-- Column types use DuckDB names in Phase 1 output.
-- Numeric summaries include DuckDB numeric type families: integer, decimal, floating point, and
-  unsigned integer types.
+- empty command
+- unknown command
+- missing `use` path
+- unsupported extra arguments to `describe`, `exit`, or `quit`
+- missing expression after `if`
+- duplicate `if`
+- malformed option syntax
+- unterminated quoted string
+- incomplete expression
+- unsupported token in expression
 
 ## Non-Goals
 
-- No CSV, Feather, Arrow IPC, remote paths, object storage, SQL command, visualization, transforms,
-  autocomplete, history, or syntax highlighting.
-- No Stata-compatible edge behavior.
-- No custom pretty table library in Phase 1.
+- No execution for filtered summaries, `keep`, `drop`, `generate`, or `replace`.
+- No persistent transformed dataset state.
+- No SQL command, scripting, prompt-toolkit UX, visualization, lazy execution optimization, remote
+  paths, or non-Parquet loaders.
+- No full Stata compatibility.
 
 ## Acceptance Criteria
 
-- `tabdat` is installed as a console script by the package.
-- Parser tests cover valid and invalid Phase 1 command strings.
-- Backend/executor tests cover loading, description, summaries, missing active dataset, missing
-  columns, and non-numeric column errors.
-- CLI smoke tests exercise user-visible command execution.
+- Existing Phase 1 CLI behavior and tests continue to pass.
+- Parser tests cover valid Phase 2 command, option, condition, and expression forms.
+- Parser tests cover invalid Phase 2 syntax and stable user-facing error categories.
+- CLI smoke tests verify malformed commands print `Error: ...`.
 - Validation passes:
   - `uv run pytest`
   - `uv run ruff check .`

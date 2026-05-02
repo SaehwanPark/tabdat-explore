@@ -1,41 +1,41 @@
-# Phase 1 Request Summary
+# Phase 2 Request Summary
 
 ## Goal
 
-Begin roadmap Phase 1 by implementing the smallest end-to-end TabDat-Explore runtime slice:
-a `tabdat` CLI that can load a local Parquet file and run `describe` and `summarize`
-against a single active dataset.
+Begin roadmap Phase 2 by implementing a command-language parser foundation for TabDat-Explore.
+The parser should understand richer command shapes while preserving the Phase 1 executable
+pipeline for `use`, `describe`, and `summarize`.
 
 ## User Requests
 
 - Start from a temporary branch.
-- Commit meaningful Phase 1 checkpoints.
+- Commit meaningful Phase 2 checkpoints.
 - Open a GitHub PR with `gh` when complete.
 - Include `@codex review` in the PR body because this phase adds code.
 
 ## Phase Fit
 
-This is roadmap Phase 1: Core Skeleton (Vertical Slice).
+This is roadmap Phase 2: Command Language & Parser.
 
 The work should add:
 
-- CLI entry point and basic interactive shell.
-- Minimal parser for Phase 1 commands.
-- Executor with one active dataset.
-- DuckDB-backed local Parquet loading and summary operations.
-- Focused tests and validation commands.
+- Structured parsing for `command varlist, options`.
+- Optional `if` clauses.
+- Expression parsing for conditions and future generated expressions.
+- Useful user-facing parse errors.
+- Focused parser and CLI smoke tests.
 
 ## Non-Goals
 
-- No autocomplete, syntax highlighting, history, or prompt-toolkit UX.
-- No scripts, `if` conditions, options, SQL, transformations, visualization, or lazy-mode toggle.
-- No broad Stata compatibility.
-- No support for non-Parquet loading in Phase 1.
+- Do not execute dataset mutations for `keep`, `drop`, `generate`, or `replace` in Phase 2.
+- Do not add Phase 3 EDA commands, SQL, visualization, prompt-toolkit UX, scripts, or lazy-mode
+  optimization.
+- Do not broaden the loader beyond local `.parquet` files.
 
 ## Expected Outputs
 
-- `_workspace/01_product_command-contract.md` for `use`, `describe`, and `summarize`.
-- Runtime package modules under `src/`.
-- Focused tests for parser, executor/backend, and CLI-visible behavior.
+- Updated `_workspace/01_product_command-contract.md` for Phase 2 parser behavior.
+- Parser/model changes under `src/tabdat/`.
+- Focused tests for grammar, expressions, diagnostics, and existing command compatibility.
 - Updated SDD state files and final handoff artifacts.
-- PR opened from `temp/phase1-core-skeleton`.
+- PR opened from `temp/phase2-parser-foundation`.
