@@ -113,20 +113,22 @@ wheels = [
 [[package]]
 name = "tabdat-eda-dev"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
+dependencies = [
+    { name = "duckdb" },
+]
 
 [package.dev-dependencies]
 dev = [
-    { name = "duckdb" },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
+requires-dist = [{ name = "duckdb", specifier = ">=1.4.3" }]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "duckdb", specifier = ">=1.4.3" },
     { name = "pytest", specifier = ">=9.0.1" },
     { name = "ruff", specifier = ">=0.15.12" },
 ]
