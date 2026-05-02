@@ -331,6 +331,22 @@ def test_by_summarize_and_count_do_not_change_active_dataset(sample_parquet: Pat
   assert preview.columns == ("age", "bmi", "sex", "cost")
 
 
+def test_by_summarize_without_varlist_uses_numeric_non_group_columns(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    summarized = executor.execute(ByCommand(("sex",), SummarizeCommand(())))
+  finally:
+    executor.close()
+
+  assert isinstance(summarized, TableResult)
+  assert summarized.headers == ("sex", "mean_age", "mean_bmi", "mean_cost")
+  assert summarized.rows == (
+    ("F", 42.0, 25.0, 100.0),
+    ("M", 42.0, 25.0, 150.0),
+  )
+
+
 def test_collapse_replaces_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:

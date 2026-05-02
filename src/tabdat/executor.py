@@ -172,8 +172,9 @@ class Executor:
     dataset = self._require_active_dataset("by")
     if isinstance(command.command, SummarizeCommand):
       rows = self.backend.grouped_summarize(dataset, command.groups, command.command.variables)
-      variables = command.command.variables or tuple(
-        column.name for column in dataset.columns if column.name not in command.groups
+      variables = command.command.variables or _default_grouped_summary_variables(
+        dataset,
+        command.groups,
       )
       headers = command.groups + tuple(f"mean_{variable}" for variable in variables)
       return TableResult(headers=headers, rows=rows)
@@ -192,3 +193,33 @@ def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:
   if command.column_percent:
     headers += ("Col %",)
   return headers
+
+
+def _default_grouped_summary_variables(
+  dataset: DatasetInfo,
+  groups: tuple[str, ...],
+) -> tuple[str, ...]:
+  return tuple(
+    column.name
+    for column in dataset.columns
+    if column.name not in groups and _is_numeric_type(column.data_type)
+  )
+
+
+def _is_numeric_type(data_type: str) -> bool:
+  normalized = data_type.upper()
+  numeric_prefixes = (
+    "TINYINT",
+    "SMALLINT",
+    "INTEGER",
+    "BIGINT",
+    "HUGEINT",
+    "UTINYINT",
+    "USMALLINT",
+    "UINTEGER",
+    "UBIGINT",
+    "FLOAT",
+    "DOUBLE",
+    "DECIMAL",
+  )
+  return normalized.startswith(numeric_prefixes)
