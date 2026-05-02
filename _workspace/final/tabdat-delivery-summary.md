@@ -1,19 +1,16 @@
-# Phase 1 Delivery Summary
+# Phase 2 Delivery Summary
 
 ## Completed
 
-- Created branch `temp/phase1-core-skeleton`.
-- Wrote the Phase 1 request summary and command contract.
-- Added the first `tabdat` runtime package under `src/tabdat/`.
-- Implemented:
-  - `tabdat` console script
-  - basic interactive shell
-  - repeated `-c/--command` execution for smoke tests
-  - parser for `use`, `describe`, `summarize`, `exit`, and `quit`
-  - executor with one active dataset
-  - DuckDB-backed local Parquet loading and numeric summaries
-  - deterministic terminal formatting
-- Added parser, executor/backend, and CLI smoke tests.
+- Created branch `temp/phase2-parser-foundation`.
+- Wrote the Phase 2 request summary and command contract.
+- Added parser models for command options, parsed-only commands, and expression ASTs.
+- Implemented command grammar support for varlists, comma options, `if` clauses, assignments, and
+  future command forms.
+- Implemented expression parsing for identifiers, numbers, strings, unary minus, arithmetic,
+  comparisons, parentheses, and function calls.
+- Preserved existing Phase 1 executable command behavior.
+- Added parser, executor-boundary, and CLI diagnostic tests.
 - Updated SDD and handoff artifacts.
 
 ## Validation
@@ -24,14 +21,11 @@
 
 ## Known Limits
 
-- Only local `.parquet` loading is supported.
-- Paths with spaces are not supported yet.
-- `summarize` supports numeric columns only.
-- No Phase 2 grammar, options, `if`, scripts, SQL, transformations, visualization, autocomplete,
-  history, or syntax highlighting.
+- Phase 2 command forms parse but do not execute dataset transformations.
+- `use` still supports only one whitespace-free local `.parquet` path.
+- No prompt-toolkit UX, scripts, SQL, visualization, lazy optimization, or non-Parquet loading.
 
 ## Next Useful Work
 
-Begin Phase 2 by expanding the command grammar around `command varlist, options`, `if`
-conditions, and clearer user-facing parse diagnostics while preserving the Phase 1 vertical
-boundaries.
+Begin Phase 3 by defining execution contracts for the first core EDA or transformation commands
+that consume the new parser structures, such as `count`, `keep`, or `generate`.

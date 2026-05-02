@@ -20,16 +20,23 @@ This file tracks feature state for spec-driven development. Product intent lives
   - executor with one active dataset
   - DuckDB-backed local Parquet loading and summaries
   - focused parser, executor/backend, and CLI smoke tests
+- Implemented the Phase 2 parser foundation:
+  - structured parser models for future command forms
+  - command varlists, comma options, `if` clauses, and expression ASTs
+  - expression parsing for identifiers, literals, arithmetic, comparisons, grouping, unary minus,
+    and function calls
+  - user-facing parse diagnostics for malformed Phase 2 syntax
+  - focused parser coverage while preserving Phase 1 executable behavior
 
 ## Present
 
-- Phase 1 is implemented for local Parquet files and the initial inspection commands.
-- The current runtime is intentionally minimal and does not yet include Phase 2 grammar features,
-  prompt-toolkit UX, scripts, transformations, SQL, or visualization.
+- Phase 2 grammar is implemented as a parser foundation. Parsed-only forms such as `keep if ...`
+  and `generate ... = ...` are represented but intentionally not executed yet.
+- The current runtime remains intentionally minimal and does not yet include prompt-toolkit UX,
+  scripts, transformations, SQL, or visualization.
 
 ## Future
 
-- Phase 2: command grammar, `if` conditions, expression parsing, and user-facing error handling.
 - Phase 3: core EDA and transformation commands from the v0 glossary.
 - Phase 4: SQL escape hatch over the active dataset.
 - Phase 5: prompt-toolkit UX with highlighting, history, and autocomplete.
