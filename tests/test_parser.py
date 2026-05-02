@@ -51,9 +51,11 @@ def test_parse_phase_3_inspection_commands() -> None:
   assert parse_command("count") == CountCommand()
   assert parse_command("head") == HeadCommand(5)
   assert parse_command("head 10") == HeadCommand(10)
+  assert parse_command("head 01") == HeadCommand(1)
   assert parse_command("head 0") == HeadCommand(0)
   assert parse_command("tail") == TailCommand(5)
   assert parse_command("tail 2") == TailCommand(2)
+  assert parse_command("tail 000") == TailCommand(0)
 
 
 def test_parse_summarize_with_if_as_structured_phase_2_command() -> None:

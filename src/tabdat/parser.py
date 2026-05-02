@@ -171,7 +171,7 @@ def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
     limit = int(limit_text)
   except ValueError as exc:
     raise ParseError(f"{command_name} row limit must be a non-negative integer") from exc
-  if str(limit) != limit_text or limit < 0:
+  if not limit_text.isascii() or not limit_text.isdigit():
     raise ParseError(f"{command_name} row limit must be a non-negative integer")
   return limit
 
