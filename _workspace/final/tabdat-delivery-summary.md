@@ -1,28 +1,37 @@
-# Phase 0 Delivery Summary
+# Phase 1 Delivery Summary
 
 ## Completed
 
-- Captured the Phase 0 request and constraints in `_workspace/00_input/request-summary.md`.
-- Added durable product guardrails in `docs/phase0_product_guardrails.md`.
-- Added the initial 12-command glossary in `docs/command_glossary_v0.md`.
-- Added root SDD files: `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md`.
-- Updated contributor-facing entry points in `README.md` and `AGENTS.md`.
-- Configured Ruff through `uv` with 2-space indentation settings.
+- Created branch `temp/phase1-core-skeleton`.
+- Wrote the Phase 1 request summary and command contract.
+- Added the first `tabdat` runtime package under `src/tabdat/`.
+- Implemented:
+  - `tabdat` console script
+  - basic interactive shell
+  - repeated `-c/--command` execution for smoke tests
+  - parser for `use`, `describe`, `summarize`, `exit`, and `quit`
+  - executor with one active dataset
+  - DuckDB-backed local Parquet loading and numeric summaries
+  - deterministic terminal formatting
+- Added parser, executor/backend, and CLI smoke tests.
+- Updated SDD and handoff artifacts.
 
 ## Validation
 
+- `uv run pytest`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
-- `uv run python -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('pyproject ok')"`
-- `find docs -maxdepth 2 -type f | sort`
-- `git status --short --branch`
 
 ## Known Limits
 
-- No runtime implementation was added in Phase 0.
-- Markdown-specific linting is not configured.
-- Detailed command contracts still need to be written before Phase 1 implementation.
+- Only local `.parquet` loading is supported.
+- Paths with spaces are not supported yet.
+- `summarize` supports numeric columns only.
+- No Phase 2 grammar, options, `if`, scripts, SQL, transformations, visualization, autocomplete,
+  history, or syntax highlighting.
 
 ## Next Useful Work
 
-Begin Phase 1 by writing command contracts for `use`, `describe`, and `summarize`, then implement the smallest CLI -> parser -> executor -> DuckDB vertical slice.
+Begin Phase 2 by expanding the command grammar around `command varlist, options`, `if`
+conditions, and clearer user-facing parse diagnostics while preserving the Phase 1 vertical
+boundaries.

@@ -4,10 +4,16 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "duckdb>=1.4.3",
+]
+
+[project.scripts]
+tabdat = "tabdat.cli:main"
 
 [dependency-groups]
 dev = [
+    "pytest>=9.0.1",
     "ruff>=0.15.12",
 ]
 
@@ -21,3 +27,10 @@ select = ["E", "F", "I", "UP"]
 [tool.ruff.format]
 indent-style = "space"
 line-ending = "lf"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tabdat"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
