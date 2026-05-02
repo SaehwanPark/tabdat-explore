@@ -17,6 +17,7 @@ Keep this file short and repo-wide. Detailed reusable workflows live under `.age
 - Run project commands through `uv run ...`.
 - Until a test suite exists, every implementation task should add or update focused tests and record the exact validation command in the final response.
 - For reusable agent workflows, use `.agents/skills/tabdat-orchestrator/SKILL.md` and `docs/harness/tabdat/team-spec.md`.
+- Note this project should follow: FP-style, SDD (spec-driven), TDD (test-driven)
 
 ## Tooling Troubleshoot
 - When essential tools like `uv`, `gh`, `hf` are not found, check paths: `which uv`, `which gh`, `which hf`
