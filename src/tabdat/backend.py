@@ -5,7 +5,19 @@ from pathlib import Path
 import duckdb
 
 from tabdat.errors import ExecutionError
-from tabdat.models import CodebookRow, ColumnInfo, DatasetInfo, SummaryRow
+from tabdat.models import (
+  BinaryExpression,
+  CodebookRow,
+  ColumnInfo,
+  DatasetInfo,
+  Expression,
+  FunctionCallExpression,
+  IdentifierExpression,
+  NumberExpression,
+  StringExpression,
+  SummaryRow,
+  UnaryExpression,
+)
 
 NUMERIC_TYPES = (
   "TINYINT",
@@ -21,10 +33,12 @@ NUMERIC_TYPES = (
   "DOUBLE",
   "DECIMAL",
 )
+SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
+ACTIVE_TABLE = "__tabdat_active"
 
 
 class DuckDBBackend:
-  """Small DuckDB adapter for the Phase 1 active Parquet dataset."""
+  """Small DuckDB adapter for the active Phase 3 dataset."""
 
   def __init__(self) -> None:
     self._connection = duckdb.connect(database=":memory:")
@@ -41,21 +55,24 @@ class DuckDBBackend:
     if not normalized.is_file():
       raise ExecutionError(f"use expected a file path: {path}")
 
-    path_arg = str(normalized)
     try:
-      description = self._connection.execute(
-        "describe select * from read_parquet(?)",
-        [path_arg],
-      ).fetchall()
-      row_count = self._connection.execute(
-        "select count(*) from read_parquet(?)",
-        [path_arg],
-      ).fetchone()[0]
+      self._connection.execute(
+        f"create or replace temp table {ACTIVE_TABLE} as select * from read_parquet(?)",
+        [str(normalized)],
+      )
     except duckdb.Error as exc:
       raise ExecutionError(f"use could not read Parquet file: {path}") from exc
 
+    return self.active_dataset_info(normalized)
+
+  def active_dataset_info(self, path: Path) -> DatasetInfo:
+    try:
+      description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
+      row_count = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()[0]
+    except duckdb.Error as exc:
+      raise ExecutionError("active dataset is not available") from exc
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
-    return DatasetInfo(path=normalized, row_count=row_count, columns=columns)
+    return DatasetInfo(path=path, row_count=row_count, columns=columns)
 
   def summarize(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[SummaryRow, ...]:
     column_types = {column.name: column.data_type.upper() for column in dataset.columns}
@@ -66,9 +83,31 @@ class DuckDBBackend:
     if not requested:
       raise ExecutionError("summarize found no numeric columns")
 
-    missing = tuple(variable for variable in requested if variable not in column_types)
-    if missing:
-      raise ExecutionError(f"summarize unknown variable: {', '.join(missing)}")
+    _require_columns("summarize", column_types, requested)
+    non_numeric = tuple(
+      variable for variable in requested if not _is_numeric_type(column_types[variable])
+    )
+    if non_numeric:
+      raise ExecutionError(f"summarize requires numeric variables: {', '.join(non_numeric)}")
+
+    return tuple(self._summarize_variable(variable) for variable in requested)
+
+  def grouped_summarize(
+    self,
+    dataset: DatasetInfo,
+    groups: tuple[str, ...],
+    variables: tuple[str, ...],
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type.upper() for column in dataset.columns}
+    _require_columns("by", column_types, groups)
+    requested = variables or tuple(
+      column.name
+      for column in dataset.columns
+      if column.name not in groups and _is_numeric_type(column.data_type)
+    )
+    if not requested:
+      raise ExecutionError("by summarize found no numeric columns")
+    _require_columns("summarize", column_types, requested)
 
     non_numeric = tuple(
       variable for variable in requested if not _is_numeric_type(column_types[variable])
@@ -76,8 +115,34 @@ class DuckDBBackend:
     if non_numeric:
       raise ExecutionError(f"summarize requires numeric variables: {', '.join(non_numeric)}")
 
-    rows = tuple(self._summarize_variable(dataset.path, variable) for variable in requested)
-    return rows
+    group_sql = ", ".join(_quote_identifier(group) for group in groups)
+    aggregate_sql = ", ".join(
+      f"avg({_quote_identifier(variable)}) as {_quote_identifier('mean_' + variable)}"
+      for variable in requested
+    )
+    sql = f"""
+      select {group_sql}, {aggregate_sql}
+      from {ACTIVE_TABLE}
+      group by {group_sql}
+      order by {group_sql}
+    """
+    return self._fetch_table(sql, "by summarize")
+
+  def grouped_count(
+    self,
+    dataset: DatasetInfo,
+    groups: tuple[str, ...],
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("by", column_types, groups)
+    group_sql = ", ".join(_quote_identifier(group) for group in groups)
+    sql = f"""
+      select {group_sql}, count(*) as count
+      from {ACTIVE_TABLE}
+      group by {group_sql}
+      order by {group_sql}
+    """
+    return self._fetch_table(sql, "by count")
 
   def codebook(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[CodebookRow, ...]:
     column_types = {column.name: column.data_type for column in dataset.columns}
@@ -85,13 +150,11 @@ class DuckDBBackend:
     _require_columns("codebook", column_types, requested)
 
     return tuple(
-      self._codebook_variable(dataset.path, variable, column_types[variable])
-      for variable in requested
+      self._codebook_variable(variable, column_types[variable]) for variable in requested
     )
 
   def preview_rows(
     self,
-    dataset: DatasetInfo,
     limit: int,
     *,
     tail: bool = False,
@@ -100,22 +163,22 @@ class DuckDBBackend:
       return ()
 
     query = (
-      """
+      f"""
         select * exclude (__tabdat_row_number)
         from (
           select
             row_number() over () as __tabdat_row_number,
             *
-          from read_parquet(?)
+          from {ACTIVE_TABLE}
         )
         order by __tabdat_row_number desc
         limit ?
       """
       if tail
-      else "select * from read_parquet(?) limit ?"
+      else f"select * from {ACTIVE_TABLE} limit ?"
     )
     try:
-      rows = tuple(self._connection.execute(query, [str(dataset.path), limit]).fetchall())
+      rows = tuple(self._connection.execute(query, [limit]).fetchall())
     except duckdb.Error as exc:
       command_name = "tail" if tail else "head"
       raise ExecutionError(f"{command_name} failed") from exc
@@ -124,7 +187,163 @@ class DuckDBBackend:
       return tuple(reversed(rows))
     return rows
 
-  def _summarize_variable(self, path: Path, variable: str) -> SummaryRow:
+  def keep_columns(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("keep", column_types, variables)
+    self._replace_active(
+      f"select {_select_list(variables)} from {ACTIVE_TABLE}",
+      "keep",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def drop_columns(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("drop", column_types, variables)
+    remaining = tuple(column.name for column in dataset.columns if column.name not in variables)
+    if not remaining:
+      raise ExecutionError("drop would remove every column")
+    self._replace_active(
+      f"select {_select_list(remaining)} from {ACTIVE_TABLE}",
+      "drop",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def filter_rows(
+    self,
+    dataset: DatasetInfo,
+    condition: Expression,
+    *,
+    keep: bool,
+  ) -> DatasetInfo:
+    condition_sql = self._compile_expression(dataset, condition)
+    predicate = condition_sql if keep else f"not ({condition_sql})"
+    command_name = "keep" if keep else "drop"
+    self._replace_active(
+      f"select * from {ACTIVE_TABLE} where {predicate}",
+      command_name,
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def rename_column(self, dataset: DatasetInfo, old_name: str, new_name: str) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("rename", column_types, (old_name,))
+    if new_name in column_types:
+      raise ExecutionError(f"rename target already exists: {new_name}")
+    renamed = tuple(
+      new_name if column.name == old_name else column.name for column in dataset.columns
+    )
+    select_sql = ", ".join(
+      f"{_quote_identifier(column.name)} as {_quote_identifier(new_name)}"
+      if column.name == old_name
+      else _quote_identifier(column.name)
+      for column in dataset.columns
+    )
+    self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "rename")
+    next_dataset = self.active_dataset_info(dataset.path)
+    if tuple(column.name for column in next_dataset.columns) != renamed:
+      raise ExecutionError("rename failed")
+    return next_dataset
+
+  def generate_column(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if variable in column_types:
+      raise ExecutionError(f"generate target already exists: {variable}")
+    expression_sql = self._compile_expression(dataset, expression)
+    self._replace_active(
+      f"select *, {expression_sql} as {_quote_identifier(variable)} from {ACTIVE_TABLE}",
+      "generate",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def replace_column(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+    condition: Expression | None,
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("replace", column_types, (variable,))
+    expression_sql = self._compile_expression(dataset, expression)
+    replacement_sql = expression_sql
+    if condition is not None:
+      condition_sql = self._compile_expression(dataset, condition)
+      quoted_variable = _quote_identifier(variable)
+      replacement_sql = (
+        f"case when {condition_sql} then {expression_sql} else {quoted_variable} end"
+      )
+    select_sql = ", ".join(
+      f"{replacement_sql} as {_quote_identifier(column.name)}"
+      if column.name == variable
+      else _quote_identifier(column.name)
+      for column in dataset.columns
+    )
+    self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "replace")
+    return self.active_dataset_info(dataset.path)
+
+  def tabulate(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    *,
+    row_percent: bool,
+    column_percent: bool,
+    include_missing: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("tabulate", column_types, variables)
+    if len(variables) == 1:
+      return self._tabulate_one_way(variables[0], include_missing=include_missing)
+    return self._tabulate_two_way(
+      variables[0],
+      variables[1],
+      row_percent=row_percent,
+      column_percent=column_percent,
+      include_missing=include_missing,
+    )
+
+  def collapse(
+    self,
+    dataset: DatasetInfo,
+    statistic: str,
+    variables: tuple[str, ...],
+    groups: tuple[str, ...],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type.upper() for column in dataset.columns}
+    _require_columns("collapse", column_types, groups)
+    _require_columns("collapse", column_types, variables)
+    if statistic != "count":
+      non_numeric = tuple(
+        variable for variable in variables if not _is_numeric_type(column_types[variable])
+      )
+      if non_numeric:
+        raise ExecutionError(
+          f"collapse {statistic} requires numeric variables: {', '.join(non_numeric)}"
+        )
+
+    group_sql = ", ".join(_quote_identifier(group) for group in groups)
+    aggregate_sql = ", ".join(
+      f"{statistic}({_quote_identifier(variable)}) "
+      f"as {_quote_identifier(statistic + '_' + variable)}"
+      for variable in variables
+    )
+    self._replace_active(
+      f"""
+      select {group_sql}, {aggregate_sql}
+      from {ACTIVE_TABLE}
+      group by {group_sql}
+      order by {group_sql}
+      """,
+      "collapse",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def _summarize_variable(self, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""
       select
@@ -133,13 +352,10 @@ class DuckDBBackend:
         stddev_samp({quoted_variable}) as std_dev,
         min({quoted_variable}) as minimum,
         max({quoted_variable}) as maximum
-      from read_parquet(?)
+      from {ACTIVE_TABLE}
     """
     try:
-      count, mean, std_dev, minimum, maximum = self._connection.execute(
-        sql,
-        [str(path)],
-      ).fetchone()
+      count, mean, std_dev, minimum, maximum = self._connection.execute(sql).fetchone()
     except duckdb.Error as exc:
       raise ExecutionError(f"summarize failed for variable: {variable}") from exc
 
@@ -152,33 +368,24 @@ class DuckDBBackend:
       maximum=maximum,
     )
 
-  def _codebook_variable(self, path: Path, variable: str, data_type: str) -> CodebookRow:
+  def _codebook_variable(self, variable: str, data_type: str) -> CodebookRow:
     quoted_variable = _quote_identifier(variable)
     profile_sql = f"""
       select
         count({quoted_variable}) as nonmissing,
         count(*) - count({quoted_variable}) as missing,
         count(distinct {quoted_variable}) as distinct_count
-      from read_parquet(?)
+      from {ACTIVE_TABLE}
     """
     examples_sql = f"""
       select {quoted_variable}
-      from read_parquet(?)
+      from {ACTIVE_TABLE}
       where {quoted_variable} is not null
       limit 3
     """
     try:
-      nonmissing, missing, distinct = self._connection.execute(
-        profile_sql,
-        [str(path)],
-      ).fetchone()
-      examples = tuple(
-        row[0]
-        for row in self._connection.execute(
-          examples_sql,
-          [str(path)],
-        ).fetchall()
-      )
+      nonmissing, missing, distinct = self._connection.execute(profile_sql).fetchone()
+      examples = tuple(row[0] for row in self._connection.execute(examples_sql).fetchall())
     except duckdb.Error as exc:
       raise ExecutionError(f"codebook failed for variable: {variable}") from exc
 
@@ -190,6 +397,110 @@ class DuckDBBackend:
       distinct=distinct,
       examples=examples,
     )
+
+  def _tabulate_one_way(
+    self,
+    variable: str,
+    *,
+    include_missing: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    quoted = _quote_identifier(variable)
+    where_sql = "" if include_missing else f"where {quoted} is not null"
+    sql = f"""
+      select
+        {quoted} as value,
+        count(*) as count,
+        100.0 * count(*) / sum(count(*)) over () as percent
+      from {ACTIVE_TABLE}
+      {where_sql}
+      group by {quoted}
+      order by {quoted}
+    """
+    return self._fetch_table(sql, "tabulate")
+
+  def _tabulate_two_way(
+    self,
+    first: str,
+    second: str,
+    *,
+    row_percent: bool,
+    column_percent: bool,
+    include_missing: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    first_sql = _quote_identifier(first)
+    second_sql = _quote_identifier(second)
+    predicates = (
+      () if include_missing else (f"{first_sql} is not null", f"{second_sql} is not null")
+    )
+    where_sql = "" if not predicates else f"where {' and '.join(predicates)}"
+    extra_columns: list[str] = []
+    if row_percent:
+      extra_columns.append(
+        "100.0 * count / sum(count) over (partition by first_value) as row_percent"
+      )
+    if column_percent:
+      extra_columns.append(
+        "100.0 * count / sum(count) over (partition by second_value) as column_percent"
+      )
+    extra_sql = "" if not extra_columns else ", " + ", ".join(extra_columns)
+    sql = f"""
+      with counts as (
+        select
+          {first_sql} as first_value,
+          {second_sql} as second_value,
+          count(*) as count
+        from {ACTIVE_TABLE}
+        {where_sql}
+        group by {first_sql}, {second_sql}
+      )
+      select first_value, second_value, count{extra_sql}
+      from counts
+      order by first_value, second_value
+    """
+    return self._fetch_table(sql, "tabulate")
+
+  def _compile_expression(self, dataset: DatasetInfo, expression: Expression) -> str:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if isinstance(expression, IdentifierExpression):
+      _require_columns("expression", column_types, (expression.name,))
+      return _quote_identifier(expression.name)
+    if isinstance(expression, NumberExpression):
+      return str(expression.value)
+    if isinstance(expression, StringExpression):
+      return _quote_literal(expression.value)
+    if isinstance(expression, UnaryExpression):
+      return f"-({self._compile_expression(dataset, expression.operand)})"
+    if isinstance(expression, BinaryExpression):
+      left = self._compile_expression(dataset, expression.left)
+      right = self._compile_expression(dataset, expression.right)
+      return f"({left} {expression.operator} {right})"
+    if isinstance(expression, FunctionCallExpression):
+      function_name = expression.name.lower()
+      if function_name not in SUPPORTED_FUNCTIONS:
+        raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      arguments = ", ".join(
+        self._compile_expression(dataset, argument) for argument in expression.arguments
+      )
+      return f"{function_name}({arguments})"
+    raise ExecutionError("unsupported expression")
+
+  def _replace_active(self, select_sql: str, command_name: str) -> None:
+    try:
+      self._connection.execute(
+        f"create or replace temp table __tabdat_next as {select_sql}",
+      )
+      self._connection.execute(
+        f"create or replace temp table {ACTIVE_TABLE} as select * from __tabdat_next"
+      )
+      self._connection.execute("drop table __tabdat_next")
+    except duckdb.Error as exc:
+      raise ExecutionError(f"{command_name} failed") from exc
+
+  def _fetch_table(self, sql: str, command_name: str) -> tuple[tuple[object, ...], ...]:
+    try:
+      return tuple(self._connection.execute(sql).fetchall())
+    except duckdb.Error as exc:
+      raise ExecutionError(f"{command_name} failed") from exc
 
 
 def _is_numeric_type(data_type: str) -> bool:
@@ -207,6 +518,15 @@ def _require_columns(
     raise ExecutionError(f"{command_name} unknown variable: {', '.join(missing)}")
 
 
+def _select_list(variables: tuple[str, ...]) -> str:
+  return ", ".join(_quote_identifier(variable) for variable in variables)
+
+
 def _quote_identifier(identifier: str) -> str:
   escaped = identifier.replace('"', '""')
   return f'"{escaped}"'
+
+
+def _quote_literal(value: str) -> str:
+  escaped = value.replace("'", "''")
+  return f"'{escaped}'"
