@@ -34,3 +34,13 @@ def test_cli_prints_command_errors(capsys) -> None:
   assert exit_code == 1
   assert captured.out == ""
   assert "Error: describe requires an active dataset" in captured.err
+
+
+def test_cli_prints_phase_2_parse_errors(capsys) -> None:
+  exit_code = main(["-c", "summarize age if"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert captured.out == ""
+  assert "Error: missing expression after if" in captured.err

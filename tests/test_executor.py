@@ -7,6 +7,7 @@ from tabdat.executor import Executor
 from tabdat.models import (
   DescribeCommand,
   DescribeResult,
+  ParsedCommand,
   SummarizeCommand,
   SummarizeResult,
   UseCommand,
@@ -95,6 +96,15 @@ def test_summarize_rejects_non_numeric_column(sample_parquet: Path) -> None:
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="summarize requires numeric variables: sex"):
       executor.execute(SummarizeCommand(("sex",)))
+  finally:
+    executor.close()
+
+
+def test_executor_rejects_parsed_only_phase_2_command() -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(ExecutionError, match="unsupported command"):
+      executor.execute(ParsedCommand(name="keep"))
   finally:
     executor.close()
 

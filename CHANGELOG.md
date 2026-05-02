@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the Phase 2 parser foundation with structured command options, `if` clauses, expression
+  ASTs, parsed-only future command forms, and focused diagnostics tests.
+- Fixed Phase 2 parser regressions so `summarize` rejects assignment syntax and punctuated varlist
+  names remain supported.
 - Added Phase 1 `tabdat` CLI skeleton with `use`, `describe`, and `summarize`.
 - Added DuckDB-backed local Parquet loading and numeric summary execution.
 - Added focused parser, executor/backend, and CLI smoke tests.

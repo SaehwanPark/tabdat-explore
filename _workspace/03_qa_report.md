@@ -1,41 +1,33 @@
-# Phase 1 QA Report
+# Phase 2 QA Report
 
-Status: pass
+## Status
+
+pass
 
 ## Boundaries Checked
 
-- Roadmap to command contract: Phase 1 scope stays limited to `use`, `describe`, `summarize`,
-  a minimal parser, executor state, and DuckDB-backed Parquet loading.
-- Contract to parser: supported forms parse to explicit command models; unsupported forms raise
-  command-level parse errors.
-- Parser to executor: executor consumes structured command models and owns active-dataset
-  validation.
-- Executor to backend: backend receives explicit Parquet paths and variable names, then returns
-  structured dataset and summary results.
-- Backend to formatter/CLI: CLI prints deterministic formatted output and command-level errors.
-- Tests to claimed behavior: parser, executor/backend, and CLI smoke tests cover success and
-  error paths.
+- Product contract to parser behavior: Phase 2 grammar forms are represented in parser/model tests.
+- Review feedback regressions: `summarize age = 5` is rejected and punctuated varlist names such as
+  `bmi-zscore` are preserved.
+- Parser representation to executor: parsed-only commands are accepted by the parser and rejected by
+  the executor as unsupported until later phases define execution.
+- Phase 1 compatibility: existing `use`, `describe`, `summarize`, `exit`, and `quit` tests still
+  pass.
+- CLI diagnostics: malformed Phase 2 syntax prints a user-facing `Error:` message.
+- SDD docs: `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` reflect the parser foundation.
 
 ## Blocking Issues
 
-- None.
+- None found.
 
 ## Non-Blocking Follow-Ups
 
-- Add quoted path support when the command grammar grows in Phase 2.
-- Add richer terminal UX in Phase 5 rather than widening Phase 1.
-- Consider dedicated formatter snapshot tests once output stabilizes further.
+- Define Phase 3 execution contracts before making `keep`, `generate`, filtered summaries, or
+  option-bearing summaries mutate or query data.
+- Decide whether later path parsing should support quoted paths with spaces.
 
 ## Validation Evidence
 
-- command: `uv run pytest`
-- outcome: 21 passed
-- command: `uv run ruff check .`
-- outcome: all checks passed
-- command: `uv run ruff format --check .`
-- outcome: all files formatted
-
-## Recommended Next Action
-
-Open the Phase 1 PR with `@codex review`, then use Phase 2 to expand command grammar and
-user-facing errors without changing the Phase 1 backend contract unnecessarily.
+- `uv run pytest` - passed.
+- `uv run ruff check .` - passed.
+- `uv run ruff format --check .` - passed.

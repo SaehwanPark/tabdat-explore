@@ -1,35 +1,402 @@
-"""Minimal Phase 1 command parser."""
+"""Command parser for the early TabDat command language."""
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from tabdat.errors import ParseError
-from tabdat.models import Command, DescribeCommand, ExitCommand, SummarizeCommand, UseCommand
+from tabdat.models import (
+  BinaryExpression,
+  Command,
+  CommandOption,
+  DescribeCommand,
+  ExitCommand,
+  Expression,
+  FunctionCallExpression,
+  IdentifierExpression,
+  NumberExpression,
+  ParsedCommand,
+  StringExpression,
+  SummarizeCommand,
+  UnaryExpression,
+  UseCommand,
+)
+
+_EXECUTABLE_COMMANDS = {"use", "describe", "summarize", "exit", "quit"}
+_PARSED_ONLY_COMMANDS = {"keep", "drop", "generate", "replace"}
+_BINARY_PRECEDENCE = {
+  "==": 1,
+  "!=": 1,
+  "<": 1,
+  "<=": 1,
+  ">": 1,
+  ">=": 1,
+  "+": 2,
+  "-": 2,
+  "*": 3,
+  "/": 3,
+}
+
+
+@dataclass(frozen=True)
+class _Token:
+  kind: Literal["identifier", "number", "string", "symbol"]
+  text: str
+  start: int
+  end: int
+
+
+@dataclass(frozen=True)
+class _CommandParts:
+  name: str
+  arguments: tuple[str, ...]
+  condition: Expression | None
+  options: tuple[CommandOption, ...]
+  expression: Expression | None = None
 
 
 def parse_command(text: str) -> Command:
-  parts = text.strip().split()
-  if not parts:
+  stripped = text.strip()
+  if not stripped:
     raise ParseError("empty command")
 
-  command, *args = parts
-  command = command.lower()
+  command_name = stripped.split(maxsplit=1)[0].lower()
 
-  if command == "use":
-    if len(args) != 1:
-      raise ParseError("use expects exactly one path: use <path>")
-    return UseCommand(path=Path(args[0]))
+  if command_name == "use":
+    return _parse_use(stripped)
 
-  if command == "describe":
-    if args:
-      raise ParseError("describe does not accept arguments in Phase 1")
+  tokens = _tokenize(stripped)
+  parts = _parse_command_parts(tokens)
+
+  if parts.name == "describe":
+    if parts.arguments or parts.condition is not None or parts.options:
+      raise ParseError("describe does not accept arguments, if clauses, or options")
     return DescribeCommand()
 
-  if command == "summarize":
-    return SummarizeCommand(variables=tuple(args))
+  if parts.name == "summarize":
+    if parts.expression is not None:
+      raise ParseError("summarize does not accept assignment syntax")
+    if parts.condition is None and not parts.options:
+      return SummarizeCommand(variables=parts.arguments)
+    return ParsedCommand(
+      name=parts.name,
+      arguments=parts.arguments,
+      condition=parts.condition,
+      options=parts.options,
+    )
 
-  if command in {"exit", "quit"}:
-    if args:
-      raise ParseError(f"{command} does not accept arguments")
+  if parts.name in {"exit", "quit"}:
+    if parts.arguments or parts.condition is not None or parts.options:
+      raise ParseError(f"{parts.name} does not accept arguments, if clauses, or options")
     return ExitCommand()
 
-  raise ParseError(f"unknown command: {command}")
+  if parts.name in _PARSED_ONLY_COMMANDS:
+    return ParsedCommand(
+      name=parts.name,
+      arguments=parts.arguments,
+      condition=parts.condition,
+      options=parts.options,
+      expression=parts.expression,
+    )
+
+  raise ParseError(f"unknown command: {parts.name}")
+
+
+def parse_expression(text: str) -> Expression:
+  tokens = _tokenize(text)
+  if not tokens:
+    raise ParseError("missing expression")
+  parser = _ExpressionParser(tokens)
+  expression = parser.parse()
+  if not parser.at_end:
+    raise ParseError(f"unsupported token in expression: {parser.peek.text}")
+  return expression
+
+
+def _parse_use(text: str) -> UseCommand:
+  parts = text.split()
+  if len(parts) != 2:
+    raise ParseError("use expects exactly one path: use <path>")
+  return UseCommand(path=Path(parts[1]))
+
+
+def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
+  stream = _TokenStream(tokens)
+  first = stream.consume()
+  if first.kind != "identifier":
+    raise ParseError("command must start with a command name")
+
+  name = first.text.lower()
+  if name not in _EXECUTABLE_COMMANDS and name not in _PARSED_ONLY_COMMANDS:
+    raise ParseError(f"unknown command: {name}")
+
+  arguments: list[str] = []
+  condition: Expression | None = None
+  options: tuple[CommandOption, ...] = ()
+  expression: Expression | None = None
+
+  while not stream.at_end:
+    token = stream.peek
+    if token.text == ",":
+      options = _parse_options(stream.remaining_after_current())
+      stream.advance_to_end()
+      break
+    if token.kind == "identifier" and token.text.lower() == "if":
+      if condition is not None:
+        raise ParseError("duplicate if clause")
+      stream.consume()
+      condition_tokens, option_tokens = _split_expression_and_options(stream.remaining())
+      if not condition_tokens:
+        raise ParseError("missing expression after if")
+      condition = _ExpressionParser(condition_tokens).parse_all()
+      options = _parse_options(option_tokens) if option_tokens else options
+      stream.advance_to_end()
+      break
+    if token.text == "=":
+      if not arguments:
+        raise ParseError(f"{name} assignment requires a target before =")
+      stream.consume()
+      expression_tokens, option_tokens = _split_expression_and_options(stream.remaining())
+      if not expression_tokens:
+        raise ParseError(f"{name} assignment requires an expression after =")
+      expression = _ExpressionParser(expression_tokens).parse_all()
+      options = _parse_options(option_tokens) if option_tokens else options
+      stream.advance_to_end()
+      break
+    arguments.append(_parse_argument(stream))
+
+  return _CommandParts(
+    name=name,
+    arguments=tuple(arguments),
+    condition=condition,
+    options=options,
+    expression=expression,
+  )
+
+
+def _parse_argument(stream: "_TokenStream") -> str:
+  parts: list[str] = []
+  previous: _Token | None = None
+  while not stream.at_end:
+    token = stream.peek
+    if token.text in {",", "="}:
+      break
+    if token.kind == "identifier" and token.text.lower() == "if":
+      break
+    if previous is not None and token.start > previous.end:
+      break
+    previous = stream.consume()
+    parts.append(previous.text)
+  if not parts:
+    raise ParseError(f"unsupported token in command: {stream.peek.text}")
+  return "".join(parts)
+
+
+def _split_expression_and_options(
+  tokens: tuple[_Token, ...],
+) -> tuple[tuple[_Token, ...], tuple[_Token, ...]]:
+  depth = 0
+  for index, token in enumerate(tokens):
+    if token.text == "(":
+      depth += 1
+    elif token.text == ")":
+      depth -= 1
+    elif token.kind == "identifier" and token.text.lower() == "if" and depth == 0:
+      raise ParseError("duplicate if clause")
+    elif token.text == "," and depth == 0:
+      return tokens[:index], tokens[index + 1 :]
+  return tokens, ()
+
+
+def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
+  if not tokens:
+    raise ParseError("comma must be followed by at least one option")
+
+  stream = _TokenStream(tokens)
+  options: list[CommandOption] = []
+  while not stream.at_end:
+    name = stream.consume()
+    if name.kind != "identifier":
+      raise ParseError("option names must be identifiers")
+    value: str | int | float | bool = True
+    if not stream.at_end and stream.peek.text == "=":
+      stream.consume()
+      if stream.at_end:
+        raise ParseError(f"option {name.text} requires a value after =")
+      value_token = stream.consume()
+      if value_token.text in {",", "=", "(", ")"}:
+        raise ParseError(f"option {name.text} has malformed value")
+      value = _option_value(value_token)
+    elif not stream.at_end and stream.peek.kind in {"number", "string"}:
+      raise ParseError(f"option {name.text} value must use option=value syntax")
+    options.append(CommandOption(name=name.text, value=value))
+  return tuple(options)
+
+
+def _option_value(token: _Token) -> str | int | float:
+  if token.kind == "number":
+    return _parse_number(token.text)
+  return token.text
+
+
+def _tokenize(text: str) -> tuple[_Token, ...]:
+  tokens: list[_Token] = []
+  index = 0
+  while index < len(text):
+    char = text[index]
+    if char.isspace():
+      index += 1
+      continue
+    if char.isalpha() or char == "_":
+      start = index
+      index += 1
+      while index < len(text) and (text[index].isalnum() or text[index] == "_"):
+        index += 1
+      tokens.append(_Token("identifier", text[start:index], start, index))
+      continue
+    if char.isdigit() or (char == "." and index + 1 < len(text) and text[index + 1].isdigit()):
+      start = index
+      index += 1
+      while index < len(text) and (text[index].isdigit() or text[index] == "."):
+        index += 1
+      number_text = text[start:index]
+      if number_text.count(".") > 1:
+        raise ParseError(f"malformed number: {number_text}")
+      tokens.append(_Token("number", number_text, start, index))
+      continue
+    if char in {"'", '"'}:
+      quote = char
+      index += 1
+      value: list[str] = []
+      while index < len(text) and text[index] != quote:
+        value.append(text[index])
+        index += 1
+      if index >= len(text):
+        raise ParseError("unterminated quoted string")
+      index += 1
+      tokens.append(_Token("string", "".join(value), index - len(value) - 1, index))
+      continue
+    two_char = text[index : index + 2]
+    if two_char in {"==", "!=", "<=", ">="}:
+      tokens.append(_Token("symbol", two_char, index, index + 2))
+      index += 2
+      continue
+    if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")"}:
+      tokens.append(_Token("symbol", char, index, index + 1))
+      index += 1
+      continue
+    raise ParseError(f"unsupported token in command: {char}")
+  return tuple(tokens)
+
+
+def _parse_number(text: str) -> int | float:
+  if "." in text:
+    return float(text)
+  return int(text)
+
+
+class _ExpressionParser:
+  def __init__(self, tokens: tuple[_Token, ...]) -> None:
+    self._stream = _TokenStream(tokens)
+
+  @property
+  def at_end(self) -> bool:
+    return self._stream.at_end
+
+  @property
+  def peek(self) -> _Token:
+    return self._stream.peek
+
+  def parse(self) -> Expression:
+    return self._parse_binary(min_precedence=1)
+
+  def parse_all(self) -> Expression:
+    expression = self.parse()
+    if not self._stream.at_end:
+      raise ParseError(f"unsupported token in expression: {self._stream.peek.text}")
+    return expression
+
+  def _parse_binary(self, min_precedence: int) -> Expression:
+    left = self._parse_primary()
+    while not self._stream.at_end:
+      operator = self._stream.peek.text
+      precedence = _BINARY_PRECEDENCE.get(operator)
+      if precedence is None or precedence < min_precedence:
+        break
+      self._stream.consume()
+      if self._stream.at_end:
+        raise ParseError(f"incomplete expression after {operator}")
+      right = self._parse_binary(precedence + 1)
+      left = BinaryExpression(left=left, operator=operator, right=right)
+    return left
+
+  def _parse_primary(self) -> Expression:
+    if self._stream.at_end:
+      raise ParseError("missing expression")
+
+    token = self._stream.consume()
+    if token.kind == "identifier":
+      if not self._stream.at_end and self._stream.peek.text == "(":
+        return self._parse_function_call(token.text)
+      return IdentifierExpression(token.text)
+    if token.kind == "number":
+      return NumberExpression(_parse_number(token.text))
+    if token.kind == "string":
+      return StringExpression(token.text)
+    if token.text == "-":
+      operand = self._parse_primary()
+      return UnaryExpression(operator="-", operand=operand)
+    if token.text == "(":
+      expression = self._parse_binary(min_precedence=1)
+      if self._stream.at_end or self._stream.consume().text != ")":
+        raise ParseError("missing closing ) in expression")
+      return expression
+    raise ParseError(f"unsupported token in expression: {token.text}")
+
+  def _parse_function_call(self, name: str) -> FunctionCallExpression:
+    self._stream.consume()
+    arguments: list[Expression] = []
+    if not self._stream.at_end and self._stream.peek.text == ")":
+      self._stream.consume()
+      return FunctionCallExpression(name=name, arguments=())
+
+    while True:
+      arguments.append(self._parse_binary(min_precedence=1))
+      if self._stream.at_end:
+        raise ParseError(f"missing closing ) in function call: {name}")
+      separator = self._stream.consume()
+      if separator.text == ")":
+        break
+      if separator.text != ",":
+        raise ParseError(f"function call {name} arguments must be separated by commas")
+    return FunctionCallExpression(name=name, arguments=tuple(arguments))
+
+
+class _TokenStream:
+  def __init__(self, tokens: tuple[_Token, ...]) -> None:
+    self._tokens = tokens
+    self._position = 0
+
+  @property
+  def at_end(self) -> bool:
+    return self._position >= len(self._tokens)
+
+  @property
+  def peek(self) -> _Token:
+    if self.at_end:
+      raise ParseError("unexpected end of command")
+    return self._tokens[self._position]
+
+  def consume(self) -> _Token:
+    token = self.peek
+    self._position += 1
+    return token
+
+  def remaining(self) -> tuple[_Token, ...]:
+    return self._tokens[self._position :]
+
+  def remaining_after_current(self) -> tuple[_Token, ...]:
+    return self._tokens[self._position + 1 :]
+
+  def advance_to_end(self) -> None:
+    self._position = len(self._tokens)

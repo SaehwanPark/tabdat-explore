@@ -1,7 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore is currently in Phase 1. This document records the implemented core skeleton and
-the boundaries future phases should preserve.
+TabDat-Explore is currently past the Phase 2 parser foundation. This document records the
+implemented core skeleton, command-language model, and the boundaries future phases should
+preserve.
 
 ## Runtime Flow
 
@@ -22,11 +23,15 @@ Owns user interaction, command input, script entry points in later phases, and t
 
 ### Command Parser
 
-Converts command text into small internal command objects. Early parsing should support only the command forms required by the current command contract.
+Converts command text into internal command objects. The parser owns tokenization, varlist and
+option parsing, `if` clauses, and expression AST construction. It may represent parsed-only future
+commands, but execution remains an executor responsibility.
 
 ### Executor
 
-Dispatches parsed commands, maintains session state, and coordinates with the backend. For the MVP, session state should contain one active dataset.
+Dispatches executable commands, maintains session state, and coordinates with the backend. For the
+MVP, session state should contain one active dataset. Parsed-only Phase 2 command forms must fail
+with an unsupported-command execution error until a later command contract defines execution.
 
 ### DuckDB Backend
 
@@ -46,6 +51,7 @@ display formatting.
 - Runtime modules live under `src/tabdat/`.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
+- Phase 2 parser models include command options and expression ASTs for future command execution.
 
 ## Development Boundaries
 

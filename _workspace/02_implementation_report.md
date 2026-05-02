@@ -1,51 +1,43 @@
-# Phase 1 Implementation Report
-
-## Summary
-
-Implemented the Phase 1 core skeleton for TabDat-Explore: a minimal `tabdat` CLI that can load a
-local Parquet file and run `describe` and `summarize` through parser, executor, backend, and
-formatter boundaries.
+# Phase 2 Implementation Report
 
 ## Contract Consumed
 
 - `_workspace/01_product_command-contract.md`
 
-## Changed Surfaces
+## Files Changed
 
-- Added package modules under `src/tabdat/`:
-  - parser, command/result models, executor, DuckDB backend, formatter, CLI, and user-facing errors.
-- Added tests under `tests/`:
-  - parser unit tests
-  - executor/backend tests with temporary Parquet fixtures
-  - CLI smoke tests for repeated `-c` command execution
-- Updated packaging:
-  - `tabdat` console script
-  - DuckDB runtime dependency
-  - pytest dev dependency
-  - Hatchling build configuration for the `src/tabdat` package
-- Updated SDD files:
-  - `SPEC.md`
-  - `ARCHITECTURE.md`
-  - `CHANGELOG.md`
-- Added `.pytest_cache/` to `.gitignore`.
+- `src/tabdat/models.py`
+- `src/tabdat/parser.py`
+- `tests/test_parser.py`
+- `tests/test_executor.py`
+- `tests/test_cli.py`
+- `SPEC.md`
+- `ARCHITECTURE.md`
+- `CHANGELOG.md`
 
 ## Implementation Notes
 
-- Parser supports only Phase 1 whitespace-separated forms: `use <path>`, `describe`,
-  `summarize [varlist]`, `exit`, and `quit`.
-- Executor maintains one active dataset and converts missing-session cases into command-level
-  errors.
-- Backend uses DuckDB `read_parquet(?)` and returns structured dataset and summary objects.
-- Formatter owns terminal display and keeps output deterministic for tests.
+- Added immutable expression and parser model objects for identifiers, numbers, strings, unary
+  expressions, binary expressions, function calls, command options, and parsed-only commands.
+- Replaced the whitespace-only parser with a small tokenizer and precedence-based expression
+  parser.
+- Preserved Phase 1 executable models for `use`, `describe`, `summarize`, `exit`, and `quit`.
+- Added parsed-only support for future forms such as `keep if age >= 18` and
+  `generate log_cost = log(cost)`.
+- Preserved punctuated variable names in command varlists while keeping expression identifiers
+  strict.
+- Rejected assignment syntax on executable `summarize` commands.
+- Kept executor/backend behavior unchanged except for test coverage confirming parsed-only
+  commands return the existing unsupported-command execution error.
 
-## Validation Commands
+## Validation
 
-- `uv run pytest`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
+- `uv run pytest` - passed.
+- `uv run ruff check .` - passed.
+- `uv run ruff format --check .` - passed.
 
 ## Known Gaps
 
-- Paths with spaces are not supported by the Phase 1 parser.
-- Only local `.parquet` files are supported.
-- CLI UX is intentionally basic; autocomplete, history, and highlighting remain future work.
+- `summarize if ...`, `summarize, detail`, `keep`, and `generate` parse but do not execute yet.
+- `use` still accepts only one whitespace-free path argument.
+- No SQL, scripting, prompt-toolkit UX, visualization, or lazy execution behavior was added.
