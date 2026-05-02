@@ -31,6 +31,6 @@ def test_cli_prints_command_errors(capsys) -> None:
 
   captured = capsys.readouterr()
 
-  assert exit_code == 0
+  assert exit_code == 1
   assert captured.out == ""
   assert "Error: describe requires an active dataset" in captured.err
