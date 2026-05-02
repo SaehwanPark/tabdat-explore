@@ -9,6 +9,8 @@
   future command forms.
 - Implemented expression parsing for identifiers, numbers, strings, unary minus, arithmetic,
   comparisons, parentheses, and function calls.
+- Fixed review regressions so assignment syntax on `summarize` is rejected and punctuated Phase 1
+  varlist names remain accepted.
 - Preserved existing Phase 1 executable command behavior.
 - Added parser, executor-boundary, and CLI diagnostic tests.
 - Updated SDD and handoff artifacts.

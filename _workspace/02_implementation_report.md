@@ -24,12 +24,15 @@
 - Preserved Phase 1 executable models for `use`, `describe`, `summarize`, `exit`, and `quit`.
 - Added parsed-only support for future forms such as `keep if age >= 18` and
   `generate log_cost = log(cost)`.
+- Preserved punctuated variable names in command varlists while keeping expression identifiers
+  strict.
+- Rejected assignment syntax on executable `summarize` commands.
 - Kept executor/backend behavior unchanged except for test coverage confirming parsed-only
   commands return the existing unsupported-command execution error.
 
 ## Validation
 
-- `uv run pytest` - passed, 39 tests.
+- `uv run pytest` - passed.
 - `uv run ruff check .` - passed.
 - `uv run ruff format --check .` - passed.
 

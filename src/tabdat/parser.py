@@ -42,6 +42,8 @@ _BINARY_PRECEDENCE = {
 class _Token:
   kind: Literal["identifier", "number", "string", "symbol"]
   text: str
+  start: int
+  end: int
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,8 @@ def parse_command(text: str) -> Command:
     return DescribeCommand()
 
   if parts.name == "summarize":
+    if parts.expression is not None:
+      raise ParseError("summarize does not accept assignment syntax")
     if parts.condition is None and not parts.options:
       return SummarizeCommand(variables=parts.arguments)
     return ParsedCommand(
@@ -159,9 +163,7 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
       options = _parse_options(option_tokens) if option_tokens else options
       stream.advance_to_end()
       break
-    if token.kind != "identifier":
-      raise ParseError(f"unsupported token in command: {token.text}")
-    arguments.append(stream.consume().text)
+    arguments.append(_parse_argument(stream))
 
   return _CommandParts(
     name=name,
@@ -170,6 +172,24 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
     options=options,
     expression=expression,
   )
+
+
+def _parse_argument(stream: "_TokenStream") -> str:
+  parts: list[str] = []
+  previous: _Token | None = None
+  while not stream.at_end:
+    token = stream.peek
+    if token.text in {",", "="}:
+      break
+    if token.kind == "identifier" and token.text.lower() == "if":
+      break
+    if previous is not None and token.start > previous.end:
+      break
+    previous = stream.consume()
+    parts.append(previous.text)
+  if not parts:
+    raise ParseError(f"unsupported token in command: {stream.peek.text}")
+  return "".join(parts)
 
 
 def _split_expression_and_options(
@@ -232,7 +252,7 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
       index += 1
       while index < len(text) and (text[index].isalnum() or text[index] == "_"):
         index += 1
-      tokens.append(_Token("identifier", text[start:index]))
+      tokens.append(_Token("identifier", text[start:index], start, index))
       continue
     if char.isdigit() or (char == "." and index + 1 < len(text) and text[index + 1].isdigit()):
       start = index
@@ -242,7 +262,7 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
       number_text = text[start:index]
       if number_text.count(".") > 1:
         raise ParseError(f"malformed number: {number_text}")
-      tokens.append(_Token("number", number_text))
+      tokens.append(_Token("number", number_text, start, index))
       continue
     if char in {"'", '"'}:
       quote = char
@@ -254,15 +274,15 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
       if index >= len(text):
         raise ParseError("unterminated quoted string")
       index += 1
-      tokens.append(_Token("string", "".join(value)))
+      tokens.append(_Token("string", "".join(value), index - len(value) - 1, index))
       continue
     two_char = text[index : index + 2]
     if two_char in {"==", "!=", "<=", ">="}:
-      tokens.append(_Token("symbol", two_char))
+      tokens.append(_Token("symbol", two_char, index, index + 2))
       index += 2
       continue
     if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")"}:
-      tokens.append(_Token("symbol", char))
+      tokens.append(_Token("symbol", char, index, index + 1))
       index += 1
       continue
     raise ParseError(f"unsupported token in command: {char}")

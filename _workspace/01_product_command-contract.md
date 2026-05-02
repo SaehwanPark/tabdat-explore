@@ -21,7 +21,8 @@ command [varlist] [if expression] [, option [option=value ...]]
 Rules:
 
 - Command names are case-insensitive.
-- Varlist items are identifiers after the command and before `if` or `,`.
+- Varlist items are non-whitespace argument strings after the command and before `if`, `=`, or `,`;
+  this preserves Phase 1 support for punctuated column names such as `bmi-zscore`.
 - Options appear after one comma and are whitespace-separated.
 - Options may be boolean flags (`detail`) or key/value pairs (`limit=10`).
 - `if` introduces one expression and must not appear more than once.
@@ -86,6 +87,8 @@ Summarizes numeric columns exactly as in Phase 1. The parser may accept structur
 for future commands, but executor support for `summarize if ...` or `summarize, detail` is not part
 of this slice.
 
+Assignment syntax is invalid for `summarize`; `summarize age = 5` must fail during parsing.
+
 ### `exit` / `quit`
 
 Exit aliases accept no arguments, `if`, or options.
@@ -113,6 +116,7 @@ Parse errors should name the problem and give the smallest useful correction. Re
 - missing expression after `if`
 - duplicate `if`
 - malformed option syntax
+- assignment syntax on commands that do not support it
 - unterminated quoted string
 - incomplete expression
 - unsupported token in expression

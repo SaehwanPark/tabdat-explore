@@ -31,14 +31,20 @@ def test_parse_summarize_command_with_variables() -> None:
   assert parse_command("summarize age bmi") == SummarizeCommand(("age", "bmi"))
 
 
+def test_parse_summarize_preserves_punctuated_variable_names() -> None:
+  assert parse_command("summarize bmi-zscore cost.2024 x/y") == SummarizeCommand(
+    ("bmi-zscore", "cost.2024", "x/y")
+  )
+
+
 def test_parse_summarize_command_without_variables() -> None:
   assert parse_command("summarize") == SummarizeCommand(())
 
 
 def test_parse_summarize_with_if_as_structured_phase_2_command() -> None:
-  assert parse_command("summarize age bmi if age >= 18") == ParsedCommand(
+  assert parse_command("summarize age bmi-zscore if age >= 18") == ParsedCommand(
     name="summarize",
-    arguments=("age", "bmi"),
+    arguments=("age", "bmi-zscore"),
     condition=BinaryExpression(
       left=IdentifierExpression("age"),
       operator=">=",
@@ -125,6 +131,7 @@ def test_parse_exit_aliases() -> None:
     "describe if age > 18",
     "exit now",
     "unknown",
+    "summarize age = 5",
     "summarize age if",
     "summarize age if age >=",
     "summarize age if if age > 18",

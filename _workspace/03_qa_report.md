@@ -7,6 +7,8 @@ pass
 ## Boundaries Checked
 
 - Product contract to parser behavior: Phase 2 grammar forms are represented in parser/model tests.
+- Review feedback regressions: `summarize age = 5` is rejected and punctuated varlist names such as
+  `bmi-zscore` are preserved.
 - Parser representation to executor: parsed-only commands are accepted by the parser and rejected by
   the executor as unsupported until later phases define execution.
 - Phase 1 compatibility: existing `use`, `describe`, `summarize`, `exit`, and `quit` tests still
@@ -26,6 +28,6 @@ pass
 
 ## Validation Evidence
 
-- `uv run pytest` - passed, 39 tests.
+- `uv run pytest` - passed.
 - `uv run ruff check .` - passed.
 - `uv run ruff format --check .` - passed.
