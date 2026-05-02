@@ -13,6 +13,9 @@
 
 - `uv run ruff check .`
 - `uv run ruff format --check .`
+- `uv run python -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('pyproject ok')"`
+- `find docs -maxdepth 2 -type f | sort`
+- `git status --short --branch`
 
 ## Known Limits
 

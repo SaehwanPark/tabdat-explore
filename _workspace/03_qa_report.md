@@ -31,6 +31,9 @@ Status: pass
 
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
+- `uv run python -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('pyproject ok')"` passed.
+- `find docs -maxdepth 2 -type f | sort` listed the expected docs.
+- `git status --short --branch` showed no uncommitted changes after committed artifacts.
 
 ## Residual Risk
 
