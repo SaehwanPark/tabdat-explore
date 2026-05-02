@@ -1,4 +1,4 @@
-# Phase 2 Implementation Report
+# Phase 3 Inspection Implementation Report
 
 ## Contract Consumed
 
@@ -8,6 +8,9 @@
 
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
+- `src/tabdat/executor.py`
+- `src/tabdat/backend.py`
+- `src/tabdat/formatter.py`
 - `tests/test_parser.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
@@ -17,18 +20,16 @@
 
 ## Implementation Notes
 
-- Added immutable expression and parser model objects for identifiers, numbers, strings, unary
-  expressions, binary expressions, function calls, command options, and parsed-only commands.
-- Replaced the whitespace-only parser with a small tokenizer and precedence-based expression
-  parser.
-- Preserved Phase 1 executable models for `use`, `describe`, `summarize`, `exit`, and `quit`.
-- Added parsed-only support for future forms such as `keep if age >= 18` and
-  `generate log_cost = log(cost)`.
-- Preserved punctuated variable names in command varlists while keeping expression identifiers
-  strict.
-- Rejected assignment syntax on executable `summarize` commands.
-- Kept executor/backend behavior unchanged except for test coverage confirming parsed-only
-  commands return the existing unsupported-command execution error.
+- Added executable command models for `codebook`, `count`, `head`, and `tail`.
+- Added structured results for codebook profiles, row counts, and row previews.
+- Extended the parser to accept Phase 3 inspection syntax and reject filters/options outside this
+  slice.
+- Added executor dispatch while preserving one active dataset as the only runtime state.
+- Added DuckDB-backed codebook profiling and head/tail previews over `read_parquet(?)`.
+- Added formatter output for compact codebook tables, row counts, and preview rows.
+- Added parser, executor/backend, and CLI smoke coverage.
+- Updated SDD state files to mark the inspection slice complete and keep broader Phase 3 work in
+  progress.
 
 ## Validation
 
@@ -38,6 +39,7 @@
 
 ## Known Gaps
 
-- `summarize if ...`, `summarize, detail`, `keep`, and `generate` parse but do not execute yet.
-- `use` still accepts only one whitespace-free path argument.
-- No SQL, scripting, prompt-toolkit UX, visualization, or lazy execution behavior was added.
+- No row filters for `count`, `head`, `tail`, or `codebook`.
+- Transformations, grouping, SQL, visualization, scripting, prompt-toolkit UX, and lazy execution
+  optimization remain future work.
+- `tail` uses DuckDB row-number ordering over the active local Parquet scan.

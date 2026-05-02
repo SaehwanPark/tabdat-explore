@@ -5,15 +5,22 @@ from dataclasses import dataclass
 from tabdat.backend import DuckDBBackend
 from tabdat.errors import ExecutionError
 from tabdat.models import (
+  CodebookCommand,
+  CodebookResult,
   Command,
+  CountCommand,
+  CountResult,
   DatasetInfo,
   DescribeCommand,
   DescribeResult,
   ExitCommand,
+  HeadCommand,
   LoadResult,
+  PreviewResult,
   Result,
   SummarizeCommand,
   SummarizeResult,
+  TailCommand,
   UseCommand,
 )
 
@@ -45,6 +52,25 @@ class Executor:
       dataset = self._require_active_dataset("summarize")
       rows = self.backend.summarize(dataset, command.variables)
       return SummarizeResult(rows=rows)
+
+    if isinstance(command, CodebookCommand):
+      dataset = self._require_active_dataset("codebook")
+      rows = self.backend.codebook(dataset, command.variables)
+      return CodebookResult(rows=rows)
+
+    if isinstance(command, CountCommand):
+      dataset = self._require_active_dataset("count")
+      return CountResult(row_count=dataset.row_count)
+
+    if isinstance(command, HeadCommand):
+      dataset = self._require_active_dataset("head")
+      rows = self.backend.preview_rows(dataset, command.limit)
+      return PreviewResult(columns=tuple(column.name for column in dataset.columns), rows=rows)
+
+    if isinstance(command, TailCommand):
+      dataset = self._require_active_dataset("tail")
+      rows = self.backend.preview_rows(dataset, command.limit, tail=True)
+      return PreviewResult(columns=tuple(column.name for column in dataset.columns), rows=rows)
 
     if isinstance(command, ExitCommand):
       return None

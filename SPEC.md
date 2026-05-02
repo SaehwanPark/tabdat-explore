@@ -27,17 +27,25 @@ This file tracks feature state for spec-driven development. Product intent lives
     and function calls
   - user-facing parse diagnostics for malformed Phase 2 syntax
   - focused parser coverage while preserving Phase 1 executable behavior
+- Began Phase 3 with the inspection command slice:
+  - `codebook [varlist]` compact column profiling
+  - `count` active dataset row counts
+  - `head [n]` and `tail [n]` row previews
+  - DuckDB-backed execution, deterministic terminal formatting, and focused parser/executor/CLI
+    tests
 
 ## Present
 
-- Phase 2 grammar is implemented as a parser foundation. Parsed-only forms such as `keep if ...`
-  and `generate ... = ...` are represented but intentionally not executed yet.
-- The current runtime remains intentionally minimal and does not yet include prompt-toolkit UX,
-  scripts, transformations, SQL, or visualization.
+- Phase 3 remains in progress beyond the first inspection slice. Transformations and grouping are
+  not implemented yet.
+- Parsed-only forms such as `keep if ...` and `generate ... = ...` are represented but
+  intentionally not executed yet.
+- The current runtime does not yet include prompt-toolkit UX, scripts, SQL, visualization, or lazy
+  execution optimization.
 
 ## Future
 
-- Phase 3: core EDA and transformation commands from the v0 glossary.
+- Phase 3: transformation and grouping commands from the v0 glossary.
 - Phase 4: SQL escape hatch over the active dataset.
 - Phase 5: prompt-toolkit UX with highlighting, history, and autocomplete.
 - Phase 6: artifact-based visualization.

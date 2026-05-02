@@ -1,140 +1,92 @@
-# Phase 2 Command Contract
+# Phase 3 Inspection Command Contract
 
 ## Request Summary
 
-Implement the Phase 2 parser foundation: richer command grammar, structured condition and
-expression parsing, and clearer user-facing parse errors. Existing Phase 1 commands must continue
-to execute through the CLI -> parser -> executor -> DuckDB pipeline.
+Implement the first Phase 3 core EDA slice: executable inspection commands over the active local
+Parquet dataset. Existing Phase 1 and Phase 2 parser behavior must continue to work.
 
 ## Roadmap Phase
 
-Phase 2: Command Language & Parser.
+Phase 3: Core EDA Functionality.
 
-## Grammar
+## Command Syntax
 
-Supported general command shape:
-
-```text
-command [varlist] [if expression] [, option [option=value ...]]
-```
-
-Rules:
-
-- Command names are case-insensitive.
-- Varlist items are non-whitespace argument strings after the command and before `if`, `=`, or `,`;
-  this preserves Phase 1 support for punctuated column names such as `bmi-zscore`.
-- Options appear after one comma and are whitespace-separated.
-- Options may be boolean flags (`detail`) or key/value pairs (`limit=10`).
-- `if` introduces one expression and must not appear more than once.
-- `if` expressions may appear before comma options.
-- Quoted string literals are supported in expressions.
-- Paths for `use` remain a single whitespace-free path argument in Phase 2.
-
-Examples:
+### `codebook`
 
 ```text
-summarize age bmi
-summarize age bmi if age >= 18
-summarize age bmi, detail limit=10
-summarize age if sex == "F", detail
-generate log_cost = log(cost)
+codebook [varlist]
 ```
 
-## Expression Syntax
+Shows compact column-level profiling for the active dataset. With no varlist, profile every column.
+With a varlist, profile only the requested columns in requested order.
 
-Expression parser support:
+Output columns:
 
-- identifiers: `age`, `cost`, `sex`
-- numbers: `18`, `22.5`
-- strings: `"F"`, `'M'`
-- unary minus: `-cost`
-- arithmetic: `+`, `-`, `*`, `/`
-- comparisons: `==`, `!=`, `<`, `<=`, `>`, `>=`
-- parentheses for grouping
-- function calls: `log(cost)`, `sqrt(age + 1)`
+- `Variable`
+- `Type`
+- `Nonmissing`
+- `Missing`
+- `Distinct`
+- `Examples`
 
-Unsupported expression syntax must fail during parsing with a command-language error, not a
-backend error.
+Examples should be deterministic, non-null values from the dataset scan order, limited to a compact
+display string.
 
-## Executable Commands
-
-The following Phase 1 commands remain executable:
-
-### `use`
+### `count`
 
 ```text
-use <path>
+count
 ```
 
-Loads one local `.parquet` file into the active dataset.
+Shows the number of rows in the active dataset.
 
-### `describe`
+### `head`
 
 ```text
-describe
+head [n]
 ```
 
-Prints active dataset structure. Varlist, `if`, and options are still invalid for executable
-`describe`.
+Shows the first `n` rows from the active dataset. `n` defaults to 5 and must be a non-negative
+integer.
 
-### `summarize`
+### `tail`
 
 ```text
-summarize [varlist]
+tail [n]
 ```
 
-Summarizes numeric columns exactly as in Phase 1. The parser may accept structured Phase 2 forms
-for future commands, but executor support for `summarize if ...` or `summarize, detail` is not part
-of this slice.
-
-Assignment syntax is invalid for `summarize`; `summarize age = 5` must fail during parsing.
-
-### `exit` / `quit`
-
-Exit aliases accept no arguments, `if`, or options.
-
-## Parsed-Only Commands
-
-The parser should be able to represent future command-language forms such as:
-
-```text
-keep if age >= 18
-generate log_cost = log(cost)
-```
-
-These are parsed for grammar coverage only. The executor should return an unsupported-command
-execution error if such parsed commands are sent to it.
+Shows the last `n` rows from the active dataset using the backend's stable row-number ordering for
+the active local Parquet scan. `n` defaults to 5 and must be a non-negative integer.
 
 ## Error Behavior
 
-Parse errors should name the problem and give the smallest useful correction. Required cases:
+- All commands require an active dataset and should say to run `use <path>` first.
+- `codebook` rejects unknown variables.
+- `count` rejects arguments, `if` clauses, and options.
+- `head` and `tail` reject more than one argument, non-integer limits, negative limits, `if`
+  clauses, and options.
+- `codebook`, `head`, and `tail` do not support filters or comma options in this slice.
 
-- empty command
-- unknown command
-- missing `use` path
-- unsupported extra arguments to `describe`, `exit`, or `quit`
-- missing expression after `if`
-- duplicate `if`
-- malformed option syntax
-- assignment syntax on commands that do not support it
-- unterminated quoted string
-- incomplete expression
-- unsupported token in expression
+## Data Assumptions
+
+- The active dataset remains a single local `.parquet` file loaded by `use`.
+- Backend operations use DuckDB queries over `read_parquet(?)`.
+- Preview rows may contain scalars, strings, or nulls; formatter renders null as `.`.
 
 ## Non-Goals
 
-- No execution for filtered summaries, `keep`, `drop`, `generate`, or `replace`.
-- No persistent transformed dataset state.
-- No SQL command, scripting, prompt-toolkit UX, visualization, lazy execution optimization, remote
-  paths, or non-Parquet loaders.
+- No row filters for `count`, `head`, `tail`, or `codebook`.
+- No transformations, grouping, SQL, scripting, visualization, prompt-toolkit UX, non-Parquet
+  loading, remote paths, or lazy execution optimization.
 - No full Stata compatibility.
 
 ## Acceptance Criteria
 
-- Existing Phase 1 CLI behavior and tests continue to pass.
-- Parser tests cover valid Phase 2 command, option, condition, and expression forms.
-- Parser tests cover invalid Phase 2 syntax and stable user-facing error categories.
-- CLI smoke tests verify malformed commands print `Error: ...`.
+- Parser tests cover valid and invalid forms for `codebook`, `count`, `head`, and `tail`.
+- Executor/backend tests cover successful command execution and missing-dataset or missing-column
+  failures.
+- CLI smoke tests show the new commands running after `use`.
+- Existing Phase 1/2 tests continue to pass.
 - Validation passes:
   - `uv run pytest`
   - `uv run ruff check .`

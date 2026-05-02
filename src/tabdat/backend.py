@@ -5,7 +5,7 @@ from pathlib import Path
 import duckdb
 
 from tabdat.errors import ExecutionError
-from tabdat.models import ColumnInfo, DatasetInfo, SummaryRow
+from tabdat.models import CodebookRow, ColumnInfo, DatasetInfo, SummaryRow
 
 NUMERIC_TYPES = (
   "TINYINT",
@@ -79,6 +79,51 @@ class DuckDBBackend:
     rows = tuple(self._summarize_variable(dataset.path, variable) for variable in requested)
     return rows
 
+  def codebook(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[CodebookRow, ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    requested = variables or tuple(column.name for column in dataset.columns)
+    _require_columns("codebook", column_types, requested)
+
+    return tuple(
+      self._codebook_variable(dataset.path, variable, column_types[variable])
+      for variable in requested
+    )
+
+  def preview_rows(
+    self,
+    dataset: DatasetInfo,
+    limit: int,
+    *,
+    tail: bool = False,
+  ) -> tuple[tuple[object, ...], ...]:
+    if limit == 0:
+      return ()
+
+    query = (
+      """
+        select * exclude (__tabdat_row_number)
+        from (
+          select
+            row_number() over () as __tabdat_row_number,
+            *
+          from read_parquet(?)
+        )
+        order by __tabdat_row_number desc
+        limit ?
+      """
+      if tail
+      else "select * from read_parquet(?) limit ?"
+    )
+    try:
+      rows = tuple(self._connection.execute(query, [str(dataset.path), limit]).fetchall())
+    except duckdb.Error as exc:
+      command_name = "tail" if tail else "head"
+      raise ExecutionError(f"{command_name} failed") from exc
+
+    if tail:
+      return tuple(reversed(rows))
+    return rows
+
   def _summarize_variable(self, path: Path, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""
@@ -107,10 +152,59 @@ class DuckDBBackend:
       maximum=maximum,
     )
 
+  def _codebook_variable(self, path: Path, variable: str, data_type: str) -> CodebookRow:
+    quoted_variable = _quote_identifier(variable)
+    profile_sql = f"""
+      select
+        count({quoted_variable}) as nonmissing,
+        count(*) - count({quoted_variable}) as missing,
+        count(distinct {quoted_variable}) as distinct_count
+      from read_parquet(?)
+    """
+    examples_sql = f"""
+      select {quoted_variable}
+      from read_parquet(?)
+      where {quoted_variable} is not null
+      limit 3
+    """
+    try:
+      nonmissing, missing, distinct = self._connection.execute(
+        profile_sql,
+        [str(path)],
+      ).fetchone()
+      examples = tuple(
+        row[0]
+        for row in self._connection.execute(
+          examples_sql,
+          [str(path)],
+        ).fetchall()
+      )
+    except duckdb.Error as exc:
+      raise ExecutionError(f"codebook failed for variable: {variable}") from exc
+
+    return CodebookRow(
+      variable=variable,
+      data_type=data_type,
+      nonmissing=nonmissing,
+      missing=missing,
+      distinct=distinct,
+      examples=examples,
+    )
+
 
 def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper()
   return normalized.startswith(NUMERIC_TYPES)
+
+
+def _require_columns(
+  command_name: str,
+  column_types: dict[str, str],
+  variables: tuple[str, ...],
+) -> None:
+  missing = tuple(variable for variable in variables if variable not in column_types)
+  if missing:
+    raise ExecutionError(f"{command_name} unknown variable: {', '.join(missing)}")
 
 
 def _quote_identifier(identifier: str) -> str:
