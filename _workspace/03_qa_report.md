@@ -1,41 +1,41 @@
-# Phase 0 QA Report
+# Phase 1 QA Report
 
 Status: pass
 
-## Scope Checked
+## Boundaries Checked
 
-- Phase 0 roadmap deliverables are represented:
-  - positioning statement
-  - non-goals
-  - initial command set
-  - naming decision
-  - MVP guardrails
-- Contributor style expectations are visible in durable docs:
-  - 2-space tab size
-  - proactive linting and formatting
-- SDD state files exist:
-  - `SPEC.md`
-  - `ARCHITECTURE.md`
-  - `CHANGELOG.md`
-- Tooling is executable through `uv` and Ruff.
+- Roadmap to command contract: Phase 1 scope stays limited to `use`, `describe`, `summarize`,
+  a minimal parser, executor state, and DuckDB-backed Parquet loading.
+- Contract to parser: supported forms parse to explicit command models; unsupported forms raise
+  command-level parse errors.
+- Parser to executor: executor consumes structured command models and owns active-dataset
+  validation.
+- Executor to backend: backend receives explicit Parquet paths and variable names, then returns
+  structured dataset and summary results.
+- Backend to formatter/CLI: CLI prints deterministic formatted output and command-level errors.
+- Tests to claimed behavior: parser, executor/backend, and CLI smoke tests cover success and
+  error paths.
 
-## Boundary Review
+## Blocking Issues
 
-- `docs/dev_phase.md` Phase 0 maps to `docs/phase0_product_guardrails.md`.
-- `docs/project_proposal.md` product direction is preserved: Stata-inspired, modern tabular formats, DuckDB/Arrow orientation, terminal-native UX.
-- `docs/command_glossary_v0.md` keeps the initial command set small at 12 commands.
-- `AGENTS.md`, `README.md`, and root SDD files all point contributors to the same guardrails.
-- `pyproject.toml` and `uv.lock` make the lint/format expectation runnable.
+- None.
+
+## Non-Blocking Follow-Ups
+
+- Add quoted path support when the command grammar grows in Phase 2.
+- Add richer terminal UX in Phase 5 rather than widening Phase 1.
+- Consider dedicated formatter snapshot tests once output stabilizes further.
 
 ## Validation Evidence
 
-- `uv run ruff check .` passed.
-- `uv run ruff format --check .` passed.
-- `uv run python -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('pyproject ok')"` passed.
-- `find docs -maxdepth 2 -type f | sort` listed the expected docs.
-- `git status --short --branch` showed no uncommitted changes after committed artifacts.
+- command: `uv run pytest`
+- outcome: 21 passed
+- command: `uv run ruff check .`
+- outcome: all checks passed
+- command: `uv run ruff format --check .`
+- outcome: all files formatted
 
-## Residual Risk
+## Recommended Next Action
 
-- Markdown-specific linting is not configured yet.
-- Runtime tests are not applicable because Phase 0 did not add runtime behavior.
+Open the Phase 1 PR with `@codex review`, then use Phase 2 to expand command grammar and
+user-facing errors without changing the Phase 1 backend contract unnecessarily.

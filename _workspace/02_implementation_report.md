@@ -1,35 +1,51 @@
-# Phase 0 Implementation Report
+# Phase 1 Implementation Report
 
 ## Summary
 
-Implemented Phase 0 product guardrails as documentation, SDD state files, and contributor tooling configuration.
+Implemented the Phase 1 core skeleton for TabDat-Explore: a minimal `tabdat` CLI that can load a
+local Parquet file and run `describe` and `summarize` through parser, executor, backend, and
+formatter boundaries.
+
+## Contract Consumed
+
+- `_workspace/01_product_command-contract.md`
 
 ## Changed Surfaces
 
-- Added Phase 0 request capture in `_workspace/00_input/request-summary.md`.
-- Added product guardrails in `docs/phase0_product_guardrails.md`.
-- Added initial command glossary in `docs/command_glossary_v0.md`.
-- Added SDD files: `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md`.
-- Updated `README.md` and `AGENTS.md` to point at the new guardrails and style rules.
-- Added Ruff as a dev dependency and configured lint/format settings in `pyproject.toml`.
-- Added `uv.lock`.
+- Added package modules under `src/tabdat/`:
+  - parser, command/result models, executor, DuckDB backend, formatter, CLI, and user-facing errors.
+- Added tests under `tests/`:
+  - parser unit tests
+  - executor/backend tests with temporary Parquet fixtures
+  - CLI smoke tests for repeated `-c` command execution
+- Updated packaging:
+  - `tabdat` console script
+  - DuckDB runtime dependency
+  - pytest dev dependency
+  - Hatchling build configuration for the `src/tabdat` package
+- Updated SDD files:
+  - `SPEC.md`
+  - `ARCHITECTURE.md`
+  - `CHANGELOG.md`
+- Added `.pytest_cache/` to `.gitignore`.
 
-## Commits
+## Implementation Notes
 
-- `docs: capture phase 0 request`
-- `docs: add phase 0 guardrails and command glossary`
-- `docs: add sdd project state files`
-- `build: configure ruff validation`
+- Parser supports only Phase 1 whitespace-separated forms: `use <path>`, `describe`,
+  `summarize [varlist]`, `exit`, and `quit`.
+- Executor maintains one active dataset and converts missing-session cases into command-level
+  errors.
+- Backend uses DuckDB `read_parquet(?)` and returns structured dataset and summary objects.
+- Formatter owns terminal display and keeps output deterministic for tests.
 
 ## Validation Commands
 
+- `uv run pytest`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
-- `uv run python -c "import tomllib; tomllib.load(open('pyproject.toml','rb')); print('pyproject ok')"`
-- `find docs -maxdepth 2 -type f | sort`
-- `git status --short --branch`
 
-## Notes
+## Known Gaps
 
-- No runtime CLI, parser, executor, backend, or command behavior was implemented.
-- The PR should include `@codex review` because the change includes project configuration updates in `pyproject.toml` and `uv.lock`.
+- Paths with spaces are not supported by the Phase 1 parser.
+- Only local `.parquet` files are supported.
+- CLI UX is intentionally basic; autocomplete, history, and highlighting remain future work.

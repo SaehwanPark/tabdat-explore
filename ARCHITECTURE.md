@@ -1,14 +1,16 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore is currently in Phase 0. This document records the intended architecture so Phase 1 can implement a small vertical slice without widening scope.
+TabDat-Explore is currently in Phase 1. This document records the implemented core skeleton and
+the boundaries future phases should preserve.
 
-## Planned Runtime Flow
+## Runtime Flow
 
 ```text
 CLI Shell
   -> Command Parser
   -> Executor
   -> DuckDB Backend
+  -> Formatter
   -> Terminal Output
 ```
 
@@ -30,13 +32,20 @@ Dispatches parsed commands, maintains session state, and coordinates with the ba
 
 Owns data access and query execution. Parquet is the primary initial format. Backend operations should avoid unnecessary materialization where practical.
 
+### Formatter
+
+Converts structured command results into deterministic terminal text. The backend should not own
+display formatting.
+
 ## Current Repository State
 
 - Product docs are in `docs/project_proposal.md`, `docs/dev_phase.md`, and `docs/phase0_product_guardrails.md`.
 - Initial command scope is in `docs/command_glossary_v0.md`.
 - Package metadata is in `pyproject.toml`.
 - Phase handoff artifacts live under `_workspace/`.
-- Runtime modules have not been created yet.
+- Runtime modules live under `src/tabdat/`.
+- Focused tests live under `tests/`.
+- The installed console script is `tabdat`.
 
 ## Development Boundaries
 

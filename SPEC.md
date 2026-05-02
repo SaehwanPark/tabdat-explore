@@ -14,15 +14,21 @@ This file tracks feature state for spec-driven development. Product intent lives
   - backend direction: DuckDB primary, Parquet first
   - contributor style: 2-space tab size and proactive linting/formatting
 - Defined the v0 command glossary with 12 initial commands.
+- Implemented the Phase 1 core skeleton:
+  - `tabdat` console script and basic shell
+  - minimal parser for `use`, `describe`, `summarize`, `exit`, and `quit`
+  - executor with one active dataset
+  - DuckDB-backed local Parquet loading and summaries
+  - focused parser, executor/backend, and CLI smoke tests
 
 ## Present
 
-- Prepare for Phase 1: a minimal vertical CLI slice that can load a Parquet file and run `describe` and `summarize`.
-- Before Phase 1 implementation, write command contracts for the commands being implemented.
+- Phase 1 is implemented for local Parquet files and the initial inspection commands.
+- The current runtime is intentionally minimal and does not yet include Phase 2 grammar features,
+  prompt-toolkit UX, scripts, transformations, SQL, or visualization.
 
 ## Future
 
-- Phase 1: CLI shell, `use`, `describe`, `summarize`, minimal parser, executor, and DuckDB integration.
 - Phase 2: command grammar, `if` conditions, expression parsing, and user-facing error handling.
 - Phase 3: core EDA and transformation commands from the v0 glossary.
 - Phase 4: SQL escape hatch over the active dataset.
