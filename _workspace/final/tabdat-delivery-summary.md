@@ -1,12 +1,16 @@
-# Phase 3 Inspection Delivery Summary
+# Full Phase 3 Delivery Summary
 
 ## Completed
 
-- Created branch `phase3-inspection-slice`.
-- Wrote the Phase 3 request summary and inspection command contract.
-- Added executable `codebook`, `count`, `head`, and `tail` commands.
-- Added DuckDB-backed codebook profiling and row previews over the active Parquet dataset.
-- Added deterministic terminal formatting for new result types.
+- Created branch `tmp/phase3-core-eda`.
+- Wrote the full Phase 3 request summary and command contract.
+- Added executable transformations: `keep`, `drop`, `select`, `rename`, `generate`, and `replace`.
+- Added grouping and summaries: `tabulate`, `collapse`, `by group: summarize`, and
+  `by group: count`.
+- Moved backend execution to a session-local active DuckDB table so transformations affect
+  subsequent commands.
+- Added expression-to-SQL compilation for supported Phase 3 expressions.
+- Added deterministic terminal formatting for transformation acknowledgements and table results.
 - Added parser, executor/backend, and CLI smoke tests.
 - Updated SDD and handoff artifacts.
 
@@ -18,12 +22,12 @@
 
 ## Known Limits
 
-- Filters are not yet supported for inspection commands.
-- Transformations and grouping remain unimplemented.
-- No prompt-toolkit UX, scripts, SQL, visualization, lazy optimization, or non-Parquet loading was
-  added.
+- Transformed data is not persisted to disk.
+- `by:` supports only `summarize` and `count`.
+- No SQL command, prompt-toolkit UX, scripts, visualization, non-Parquet loading, or Phase 7 lazy
+  optimization was added.
 
 ## Next Useful Work
 
-Continue Phase 3 with a focused transformation contract for `keep`, `drop`, and `rename`, or define
-`tabulate` separately as the next inspection/grouping-oriented slice.
+Start Phase 4 with a SQL command contract that exposes the active dataset and defines result
+preview versus table creation behavior.

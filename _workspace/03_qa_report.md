@@ -1,4 +1,4 @@
-# Phase 3 Inspection QA Report
+# Full Phase 3 QA Report
 
 ## Status
 
@@ -6,16 +6,15 @@ pass
 
 ## Boundaries Checked
 
-- Contract to parser: valid and invalid `codebook`, `count`, `head`, and `tail` forms are covered
-  in parser tests.
-- Parser to executor: new executable command models dispatch to concrete executor branches instead
-  of the parsed-only unsupported-command path.
-- Executor to backend: active-dataset requirements, missing-column handling, codebook profiling,
-  row counts, and previews are covered in executor tests.
-- Backend to formatter/CLI: CLI smoke tests exercise `use` followed by `count`, `codebook`, `head`,
-  and `tail`.
-- SDD docs: `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` reflect the Phase 3 inspection slice
-  and keep transformations/grouping as future work.
+- Contract to parser: tests cover valid and invalid transformation, tabulation, collapse, and `by:`
+  forms.
+- Parser to executor: new typed command models dispatch to concrete executor branches.
+- Executor to backend: active dataset requirements, state-changing transformations, grouped
+  summaries, tabulations, and collapse are covered in executor tests.
+- Backend to formatter/CLI: CLI smoke tests exercise a first-pass EDA flow after `use`, including
+  filters, generated/replaced columns, tabulation, grouped summary, collapse, and preview.
+- SDD docs: `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` reflect full Phase 3 completion and
+  keep SQL, UX, visualization, scripting, and lazy optimization as future work.
 
 ## Blocking Issues
 
@@ -23,9 +22,9 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Define separate Phase 3 contracts for transformations and grouping before implementing them.
-- Decide later whether preview commands need explicit ordering semantics beyond the active backend
-  scan order.
+- Add explicit save/write semantics before users need persistent transformed datasets.
+- Expand `by:` child command coverage only after a new command contract defines the behavior.
+- Revisit active relation materialization during Phase 7 lazy execution work.
 
 ## Validation Evidence
 
