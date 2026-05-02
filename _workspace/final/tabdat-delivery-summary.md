@@ -1,18 +1,13 @@
-# Phase 2 Delivery Summary
+# Phase 3 Inspection Delivery Summary
 
 ## Completed
 
-- Created branch `temp/phase2-parser-foundation`.
-- Wrote the Phase 2 request summary and command contract.
-- Added parser models for command options, parsed-only commands, and expression ASTs.
-- Implemented command grammar support for varlists, comma options, `if` clauses, assignments, and
-  future command forms.
-- Implemented expression parsing for identifiers, numbers, strings, unary minus, arithmetic,
-  comparisons, parentheses, and function calls.
-- Fixed review regressions so assignment syntax on `summarize` is rejected and punctuated Phase 1
-  varlist names remain accepted.
-- Preserved existing Phase 1 executable command behavior.
-- Added parser, executor-boundary, and CLI diagnostic tests.
+- Created branch `phase3-inspection-slice`.
+- Wrote the Phase 3 request summary and inspection command contract.
+- Added executable `codebook`, `count`, `head`, and `tail` commands.
+- Added DuckDB-backed codebook profiling and row previews over the active Parquet dataset.
+- Added deterministic terminal formatting for new result types.
+- Added parser, executor/backend, and CLI smoke tests.
 - Updated SDD and handoff artifacts.
 
 ## Validation
@@ -23,11 +18,12 @@
 
 ## Known Limits
 
-- Phase 2 command forms parse but do not execute dataset transformations.
-- `use` still supports only one whitespace-free local `.parquet` path.
-- No prompt-toolkit UX, scripts, SQL, visualization, lazy optimization, or non-Parquet loading.
+- Filters are not yet supported for inspection commands.
+- Transformations and grouping remain unimplemented.
+- No prompt-toolkit UX, scripts, SQL, visualization, lazy optimization, or non-Parquet loading was
+  added.
 
 ## Next Useful Work
 
-Begin Phase 3 by defining execution contracts for the first core EDA or transformation commands
-that consume the new parser structures, such as `count`, `keep`, or `generate`.
+Continue Phase 3 with a focused transformation contract for `keep`, `drop`, and `rename`, or define
+`tabulate` separately as the next inspection/grouping-oriented slice.

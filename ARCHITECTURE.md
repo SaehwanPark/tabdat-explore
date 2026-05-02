@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore is currently past the Phase 2 parser foundation. This document records the
-implemented core skeleton, command-language model, and the boundaries future phases should
-preserve.
+TabDat-Explore has begun Phase 3 with executable inspection commands. This document records the
+implemented core skeleton, command-language model, inspection slice, and the boundaries future
+phases should preserve.
 
 ## Runtime Flow
 
@@ -19,7 +19,9 @@ CLI Shell
 
 ### CLI Shell
 
-Owns user interaction, command input, script entry points in later phases, and terminal output formatting. Early Phase 1 should keep this minimal.
+Owns user interaction, command input, script entry points in later phases, and terminal output
+formatting. The current shell remains intentionally minimal and uses repeated `-c` commands for
+smoke-testable workflows.
 
 ### Command Parser
 
@@ -30,12 +32,15 @@ commands, but execution remains an executor responsibility.
 ### Executor
 
 Dispatches executable commands, maintains session state, and coordinates with the backend. For the
-MVP, session state should contain one active dataset. Parsed-only Phase 2 command forms must fail
-with an unsupported-command execution error until a later command contract defines execution.
+MVP, session state contains one active dataset. Parsed-only Phase 2 command forms must fail with an
+unsupported-command execution error until a later command contract defines execution.
 
 ### DuckDB Backend
 
-Owns data access and query execution. Parquet is the primary initial format. Backend operations should avoid unnecessary materialization where practical.
+Owns data access and query execution. Parquet is the primary initial format. Backend operations
+should avoid unnecessary materialization where practical. Current backend operations inspect Parquet
+metadata, summarize numeric columns, profile columns for `codebook`, return row counts from
+metadata, and preview rows for `head`/`tail`.
 
 ### Formatter
 
@@ -52,6 +57,7 @@ display formatting.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
 - Phase 2 parser models include command options and expression ASTs for future command execution.
+- Phase 3 inspection commands are executable: `codebook`, `count`, `head`, and `tail`.
 
 ## Development Boundaries
 
