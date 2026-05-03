@@ -35,6 +35,7 @@ NUMERIC_TYPES = (
 )
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
 ACTIVE_TABLE = "__tabdat_active"
+ACTIVE_VIEW = "active"
 
 
 class DuckDBBackend:
@@ -73,6 +74,25 @@ class DuckDBBackend:
       raise ExecutionError("active dataset is not available") from exc
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
     return DatasetInfo(path=path, row_count=row_count, columns=columns)
+
+  def run_sql(self, query: str) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+    _require_result_query(query)
+    self._bind_active_view()
+    try:
+      result = self._connection.execute(query)
+      headers = tuple(column[0] for column in result.description or ())
+      rows = tuple(result.fetchall())
+    except duckdb.Error as exc:
+      raise ExecutionError("sql failed") from exc
+    if not headers:
+      raise ExecutionError("sql must produce a table result")
+    return headers, rows
+
+  def replace_active_with_sql(self, dataset: DatasetInfo, query: str) -> DatasetInfo:
+    _require_result_query(query)
+    self._bind_active_view()
+    self._replace_active(query, "sql")
+    return self.active_dataset_info(dataset.path)
 
   def summarize(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[SummaryRow, ...]:
     column_types = {column.name: column.data_type.upper() for column in dataset.columns}
@@ -496,6 +516,14 @@ class DuckDBBackend:
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
 
+  def _bind_active_view(self) -> None:
+    try:
+      self._connection.execute(
+        f"create or replace temp view {ACTIVE_VIEW} as select * from {ACTIVE_TABLE}"
+      )
+    except duckdb.Error as exc:
+      raise ExecutionError("active dataset is not available") from exc
+
   def _fetch_table(self, sql: str, command_name: str) -> tuple[tuple[object, ...], ...]:
     try:
       return tuple(self._connection.execute(sql).fetchall())
@@ -530,3 +558,9 @@ def _quote_identifier(identifier: str) -> str:
 def _quote_literal(value: str) -> str:
   escaped = value.replace("'", "''")
   return f"'{escaped}'"
+
+
+def _require_result_query(query: str) -> None:
+  first_word = query.lstrip().split(maxsplit=1)[0].lower() if query.strip() else ""
+  if first_word not in {"select", "with"}:
+    raise ExecutionError("sql only supports select or with queries in Phase 4")

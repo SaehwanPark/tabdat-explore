@@ -95,6 +95,32 @@ def test_cli_runs_full_phase_3_eda_flow(sample_parquet: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_4_sql_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "sql select sex, avg(bmi) as mean_bmi from active group by sex order by sex",
+      "-c",
+      "sql select sex, count(*) as n from active group by sex order by sex into summary",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "sex  mean_bmi" in captured.out
+  assert "F    25" in captured.out
+  assert "Created summary: 2 rows, 2 columns" in captured.out
+  assert "sex  n" in captured.out
+  assert "F    2" in captured.out
+  assert "M    1" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_prints_command_errors(capsys) -> None:
   exit_code = main(["-c", "describe"])
 

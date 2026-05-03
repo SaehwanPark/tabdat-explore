@@ -27,6 +27,7 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   SelectCommand,
+  SqlCommand,
   StringExpression,
   SummarizeCommand,
   TabulateCommand,
@@ -51,6 +52,7 @@ _EXECUTABLE_COMMANDS = {
   "replace",
   "tabulate",
   "collapse",
+  "sql",
   "exit",
   "quit",
 }
@@ -98,6 +100,8 @@ def parse_command(text: str) -> Command:
     return _parse_use(stripped)
   if command_name == "by":
     return _parse_by(stripped)
+  if command_name == "sql":
+    return _parse_sql(stripped)
 
   tokens = _tokenize(stripped)
   parts = _parse_command_parts(tokens)
@@ -235,6 +239,62 @@ def _parse_by(text: str) -> ByCommand:
   if isinstance(command, ByCommand):
     raise ParseError("nested by commands are not supported")
   return ByCommand(groups=groups, command=command)
+
+
+def _parse_sql(text: str) -> SqlCommand:
+  body = text[3:].strip()
+  if not body:
+    raise ParseError("sql expects a query")
+
+  if body.startswith('"""'):
+    query, remainder = _parse_triple_quoted_sql(body)
+  else:
+    query, remainder = _split_sql_into(body)
+
+  normalized_query = query.strip()
+  if not normalized_query:
+    raise ParseError("sql expects a query")
+
+  into = _parse_sql_into_remainder(remainder)
+  if into is not None:
+    _validate_sql_table_name(into)
+  return SqlCommand(query=normalized_query, into=into)
+
+
+def _parse_triple_quoted_sql(body: str) -> tuple[str, str]:
+  closing_index = body.find('"""', 3)
+  if closing_index == -1:
+    raise ParseError('sql multiline query is missing closing """')
+  query = body[3:closing_index]
+  remainder = body[closing_index + 3 :].strip()
+  return query, remainder
+
+
+def _split_sql_into(body: str) -> tuple[str, str]:
+  parts = body.rsplit(maxsplit=2)
+  if parts and parts[-1].lower() == "into":
+    raise ParseError("sql into expects syntax: sql <query> into <table>")
+  if len(parts) >= 3 and parts[-2].lower() == "into":
+    query = body[: -len(f" into {parts[-1]}")]
+    return query, f"into {parts[-1]}"
+  return body, ""
+
+
+def _parse_sql_into_remainder(remainder: str) -> str | None:
+  if not remainder:
+    return None
+  parts = remainder.split()
+  if len(parts) != 2 or parts[0].lower() != "into":
+    raise ParseError("sql into expects syntax: sql <query> into <table>")
+  return parts[1]
+
+
+def _validate_sql_table_name(table_name: str) -> None:
+  if not table_name.isidentifier():
+    raise ParseError("sql into table name must be an identifier")
+  normalized = table_name.lower()
+  if normalized == "active" or normalized.startswith("__tabdat_"):
+    raise ParseError(f"sql into cannot use reserved table name: {table_name}")
 
 
 def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand | DropCommand:

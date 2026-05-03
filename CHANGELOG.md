@@ -6,6 +6,8 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 4 SQL integration with `sql` queries over the active dataset exposed as `active`,
+  multiline `sql """..."""` parsing, and `into <table>` active-dataset replacement.
 - Completed the roadmap Phase 3 core EDA surface with executable transformations (`keep`, `drop`,
   `select`, `rename`, `generate`, `replace`), grouping (`by:` and `collapse`), and `tabulate`.
 - Added session-local active DuckDB table state so transformations feed subsequent inspection and

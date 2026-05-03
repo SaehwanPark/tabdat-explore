@@ -46,6 +46,7 @@ def _run_shell(executor: Executor) -> int:
   while True:
     try:
       command_text = input("tabdat> ")
+      command_text = _read_multiline_sql(command_text)
     except EOFError:
       print()
       return 0
@@ -67,6 +68,24 @@ def _run_one(command_text: str, executor: Executor) -> _RunStatus:
   if result is not None:
     print(format_result(result))
   return _RunStatus.CONTINUE
+
+
+def _read_multiline_sql(command_text: str) -> str:
+  if not _has_open_sql_triple_quote(command_text):
+    return command_text
+
+  lines = [command_text]
+  while True:
+    continuation = input("... ")
+    lines.append(continuation)
+    joined = "\n".join(lines)
+    if not _has_open_sql_triple_quote(joined):
+      return joined
+
+
+def _has_open_sql_triple_quote(command_text: str) -> bool:
+  stripped = command_text.lstrip()
+  return stripped.lower().startswith('sql """') and stripped.count('"""') % 2 == 1
 
 
 if __name__ == "__main__":

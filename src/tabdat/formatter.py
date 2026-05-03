@@ -10,6 +10,7 @@ from tabdat.models import (
   LoadResult,
   PreviewResult,
   Result,
+  SqlCreateResult,
   SummarizeResult,
   TableResult,
   TransformResult,
@@ -80,6 +81,10 @@ def format_result(result: Result) -> str:
   if isinstance(result, TransformResult):
     dataset = result.dataset
     return f"{result.message}: {dataset.row_count} rows, {dataset.column_count} columns"
+
+  if isinstance(result, SqlCreateResult):
+    dataset = result.dataset
+    return f"Created {result.table_name}: {dataset.row_count} rows, {dataset.column_count} columns"
 
   if isinstance(result, TableResult):
     rows = (tuple(_format_cell(value) for value in row) for row in result.rows)

@@ -26,6 +26,8 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   SelectCommand,
+  SqlCommand,
+  SqlCreateResult,
   StringExpression,
   SummarizeCommand,
   SummarizeResult,
@@ -360,6 +362,61 @@ def test_collapse_replaces_active_dataset(sample_parquet: Path) -> None:
   assert [column.name for column in result.dataset.columns] == ["sex", "mean_age", "mean_cost"]
   assert isinstance(preview, PreviewResult)
   assert preview.rows == (("F", 42.0, 100.0), ("M", 42.0, 150.0))
+
+
+def test_sql_queries_active_dataset(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    result = executor.execute(
+      SqlCommand("select sex, avg(bmi) as mean_bmi from active group by sex order by sex")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("sex", "mean_bmi")
+  assert result.rows == (("F", 25.0), ("M", 25.0))
+
+
+def test_sql_into_replaces_active_dataset(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    result = executor.execute(
+      SqlCommand(
+        "select sex, count(*) as n from active group by sex order by sex",
+        into="summary",
+      )
+    )
+    described = executor.execute(DescribeCommand())
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, SqlCreateResult)
+  assert result.table_name == "summary"
+  assert result.dataset.row_count == 2
+  assert [column.name for column in result.dataset.columns] == ["sex", "n"]
+  assert isinstance(described, DescribeResult)
+  assert [column.name for column in described.dataset.columns] == ["sex", "n"]
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("sex", "n")
+  assert preview.rows == (("F", 2), ("M", 1))
+
+
+def test_sql_reports_user_facing_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(ExecutionError, match="sql requires an active dataset"):
+      executor.execute(SqlCommand("select * from active"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="sql only supports select or with queries"):
+      executor.execute(SqlCommand("drop table active"))
+    with pytest.raises(ExecutionError, match="sql failed"):
+      executor.execute(SqlCommand("select missing from active"))
+  finally:
+    executor.close()
 
 
 def test_phase_3_transformations_report_user_facing_errors(sample_parquet: Path) -> None:
