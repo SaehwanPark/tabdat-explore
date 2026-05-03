@@ -1,7 +1,7 @@
 [project]
-name = "tabdat-eda-dev"
+name = "tabdat-explore-dev"
 version = "0.1.0"
-description = "Add your description here"
+description = "Terminal-native exploratory data analysis tool for modern tabular data, Stata-inspired"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
