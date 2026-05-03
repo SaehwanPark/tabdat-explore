@@ -43,15 +43,20 @@ This file tracks feature state for spec-driven development. Product intent lives
   - `sql """..."""` multiline query parsing and minimal shell continuation
   - `into <table>` support that replaces the active dataset with the SQL result
   - focused parser, executor/backend, and CLI smoke tests
+- Implemented Phase 5 CLI UX:
+  - prompt-toolkit interactive shell
+  - syntax highlighting for command-oriented input
+  - context-aware completions for commands, active dataset columns, options, `by:` forms, and SQL
+    helpers
+  - persistent command history and inline history suggestions
+  - focused shell UX tests while preserving `-c` command mode
 
 ## Present
 
-- Phase 4 is complete for SQL escape-hatch execution over the active dataset.
-- The current runtime does not yet include prompt-toolkit UX, scripts, visualization, or lazy
-  execution optimization.
+- Phase 5 is complete for prompt-toolkit interactive shell UX.
+- The current runtime does not yet include scripts, visualization, or lazy execution optimization.
 
 ## Future
 
-- Phase 5: prompt-toolkit UX with highlighting, history, and autocomplete.
 - Phase 6: artifact-based visualization.
 - Phase 7 and later: lazy execution optimization, scripting, configuration, and extensions.

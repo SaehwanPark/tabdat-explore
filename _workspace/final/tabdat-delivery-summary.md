@@ -1,26 +1,24 @@
-# Phase 4 Delivery Summary
+# Phase 5 Delivery Summary
 
-## Summary
+## Completed Work
 
-Implemented Phase 4 SQL integration. Users can query the active dataset through SQL as `active`;
-`sql ... into <table>` replaces the active dataset with the query result.
-
-## Changed Areas
-
-- command model, parser, executor, backend, formatter, and CLI shell continuation
-- parser, executor, and CLI tests
-- README, `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
-- workspace handoff artifacts
+- Added prompt-toolkit interactive shell UX with persistent history, inline history suggestions,
+  syntax highlighting, and context-aware autocomplete.
+- Preserved existing `tabdat -c ...` command execution and multiline SQL continuation behavior.
+- Added focused shell tests covering command, column, option, `by:`, SQL helper, lexer, and session
+  setup behavior.
+- Updated README, SPEC, ARCHITECTURE, CHANGELOG, and workspace handoff reports for Phase 5.
 
 ## Validation
 
+- `uv run pytest tests/test_shell.py tests/test_cli.py` passed with 15 tests.
+- `uv run pytest` passed with 125 tests.
 - `uv run mypy` passed.
-- `uv run pytest` passed with 117 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 
 ## Known Limits
 
-- SQL is restricted to `select` and `with`.
-- `into` updates active state but does not persist files.
-- `use` remains path-only.
+- SQL autocomplete is intentionally lightweight.
+- Inline suggestions come from command history.
+- Parser and executor diagnostics remain authoritative over autocomplete behavior.

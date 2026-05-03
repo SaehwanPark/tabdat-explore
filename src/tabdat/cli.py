@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import Enum, auto
 
 from tabdat.errors import TabDatError
@@ -10,6 +10,7 @@ from tabdat.executor import Executor
 from tabdat.formatter import format_result
 from tabdat.models import ExitCommand
 from tabdat.parser import parse_command
+from tabdat.shell import create_prompt_session
 
 
 class _RunStatus(Enum):
@@ -43,10 +44,11 @@ def _run_commands(commands: Sequence[str], executor: Executor) -> int:
 
 
 def _run_shell(executor: Executor) -> int:
+  session = create_prompt_session(executor)
   while True:
     try:
-      command_text = input("tabdat> ")
-      command_text = _read_multiline_sql(command_text)
+      command_text = session.prompt("tabdat> ")
+      command_text = _read_multiline_sql(command_text, session.prompt)
     except EOFError:
       print()
       return 0
@@ -70,13 +72,16 @@ def _run_one(command_text: str, executor: Executor) -> _RunStatus:
   return _RunStatus.CONTINUE
 
 
-def _read_multiline_sql(command_text: str) -> str:
+def _read_multiline_sql(
+  command_text: str,
+  read_continuation: Callable[[str], str] = input,
+) -> str:
   if not _has_open_sql_triple_quote(command_text):
     return command_text
 
   lines = [command_text]
   while True:
-    continuation = input("... ")
+    continuation = read_continuation("... ")
     lines.append(continuation)
     joined = "\n".join(lines)
     if not _has_open_sql_triple_quote(joined):
