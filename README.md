@@ -1,8 +1,97 @@
-# TabDat-Explore (Tabular Data Explorer) Project
+# TabDat-Explore
 
-See initial documents:
+TabDat-Explore is a terminal-native exploratory data analysis tool for modern tabular data.
+It is Stata-inspired in feel, but not Stata-compatible. The current implementation uses a
+single active dataset, DuckDB for execution, and Parquet as the primary input format.
+
+## What It Does
+
+TabDat-Explore is built for quick inspection and transformation of local datasets from the
+command line. The current CLI supports:
+
+- loading a local `.parquet` file with `use`
+- inspecting structure with `describe`
+- computing summaries with `summarize`
+- column profiling with `codebook`
+- row counts with `count`
+- row previews with `head` and `tail`
+- column selection and row filtering with `keep`, `drop`, and `select`
+- renaming and deriving columns with `rename`, `generate`, and `replace`
+- frequency tables with `tabulate`
+- grouped aggregation with `collapse`
+- grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
+
+The repository is currently at the core EDA phase of the roadmap. SQL integration, scripting,
+visualization, and prompt-toolkit shell enhancements are planned later.
+
+## Quickstart
+
+1. Install dependencies:
+
+   ```bash
+   uv sync
+   ```
+
+2. Run the CLI against a Parquet file:
+
+   ```bash
+   uv run tabdat -c "use data.parquet" -c "describe" -c "summarize age bmi"
+   ```
+
+3. Start the interactive shell:
+
+   ```bash
+   uv run tabdat
+   ```
+
+   Then enter commands at the `tabdat>` prompt.
+
+## Example Session
+
+```text
+tabdat> use data.parquet
+Loaded: data.parquet (3 rows, 4 columns)
+
+tabdat> describe
+Dataset: data.parquet
+Rows: 3
+Columns: 4
+
+Variable  Type
+age       INTEGER
+bmi       DOUBLE
+sex       VARCHAR
+cost      DOUBLE
+
+tabdat> summarize age bmi
+Variable  Count  Mean  Std Dev  Min  Max
+age       3      42    12       30   54
+bmi       3      25    2.5      22.5  27.5
+```
+
+## Design Notes
+
+- One active dataset per session keeps the mental model simple.
+- DuckDB is the primary execution engine.
+- Parquet is the primary data format.
+- SQL is intended as an escape hatch, not the main interface.
+- The terminal experience is part of the product, not an afterthought.
+
+## Project Docs
 
 - [Project proposal](docs/project_proposal.md)
 - [Development roadmap](docs/dev_phase.md)
 - [Phase 0 product guardrails](docs/phase0_product_guardrails.md)
 - [Command glossary v0](docs/command_glossary_v0.md)
+- [Architecture notes](ARCHITECTURE.md)
+- [Spec status](SPEC.md)
+
+## Validation
+
+This repository uses `uv` for commands and `pytest` for tests.
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format --check .
+```
