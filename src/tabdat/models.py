@@ -146,6 +146,12 @@ class CollapseCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SqlCommand:
+  query: str
+  into: str | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ByCommand:
   groups: tuple[str, ...]
   command: "Command"
@@ -181,6 +187,7 @@ Command = (
   | ReplaceCommand
   | TabulateCommand
   | CollapseCommand
+  | SqlCommand
   | ByCommand
   | ExitCommand
   | ParsedCommand
@@ -262,6 +269,12 @@ class TransformResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SqlCreateResult:
+  table_name: str
+  dataset: DatasetInfo
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class TableResult:
   headers: tuple[str, ...]
   rows: tuple[tuple[object, ...], ...]
@@ -275,5 +288,6 @@ Result = (
   | CountResult
   | PreviewResult
   | TransformResult
+  | SqlCreateResult
   | TableResult
 )

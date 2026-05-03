@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tabdat.cli import main
+from tabdat.cli import _has_open_sql_triple_quote, main
 
 
 def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
@@ -93,6 +93,40 @@ def test_cli_runs_full_phase_3_eda_flow(sample_parquet: Path, capsys) -> None:
   assert "Collapsed dataset: 2 rows, 3 columns" in captured.out
   assert "sex  mean_age  mean_cost" in captured.out
   assert captured.err == ""
+
+
+def test_cli_runs_phase_4_sql_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "sql select sex, avg(bmi) as mean_bmi from active group by sex order by sex",
+      "-c",
+      "sql select sex, count(*) as n from active group by sex order by sex into summary",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "sex  mean_bmi" in captured.out
+  assert "F    25" in captured.out
+  assert "Created summary: 2 rows, 2 columns" in captured.out
+  assert "sex  n" in captured.out
+  assert "F    2" in captured.out
+  assert "M    1" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_detects_multiline_sql_with_flexible_spacing() -> None:
+  assert _has_open_sql_triple_quote('sql """')
+  assert _has_open_sql_triple_quote('sql    """')
+  assert _has_open_sql_triple_quote('\tsql\t"""')
+  assert not _has_open_sql_triple_quote('sql """select * from active"""')
+  assert not _has_open_sql_triple_quote('summarize """')
 
 
 def test_cli_prints_command_errors(capsys) -> None:

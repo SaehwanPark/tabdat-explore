@@ -26,6 +26,8 @@ from tabdat.models import (
   ReplaceCommand,
   Result,
   SelectCommand,
+  SqlCommand,
+  SqlCreateResult,
   SummarizeCommand,
   SummarizeResult,
   TableResult,
@@ -160,6 +162,15 @@ class Executor:
       )
       self.state.active_dataset = next_dataset
       return TransformResult("Collapsed dataset", next_dataset)
+
+    if isinstance(command, SqlCommand):
+      dataset = self._require_active_dataset("sql")
+      if command.into is not None:
+        next_dataset = self.backend.replace_active_with_sql(dataset, command.query)
+        self.state.active_dataset = next_dataset
+        return SqlCreateResult(command.into, next_dataset)
+      sql_headers, sql_rows = self.backend.run_sql(command.query)
+      return TableResult(headers=sql_headers, rows=sql_rows)
 
     if isinstance(command, ByCommand):
       return self._execute_by(command)

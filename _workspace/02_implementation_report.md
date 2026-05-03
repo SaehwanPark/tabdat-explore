@@ -1,47 +1,31 @@
-# Full Phase 3 Implementation Report
+# Phase 4 Implementation Report
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md`
-
-## Files Changed
-
-- `src/tabdat/models.py`
-- `src/tabdat/parser.py`
-- `src/tabdat/executor.py`
-- `src/tabdat/backend.py`
-- `src/tabdat/formatter.py`
-- `tests/test_parser.py`
-- `tests/test_executor.py`
-- `tests/test_cli.py`
-- `SPEC.md`
-- `ARCHITECTURE.md`
-- `CHANGELOG.md`
+`_workspace/01_product_command-contract.md`
 
 ## Implementation Notes
 
-- Added typed command models for `keep`, `drop`, `select`, `rename`, `generate`, `replace`,
-  `tabulate`, `collapse`, and `by:`.
-- Extended parsing for Phase 3 transformation syntax, `replace ... if ...`, `by group: command`,
-  and `collapse ..., by(group_vars)`.
-- Changed backend execution from path-only reads to a session-local active DuckDB table so
-  transformations feed later commands.
-- Added expression-to-DuckDB-SQL compilation for identifiers, literals, arithmetic, comparisons,
-  unary minus, and a small supported function set.
-- Added executor dispatch for transformations, tabulations, grouped summaries, and collapse.
-- Added generic table formatting plus transformation acknowledgements.
-- Added parser, executor/backend, and CLI smoke coverage for the full Phase 3 flow.
-- Updated SDD files to mark Phase 3 complete and preserve remaining future phases.
+- Added `SqlCommand` and `SqlCreateResult` to the command/result model.
+- Added SQL parsing before generic token parsing so DuckDB SQL syntax is preserved.
+- Added parser support for `into <table>` and multiline `sql """..."""`.
+- Added DuckDB backend methods for SQL query execution and SQL replacement of the active table.
+- Bound the active dataset as the user-facing DuckDB view `active`.
+- Added executor handling for table results and active replacement via `into`.
+- Added formatter output for `Created <table>: <rows> rows, <columns> columns`.
+- Added minimal interactive continuation for open `sql """` blocks.
+- Updated README, SDD docs, changelog, and architecture notes.
 
 ## Validation
 
-- `uv run pytest` - passed.
-- `uv run ruff check .` - passed.
-- `uv run ruff format --check .` - passed.
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed before merging main.
+- `uv run mypy` passed.
+- `uv run pytest` passed with 117 tests.
+- `uv run ruff check .` passed.
+- `uv run ruff format --check .` passed.
 
-## Known Gaps
+## Known Limits
 
-- Transformations are session-local and are not written back to disk.
-- `by:` supports only `summarize` and `count` in Phase 3.
-- SQL integration, prompt-toolkit UX, visualization, scripting, non-Parquet loading, and Phase 7
-  lazy optimization remain future work.
+- `into <table>` does not create a durable catalog entry or persistent file.
+- `use <table>` is not supported.
+- SQL statements are restricted to `select` and `with`.

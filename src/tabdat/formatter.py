@@ -10,6 +10,7 @@ from tabdat.models import (
   LoadResult,
   PreviewResult,
   Result,
+  SqlCreateResult,
   SummarizeResult,
   TableResult,
   TransformResult,
@@ -52,9 +53,7 @@ def format_result(result: Result) -> str:
       )
       for row in result.rows
     )
-    return "\n".join(
-      _table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), summary_rows)
-    )
+    return "\n".join(_table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), summary_rows))
 
   if isinstance(result, CodebookResult):
     codebook_rows = (
@@ -69,7 +68,10 @@ def format_result(result: Result) -> str:
       for row in result.rows
     )
     return "\n".join(
-      _table(("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"), codebook_rows)
+      _table(
+        ("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"),
+        codebook_rows,
+      )
     )
 
   if isinstance(result, CountResult):
@@ -82,6 +84,10 @@ def format_result(result: Result) -> str:
   if isinstance(result, TransformResult):
     dataset = result.dataset
     return f"{result.message}: {dataset.row_count} rows, {dataset.column_count} columns"
+
+  if isinstance(result, SqlCreateResult):
+    dataset = result.dataset
+    return f"Created {result.table_name}: {dataset.row_count} rows, {dataset.column_count} columns"
 
   if isinstance(result, TableResult):
     table_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)

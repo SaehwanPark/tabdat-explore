@@ -20,9 +20,10 @@ command line. The current CLI supports:
 - frequency tables with `tabulate`
 - grouped aggregation with `collapse`
 - grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
+- SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
 
-The repository is currently at the core EDA phase of the roadmap. SQL integration, scripting,
-visualization, and prompt-toolkit shell enhancements are planned later.
+The repository has completed the SQL integration phase of the roadmap. Scripting, visualization,
+and prompt-toolkit shell enhancements are planned later.
 
 ## Quickstart
 
@@ -67,6 +68,14 @@ tabdat> summarize age bmi
 Variable  Count  Mean  Std Dev  Min  Max
 age       3      42    12       30   54
 bmi       3      25    2.5      22.5  27.5
+
+tabdat> sql select sex, avg(bmi) as mean_bmi from active group by sex order by sex
+sex  mean_bmi
+F    25
+M    25
+
+tabdat> sql select sex, count(*) as n from active group by sex into summary
+Created summary: 2 rows, 2 columns
 ```
 
 ## Design Notes
@@ -74,7 +83,8 @@ bmi       3      25    2.5      22.5  27.5
 - One active dataset per session keeps the mental model simple.
 - DuckDB is the primary execution engine.
 - Parquet is the primary data format.
-- SQL is intended as an escape hatch, not the main interface.
+- SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
+  dataset with the query result and does not persist a file.
 - The terminal experience is part of the product, not an afterthought.
 
 ## Project Docs
@@ -88,9 +98,11 @@ bmi       3      25    2.5      22.5  27.5
 
 ## Validation
 
-This repository uses `uv` for commands and `pytest` for tests.
+This repository uses `uv` for commands, `pytest` for tests, `mypy` for type checking, and `ruff`
+for linting and formatting.
 
 ```bash
+uv run mypy
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .

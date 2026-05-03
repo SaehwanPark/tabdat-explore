@@ -80,6 +80,14 @@ Produce one-way or two-way frequency tables.
 
 Phase 3 focus.
 
+## SQL Escape Hatch
+
+### `sql`
+
+Run a result-producing SQL query over the active dataset exposed as `active`.
+
+Phase 4 focus.
+
 ## Deferred Commands
 
 The following commands are important but should remain outside the v0 command set until the core workflow is stable:
@@ -88,7 +96,6 @@ The following commands are important but should remain outside the v0 command se
 - `select`
 - `collapse`
 - `by:`
-- `sql`
 - `histogram`
 - `scatter`
 - `bar`

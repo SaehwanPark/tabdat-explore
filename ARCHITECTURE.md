@@ -1,6 +1,6 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 3 core EDA surface. This document records the
+TabDat-Explore has completed the roadmap Phase 4 SQL integration slice. This document records the
 implemented core skeleton, command-language model, active DuckDB relation model, and the boundaries
 future phases should preserve.
 
@@ -40,7 +40,9 @@ unsupported-command execution error until a later command contract defines execu
 Owns data access and query execution. Parquet is the primary initial format. Loading creates a
 session-local active DuckDB table. Transformations replace that active table in the current session,
 so later inspection, summary, tabulation, and grouping commands see prior command results. No
-persistent write/save behavior exists yet.
+persistent write/save behavior exists yet. SQL commands bind the active table as the user-facing
+DuckDB view `active`; `sql ... into <table>` replaces the active table with the query result while
+using `<table>` as the displayed result name.
 
 ### Formatter
 
@@ -60,6 +62,9 @@ display formatting.
 - Phase 3 commands are executable: `codebook`, `count`, `head`, `tail`, `keep`, `drop`, `select`,
   `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
 - The supported `by:` child commands are `summarize` and `count`.
+- Phase 4 SQL is executable for result-producing `select` and `with` queries through `sql`.
+- Multiline SQL can be entered with `sql """..."""`.
+- `sql ... into <table>` replaces the active dataset with the SQL result; `use` remains path-only.
 
 ## Development Boundaries
 

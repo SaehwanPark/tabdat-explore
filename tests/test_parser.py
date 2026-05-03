@@ -23,6 +23,7 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   SelectCommand,
+  SqlCommand,
   StringExpression,
   SummarizeCommand,
   TabulateCommand,
@@ -170,6 +171,31 @@ def test_parse_phase_3_grouping_commands() -> None:
   )
 
 
+def test_parse_phase_4_sql_commands() -> None:
+  assert parse_command(
+    "sql select sex, avg(bmi) as mean_bmi from active group by sex"
+  ) == SqlCommand(query="select sex, avg(bmi) as mean_bmi from active group by sex")
+  assert parse_command(
+    "sql select sex, avg(bmi) from active group by sex into summary"
+  ) == SqlCommand(
+    query="select sex, avg(bmi) from active group by sex",
+    into="summary",
+  )
+  assert parse_command("sql select * from active   into summary") == SqlCommand(
+    query="select * from active",
+    into="summary",
+  )
+  assert parse_command('sql """\nselect sex, count(*) as n\nfrom active\n"""') == SqlCommand(
+    query="select sex, count(*) as n\nfrom active"
+  )
+  assert parse_command(
+    'sql """\nselect sex, count(*) as n\nfrom active\n""" into grouped'
+  ) == SqlCommand(
+    query="select sex, count(*) as n\nfrom active",
+    into="grouped",
+  )
+
+
 def test_parse_expression_with_precedence_and_function_call() -> None:
   assert parse_expression("sqrt(age + 1) >= 5") == BinaryExpression(
     left=FunctionCallExpression(
@@ -246,6 +272,12 @@ def test_parse_exit_aliases() -> None:
     "by: summarize age",
     "by sex:",
     "by sex: by age: count",
+    "sql",
+    'sql """select * from active',
+    "sql select * from active into",
+    "sql select * from active into active",
+    "sql select * from active into __tabdat_next",
+    "sql select * from active into bad-name",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],
