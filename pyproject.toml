@@ -6,6 +6,8 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "duckdb>=1.4.3",
+    "pydantic>=2.13.3",
+    "pymonad>=2.4.0",
 ]
 
 [project.scripts]
@@ -13,6 +15,7 @@ tabdat = "tabdat.cli:main"
 
 [dependency-groups]
 dev = [
+    "mypy>=1.20.2",
     "pytest>=9.0.1",
     "ruff>=0.15.12",
 ]
@@ -27,6 +30,22 @@ select = ["E", "F", "I", "UP"]
 [tool.ruff.format]
 indent-style = "space"
 line-ending = "lf"
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src/tabdat"]
+warn_unused_configs = true
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+check_untyped_defs = true
+strict_equality = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["duckdb", "pymonad.*"]
+ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tabdat"]

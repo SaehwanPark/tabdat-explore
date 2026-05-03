@@ -68,9 +68,12 @@ class DuckDBBackend:
   def active_dataset_info(self, path: Path) -> DatasetInfo:
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
-      row_count = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()[0]
+      row_count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
     except duckdb.Error as exc:
       raise ExecutionError("active dataset is not available") from exc
+    if row_count_row is None:
+      raise ExecutionError("active dataset is not available")
+    row_count = row_count_row[0]
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
     return DatasetInfo(path=path, row_count=row_count, columns=columns)
 
@@ -355,9 +358,12 @@ class DuckDBBackend:
       from {ACTIVE_TABLE}
     """
     try:
-      count, mean, std_dev, minimum, maximum = self._connection.execute(sql).fetchone()
+      row = self._connection.execute(sql).fetchone()
     except duckdb.Error as exc:
       raise ExecutionError(f"summarize failed for variable: {variable}") from exc
+    if row is None:
+      raise ExecutionError(f"summarize failed for variable: {variable}")
+    count, mean, std_dev, minimum, maximum = row
 
     return SummaryRow(
       variable=variable,
@@ -384,10 +390,13 @@ class DuckDBBackend:
       limit 3
     """
     try:
-      nonmissing, missing, distinct = self._connection.execute(profile_sql).fetchone()
+      profile_row = self._connection.execute(profile_sql).fetchone()
       examples = tuple(row[0] for row in self._connection.execute(examples_sql).fetchall())
     except duckdb.Error as exc:
       raise ExecutionError(f"codebook failed for variable: {variable}") from exc
+    if profile_row is None:
+      raise ExecutionError(f"codebook failed for variable: {variable}")
+    nonmissing, missing, distinct = profile_row
 
     return CodebookRow(
       variable=variable,
