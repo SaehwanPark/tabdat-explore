@@ -1,13 +1,13 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 4 SQL integration slice. This document records the
-implemented core skeleton, command-language model, active DuckDB relation model, and the boundaries
+TabDat-Explore has completed the roadmap Phase 5 CLI UX slice. This document records the
+implemented shell UX, command-language model, active DuckDB relation model, and the boundaries
 future phases should preserve.
 
 ## Runtime Flow
 
 ```text
-CLI Shell
+CLI Shell / prompt-toolkit UX
   -> Command Parser
   -> Executor
   -> DuckDB Backend
@@ -20,8 +20,9 @@ CLI Shell
 ### CLI Shell
 
 Owns user interaction, command input, script entry points in later phases, and terminal output
-formatting. The current shell remains intentionally minimal and uses repeated `-c` commands for
-smoke-testable workflows.
+formatting. Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for
+history, inline history suggestions, syntax highlighting, and context-aware completions. Repeated
+`-c` commands bypass prompt-toolkit and remain the smoke-testable batch workflow.
 
 ### Command Parser
 
@@ -65,6 +66,10 @@ display formatting.
 - Phase 4 SQL is executable for result-producing `select` and `with` queries through `sql`.
 - Multiline SQL can be entered with `sql """..."""`.
 - `sql ... into <table>` replaces the active dataset with the SQL result; `use` remains path-only.
+- Phase 5 prompt-toolkit UX is available for interactive sessions.
+- Autocomplete reads active dataset metadata from executor state but does not validate or mutate
+  session state.
+- Inline suggestions are history-based and persisted via `~/.tabdat_history`.
 
 ## Development Boundaries
 

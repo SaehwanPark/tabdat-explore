@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 5 prompt-toolkit interactive shell UX with syntax highlighting, persistent command
+  history, inline history suggestions, and context-aware autocomplete for commands, active dataset
+  columns, common options, `by:` forms, and lightweight SQL helpers.
 - Added Phase 4 SQL integration with `sql` queries over the active dataset exposed as `active`,
   multiline `sql """..."""` parsing, and `into <table>` active-dataset replacement.
 - Completed the roadmap Phase 3 core EDA surface with executable transformations (`keep`, `drop`,

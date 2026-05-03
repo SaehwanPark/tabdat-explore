@@ -1,4 +1,4 @@
-# Phase 4 Implementation Report
+# Phase 5 Implementation Report
 
 ## Contract Consumed
 
@@ -6,26 +6,23 @@
 
 ## Implementation Notes
 
-- Added `SqlCommand` and `SqlCreateResult` to the command/result model.
-- Added SQL parsing before generic token parsing so DuckDB SQL syntax is preserved.
-- Added parser support for `into <table>` and multiline `sql """..."""`.
-- Added DuckDB backend methods for SQL query execution and SQL replacement of the active table.
-- Bound the active dataset as the user-facing DuckDB view `active`.
-- Added executor handling for table results and active replacement via `into`.
-- Added formatter output for `Created <table>: <rows> rows, <columns> columns`.
-- Added minimal interactive continuation for open `sql """` blocks.
+- Added `prompt-toolkit` as a runtime dependency.
+- Added `src/tabdat/shell.py` for prompt session setup, history, inline suggestions,
+  context-aware completions, and syntax highlighting.
+- Updated interactive shell mode to use `PromptSession` while preserving `tabdat -c ...` behavior.
+- Preserved multiline SQL continuation with prompt-toolkit continuation prompts.
+- Added focused shell tests for command, column, option, `by:`, SQL, lexer, and session setup
+  behavior.
 - Updated README, SDD docs, changelog, and architecture notes.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed before merging main.
-- `uv run mypy` passed.
-- `uv run pytest` passed with 117 tests.
-- `uv run ruff check .` passed.
-- `uv run ruff format --check .` passed.
+- `uv run pytest tests/test_shell.py tests/test_cli.py` passed with 15 tests.
+- `uv run mypy` passed during implementation.
+- Final validation is recorded in `_workspace/03_qa_report.md`.
 
 ## Known Limits
 
-- `into <table>` does not create a durable catalog entry or persistent file.
-- `use <table>` is not supported.
-- SQL statements are restricted to `select` and `with`.
+- SQL autocomplete is a lightweight helper list, not a SQL parser.
+- Inline suggestions are history-based only.
+- Autocomplete does not replace parser or executor validation.

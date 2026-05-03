@@ -1,4 +1,4 @@
-# Phase 4 QA Report
+# Phase 5 QA Report
 
 ## Status
 
@@ -6,26 +6,30 @@ pass
 
 ## Boundaries Checked
 
-- docs and roadmap to command contract
-- command contract to parser
-- parser model to executor
-- executor state changes to DuckDB backend
-- backend result shape to formatter and CLI output
-- tests to claimed Phase 4 behavior
+- roadmap and project docs to Phase 5 UX contract
+- command contract to shell completer and lexer behavior
+- interactive shell setup to existing CLI execution path
+- executor state to column completion metadata
+- tests to claimed command, column, option, `by:`, SQL, lexer, and batch CLI behavior
+- documentation to implemented Phase 5 behavior
 
-## Current Evidence
+## Validation Evidence
 
-- Targeted parser/executor/CLI tests passed after fixing trailing `into` parsing.
-- Review fixes cover flexible SQL `into` whitespace and flexible multiline SQL shell detection.
+- `uv run pytest tests/test_shell.py tests/test_cli.py` passed with 15 tests.
+- `uv run pytest` passed with 125 tests.
 - `uv run mypy` passed.
-- `uv run pytest` passed with 117 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 
 ## Blocking Issues
 
-- None known before final full validation.
+- None.
+
+## Non-Blocking Follow-Ups
+
+- SQL autocomplete remains a lightweight helper list, not semantic SQL completion.
+- Inline suggestions are history-based only.
 
 ## Recommended Next Action
 
-Commit, push, and open the Phase 4 PR.
+Commit final validation artifacts, push the branch, and open the Phase 5 PR.
