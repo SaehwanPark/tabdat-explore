@@ -305,7 +305,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tabdat-eda-dev"
+name = "tabdat-explore-dev"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
