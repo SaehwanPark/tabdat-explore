@@ -19,6 +19,16 @@ def _completion_texts(completer: TabdatCompleter, text: str) -> list[str]:
   ]
 
 
+def _completion_start_positions(completer: TabdatCompleter, text: str) -> list[int]:
+  return [
+    completion.start_position
+    for completion in completer.get_completions(
+      Document(text, cursor_position=len(text)),
+      CompleteEvent(),
+    )
+  ]
+
+
 def test_completer_suggests_command_names() -> None:
   executor = Executor()
   try:
@@ -61,6 +71,24 @@ def test_completer_suggests_tabulate_options(sample_parquet: Path) -> None:
   assert completions == ["row", "col", "missing"]
 
 
+def test_completer_suggests_tabulate_options_after_compact_comma(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    completer = TabdatCompleter(executor)
+    all_options = _completion_texts(completer, "tabulate sex,")
+    row_option = _completion_texts(completer, "tabulate sex,r")
+    row_start_positions = _completion_start_positions(completer, "tabulate sex,r")
+  finally:
+    executor.close()
+
+  assert all_options == ["row", "col", "missing"]
+  assert row_option == ["row"]
+  assert row_start_positions == [-1]
+
+
 def test_completer_suggests_by_columns_and_child_commands(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -72,6 +100,24 @@ def test_completer_suggests_by_columns_and_child_commands(sample_parquet: Path) 
 
   assert group_completions == ["sex"]
   assert child_completions == ["summarize"]
+
+
+def test_completer_suggests_by_child_commands_after_compact_colon(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    completer = TabdatCompleter(executor)
+    all_commands = _completion_texts(completer, "by sex:")
+    summarize_command = _completion_texts(completer, "by sex:sum")
+    summarize_start_positions = _completion_start_positions(completer, "by sex:sum")
+  finally:
+    executor.close()
+
+  assert "summarize" in all_commands
+  assert summarize_command == ["summarize"]
+  assert summarize_start_positions == [-3]
 
 
 def test_completer_suggests_sql_helpers() -> None:

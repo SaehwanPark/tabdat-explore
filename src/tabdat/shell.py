@@ -54,6 +54,7 @@ _TABULATE_OPTIONS = ("row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
+_PREFIX_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$|by\($")
 _STYLE = Style.from_dict(
   {
     "command": "bold #00aa88",
@@ -88,7 +89,7 @@ class TabdatCompleter(Completer):
   ) -> Iterable[Completion]:
     text = document.text_before_cursor
     stripped = text.lstrip()
-    word = document.get_word_before_cursor(WORD=True)
+    word = _completion_prefix(text)
 
     if _is_first_token(text):
       yield from _matching_completions(COMMAND_NAMES, word)
@@ -103,7 +104,7 @@ class TabdatCompleter(Completer):
       yield from self._by_completions(stripped, word)
       return
 
-    if _is_after_comma(text):
+    if command_name in {"tabulate", "collapse"} and _is_after_comma(text):
       yield from _option_completions(command_name, word)
       return
 
@@ -166,13 +167,15 @@ def _is_first_token(text: str) -> bool:
   return not stripped or not any(character.isspace() for character in stripped)
 
 
+def _completion_prefix(text: str) -> str:
+  match = _PREFIX_PATTERN.search(text)
+  if match is None:
+    return ""
+  return match.group(0)
+
+
 def _is_after_comma(text: str) -> bool:
-  if text.rstrip().endswith(","):
-    return True
-  words = text.split()
-  if not words or "," not in text:
-    return False
-  return text.rsplit(",", maxsplit=1)[1].strip() == words[-1]
+  return "," in text
 
 
 def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
