@@ -1,45 +1,55 @@
-# Phase 4 SQL Command Contract
+# Phase 5 CLI UX Contract
 
 ## Request Summary
 
-Add SQL integration as an escape hatch over the active dataset. `into <table>` updates the active
-dataset with the SQL result.
+Add prompt-toolkit-powered interactive shell UX while preserving existing command execution behavior.
 
 ## Roadmap Phase
 
-Phase 4: SQL Integration.
+Phase 5: CLI UX.
 
-## Syntax
+## Interactive Behavior
 
-```text
-sql <select-or-with-query>
-sql <select-or-with-query> into <table>
-sql """<select-or-with-query>"""
-sql """<select-or-with-query>""" into <table>
-```
+- Interactive `uv run tabdat` uses a `prompt_toolkit.PromptSession`.
+- Batch mode with `tabdat -c ...` is unchanged and remains smoke-testable.
+- Prompt text remains `tabdat> `.
+- Open multiline SQL triple quotes continue with the `... ` continuation prompt until closed.
+- Command history is persisted in `~/.tabdat_history`.
+- Inline suggestions come from prior command history.
 
-## Semantics
+## Autocomplete Semantics
 
-- `active` is a DuckDB view over the current active dataset.
-- SQL without `into` returns a formatted table and does not change active state.
-- SQL with `into <table>` replaces the active dataset with the query result.
-- The `into` table name appears in output: `Created <table>: <rows> rows, <columns> columns`.
-- `use` remains path-only.
-- SQL is limited to result-producing `select` or `with` queries.
-- `into` names must be identifiers and cannot be `active` or internal `__tabdat_*` names.
+- At the first token, suggest executable command names: `use`, `describe`, `summarize`, `codebook`,
+  `count`, `head`, `tail`, `keep`, `drop`, `select`, `rename`, `generate`, `replace`, `tabulate`,
+  `collapse`, `sql`, `by`, `exit`, and `quit`.
+- For command arguments that commonly accept variable names, suggest active dataset columns when an
+  active dataset exists.
+- For `by <vars>:` prefixes, suggest active dataset columns before `:` and command names after `:`.
+- After a comma in `tabulate`, suggest `row`, `col`, and `missing`.
+- After a comma in `collapse`, suggest `by(`.
+- In `sql` input, suggest lightweight SQL helpers such as `select`, `from active`, `where`,
+  `group by`, `order by`, and `into`.
+- Before a dataset is loaded, column completions are empty.
 
-## Error Behavior
+## Highlighting Semantics
 
-- `sql` requires an active dataset.
-- Empty SQL, unterminated triple quotes, malformed `into`, and invalid table names are parse errors.
-- Unsupported SQL statement types and DuckDB failures are user-facing execution errors.
+- Highlight known command names and `by`, `if`, and `into` keywords.
+- Highlight numbers, strings, operators, commas, and parentheses.
+- Highlighting is presentational only and does not change parsing or execution.
+
+## Non-Goals
+
+- No new TabDat commands.
+- No changes to parser grammar, executor semantics, backend state, or formatter output.
+- No semantic SQL parser or full SQL autocomplete.
+- No external shell configuration, keybinding customization, or terminal theme system.
 
 ## Acceptance Criteria
 
-- Parser tests cover valid single-line, multiline, and `into` SQL forms plus malformed forms.
-- Executor/backend tests cover active SQL queries, `into` replacement, post-`into` active inspection,
-  missing active dataset, unsupported statements, and invalid SQL.
-- CLI smoke test covers a Phase 4 SQL flow.
+- Focused tests cover command, column, option, `by`, and SQL completions.
+- Focused tests cover lexer output for command and literal highlighting.
+- CLI tests confirm `-c` execution remains unchanged.
+- Documentation records Phase 5 as complete and notes current limitations.
 - Validation passes:
   - `uv run pytest`
   - `uv run mypy`

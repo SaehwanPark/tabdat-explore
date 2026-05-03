@@ -1,36 +1,36 @@
-# Request Summary: Phase 4 SQL Integration
+# Phase 5 Request Summary
 
 ## Goal
 
-Implement roadmap Phase 4 on a temporary branch and publish it as a PR.
+Implement roadmap Phase 5: prompt-toolkit-powered interactive CLI UX for TabDat-Explore.
+
+## Requested Workflow
+
+- Use a temporary branch.
+- Commit meaningful implementation checkpoints.
+- Run `mypy` after implementation.
+- Create and submit a PR when fully done.
+- Include `@codex review` in the PR message.
 
 ## Phase Fit
 
-Phase 4 adds SQL power without broadening the Stata-inspired command surface:
+Roadmap Phase 5 covers terminal UX via `prompt_toolkit`:
 
-- `sql` command for single-line and multiline result-producing queries
-- active dataset exposed as `active`
-- `into <table>` support
-
-## User Decision
-
-`into <table>` should change/update the active dataset. The table name is used in user-facing output;
-it is not a persistent table catalog feature.
+- syntax highlighting
+- context-aware autocomplete for commands, columns, and options
+- command history
+- inline suggestions
 
 ## Touched Surfaces
 
-- command model
-- parser
-- executor
-- DuckDB backend
-- formatter
-- CLI shell continuation for multiline SQL
-- tests
-- README, SDD docs, and workspace handoff artifacts
+- CLI shell behavior
+- runtime dependencies
+- focused tests
+- README and SDD state docs
+- workspace implementation and QA reports
 
-## Non-Goals
+## Assumptions
 
-- no persistent writes
-- no `use <table>` support
-- no prompt-toolkit UX
-- no non-result SQL statements
+- Command semantics, parser behavior, executor behavior, and backend data behavior remain unchanged.
+- Inline suggestions are history-based for Phase 5.
+- Autocomplete is best-effort UX help; parser and executor remain authoritative for diagnostics.
