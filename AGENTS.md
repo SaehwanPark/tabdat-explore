@@ -20,7 +20,17 @@ Keep this file short and repo-wide. Detailed reusable workflows live under `.age
 - Use a tab size of 2 spaces across project files.
 - Run configured linting and formatting proactively before commits.
 - For reusable agent workflows, use `.agents/skills/tabdat-orchestrator/SKILL.md` and `docs/harness/tabdat/team-spec.md`.
-- Note this project should follow: FP-style, SDD (spec-driven), TDD (test-driven)
+- Note this project should follow: FP-style (use `fp-developer` skill whenever writing or editing codebase), SDD (spec-driven), TDD (test-driven)
+- Focus on type safety via `mypy` and `pydantic`: Use `mypy` to prevent bugs by analyzing code for errors before execution, use `pydantic` to ensure data integrity by ensuring data structures conform to defined types.
+- Use `pymonad` for more consistent functional programming
+
+## Recommended Tools
+- `pytest`
+- `mypy`: you may install via `uv`
+- `pydantic`: you may install via `uv`
+- `pymonad`: you may install via `uv`
+- `gh`
+- `hf`
 
 ## Tooling Troubleshoot
 - When essential tools like `uv`, `gh`, `hf` are not found, check paths: `which uv`, `which gh`, `which hf`
