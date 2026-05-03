@@ -79,14 +79,16 @@ class Executor:
       dataset = self._require_active_dataset("head")
       preview_rows = self.backend.preview_rows(command.limit)
       return PreviewResult(
-        columns=tuple(column.name for column in dataset.columns), rows=preview_rows
+        columns=tuple(column.name for column in dataset.columns),
+        rows=preview_rows,
       )
 
     if isinstance(command, TailCommand):
       dataset = self._require_active_dataset("tail")
       preview_rows = self.backend.preview_rows(command.limit, tail=True)
       return PreviewResult(
-        columns=tuple(column.name for column in dataset.columns), rows=preview_rows
+        columns=tuple(column.name for column in dataset.columns),
+        rows=preview_rows,
       )
 
     if isinstance(command, KeepCommand):
@@ -147,7 +149,7 @@ class Executor:
         column_percent=command.column_percent,
         include_missing=command.include_missing,
       )
-      headers = _tabulate_headers(command)
+      headers: tuple[str, ...] = _tabulate_headers(command)
       return TableResult(headers=headers, rows=table_rows)
 
     if isinstance(command, CollapseCommand):
@@ -186,18 +188,23 @@ class Executor:
   def _execute_by(self, command: ByCommand) -> TableResult:
     dataset = self._require_active_dataset("by")
     if isinstance(command.command, SummarizeCommand):
-      summarized_rows = self.backend.grouped_summarize(
-        dataset, command.groups, command.command.variables
+      table_rows = self.backend.grouped_summarize(
+        dataset,
+        command.groups,
+        command.command.variables,
       )
       variables = command.command.variables or _default_grouped_summary_variables(
         dataset,
         command.groups,
       )
-      headers = command.groups + tuple(f"mean_{variable}" for variable in variables)
-      return TableResult(headers=headers, rows=summarized_rows)
+      summary_headers: tuple[str, ...] = command.groups + tuple(
+        f"mean_{variable}" for variable in variables
+      )
+      return TableResult(headers=summary_headers, rows=table_rows)
     if isinstance(command.command, CountCommand):
-      counted_rows = self.backend.grouped_count(dataset, command.groups)
-      return TableResult(headers=command.groups + ("Count",), rows=counted_rows)
+      table_rows = self.backend.grouped_count(dataset, command.groups)
+      count_headers: tuple[str, ...] = command.groups + ("Count",)
+      return TableResult(headers=count_headers, rows=table_rows)
     raise ExecutionError("by only supports summarize and count in Phase 3")
 
 

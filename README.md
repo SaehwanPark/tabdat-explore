@@ -102,7 +102,7 @@ This repository uses `uv` for commands, `pytest` for tests, `mypy` for type chec
 for linting and formatting.
 
 ```bash
-uv run mypy src tests
+uv run mypy
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .

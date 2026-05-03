@@ -181,6 +181,10 @@ def test_parse_phase_4_sql_commands() -> None:
     query="select sex, avg(bmi) from active group by sex",
     into="summary",
   )
+  assert parse_command("sql select * from active   into summary") == SqlCommand(
+    query="select * from active",
+    into="summary",
+  )
   assert parse_command('sql """\nselect sex, count(*) as n\nfrom active\n"""') == SqlCommand(
     query="select sex, count(*) as n\nfrom active"
   )

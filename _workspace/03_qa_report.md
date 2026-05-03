@@ -16,9 +16,9 @@ pass
 ## Current Evidence
 
 - Targeted parser/executor/CLI tests passed after fixing trailing `into` parsing.
-- Ruff check for `src` and `tests` passed after line-length cleanup.
-- `uv run mypy src tests` passed.
-- `uv run pytest` passed with 112 tests.
+- Review fixes cover flexible SQL `into` whitespace and flexible multiline SQL shell detection.
+- `uv run mypy` passed.
+- `uv run pytest` passed with 117 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 

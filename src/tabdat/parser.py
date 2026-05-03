@@ -2,7 +2,9 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, NoReturn, cast
+
+from pymonad.either import Either, Left, Right
 
 from tabdat.errors import ParseError
 from tabdat.models import (
@@ -103,9 +105,42 @@ def parse_command(text: str) -> Command:
   if command_name == "sql":
     return _parse_sql(stripped)
 
-  tokens = _tokenize(stripped)
-  parts = _parse_command_parts(tokens)
+  return _parse_structured_command(stripped)
 
+
+def _parse_structured_command(text: str) -> Command:
+  command = (
+    _tokenize_either(text).then(_parse_command_parts_either).then(_build_command_from_parts_either)
+  )
+  return cast(Command, command.either(_raise_parse_error, lambda command: command))
+
+
+def _parse_command_parts_either(tokens: tuple[_Token, ...]) -> Either[str, _CommandParts]:
+  try:
+    return Right(_parse_command_parts(tokens))
+  except ParseError as exc:
+    return Left(str(exc))
+
+
+def _build_command_from_parts_either(parts: _CommandParts) -> Either[str, Command]:
+  try:
+    return Right(_build_command_from_parts(parts))
+  except ParseError as exc:
+    return Left(str(exc))
+
+
+def _tokenize_either(text: str) -> Either[str, tuple[_Token, ...]]:
+  try:
+    return Right(_tokenize(text))
+  except ParseError as exc:
+    return Left(str(exc))
+
+
+def _raise_parse_error(message: str) -> NoReturn:
+  raise ParseError(message)
+
+
+def _build_command_from_parts(parts: _CommandParts) -> Command:
   if parts.name == "describe":
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError("describe does not accept arguments, if clauses, or options")
@@ -271,11 +306,13 @@ def _parse_triple_quoted_sql(body: str) -> tuple[str, str]:
 
 
 def _split_sql_into(body: str) -> tuple[str, str]:
-  parts = body.rsplit(maxsplit=2)
+  stripped_body = body.rstrip()
+  parts = stripped_body.rsplit(maxsplit=2)
   if parts and parts[-1].lower() == "into":
     raise ParseError("sql into expects syntax: sql <query> into <table>")
   if len(parts) >= 3 and parts[-2].lower() == "into":
-    query = body[: -len(f" into {parts[-1]}")]
+    into_start = stripped_body.rfind(parts[-2])
+    query = stripped_body[:into_start].rstrip()
     return query, f"into {parts[-1]}"
   return body, ""
 
@@ -343,6 +380,7 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
   statistic = parts.arguments[0].lower()
   if statistic not in _COLLAPSE_STATS:
     raise ParseError(f"collapse unsupported statistic: {parts.arguments[0]}")
+  statistic_literal = cast(Literal["count", "mean", "sum", "min", "max"], statistic)
 
   by_options = tuple(option for option in parts.options if option.name == "by")
   if len(by_options) != 1 or len(parts.options) != 1:
@@ -352,7 +390,7 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
     raise ParseError("collapse by() expects at least one grouping variable")
 
   return CollapseCommand(
-    statistic=cast(Literal["count", "mean", "sum", "min", "max"], statistic),
+    statistic=statistic_literal,
     variables=parts.arguments[1:],
     groups=groups,
   )
@@ -621,11 +659,11 @@ class _ExpressionParser:
       if self._stream.at_end:
         raise ParseError(f"incomplete expression after {operator}")
       right = self._parse_binary(precedence + 1)
-      left = BinaryExpression(
-        left=left,
-        operator=cast(Literal["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="], operator),
-        right=right,
+      operator_literal = cast(
+        Literal["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="],
+        operator,
       )
+      left = BinaryExpression(left=left, operator=operator_literal, right=right)
     return left
 
   def _parse_primary(self) -> Expression:

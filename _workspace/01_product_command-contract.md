@@ -42,6 +42,6 @@ sql """<select-or-with-query>""" into <table>
 - CLI smoke test covers a Phase 4 SQL flow.
 - Validation passes:
   - `uv run pytest`
-  - `uv run mypy src tests`
+  - `uv run mypy`
   - `uv run ruff check .`
   - `uv run ruff format --check .`

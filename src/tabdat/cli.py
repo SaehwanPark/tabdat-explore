@@ -85,7 +85,13 @@ def _read_multiline_sql(command_text: str) -> str:
 
 def _has_open_sql_triple_quote(command_text: str) -> bool:
   stripped = command_text.lstrip()
-  return stripped.lower().startswith('sql """') and stripped.count('"""') % 2 == 1
+  parts = stripped.split(maxsplit=1)
+  return (
+    len(parts) == 2
+    and parts[0].lower() == "sql"
+    and parts[1].lstrip().startswith('"""')
+    and stripped.count('"""') % 2 == 1
+  )
 
 
 if __name__ == "__main__":

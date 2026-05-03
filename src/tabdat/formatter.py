@@ -1,6 +1,6 @@
 """Terminal formatting for structured command results."""
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from tabdat.models import (
@@ -96,7 +96,7 @@ def format_result(result: Result) -> str:
   raise TypeError(f"Unsupported result: {type(result).__name__}")
 
 
-def _table(headers: tuple[str, ...], rows: Iterable[tuple[str, ...]]) -> list[str]:
+def _table(headers: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:
   materialized = list(rows)
   widths = [
     max(len(value) for value in column) for column in zip(headers, *materialized, strict=False)
@@ -106,7 +106,7 @@ def _table(headers: tuple[str, ...], rows: Iterable[tuple[str, ...]]) -> list[st
   return lines
 
 
-def _format_row(values: tuple[str, ...], widths: list[int]) -> str:
+def _format_row(values: Sequence[str], widths: Sequence[int]) -> str:
   return "  ".join(value.ljust(width) for value, width in zip(values, widths, strict=True))
 
 

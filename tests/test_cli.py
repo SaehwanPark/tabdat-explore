@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tabdat.cli import main
+from tabdat.cli import _has_open_sql_triple_quote, main
 
 
 def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
@@ -119,6 +119,14 @@ def test_cli_runs_phase_4_sql_flow(sample_parquet: Path, capsys) -> None:
   assert "F    2" in captured.out
   assert "M    1" in captured.out
   assert captured.err == ""
+
+
+def test_cli_detects_multiline_sql_with_flexible_spacing() -> None:
+  assert _has_open_sql_triple_quote('sql """')
+  assert _has_open_sql_triple_quote('sql    """')
+  assert _has_open_sql_triple_quote('\tsql\t"""')
+  assert not _has_open_sql_triple_quote('sql """select * from active"""')
+  assert not _has_open_sql_triple_quote('summarize """')
 
 
 def test_cli_prints_command_errors(capsys) -> None:

@@ -69,12 +69,12 @@ class DuckDBBackend:
   def active_dataset_info(self, path: Path) -> DatasetInfo:
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
-      count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
+      row_count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
     except duckdb.Error as exc:
       raise ExecutionError("active dataset is not available") from exc
-    if count_row is None:
+    if row_count_row is None:
       raise ExecutionError("active dataset is not available")
-    row_count = count_row[0]
+    row_count = row_count_row[0]
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
     return DatasetInfo(path=path, row_count=row_count, columns=columns)
 
@@ -378,12 +378,12 @@ class DuckDBBackend:
       from {ACTIVE_TABLE}
     """
     try:
-      summary_row = self._connection.execute(sql).fetchone()
+      row = self._connection.execute(sql).fetchone()
     except duckdb.Error as exc:
       raise ExecutionError(f"summarize failed for variable: {variable}") from exc
-    if summary_row is None:
+    if row is None:
       raise ExecutionError(f"summarize failed for variable: {variable}")
-    count, mean, std_dev, minimum, maximum = summary_row
+    count, mean, std_dev, minimum, maximum = row
 
     return SummaryRow(
       variable=variable,

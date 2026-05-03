@@ -14,8 +14,8 @@ Implemented Phase 4 SQL integration. Users can query the active dataset through 
 
 ## Validation
 
-- `uv run mypy src tests` passed.
-- `uv run pytest` passed with 112 tests.
+- `uv run mypy` passed.
+- `uv run pytest` passed with 117 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 

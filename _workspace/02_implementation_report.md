@@ -18,9 +18,9 @@
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed with 112 tests.
-- `uv run mypy src tests` passed.
-- `uv run pytest` passed with 112 tests.
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed before merging main.
+- `uv run mypy` passed.
+- `uv run pytest` passed with 117 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 
