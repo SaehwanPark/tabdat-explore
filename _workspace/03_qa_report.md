@@ -17,6 +17,7 @@ pass
 
 - Targeted parser/executor/CLI tests passed after fixing trailing `into` parsing.
 - Ruff check for `src` and `tests` passed after line-length cleanup.
+- `uv run mypy src tests` passed.
 - `uv run pytest` passed with 112 tests.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.

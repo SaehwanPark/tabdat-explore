@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from tabdat.errors import ParseError
 from tabdat.models import (
@@ -352,7 +352,7 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
     raise ParseError("collapse by() expects at least one grouping variable")
 
   return CollapseCommand(
-    statistic=statistic,
+    statistic=cast(Literal["count", "mean", "sum", "min", "max"], statistic),
     variables=parts.arguments[1:],
     groups=groups,
   )
@@ -621,7 +621,11 @@ class _ExpressionParser:
       if self._stream.at_end:
         raise ParseError(f"incomplete expression after {operator}")
       right = self._parse_binary(precedence + 1)
-      left = BinaryExpression(left=left, operator=operator, right=right)
+      left = BinaryExpression(
+        left=left,
+        operator=cast(Literal["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="], operator),
+        right=right,
+      )
     return left
 
   def _parse_primary(self) -> Expression:

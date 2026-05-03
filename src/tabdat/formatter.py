@@ -42,7 +42,7 @@ def format_result(result: Result) -> str:
     return "\n".join(lines)
 
   if isinstance(result, SummarizeResult):
-    rows = (
+    summary_rows = (
       (
         row.variable,
         str(row.count),
@@ -53,10 +53,10 @@ def format_result(result: Result) -> str:
       )
       for row in result.rows
     )
-    return "\n".join(_table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), rows))
+    return "\n".join(_table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), summary_rows))
 
   if isinstance(result, CodebookResult):
-    rows = (
+    codebook_rows = (
       (
         row.variable,
         row.data_type,
@@ -68,15 +68,18 @@ def format_result(result: Result) -> str:
       for row in result.rows
     )
     return "\n".join(
-      _table(("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"), rows)
+      _table(
+        ("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"),
+        codebook_rows,
+      )
     )
 
   if isinstance(result, CountResult):
     return f"Rows: {result.row_count}"
 
   if isinstance(result, PreviewResult):
-    rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
-    return "\n".join(_table(result.columns, rows))
+    preview_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
+    return "\n".join(_table(result.columns, preview_rows))
 
   if isinstance(result, TransformResult):
     dataset = result.dataset
@@ -87,8 +90,8 @@ def format_result(result: Result) -> str:
     return f"Created {result.table_name}: {dataset.row_count} rows, {dataset.column_count} columns"
 
   if isinstance(result, TableResult):
-    rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
-    return "\n".join(_table(result.headers, rows))
+    table_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
+    return "\n".join(_table(result.headers, table_rows))
 
   raise TypeError(f"Unsupported result: {type(result).__name__}")
 

@@ -20,6 +20,7 @@ from tabdat.models import (
   HeadCommand,
   IdentifierExpression,
   KeepCommand,
+  LoadResult,
   NumberExpression,
   ParsedCommand,
   PreviewResult,
@@ -34,6 +35,7 @@ from tabdat.models import (
   TableResult,
   TabulateCommand,
   TailCommand,
+  TransformResult,
   UseCommand,
 )
 
@@ -45,6 +47,7 @@ def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   finally:
     executor.close()
 
+  assert isinstance(result, LoadResult)
   assert result.dataset.row_count == 3
   assert result.dataset.column_count == 4
   assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
@@ -215,6 +218,7 @@ def test_keep_and_drop_columns_update_active_dataset(sample_parquet: Path) -> No
   finally:
     executor.close()
 
+  assert isinstance(result, TransformResult)
   assert result.dataset.column_count == 1
   assert [column.name for column in result.dataset.columns] == ["age"]
   assert isinstance(preview, PreviewResult)
@@ -249,6 +253,7 @@ def test_select_and_row_filters_update_active_dataset(sample_parquet: Path) -> N
   finally:
     executor.close()
 
+  assert isinstance(result, TransformResult)
   assert result.dataset.row_count == 1
   assert result.dataset.column_count == 2
   assert isinstance(preview, PreviewResult)
@@ -358,6 +363,7 @@ def test_collapse_replaces_active_dataset(sample_parquet: Path) -> None:
   finally:
     executor.close()
 
+  assert isinstance(result, TransformResult)
   assert result.dataset.column_count == 3
   assert [column.name for column in result.dataset.columns] == ["sex", "mean_age", "mean_cost"]
   assert isinstance(preview, PreviewResult)

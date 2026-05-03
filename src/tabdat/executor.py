@@ -63,13 +63,13 @@ class Executor:
 
     if isinstance(command, SummarizeCommand):
       dataset = self._require_active_dataset("summarize")
-      rows = self.backend.summarize(dataset, command.variables)
-      return SummarizeResult(rows=rows)
+      summary_rows = self.backend.summarize(dataset, command.variables)
+      return SummarizeResult(rows=summary_rows)
 
     if isinstance(command, CodebookCommand):
       dataset = self._require_active_dataset("codebook")
-      rows = self.backend.codebook(dataset, command.variables)
-      return CodebookResult(rows=rows)
+      codebook_rows = self.backend.codebook(dataset, command.variables)
+      return CodebookResult(rows=codebook_rows)
 
     if isinstance(command, CountCommand):
       dataset = self._require_active_dataset("count")
@@ -77,13 +77,17 @@ class Executor:
 
     if isinstance(command, HeadCommand):
       dataset = self._require_active_dataset("head")
-      rows = self.backend.preview_rows(command.limit)
-      return PreviewResult(columns=tuple(column.name for column in dataset.columns), rows=rows)
+      preview_rows = self.backend.preview_rows(command.limit)
+      return PreviewResult(
+        columns=tuple(column.name for column in dataset.columns), rows=preview_rows
+      )
 
     if isinstance(command, TailCommand):
       dataset = self._require_active_dataset("tail")
-      rows = self.backend.preview_rows(command.limit, tail=True)
-      return PreviewResult(columns=tuple(column.name for column in dataset.columns), rows=rows)
+      preview_rows = self.backend.preview_rows(command.limit, tail=True)
+      return PreviewResult(
+        columns=tuple(column.name for column in dataset.columns), rows=preview_rows
+      )
 
     if isinstance(command, KeepCommand):
       dataset = self._require_active_dataset("keep")
@@ -136,7 +140,7 @@ class Executor:
 
     if isinstance(command, TabulateCommand):
       dataset = self._require_active_dataset("tabulate")
-      rows = self.backend.tabulate(
+      table_rows = self.backend.tabulate(
         dataset,
         command.variables,
         row_percent=command.row_percent,
@@ -144,7 +148,7 @@ class Executor:
         include_missing=command.include_missing,
       )
       headers = _tabulate_headers(command)
-      return TableResult(headers=headers, rows=rows)
+      return TableResult(headers=headers, rows=table_rows)
 
     if isinstance(command, CollapseCommand):
       dataset = self._require_active_dataset("collapse")
@@ -163,8 +167,8 @@ class Executor:
         next_dataset = self.backend.replace_active_with_sql(dataset, command.query)
         self.state.active_dataset = next_dataset
         return SqlCreateResult(command.into, next_dataset)
-      headers, rows = self.backend.run_sql(command.query)
-      return TableResult(headers=headers, rows=rows)
+      sql_headers, sql_rows = self.backend.run_sql(command.query)
+      return TableResult(headers=sql_headers, rows=sql_rows)
 
     if isinstance(command, ByCommand):
       return self._execute_by(command)
@@ -182,23 +186,25 @@ class Executor:
   def _execute_by(self, command: ByCommand) -> TableResult:
     dataset = self._require_active_dataset("by")
     if isinstance(command.command, SummarizeCommand):
-      rows = self.backend.grouped_summarize(dataset, command.groups, command.command.variables)
+      summarized_rows = self.backend.grouped_summarize(
+        dataset, command.groups, command.command.variables
+      )
       variables = command.command.variables or _default_grouped_summary_variables(
         dataset,
         command.groups,
       )
       headers = command.groups + tuple(f"mean_{variable}" for variable in variables)
-      return TableResult(headers=headers, rows=rows)
+      return TableResult(headers=headers, rows=summarized_rows)
     if isinstance(command.command, CountCommand):
-      rows = self.backend.grouped_count(dataset, command.groups)
-      return TableResult(headers=command.groups + ("Count",), rows=rows)
+      counted_rows = self.backend.grouped_count(dataset, command.groups)
+      return TableResult(headers=command.groups + ("Count",), rows=counted_rows)
     raise ExecutionError("by only supports summarize and count in Phase 3")
 
 
 def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:
   if len(command.variables) == 1:
     return (command.variables[0], "Count", "Percent")
-  headers = (command.variables[0], command.variables[1], "Count")
+  headers: tuple[str, ...] = (command.variables[0], command.variables[1], "Count")
   if command.row_percent:
     headers += ("Row %",)
   if command.column_percent:

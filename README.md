@@ -98,9 +98,11 @@ Created summary: 2 rows, 2 columns
 
 ## Validation
 
-This repository uses `uv` for commands and `pytest` for tests.
+This repository uses `uv` for commands, `pytest` for tests, `mypy` for type checking, and `ruff`
+for linting and formatting.
 
 ```bash
+uv run mypy src tests
 uv run pytest
 uv run ruff check .
 uv run ruff format --check .
