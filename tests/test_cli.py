@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from tabdat.cli import _has_open_sql_triple_quote, main
+from tabdat.cli import _has_open_sql_triple_quote, _open_plot_if_needed, main
+from tabdat.models import PlotResult
 
 
 def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
@@ -119,6 +120,51 @@ def test_cli_runs_phase_4_sql_flow(sample_parquet: Path, capsys) -> None:
   assert "F    2" in captured.out
   assert "M    1" in captured.out
   assert captured.err == ""
+
+
+def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
+  plot_path = tmp_path / "age.svg"
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      f"histogram age, saving({plot_path})",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Saved plot: {plot_path}" in captured.out
+  assert plot_path.read_text().lstrip().startswith("<svg")
+  assert captured.err == ""
+
+
+def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:
+  opened: list[Path] = []
+  result = PlotResult(path=tmp_path / "plot.svg", should_open=True)
+
+  _open_plot_if_needed(
+    result,
+    open_plots=False,
+    opener=lambda plot: opened.append(plot.path),
+  )
+  assert opened == []
+
+  _open_plot_if_needed(
+    result,
+    open_plots=True,
+    opener=lambda plot: opened.append(plot.path),
+  )
+  assert opened == [result.path]
+
+  _open_plot_if_needed(
+    PlotResult(path=tmp_path / "closed.svg", should_open=False),
+    open_plots=True,
+    opener=lambda plot: opened.append(plot.path),
+  )
+  assert opened == [result.path]
 
 
 def test_cli_detects_multiline_sql_with_flexible_spacing() -> None:

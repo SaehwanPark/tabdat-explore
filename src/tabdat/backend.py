@@ -366,6 +366,46 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def plot_rows(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    *,
+    numeric: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type.upper() for column in dataset.columns}
+    _require_columns("plot", column_types, variables)
+    if numeric:
+      non_numeric = tuple(
+        variable for variable in variables if not _is_numeric_type(column_types[variable])
+      )
+      if non_numeric:
+        raise ExecutionError(f"plot requires numeric variables: {', '.join(non_numeric)}")
+    select_sql = _select_list(variables)
+    return self._fetch_table(f"select {select_sql} from {ACTIVE_TABLE}", "plot")
+
+  def bar_counts(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    *,
+    include_missing: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("bar", column_types, (variable,))
+    quoted = _quote_identifier(variable)
+    where_sql = "" if include_missing else f"where {quoted} is not null"
+    return self._fetch_table(
+      f"""
+      select cast({quoted} as varchar) as value, count(*) as count
+      from {ACTIVE_TABLE}
+      {where_sql}
+      group by {quoted}
+      order by count desc, value
+      """,
+      "bar",
+    )
+
   def _summarize_variable(self, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""

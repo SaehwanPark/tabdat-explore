@@ -8,6 +8,7 @@ from tabdat.models import (
   CountResult,
   DescribeResult,
   LoadResult,
+  PlotResult,
   PreviewResult,
   Result,
   SqlCreateResult,
@@ -92,6 +93,9 @@ def format_result(result: Result) -> str:
   if isinstance(result, TableResult):
     table_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
     return "\n".join(_table(result.headers, table_rows))
+
+  if isinstance(result, PlotResult):
+    return f"Saved plot: {_display_path(result.path)}"
 
   raise TypeError(f"Unsupported result: {type(result).__name__}")
 

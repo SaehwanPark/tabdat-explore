@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from tabdat.backend import DuckDBBackend
 from tabdat.errors import ExecutionError
 from tabdat.models import (
+  BarCommand,
   ByCommand,
   CodebookCommand,
   CodebookResult,
@@ -19,12 +20,15 @@ from tabdat.models import (
   ExitCommand,
   GenerateCommand,
   HeadCommand,
+  HistogramCommand,
   KeepCommand,
   LoadResult,
+  PlotResult,
   PreviewResult,
   RenameCommand,
   ReplaceCommand,
   Result,
+  ScatterCommand,
   SelectCommand,
   SqlCommand,
   SqlCreateResult,
@@ -36,6 +40,7 @@ from tabdat.models import (
   TransformResult,
   UseCommand,
 )
+from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
 
 
 @dataclass
@@ -171,6 +176,38 @@ class Executor:
         return SqlCreateResult(command.into, next_dataset)
       sql_headers, sql_rows = self.backend.run_sql(command.query)
       return TableResult(headers=sql_headers, rows=sql_rows)
+
+    if isinstance(command, HistogramCommand):
+      dataset = self._require_active_dataset("histogram")
+      rows = self.backend.plot_rows(dataset, (command.variable,), numeric=True)
+      path = command.saving or default_plot_path("histogram", (command.variable,))
+      saved_path = save_histogram(rows, command.variable, path, bins=command.bins)
+      return PlotResult(path=saved_path, should_open=command.open_artifact)
+
+    if isinstance(command, ScatterCommand):
+      dataset = self._require_active_dataset("scatter")
+      rows = self.backend.plot_rows(
+        dataset,
+        (command.y_variable, command.x_variable),
+        numeric=True,
+      )
+      path = command.saving or default_plot_path(
+        "scatter",
+        (command.y_variable, command.x_variable),
+      )
+      saved_path = save_scatter(rows, command.y_variable, command.x_variable, path)
+      return PlotResult(path=saved_path, should_open=command.open_artifact)
+
+    if isinstance(command, BarCommand):
+      dataset = self._require_active_dataset("bar")
+      rows = self.backend.bar_counts(
+        dataset,
+        command.variable,
+        include_missing=command.include_missing,
+      )
+      path = command.saving or default_plot_path("bar", (command.variable,))
+      saved_path = save_bar(rows, command.variable, path)
+      return PlotResult(path=saved_path, should_open=command.open_artifact)
 
     if isinstance(command, ByCommand):
       return self._execute_by(command)
