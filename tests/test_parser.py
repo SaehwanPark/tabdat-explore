@@ -4,6 +4,7 @@ import pytest
 
 from tabdat.errors import ParseError
 from tabdat.models import (
+  BarCommand,
   BinaryExpression,
   ByCommand,
   CodebookCommand,
@@ -15,6 +16,7 @@ from tabdat.models import (
   ExitCommand,
   FunctionCallExpression,
   GenerateCommand,
+  HistogramCommand,
   HeadCommand,
   IdentifierExpression,
   KeepCommand,
@@ -22,6 +24,7 @@ from tabdat.models import (
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  ScatterCommand,
   SelectCommand,
   SqlCommand,
   StringExpression,
@@ -196,6 +199,32 @@ def test_parse_phase_4_sql_commands() -> None:
   )
 
 
+def test_parse_phase_6_visualization_commands() -> None:
+  assert parse_command("histogram age") == HistogramCommand(variable="age")
+  assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
+    HistogramCommand(
+      variable="age",
+      bins=20,
+      saving=Path("figures/age.svg"),
+      open_artifact=False,
+    )
+  )
+  assert parse_command("scatter bmi age") == ScatterCommand(
+    y_variable="bmi",
+    x_variable="age",
+  )
+  assert parse_command("scatter bmi age, saving(artifacts/bmi-age.png)") == ScatterCommand(
+    y_variable="bmi",
+    x_variable="age",
+    saving=Path("artifacts/bmi-age.png"),
+  )
+  assert parse_command("bar sex, missing noopen") == BarCommand(
+    variable="sex",
+    include_missing=True,
+    open_artifact=False,
+  )
+
+
 def test_parse_expression_with_precedence_and_function_call() -> None:
   assert parse_expression("sqrt(age + 1) >= 5") == BinaryExpression(
     left=FunctionCallExpression(
@@ -278,6 +307,21 @@ def test_parse_exit_aliases() -> None:
     "sql select * from active into active",
     "sql select * from active into __tabdat_next",
     "sql select * from active into bad-name",
+    "histogram",
+    "histogram age bmi",
+    "histogram age if age > 18",
+    "histogram age, width=200",
+    "histogram age, bins=0",
+    "histogram age, bins=ten",
+    "histogram age, noopen=false",
+    "scatter bmi",
+    "scatter bmi age cost",
+    "scatter bmi age, bins=20",
+    "scatter bmi age, noopen=true",
+    "bar",
+    "bar sex age",
+    "bar sex, bins=20",
+    "bar sex, missing=true",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],

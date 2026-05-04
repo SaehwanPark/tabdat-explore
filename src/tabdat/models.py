@@ -152,6 +152,30 @@ class SqlCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class HistogramCommand:
+  variable: str
+  bins: int | None = None
+  saving: Path | None = None
+  open_artifact: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ScatterCommand:
+  y_variable: str
+  x_variable: str
+  saving: Path | None = None
+  open_artifact: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class BarCommand:
+  variable: str
+  saving: Path | None = None
+  include_missing: bool = False
+  open_artifact: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ByCommand:
   groups: tuple[str, ...]
   command: "Command"
@@ -188,6 +212,9 @@ Command = (
   | TabulateCommand
   | CollapseCommand
   | SqlCommand
+  | HistogramCommand
+  | ScatterCommand
+  | BarCommand
   | ByCommand
   | ExitCommand
   | ParsedCommand
@@ -280,6 +307,12 @@ class TableResult:
   rows: tuple[tuple[object, ...], ...]
 
 
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class PlotResult:
+  path: Path
+  should_open: bool
+
+
 Result = (
   LoadResult
   | DescribeResult
@@ -290,4 +323,5 @@ Result = (
   | TransformResult
   | SqlCreateResult
   | TableResult
+  | PlotResult
 )
