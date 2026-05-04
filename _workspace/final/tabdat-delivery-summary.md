@@ -1,24 +1,23 @@
-# Phase 5 Delivery Summary
+# Phase 6 Delivery Summary
 
 ## Completed Work
 
-- Added prompt-toolkit interactive shell UX with persistent history, inline history suggestions,
-  syntax highlighting, and context-aware autocomplete.
-- Preserved existing `tabdat -c ...` command execution and multiline SQL continuation behavior.
-- Added focused shell tests covering command, column, option, `by:`, SQL helper, lexer, and session
-  setup behavior.
-- Updated README, SPEC, ARCHITECTURE, CHANGELOG, and workspace handoff reports for Phase 5.
+- Added artifact-based `histogram`, `scatter`, and `bar` commands.
+- Added Altair-backed SVG/PNG rendering with default `artifacts/plots/` paths and `saving(...)`.
+- Added interactive-only auto-open behavior with `noopen` opt-out.
+- Preserved deterministic `tabdat -c ...` batch output.
+- Added focused parser, executor, CLI, and shell tests.
+- Updated README, SPEC, ARCHITECTURE, CHANGELOG, and workspace handoff reports for Phase 6.
 
 ## Validation
 
-- `uv run pytest tests/test_shell.py tests/test_cli.py` passed with 15 tests.
-- `uv run pytest` passed with 125 tests.
+- `uv run pytest` passed with 148 tests.
 - `uv run mypy` passed.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 
 ## Known Limits
 
-- SQL autocomplete is intentionally lightweight.
-- Inline suggestions come from command history.
-- Parser and executor diagnostics remain authoritative over autocomplete behavior.
+- `bar` is one-way category frequency counts.
+- Plot commands do not downsample large datasets yet.
+- Plot customization is intentionally minimal for the first visualization slice.

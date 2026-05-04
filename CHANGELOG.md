@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 6 artifact-based visualization with `histogram`, `scatter`, and `bar` commands,
+  Altair-backed SVG/PNG output, default `artifacts/plots/` paths, `saving(...)`, `noopen`, `bins=`,
+  and `missing` options, plus interactive-only plot auto-open behavior.
 - Added Phase 5 prompt-toolkit interactive shell UX with syntax highlighting, persistent command
   history, inline history suggestions, and context-aware autocomplete for commands, active dataset
   columns, common options, `by:` forms, and lightweight SQL helpers.

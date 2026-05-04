@@ -21,10 +21,11 @@ command line. The current CLI supports:
 - grouped aggregation with `collapse`
 - grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
+- artifact plots with `histogram`, `scatter`, and `bar`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the CLI UX phase of the roadmap. Scripting, visualization, and lazy
+The repository has completed the artifact visualization phase of the roadmap. Scripting and lazy
 execution optimization are planned later.
 
 ## Quickstart
@@ -82,6 +83,9 @@ M    25
 
 tabdat> sql select sex, count(*) as n from active group by sex into summary
 Created summary: 2 rows, 2 columns
+
+tabdat> histogram age
+Saved plot: artifacts/plots/histogram-age.svg
 ```
 
 ## Design Notes
@@ -91,6 +95,8 @@ Created summary: 2 rows, 2 columns
 - Parquet is the primary data format.
 - SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
   dataset with the query result and does not persist a file.
+- Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
+  `-c` runs only print the saved path.
 - Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation
   and error messages.
 - The terminal experience is part of the product, not an afterthought.

@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 5 CLI UX slice. This document records the
-implemented shell UX, command-language model, active DuckDB relation model, and the boundaries
-future phases should preserve.
+TabDat-Explore has completed the roadmap Phase 6 artifact visualization slice. This document
+records the implemented shell UX, command-language model, active DuckDB relation model, plot
+artifact boundary, and the boundaries future phases should preserve.
 
 ## Runtime Flow
 
@@ -11,6 +11,7 @@ CLI Shell / prompt-toolkit UX
   -> Command Parser
   -> Executor
   -> DuckDB Backend
+  -> Visualization Artifact Renderer
   -> Formatter
   -> Terminal Output
 ```
@@ -45,6 +46,16 @@ persistent write/save behavior exists yet. SQL commands bind the active table as
 DuckDB view `active`; `sql ... into <table>` replaces the active table with the query result while
 using `<table>` as the displayed result name.
 
+For visualization commands, the backend extracts typed rows or frequency counts from the active
+table. It does not construct charts or write artifact files.
+
+### Visualization Artifact Renderer
+
+Owns Altair chart construction and SVG/PNG artifact writes. Default plot artifacts are written
+under `artifacts/plots/`, and explicit `saving(...)` paths create parent directories as needed.
+Interactive shell auto-open is a CLI-edge behavior; batch `-c` execution only prints the artifact
+path.
+
 ### Formatter
 
 Converts structured command results into deterministic terminal text. The backend should not own
@@ -67,6 +78,8 @@ display formatting.
 - Multiline SQL can be entered with `sql """..."""`.
 - `sql ... into <table>` replaces the active dataset with the SQL result; `use` remains path-only.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
+- Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
+- Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset metadata from executor state but does not validate or mutate
   session state.
 - Inline suggestions are history-based and persisted via `~/.tabdat_history`.
@@ -77,5 +90,6 @@ display formatting.
 - Do not add broad command grammar before a command contract needs it.
 - Keep public behavior documented before implementation.
 - Keep transformation state session-local until a save/write command is explicitly designed.
+- Keep chart rendering separate from backend data extraction.
 - Use 2-space tab size across project files.
 - Run configured linting and formatting proactively before commits.
