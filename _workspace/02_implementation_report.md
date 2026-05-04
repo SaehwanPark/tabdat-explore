@@ -1,32 +1,51 @@
-# Phase 6 Implementation Report
+# Phase 7 Implementation Report
 
 ## Contract Consumed
 
-`_workspace/01_product_command-contract.md`
+`_workspace/01_product_command-contract.md`: Phase 7 Lazy Execution Contract.
+
+## Files Changed
+
+- `pyproject.toml`, `uv.lock`
+- `src/tabdat/models.py`
+- `src/tabdat/parser.py`
+- `src/tabdat/backend.py`
+- `src/tabdat/executor.py`
+- `src/tabdat/formatter.py`
+- `tests/test_parser.py`
+- `tests/test_executor.py`
+- `tests/test_cli.py`
+- `README.md`
+- `SPEC.md`
+- `ARCHITECTURE.md`
+- `CHANGELOG.md`
+- `_workspace/*`
 
 ## Implementation Notes
 
-- Added `altair` and `vl-convert-python` as runtime dependencies.
-- Added typed command/result models for `histogram`, `scatter`, `bar`, and saved plot artifacts.
-- Extended parser option support for `saving(...)` paths while preserving `by(...)` group options.
-- Added DuckDB-backed plot row extraction and bar frequency counts.
-- Added `src/tabdat/visualization.py` for chart construction and artifact writes.
-- Updated CLI edge behavior so interactive sessions can auto-open plots while `-c` batch mode only
-  prints saved paths.
-- Added autocomplete support for visualization commands and options.
-- Added focused parser, executor, CLI, and shell tests.
-- Updated README, SDD docs, changelog, and architecture notes.
+- Models now carry typed load mode metadata on `UseCommand` and `DatasetInfo`.
+- Parser supports `use <path>, lazy` and `use <path>, lazy engine=duckdb|polars`, with focused
+  parse errors for invalid options.
+- Executor passes load mode through the backend and keeps the single active dataset state.
+- Backend preserves eager table loading by default and uses a DuckDB `read_parquet(...)` scan view
+  for lazy loads.
+- Backend stages new loads before swapping the active relation, so failed lazy loads preserve the
+  previous active dataset.
+- Session transformations continue to update the active dataset for later commands.
+- Formatter identifies lazy load sessions in CLI output as `lazy=<engine>`.
+- Polars is added as a runtime dependency and accepted as an explicit lazy engine selector; full
+  Polars-native command lowering remains a documented follow-up.
 
 ## Validation
 
-- `uv run pytest` passed with 148 tests.
-- `uv run mypy` passed.
-- `uv run ruff check .` passed.
-- `uv run ruff format --check .` passed.
-- Final validation is recorded in `_workspace/03_qa_report.md`.
+- `uv run pytest`: passed, 162 tests.
+- `uv run mypy`: passed.
+- `uv run ruff check .`: passed.
+- `uv run ruff format --check .`: passed.
 
 ## Known Limits
 
-- `bar` is one-way frequency counts only.
-- Plot commands do not downsample or optimize lazy execution.
-- No custom plot titles, themes, facets, or grouped plot forms are included in Phase 6.
+- Lazy mode is opt-in; eager remains the default.
+- The first Phase 7 slice uses DuckDB scan views for lazy Parquet loading.
+- `engine=polars` is represented in command/session metadata but does not yet execute commands
+  through a separate Polars-native planner.

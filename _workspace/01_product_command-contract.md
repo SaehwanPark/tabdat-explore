@@ -1,74 +1,56 @@
-# Phase 6 Visualization Contract
+# Phase 7 Lazy Execution Contract
 
 ## Request Summary
 
-Add lightweight artifact-based plotting commands while preserving the single active dataset model.
+Add opt-in lazy loading for large local Parquet workflows while preserving the existing single active
+dataset model.
 
 ## Roadmap Phase
 
-Phase 6: Visualization System.
+Phase 7: Lazy Execution & Performance Optimization.
 
-## Commands
+## Command Surface
 
-### `histogram`
-
-Syntax:
-
-```text
-histogram <numeric_var>[, bins=<positive_integer> saving(<path>) noopen]
-```
-
-- Requires one active dataset and one numeric variable.
-- `bins` defaults to Altair's default binning behavior.
-- Saves to `artifacts/plots/histogram-<var>.svg` unless `saving(...)` is provided.
-
-### `scatter`
+### `use`
 
 Syntax:
 
 ```text
-scatter <y_var> <x_var>[, saving(<path>) noopen]
+use <path>
+use <path>, lazy
+use <path>, lazy engine=duckdb
+use <path>, lazy engine=polars
 ```
 
-- Requires one active dataset and two numeric variables.
-- Saves to `artifacts/plots/scatter-<y_var>-<x_var>.svg` unless `saving(...)` is provided.
+- `use <path>` remains eager and preserves existing behavior.
+- `lazy` is an explicit mode flag.
+- `engine=duckdb|polars` is valid only when `lazy` is present.
+- `engine=duckdb` is the default when `lazy` is present and no engine is specified.
+- Local `.parquet` remains the only supported input format in this phase.
 
-### `bar`
+## Execution Behavior
 
-Syntax:
-
-```text
-bar <category_var>[, saving(<path>) missing noopen]
-```
-
-- Requires one active dataset and one variable.
-- Produces one-way frequency counts.
-- Excludes null values by default; `missing` includes them.
-- Saves to `artifacts/plots/bar-<category_var>.svg` unless `saving(...)` is provided.
-
-## Artifact Behavior
-
-- Supported output extensions are `.svg` and `.png`.
-- Parent directories are created when needed.
-- Existing artifact files may be overwritten.
-- Successful commands return a concise saved-path result.
-- Batch `tabdat -c ...` mode never auto-opens artifacts.
-- Interactive shell auto-opens artifacts unless `noopen` is present.
+- Eager mode creates the current active DuckDB temp table.
+- Lazy mode creates a DuckDB `read_parquet(...)` scan view for the active dataset.
+- Terminal commands such as `describe`, `count`, `head`, `summarize`, `tabulate`, `collapse`,
+  grouped commands, SQL, and plot extraction run through the backend relation boundary.
+- Session transformations preserve the active dataset model for subsequent commands.
+- Load output identifies lazy sessions as `lazy=<engine>`.
 
 ## Non-Goals
 
-- No persistent saved datasets.
-- No lazy plotting optimization or downsampling.
-- No faceting, grouped plots, custom themes, titles, legends, or aggregate numeric bar charts.
-- No configuration for artifact roots.
+- No save/write command.
+- No scripting or `.do` execution.
+- No non-Parquet input expansion.
+- No default switch from eager to lazy.
+- No full Polars-native command lowering beyond accepting and recording the lazy engine selector.
 
 ## Acceptance Criteria
 
-- Focused parser tests cover valid and invalid visualization syntax.
-- Focused executor tests verify SVG artifacts are written for all three plot commands.
-- CLI smoke tests verify batch plot commands print artifact paths without stderr.
-- Shell tests verify completions and auto-open decision behavior without launching external apps.
-- Documentation records Phase 6 as complete and notes current limitations.
+- Parser tests cover valid and invalid lazy `use` syntax.
+- Executor tests verify eager compatibility and lazy command composition.
+- CLI smoke tests verify lazy command mode output.
+- Documentation records Phase 7 as complete and notes current limitations.
 - Validation passes:
   - `uv run pytest`
   - `uv run mypy`

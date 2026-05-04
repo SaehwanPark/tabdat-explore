@@ -54,7 +54,74 @@ def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   assert isinstance(result, LoadResult)
   assert result.dataset.row_count == 3
   assert result.dataset.column_count == 4
+  assert result.dataset.execution_mode == "eager"
+  assert result.dataset.lazy_engine is None
   assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
+
+
+@pytest.mark.parametrize("engine", ["duckdb", "polars"])
+def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> None:
+  executor = Executor()
+  try:
+    result = executor.execute(
+      UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, LoadResult)
+  assert result.dataset.row_count == 3
+  assert result.dataset.column_count == 4
+  assert result.dataset.execution_mode == "lazy"
+  assert result.dataset.lazy_engine == engine
+
+
+def test_failing_lazy_use_preserves_existing_active_dataset(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  corrupt_parquet = tmp_path / "corrupt.parquet"
+  corrupt_parquet.write_text("not parquet")
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="use could not read Parquet file"):
+      executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    result = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+
+
+@pytest.mark.parametrize("engine", ["duckdb", "polars"])
+def test_lazy_transformations_compose_before_terminal_results(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(
+      UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    )
+    executor.execute(SelectCommand(("age", "sex", "cost")))
+    executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(
+          left=IdentifierExpression("age"),
+          operator=">=",
+          right=NumberExpression(42),
+        )
+      )
+    )
+    result = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, PreviewResult)
+  assert result.columns == ("age", "sex", "cost")
+  assert result.rows == ((42, "M", 150.0), (54, "F", None))
 
 
 def test_describe_requires_active_dataset() -> None:

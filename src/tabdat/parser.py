@@ -270,10 +270,57 @@ def parse_expression(text: str) -> Expression:
 
 
 def _parse_use(text: str) -> UseCommand:
-  parts = text.split()
-  if len(parts) != 2:
+  body = text[3:].strip()
+  if not body:
     raise ParseError("use expects exactly one path: use <path>")
-  return UseCommand(path=Path(parts[1]))
+
+  path_text, separator, option_text = body.partition(",")
+  path_parts = path_text.split()
+  if len(path_parts) != 1:
+    raise ParseError("use expects exactly one path: use <path>")
+
+  if not separator:
+    return UseCommand(path=Path(path_parts[0]))
+
+  options = _parse_use_options(option_text)
+  is_lazy = "lazy" in options
+  engine = options.get("engine")
+  if engine is not None and engine not in {"duckdb", "polars"}:
+    raise ParseError("use engine must be duckdb or polars")
+  if engine is not None and not is_lazy:
+    raise ParseError("use engine option requires lazy mode")
+  lazy_engine = cast(Literal["duckdb", "polars"] | None, engine)
+  return UseCommand(
+    path=Path(path_parts[0]),
+    execution_mode="lazy" if is_lazy else "eager",
+    lazy_engine=lazy_engine or ("duckdb" if is_lazy else None),
+  )
+
+
+def _parse_use_options(option_text: str) -> dict[str, str | bool]:
+  if not option_text.strip():
+    raise ParseError("use options cannot be empty")
+
+  parsed: dict[str, str | bool] = {}
+  for raw_option in option_text.split():
+    name, separator, value = raw_option.partition("=")
+    normalized = name.lower()
+    if not normalized:
+      raise ParseError("use options cannot be empty")
+    if normalized in parsed:
+      raise ParseError(f"use option specified more than once: {normalized}")
+    if normalized == "lazy":
+      if separator:
+        raise ParseError("use lazy option does not accept a value")
+      parsed[normalized] = True
+      continue
+    if normalized == "engine":
+      if not separator or not value:
+        raise ParseError("use engine option expects a value")
+      parsed[normalized] = value.lower()
+      continue
+    raise ParseError(f"unknown use option: {normalized}")
+  return parsed
 
 
 def _parse_by(text: str) -> ByCommand:

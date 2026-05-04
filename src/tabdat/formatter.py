@@ -21,9 +21,14 @@ from tabdat.models import (
 def format_result(result: Result) -> str:
   if isinstance(result, LoadResult):
     dataset = result.dataset
+    mode = (
+      f", lazy={dataset.lazy_engine}"
+      if dataset.execution_mode == "lazy" and dataset.lazy_engine is not None
+      else ""
+    )
     return (
       f"Loaded: {_display_path(dataset.path)} "
-      f"({dataset.row_count} rows, {dataset.column_count} columns)"
+      f"({dataset.row_count} rows, {dataset.column_count} columns{mode})"
     )
 
   if isinstance(result, DescribeResult):

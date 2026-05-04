@@ -58,7 +58,11 @@ class Executor:
 
   def execute(self, command: Command) -> Result | None:
     if isinstance(command, UseCommand):
-      dataset = self.backend.inspect_parquet(command.path)
+      dataset = self.backend.inspect_parquet(
+        command.path,
+        execution_mode=command.execution_mode,
+        lazy_engine=command.lazy_engine,
+      )
       self.state.active_dataset = dataset
       return LoadResult(dataset=dataset)
 
