@@ -130,6 +130,24 @@ def test_completer_suggests_sql_helpers() -> None:
   assert completions == ["group by"]
 
 
+def test_completer_suggests_visualization_columns_and_options(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    completer = TabdatCompleter(executor)
+    histogram_columns = _completion_texts(completer, "histogram a")
+    histogram_options = _completion_texts(completer, "histogram age, ")
+    scatter_options = _completion_texts(completer, "scatter bmi age, s")
+    bar_options = _completion_texts(completer, "bar sex, m")
+  finally:
+    executor.close()
+
+  assert histogram_columns == ["age"]
+  assert histogram_options == ["bins=", "saving(", "noopen"]
+  assert scatter_options == ["saving("]
+  assert bar_options == ["missing"]
+
+
 def test_lexer_highlights_commands_keywords_and_literals() -> None:
   lexer = TabdatLexer()
   line = lexer.lex_document(Document("summarize age if age >= 42"))(0)

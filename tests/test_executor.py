@@ -5,6 +5,7 @@ import pytest
 from tabdat.errors import ExecutionError
 from tabdat.executor import Executor
 from tabdat.models import (
+  BarCommand,
   BinaryExpression,
   ByCommand,
   CodebookCommand,
@@ -18,14 +19,17 @@ from tabdat.models import (
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
+  HistogramCommand,
   IdentifierExpression,
   KeepCommand,
   LoadResult,
   NumberExpression,
   ParsedCommand,
+  PlotResult,
   PreviewResult,
   RenameCommand,
   ReplaceCommand,
+  ScatterCommand,
   SelectCommand,
   SqlCommand,
   SqlCreateResult,
@@ -421,6 +425,55 @@ def test_sql_reports_user_facing_errors(sample_parquet: Path) -> None:
       executor.execute(SqlCommand("drop table active"))
     with pytest.raises(ExecutionError, match="sql failed"):
       executor.execute(SqlCommand("select missing from active"))
+  finally:
+    executor.close()
+
+
+def test_phase_6_visualizations_write_svg_artifacts(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  histogram_path = tmp_path / "plots" / "age.svg"
+  scatter_path = tmp_path / "plots" / "bmi-age.svg"
+  bar_path = tmp_path / "plots" / "sex.svg"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    histogram = executor.execute(HistogramCommand("age", bins=5, saving=histogram_path))
+    scatter = executor.execute(ScatterCommand("bmi", "age", saving=scatter_path))
+    bar = executor.execute(BarCommand("sex", saving=bar_path))
+  finally:
+    executor.close()
+
+  assert isinstance(histogram, PlotResult)
+  assert histogram.path == histogram_path
+  assert histogram.should_open
+  assert histogram_path.read_text().lstrip().startswith("<svg")
+  assert isinstance(scatter, PlotResult)
+  assert scatter.path == scatter_path
+  assert scatter_path.read_text().lstrip().startswith("<svg")
+  assert isinstance(bar, PlotResult)
+  assert bar.path == bar_path
+  assert bar_path.read_text().lstrip().startswith("<svg")
+
+
+def test_phase_6_visualizations_report_user_facing_errors(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(ExecutionError, match="histogram requires an active dataset"):
+      executor.execute(HistogramCommand("age"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="plot requires numeric variables: sex"):
+      executor.execute(HistogramCommand("sex", saving=tmp_path / "sex.svg"))
+    with pytest.raises(ExecutionError, match="plot requires numeric variables: sex"):
+      executor.execute(ScatterCommand("age", "sex", saving=tmp_path / "scatter.svg"))
+    with pytest.raises(ExecutionError, match="bar unknown variable: missing"):
+      executor.execute(BarCommand("missing", saving=tmp_path / "missing.svg"))
+    with pytest.raises(ExecutionError, match="plot saving path must end with"):
+      executor.execute(HistogramCommand("age", saving=tmp_path / "age.txt"))
   finally:
     executor.close()
 

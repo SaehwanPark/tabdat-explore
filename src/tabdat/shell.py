@@ -33,6 +33,9 @@ COMMAND_NAMES: tuple[str, ...] = (
   "tabulate",
   "collapse",
   "sql",
+  "histogram",
+  "scatter",
+  "bar",
   "by",
   "exit",
   "quit",
@@ -49,9 +52,15 @@ _COLUMN_COMMANDS = {
   "replace",
   "tabulate",
   "collapse",
+  "histogram",
+  "scatter",
+  "bar",
 }
 _TABULATE_OPTIONS = ("row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
+_HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
+_SCATTER_OPTIONS = ("saving(", "noopen")
+_BAR_OPTIONS = ("saving(", "missing", "noopen")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
 _PREFIX_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$|by\($")
@@ -104,7 +113,9 @@ class TabdatCompleter(Completer):
       yield from self._by_completions(stripped, word)
       return
 
-    if command_name in {"tabulate", "collapse"} and _is_after_comma(text):
+    if command_name in {"tabulate", "collapse", "histogram", "scatter", "bar"} and _is_after_comma(
+      text
+    ):
       yield from _option_completions(command_name, word)
       return
 
@@ -183,6 +194,12 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_TABULATE_OPTIONS, word)
   if command_name == "collapse":
     yield from _matching_completions(_COLLAPSE_OPTIONS, word)
+  if command_name == "histogram":
+    yield from _matching_completions(_HISTOGRAM_OPTIONS, word)
+  if command_name == "scatter":
+    yield from _matching_completions(_SCATTER_OPTIONS, word)
+  if command_name == "bar":
+    yield from _matching_completions(_BAR_OPTIONS, word)
 
 
 def _matching_completions(candidates: Iterable[str], word: str) -> Iterable[Completion]:

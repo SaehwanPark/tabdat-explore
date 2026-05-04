@@ -8,6 +8,7 @@ from pymonad.either import Either, Left, Right
 
 from tabdat.errors import ParseError
 from tabdat.models import (
+  BarCommand,
   BinaryExpression,
   ByCommand,
   CodebookCommand,
@@ -22,12 +23,14 @@ from tabdat.models import (
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
+  HistogramCommand,
   IdentifierExpression,
   KeepCommand,
   NumberExpression,
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  ScatterCommand,
   SelectCommand,
   SqlCommand,
   StringExpression,
@@ -55,6 +58,9 @@ _EXECUTABLE_COMMANDS = {
   "tabulate",
   "collapse",
   "sql",
+  "histogram",
+  "scatter",
+  "bar",
   "exit",
   "quit",
 }
@@ -226,6 +232,15 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
   if parts.name == "collapse":
     return _parse_collapse(parts)
 
+  if parts.name == "histogram":
+    return _parse_histogram(parts)
+
+  if parts.name == "scatter":
+    return _parse_scatter(parts)
+
+  if parts.name == "bar":
+    return _parse_bar(parts)
+
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError(f"{parts.name} does not accept arguments, if clauses, or options")
@@ -396,6 +411,112 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
   )
 
 
+def _parse_histogram(parts: _CommandParts) -> HistogramCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("histogram does not accept if clauses or assignment syntax")
+  if len(parts.arguments) != 1:
+    raise ParseError("histogram expects exactly one variable")
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"bins", "saving", "noopen"}
+  if unsupported:
+    raise ParseError(f"histogram unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "histogram", {"noopen"})
+
+  return HistogramCommand(
+    variable=parts.arguments[0],
+    bins=_single_integer_option(parts.options, "bins", "histogram", minimum=1),
+    saving=_single_path_option(parts.options, "saving", "histogram"),
+    open_artifact="noopen" not in option_names,
+  )
+
+
+def _parse_scatter(parts: _CommandParts) -> ScatterCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("scatter does not accept if clauses or assignment syntax")
+  if len(parts.arguments) != 2:
+    raise ParseError("scatter expects syntax: scatter y_var x_var")
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"saving", "noopen"}
+  if unsupported:
+    raise ParseError(f"scatter unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "scatter", {"noopen"})
+
+  return ScatterCommand(
+    y_variable=parts.arguments[0],
+    x_variable=parts.arguments[1],
+    saving=_single_path_option(parts.options, "saving", "scatter"),
+    open_artifact="noopen" not in option_names,
+  )
+
+
+def _parse_bar(parts: _CommandParts) -> BarCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("bar does not accept if clauses or assignment syntax")
+  if len(parts.arguments) != 1:
+    raise ParseError("bar expects exactly one variable")
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"saving", "missing", "noopen"}
+  if unsupported:
+    raise ParseError(f"bar unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "bar", {"missing", "noopen"})
+
+  return BarCommand(
+    variable=parts.arguments[0],
+    saving=_single_path_option(parts.options, "saving", "bar"),
+    include_missing="missing" in option_names,
+    open_artifact="noopen" not in option_names,
+  )
+
+
+def _single_integer_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+  *,
+  minimum: int,
+) -> int | None:
+  matched = tuple(option for option in options if option.name == name)
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option {name} may only be supplied once")
+  value = matched[0].value
+  if isinstance(value, bool) or not isinstance(value, int):
+    raise ParseError(f"{command_name} option {name} expects an integer value")
+  if value < minimum:
+    raise ParseError(f"{command_name} option {name} must be at least {minimum}")
+  return value
+
+
+def _single_path_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> Path | None:
+  matched = tuple(option for option in options if option.name == name)
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option {name} may only be supplied once")
+  value = matched[0].value
+  if not isinstance(value, str):
+    raise ParseError(f"{command_name} option {name} expects a path")
+  return Path(value)
+
+
+def _require_flag_options(
+  options: tuple[CommandOption, ...],
+  command_name: str,
+  flag_names: set[str],
+) -> None:
+  for option in options:
+    if option.name in flag_names and option.value is not True:
+      raise ParseError(f"{command_name} option {option.name} does not accept a value")
+
+
 def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(f"{command_name} does not accept if clauses, options, or assignment syntax")
@@ -539,18 +660,15 @@ def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
     value: str | int | float | bool | tuple[str, ...] = True
     if not stream.at_end and stream.peek.text == "(":
       stream.consume()
-      values: list[str] = []
+      value_tokens: list[_Token] = []
       while not stream.at_end and stream.peek.text != ")":
-        token = stream.consume()
-        if token.kind != "identifier":
-          raise ParseError(f"option {name.text} values must be identifiers")
-        values.append(token.text)
+        value_tokens.append(stream.consume())
       if stream.at_end:
         raise ParseError(f"option {name.text} is missing closing )")
       stream.consume()
-      if not values:
+      if not value_tokens:
         raise ParseError(f"option {name.text} expects at least one value")
-      value = tuple(values)
+      value = _parenthesized_option_value(name.text, tuple(value_tokens))
     if not stream.at_end and stream.peek.text == "=":
       stream.consume()
       if stream.at_end:
@@ -569,6 +687,21 @@ def _option_value(token: _Token) -> str | int | float:
   if token.kind == "number":
     return _parse_number(token.text)
   return token.text
+
+
+def _parenthesized_option_value(
+  option_name: str,
+  tokens: tuple[_Token, ...],
+) -> str | tuple[str, ...]:
+  if option_name == "saving":
+    return "".join(token.text for token in tokens)
+
+  values: list[str] = []
+  for token in tokens:
+    if token.kind != "identifier":
+      raise ParseError(f"option {option_name} values must be identifiers")
+    values.append(token.text)
+  return tuple(values)
 
 
 def _tokenize(text: str) -> tuple[_Token, ...]:
@@ -613,7 +746,7 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
       tokens.append(_Token("symbol", two_char, index, index + 2))
       index += 2
       continue
-    if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")", ":"}:
+    if char in {",", "=", "<", ">", "+", "-", "*", "/", "(", ")", ":", "."}:
       tokens.append(_Token("symbol", char, index, index + 1))
       index += 1
       continue

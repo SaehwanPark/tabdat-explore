@@ -1,4 +1,4 @@
-# Phase 5 QA Report
+# Phase 6 QA Report
 
 ## Status
 
@@ -6,17 +6,16 @@ pass
 
 ## Boundaries Checked
 
-- roadmap and project docs to Phase 5 UX contract
-- command contract to shell completer and lexer behavior
-- interactive shell setup to existing CLI execution path
-- executor state to column completion metadata
-- tests to claimed command, column, option, `by:`, SQL, lexer, and batch CLI behavior
-- documentation to implemented Phase 5 behavior
+- roadmap and project docs to Phase 6 visualization contract
+- command contract to parser models and executor behavior
+- backend data extraction to Altair artifact rendering
+- CLI interactive auto-open policy to deterministic `-c` batch behavior
+- tests to claimed parser, executor, CLI, and shell UX behavior
+- documentation to implemented Phase 6 behavior
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_shell.py tests/test_cli.py` passed with 15 tests.
-- `uv run pytest` passed with 125 tests.
+- `uv run pytest` passed with 148 tests.
 - `uv run mypy` passed.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
@@ -27,9 +26,9 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- SQL autocomplete remains a lightweight helper list, not semantic SQL completion.
-- Inline suggestions are history-based only.
+- Add downsampling or lazy plotting in Phase 7.
+- Add richer plot customization only after the artifact workflow proves useful.
 
 ## Recommended Next Action
 
-Commit final validation artifacts, push the branch, and open the Phase 5 PR.
+Commit final validation artifacts, push the branch, and open the Phase 6 PR.

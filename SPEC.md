@@ -50,13 +50,19 @@ This file tracks feature state for spec-driven development. Product intent lives
     helpers
   - persistent command history and inline history suggestions
   - focused shell UX tests while preserving `-c` command mode
+- Implemented Phase 6 artifact-based visualization:
+  - `histogram`, `scatter`, and `bar` plot commands
+  - Altair-backed SVG/PNG artifact rendering
+  - default artifact output under `artifacts/plots/`
+  - `saving(...)`, `noopen`, `bins=`, and `missing` plot options
+  - interactive auto-open behavior while preserving deterministic `-c` batch output
+  - focused parser, executor, CLI, and shell UX tests
 
 ## Present
 
-- Phase 5 is complete for prompt-toolkit interactive shell UX.
-- The current runtime does not yet include scripts, visualization, or lazy execution optimization.
+- Phase 6 is complete for artifact-based visualization.
+- The current runtime does not yet include scripts or lazy execution optimization.
 
 ## Future
 
-- Phase 6: artifact-based visualization.
 - Phase 7 and later: lazy execution optimization, scripting, configuration, and extensions.

@@ -1,36 +1,42 @@
-# Phase 5 Request Summary
+# Phase 6 Request Summary
 
 ## Goal
 
-Implement roadmap Phase 5: prompt-toolkit-powered interactive CLI UX for TabDat-Explore.
+Implement roadmap Phase 6: artifact-based visualization for TabDat-Explore.
 
 ## Requested Workflow
 
 - Use a temporary branch.
 - Commit meaningful implementation checkpoints.
-- Run `mypy` after implementation.
+- Document carefully.
 - Create and submit a PR when fully done.
-- Include `@codex review` in the PR message.
 
 ## Phase Fit
 
-Roadmap Phase 5 covers terminal UX via `prompt_toolkit`:
+Roadmap Phase 6 covers lightweight plotting:
 
-- syntax highlighting
-- context-aware autocomplete for commands, columns, and options
-- command history
-- inline suggestions
+- `histogram`
+- `scatter`
+- `bar`
+- artifact output under `artifacts/plots/`
+- `saving(...)` option
+- auto-open behavior
 
 ## Touched Surfaces
 
-- CLI shell behavior
+- command parser and models
+- executor and backend data extraction
+- artifact rendering
+- CLI shell auto-open behavior
+- formatter output
 - runtime dependencies
 - focused tests
-- README and SDD state docs
+- SDD state docs
 - workspace implementation and QA reports
 
 ## Assumptions
 
-- Command semantics, parser behavior, executor behavior, and backend data behavior remain unchanged.
-- Inline suggestions are history-based for Phase 5.
-- Autocomplete is best-effort UX help; parser and executor remain authoritative for diagnostics.
+- Altair is the charting backend and `vl-convert-python` provides static SVG/PNG export.
+- SVG is the default output format.
+- Interactive shell opens generated plots by default; `-c` batch mode does not auto-open.
+- `bar` means one-way category frequency counts in the first visualization slice.

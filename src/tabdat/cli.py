@@ -1,6 +1,8 @@
 """Command-line entry point for TabDat."""
 
 import argparse
+import os
+import subprocess
 import sys
 from collections.abc import Callable, Sequence
 from enum import Enum, auto
@@ -8,7 +10,7 @@ from enum import Enum, auto
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_result
-from tabdat.models import ExitCommand
+from tabdat.models import ExitCommand, PlotResult, Result
 from tabdat.parser import parse_command
 from tabdat.shell import create_prompt_session
 
@@ -35,7 +37,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _run_commands(commands: Sequence[str], executor: Executor) -> int:
   for command_text in commands:
-    status = _run_one(command_text, executor)
+    status = _run_one(command_text, executor, open_plots=False)
     if status is _RunStatus.ERROR:
       return 1
     if status is _RunStatus.STOP:
@@ -53,11 +55,17 @@ def _run_shell(executor: Executor) -> int:
       print()
       return 0
 
-    if _run_one(command_text, executor) is _RunStatus.STOP:
+    if _run_one(command_text, executor, open_plots=True) is _RunStatus.STOP:
       return 0
 
 
-def _run_one(command_text: str, executor: Executor) -> _RunStatus:
+def _run_one(
+  command_text: str,
+  executor: Executor,
+  *,
+  open_plots: bool,
+  opener: Callable[[PlotResult], None] | None = None,
+) -> _RunStatus:
   try:
     command = parse_command(command_text)
     if isinstance(command, ExitCommand):
@@ -69,7 +77,39 @@ def _run_one(command_text: str, executor: Executor) -> _RunStatus:
 
   if result is not None:
     print(format_result(result))
+    _open_plot_if_needed(result, open_plots=open_plots, opener=opener or _open_plot)
   return _RunStatus.CONTINUE
+
+
+def _open_plot_if_needed(
+  result: Result,
+  *,
+  open_plots: bool,
+  opener: Callable[[PlotResult], None],
+) -> None:
+  if isinstance(result, PlotResult) and open_plots and result.should_open:
+    opener(result)
+
+
+def _open_plot(result: PlotResult) -> None:
+  try:
+    _open_path(result.path)
+  except OSError as exc:
+    print(f"Warning: could not open plot: {exc}", file=sys.stderr)
+
+
+def _open_path(path: object) -> None:
+  if sys.platform == "win32":
+    startfile = getattr(os, "startfile")
+    startfile(path)
+    return
+  subprocess.Popen([_open_command_for_platform(sys.platform), str(path)])
+
+
+def _open_command_for_platform(platform: str) -> str:
+  if platform == "darwin":
+    return "open"
+  return "xdg-open"
 
 
 def _read_multiline_sql(
