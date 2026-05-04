@@ -1,5 +1,5 @@
 ---
-name: spen-driven-developer
+name: spec-driven-developer
 description: Maintain SPEC.md, ARCHITECTURE.md, and CHANGELOG.md while implementing features so project intent, current design, and release history stay accurate.
 ---
 
