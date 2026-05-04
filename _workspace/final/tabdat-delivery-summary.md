@@ -10,6 +10,7 @@ Implemented Phase 7 lazy execution entrypoint on branch `phase7-lazy-execution`.
 - `use <path>, lazy` loads Parquet through a DuckDB scan view.
 - `use <path>, lazy engine=duckdb|polars` records the explicit lazy engine selection.
 - CLI load output identifies lazy sessions as `lazy=<engine>`.
+- Failed lazy loads preserve the previous active dataset.
 
 ## Validation
 

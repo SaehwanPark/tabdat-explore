@@ -37,6 +37,8 @@ NUMERIC_TYPES = (
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
 ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
+NEXT_ACTIVE_TABLE = "__tabdat_next"
+NEXT_ACTIVE_VIEW = "__tabdat_next_view"
 
 
 class DuckDBBackend:
@@ -65,25 +67,32 @@ class DuckDBBackend:
     if not normalized.is_file():
       raise ExecutionError(f"use expected a file path: {path}")
 
-    self._lazy_engine = lazy_engine if execution_mode == "lazy" else None
-    self._active_storage = "view" if execution_mode == "lazy" else "table"
-
     try:
       if execution_mode == "lazy":
-        self._connection.execute(f"drop table if exists {ACTIVE_TABLE}")
+        read_sql = f"select * from read_parquet({_quote_literal(str(normalized))})"
         self._connection.execute(
-          f"""
-          create or replace temp view {ACTIVE_TABLE}
-          as select * from read_parquet({_quote_literal(str(normalized))})
-          """,
+          f"create or replace temp view {NEXT_ACTIVE_VIEW} as {read_sql}",
         )
+        self._connection.execute(f"select count(*) from {NEXT_ACTIVE_VIEW}").fetchone()
+        self._drop_active_relation()
+        self._connection.execute(f"create or replace temp view {ACTIVE_TABLE} as {read_sql}")
+        self._connection.execute(f"drop view {NEXT_ACTIVE_VIEW}")
+        self._lazy_engine = lazy_engine
+        self._active_storage = "view"
       else:
-        self._connection.execute(f"drop view if exists {ACTIVE_TABLE}")
         self._connection.execute(
-          f"create or replace temp table {ACTIVE_TABLE} as select * from read_parquet(?)",
+          f"create or replace temp table {NEXT_ACTIVE_TABLE} as select * from read_parquet(?)",
           [str(normalized)],
         )
+        self._drop_active_relation()
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
+        )
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+        self._lazy_engine = None
+        self._active_storage = "table"
     except duckdb.Error as exc:
+      self._drop_load_staging_relations()
       raise ExecutionError(f"use could not read Parquet file: {path}") from exc
 
     return self.active_dataset_info(normalized)
@@ -585,22 +594,32 @@ class DuckDBBackend:
     try:
       if self._active_storage == "view":
         self._connection.execute(
-          f"create or replace temp table __tabdat_next as {select_sql}",
+          f"create or replace temp table {NEXT_ACTIVE_TABLE} as {select_sql}",
         )
         self._connection.execute(f"drop view {ACTIVE_TABLE}")
         self._connection.execute(
-          f"create or replace temp table {ACTIVE_TABLE} as select * from __tabdat_next"
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
         )
-        self._connection.execute("drop table __tabdat_next")
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
         self._active_storage = "table"
         return
-      self._connection.execute(f"create or replace temp table __tabdat_next as {select_sql}")
+      self._connection.execute(f"create or replace temp table {NEXT_ACTIVE_TABLE} as {select_sql}")
       self._connection.execute(
-        f"create or replace temp table {ACTIVE_TABLE} as select * from __tabdat_next"
+        f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
       )
-      self._connection.execute("drop table __tabdat_next")
+      self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
+
+  def _drop_active_relation(self) -> None:
+    if self._active_storage == "view":
+      self._connection.execute(f"drop view if exists {ACTIVE_TABLE}")
+      return
+    self._connection.execute(f"drop table if exists {ACTIVE_TABLE}")
+
+  def _drop_load_staging_relations(self) -> None:
+    self._connection.execute(f"drop table if exists {NEXT_ACTIVE_TABLE}")
+    self._connection.execute(f"drop view if exists {NEXT_ACTIVE_VIEW}")
 
   def _bind_active_view(self) -> None:
     try:

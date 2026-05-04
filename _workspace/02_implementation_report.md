@@ -29,6 +29,8 @@
 - Executor passes load mode through the backend and keeps the single active dataset state.
 - Backend preserves eager table loading by default and uses a DuckDB `read_parquet(...)` scan view
   for lazy loads.
+- Backend stages new loads before swapping the active relation, so failed lazy loads preserve the
+  previous active dataset.
 - Session transformations continue to update the active dataset for later commands.
 - Formatter identifies lazy load sessions in CLI output as `lazy=<engine>`.
 - Polars is added as a runtime dependency and accepted as an explicit lazy engine selector; full
@@ -36,7 +38,7 @@
 
 ## Validation
 
-- `uv run pytest`: passed, 161 tests.
+- `uv run pytest`: passed, 162 tests.
 - `uv run mypy`: passed.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.

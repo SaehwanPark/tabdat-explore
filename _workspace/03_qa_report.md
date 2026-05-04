@@ -14,6 +14,7 @@ pass
 - Executor to backend:
   - eager loading remains table-backed and unchanged
   - lazy loading creates an active scan view and records engine metadata
+  - failed lazy loads preserve the previous active dataset
 - Backend to formatter and CLI:
   - lazy dataset metadata appears in load output
   - subsequent commands continue to operate on the active dataset
@@ -36,7 +37,7 @@ None.
 
 ## Validation Evidence
 
-- `uv run pytest`: passed, 161 tests.
+- `uv run pytest`: passed, 162 tests.
 - `uv run mypy`: passed.
 - `uv run ruff check .`: passed.
 - `uv run ruff format --check .`: passed.

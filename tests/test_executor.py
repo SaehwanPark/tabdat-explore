@@ -76,6 +76,25 @@ def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> Non
   assert result.dataset.lazy_engine == engine
 
 
+def test_failing_lazy_use_preserves_existing_active_dataset(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  corrupt_parquet = tmp_path / "corrupt.parquet"
+  corrupt_parquet.write_text("not parquet")
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="use could not read Parquet file"):
+      executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    result = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+
+
 @pytest.mark.parametrize("engine", ["duckdb", "polars"])
 def test_lazy_transformations_compose_before_terminal_results(
   sample_parquet: Path,
