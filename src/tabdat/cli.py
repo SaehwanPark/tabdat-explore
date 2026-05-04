@@ -1,6 +1,7 @@
 """Command-line entry point for TabDat."""
 
 import argparse
+import os
 import subprocess
 import sys
 from collections.abc import Callable, Sequence
@@ -92,9 +93,23 @@ def _open_plot_if_needed(
 
 def _open_plot(result: PlotResult) -> None:
   try:
-    subprocess.Popen(["open", str(result.path)])
+    _open_path(result.path)
   except OSError as exc:
     print(f"Warning: could not open plot: {exc}", file=sys.stderr)
+
+
+def _open_path(path: object) -> None:
+  if sys.platform == "win32":
+    startfile = getattr(os, "startfile")
+    startfile(path)
+    return
+  subprocess.Popen([_open_command_for_platform(sys.platform), str(path)])
+
+
+def _open_command_for_platform(platform: str) -> str:
+  if platform == "darwin":
+    return "open"
+  return "xdg-open"
 
 
 def _read_multiline_sql(

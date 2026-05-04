@@ -484,7 +484,7 @@ def _single_integer_option(
   if len(matched) > 1:
     raise ParseError(f"{command_name} option {name} may only be supplied once")
   value = matched[0].value
-  if not isinstance(value, int):
+  if isinstance(value, bool) or not isinstance(value, int):
     raise ParseError(f"{command_name} option {name} expects an integer value")
   if value < minimum:
     raise ParseError(f"{command_name} option {name} must be at least {minimum}")

@@ -1,6 +1,11 @@
 from pathlib import Path
 
-from tabdat.cli import _has_open_sql_triple_quote, _open_plot_if_needed, main
+from tabdat.cli import (
+  _has_open_sql_triple_quote,
+  _open_command_for_platform,
+  _open_plot_if_needed,
+  main,
+)
 from tabdat.models import PlotResult
 
 
@@ -165,6 +170,12 @@ def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:
     opener=lambda plot: opened.append(plot.path),
   )
   assert opened == [result.path]
+
+
+def test_cli_uses_platform_plot_open_commands() -> None:
+  assert _open_command_for_platform("darwin") == "open"
+  assert _open_command_for_platform("linux") == "xdg-open"
+  assert _open_command_for_platform("freebsd") == "xdg-open"
 
 
 def test_cli_detects_multiline_sql_with_flexible_spacing() -> None:

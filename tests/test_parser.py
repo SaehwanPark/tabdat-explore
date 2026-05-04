@@ -312,6 +312,7 @@ def test_parse_exit_aliases() -> None:
     "histogram age if age > 18",
     "histogram age, width=200",
     "histogram age, bins=0",
+    "histogram age, bins",
     "histogram age, bins=ten",
     "histogram age, noopen=false",
     "scatter bmi",
