@@ -22,11 +22,12 @@ command line. The current CLI supports:
 - grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
 - artifact plots with `histogram`, `scatter`, and `bar`
+- opt-in lazy Parquet loading with `use data.parquet, lazy`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the artifact visualization phase of the roadmap. Scripting and lazy
-execution optimization are planned later.
+The repository has completed the lazy execution entrypoint phase of the roadmap. Scripting is
+planned later.
 
 ## Quickstart
 
@@ -40,6 +41,12 @@ execution optimization are planned later.
 
    ```bash
    uv run tabdat -c "use data.parquet" -c "describe" -c "summarize age bmi"
+   ```
+
+   For larger Parquet workflows, opt into lazy loading:
+
+   ```bash
+   uv run tabdat -c "use data.parquet, lazy" -c "keep if age >= 18" -c "summarize age bmi"
    ```
 
 3. Start the interactive shell:
@@ -93,6 +100,9 @@ Saved plot: artifacts/plots/histogram-age.svg
 - One active dataset per session keeps the mental model simple.
 - DuckDB is the primary execution engine.
 - Parquet is the primary data format.
+- `use data.parquet` remains eager. `use data.parquet, lazy` creates a DuckDB Parquet scan view and
+  reports the active lazy engine; `engine=duckdb|polars` can be supplied for explicit lazy-engine
+  selection.
 - SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
   dataset with the query result and does not persist a file.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch

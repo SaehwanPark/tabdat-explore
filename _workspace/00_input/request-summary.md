@@ -1,8 +1,9 @@
-# Phase 6 Request Summary
+# Phase 7 Request Summary
 
 ## Goal
 
-Implement roadmap Phase 6: artifact-based visualization for TabDat-Explore.
+Implement roadmap Phase 7: lazy execution and performance optimization for larger Parquet
+workflows.
 
 ## Requested Workflow
 
@@ -13,22 +14,19 @@ Implement roadmap Phase 6: artifact-based visualization for TabDat-Explore.
 
 ## Phase Fit
 
-Roadmap Phase 6 covers lightweight plotting:
+Roadmap Phase 7 covers:
 
-- `histogram`
-- `scatter`
-- `bar`
-- artifact output under `artifacts/plots/`
-- `saving(...)` option
-- auto-open behavior
+- explicit `lazy` mode in `use`
+- pushdown-oriented operations such as filter, select, and groupby
+- avoiding unnecessary materialization for large data workflows
+- tight DuckDB integration with optional Polars lazy pipeline direction
 
 ## Touched Surfaces
 
 - command parser and models
-- executor and backend data extraction
-- artifact rendering
-- CLI shell auto-open behavior
-- formatter output
+- executor load dispatch and session metadata
+- DuckDB backend load strategy
+- formatter and CLI smoke behavior
 - runtime dependencies
 - focused tests
 - SDD state docs
@@ -36,7 +34,7 @@ Roadmap Phase 6 covers lightweight plotting:
 
 ## Assumptions
 
-- Altair is the charting backend and `vl-convert-python` provides static SVG/PNG export.
-- SVG is the default output format.
-- Interactive shell opens generated plots by default; `-c` batch mode does not auto-open.
-- `bar` means one-way category frequency counts in the first visualization slice.
+- `use <path>` remains eager for compatibility.
+- Lazy loading is opt-in through `use <path>, lazy`.
+- DuckDB is the default lazy engine.
+- `engine=polars` is accepted as an explicit optional lazy engine selector.

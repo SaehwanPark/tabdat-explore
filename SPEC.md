@@ -57,12 +57,18 @@ This file tracks feature state for spec-driven development. Product intent lives
   - `saving(...)`, `noopen`, `bins=`, and `missing` plot options
   - interactive auto-open behavior while preserving deterministic `-c` batch output
   - focused parser, executor, CLI, and shell UX tests
+- Implemented Phase 7 lazy execution entrypoint:
+  - `use <path>, lazy` opt-in loading while preserving eager `use <path>` defaults
+  - `engine=duckdb|polars` lazy engine selection with DuckDB as the default
+  - DuckDB `read_parquet` scan views for lazy load-time pushdown
+  - typed dataset execution-mode metadata and CLI output for lazy sessions
+  - focused parser, executor, and CLI tests for lazy command flows
 
 ## Present
 
-- Phase 6 is complete for artifact-based visualization.
-- The current runtime does not yet include scripts or lazy execution optimization.
+- Phase 7 is complete for the first lazy execution slice.
+- The current runtime does not yet include scripts.
 
 ## Future
 
-- Phase 7 and later: lazy execution optimization, scripting, configuration, and extensions.
+- Phase 8 and later: scripting, configuration, extensions, and deeper Polars-native lazy lowering.

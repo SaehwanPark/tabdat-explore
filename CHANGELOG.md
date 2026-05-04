@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 7 lazy execution entrypoint with `use <path>, lazy`, optional
+  `engine=duckdb|polars` selection, DuckDB `read_parquet` scan views for lazy loading, typed
+  execution-mode metadata, and CLI output that identifies lazy sessions.
 - Added Phase 6 artifact-based visualization with `histogram`, `scatter`, and `bar` commands,
   Altair-backed SVG/PNG output, default `artifacts/plots/` paths, `saving(...)`, `noopen`, `bins=`,
   and `missing` options, plus interactive-only plot auto-open behavior.

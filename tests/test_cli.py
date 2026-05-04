@@ -146,6 +146,29 @@ def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys
   assert captured.err == ""
 
 
+def test_cli_runs_phase_7_lazy_use_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}, lazy engine=polars",
+      "-c",
+      "select age sex",
+      "-c",
+      "head 2",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Loaded:" in captured.out
+  assert "lazy=polars" in captured.out
+  assert "Selected columns: 3 rows, 2 columns" in captured.out
+  assert "age  sex" in captured.out
+  assert "30   F" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:
   opened: list[Path] = []
   result = PlotResult(path=tmp_path / "plot.svg", should_open=True)

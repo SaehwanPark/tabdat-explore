@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 6 artifact visualization slice. This document
-records the implemented shell UX, command-language model, active DuckDB relation model, plot
-artifact boundary, and the boundaries future phases should preserve.
+TabDat-Explore has completed the roadmap Phase 7 lazy execution entrypoint slice. This document
+records the implemented shell UX, command-language model, active DuckDB relation model, lazy load
+boundary, plot artifact boundary, and the boundaries future phases should preserve.
 
 ## Runtime Flow
 
@@ -10,7 +10,7 @@ artifact boundary, and the boundaries future phases should preserve.
 CLI Shell / prompt-toolkit UX
   -> Command Parser
   -> Executor
-  -> DuckDB Backend
+  -> DuckDB Backend / Lazy Scan Boundary
   -> Visualization Artifact Renderer
   -> Formatter
   -> Terminal Output
@@ -28,8 +28,9 @@ history, inline history suggestions, syntax highlighting, and context-aware comp
 ### Command Parser
 
 Converts command text into internal command objects. The parser owns tokenization, varlist and
-option parsing, `if` clauses, and expression AST construction. It may represent parsed-only future
-commands, but execution remains an executor responsibility.
+option parsing, `if` clauses, and expression AST construction. `use <path>, lazy` and
+`use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields. It may represent
+parsed-only future commands, but execution remains an executor responsibility.
 
 ### Executor
 
@@ -39,12 +40,15 @@ unsupported-command execution error until a later command contract defines execu
 
 ### DuckDB Backend
 
-Owns data access and query execution. Parquet is the primary initial format. Loading creates a
-session-local active DuckDB table. Transformations replace that active table in the current session,
-so later inspection, summary, tabulation, and grouping commands see prior command results. No
-persistent write/save behavior exists yet. SQL commands bind the active table as the user-facing
-DuckDB view `active`; `sql ... into <table>` replaces the active table with the query result while
-using `<table>` as the displayed result name.
+Owns data access and query execution. Parquet is the primary initial format. Eager loading creates
+a session-local active DuckDB table. Lazy loading creates a DuckDB `read_parquet(...)` scan view so
+load-time projection, filtering, grouping, and terminal query operations can be pushed into DuckDB.
+Session transformations replace the active relation for later commands. The optional `polars`
+engine selector is accepted and recorded for Phase 7 workflows, while command execution continues
+through the DuckDB relation boundary until deeper Polars-native lowering is designed. No persistent
+write/save behavior exists yet. SQL commands bind the active relation as the user-facing DuckDB view
+`active`; `sql ... into <table>` replaces the active dataset with the query result while using
+`<table>` as the displayed result name.
 
 For visualization commands, the backend extracts typed rows or frequency counts from the active
 table. It does not construct charts or write artifact files.
@@ -79,6 +83,8 @@ display formatting.
 - `sql ... into <table>` replaces the active dataset with the SQL result; `use` remains path-only.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
+- Phase 7 lazy loading is executable through `use <path>, lazy` and
+  `use <path>, lazy engine=duckdb|polars`; plain `use <path>` remains eager.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset metadata from executor state but does not validate or mutate
   session state.
