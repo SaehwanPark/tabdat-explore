@@ -258,20 +258,40 @@ scatter bmi age, saving(figures/bmi_age.svg)
 
 ### Features
 
-* `.do`-like script execution
-* `run script.do`
-* Logging
-* deterministic outputs
+* Script execution from file:
+  * `tabdat -f analysis.td`
+  * `tabdat analysis.td`
+  * interactive `run analysis.td`
+* Script parser layer for command sequences and future script-level constructs.
+  * Keep row-level `if` expressions distinct from future script-level `if` / `else`.
+  * Reserve AST space for later loops, macro substitution, and error-control forms without
+    forcing those constructs into the first slice.
+* Logging and deterministic batch output.
+* Golden-output tests for complete mini sessions.
+* Reproducibility metadata in script runs, including TabDat version, Python version, backend
+  engine, and relevant configuration.
+* Lazy-mode honesty pass:
+  * avoid load-time full counts for lazy datasets unless the user explicitly requests them
+  * document which commands preserve lazy scans and which materialize intermediate results
+* Polars engine decision:
+  * either hide Polars from user-facing lazy options until it has real execution coverage
+  * or mark it experimental in command help and script metadata
+* Dogfood gate: complete one public-dataset EDA using only `tabdat` before expanding the
+  command surface beyond scripting support.
 
 ### Example
 
 ```stata
-run analysis.do
+run analysis.td
 ```
 
 ### Success Criteria
 
-* Users can replace notebook EDA with scripts
+* Users can replace notebook EDA with scripts for first-pass analysis.
+* The same script run against the same input produces deterministic terminal output and
+  artifacts, except where timestamps or user-selected output paths are explicit.
+* Full-session tests cover representative `use`, inspect, transform, SQL, plot, and script
+  execution flows.
 
 ---
 
@@ -290,10 +310,14 @@ set graph_open off
 ```
 
 * Config file support
+* `save` / `export` command contract for writing session-local transformations to durable
+  files.
+* Plot artifact naming policy for reproducible scripts and interactive reruns.
 
 ### Success Criteria
 
 * Tool behaves consistently across environments
+* Users can persist transformed datasets without leaving the tool.
 
 ---
 
@@ -308,6 +332,11 @@ set graph_open off
 * Remote data (S3, DB connections)
 * Interactive HTML plots
 * Advanced stats modules
+* Lightweight named table registry that augments, but does not replace, the single active
+  dataset model.
+* Executor dispatch refactor if command handlers or script meta-commands make the central
+  dispatcher difficult to maintain.
+* More specific error subclasses for context-sensitive CLI and script diagnostics.
 
 ---
 

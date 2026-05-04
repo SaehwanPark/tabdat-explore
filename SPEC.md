@@ -68,7 +68,35 @@ This file tracks feature state for spec-driven development. Product intent lives
 
 - Phase 7 is complete for the first lazy execution slice.
 - The current runtime does not yet include scripts.
+- Accepted reviewer feedback is being folded into Phase 8+ planning only; completed Phase 0-7
+  behavior remains historical unless a future task explicitly revisits it.
 
 ## Future
 
-- Phase 8 and later: scripting, configuration, extensions, and deeper Polars-native lazy lowering.
+- Phase 8 scripting and reproducibility:
+  - add script execution from files via `tabdat -f <script>`, `tabdat <script>`, and interactive
+    `run <script>`
+  - introduce a script parser layer for command sequences, with AST room for later loops,
+    macros, script-level conditionals, and error-control constructs
+  - keep row-level `if` expressions separate from future script-level `if` / `else`
+  - add deterministic logging, script-run metadata, and golden-output tests for complete mini
+    sessions
+  - dogfood a complete public-dataset EDA using only `tabdat` before adding many more commands
+- Phase 8 lazy and backend honesty:
+  - avoid lazy load-time full counts unless requested
+  - document which commands preserve lazy scans and which commands materialize intermediate
+    results
+  - either hide `engine=polars` until Polars has real execution coverage or mark it clearly
+    experimental in help, metadata, and docs
+- Phase 9 configuration and persistence:
+  - define configuration behavior for graph format, artifact directory, and auto-open defaults
+  - add a `save` / `export` command contract for persisting session-local transformations
+  - define plot artifact naming policy for both reproducible scripts and interactive reruns
+- Phase 10+ architecture candidates:
+  - consider a lightweight named table registry that augments the single active dataset model
+  - consider executor handler registration or another dispatch refactor if script meta-commands
+    make the central executor difficult to maintain
+  - add specific execution error subclasses when CLI or script diagnostics need
+    context-sensitive handling
+  - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
+    honest and test-covered
