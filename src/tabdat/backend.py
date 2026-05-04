@@ -1,6 +1,7 @@
 """DuckDB-backed dataset operations."""
 
 from pathlib import Path
+from typing import Literal
 
 import duckdb
 
@@ -43,11 +44,19 @@ class DuckDBBackend:
 
   def __init__(self) -> None:
     self._connection = duckdb.connect(database=":memory:")
+    self._active_storage: Literal["table", "view"] = "table"
+    self._lazy_engine: Literal["duckdb", "polars"] | None = None
 
   def close(self) -> None:
     self._connection.close()
 
-  def inspect_parquet(self, path: Path) -> DatasetInfo:
+  def inspect_parquet(
+    self,
+    path: Path,
+    *,
+    execution_mode: Literal["eager", "lazy"] = "eager",
+    lazy_engine: Literal["duckdb", "polars"] | None = None,
+  ) -> DatasetInfo:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
       raise ExecutionError("use only supports local .parquet files in Phase 1")
@@ -56,11 +65,24 @@ class DuckDBBackend:
     if not normalized.is_file():
       raise ExecutionError(f"use expected a file path: {path}")
 
+    self._lazy_engine = lazy_engine if execution_mode == "lazy" else None
+    self._active_storage = "view" if execution_mode == "lazy" else "table"
+
     try:
-      self._connection.execute(
-        f"create or replace temp table {ACTIVE_TABLE} as select * from read_parquet(?)",
-        [str(normalized)],
-      )
+      if execution_mode == "lazy":
+        self._connection.execute(f"drop table if exists {ACTIVE_TABLE}")
+        self._connection.execute(
+          f"""
+          create or replace temp view {ACTIVE_TABLE}
+          as select * from read_parquet({_quote_literal(str(normalized))})
+          """,
+        )
+      else:
+        self._connection.execute(f"drop view if exists {ACTIVE_TABLE}")
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from read_parquet(?)",
+          [str(normalized)],
+        )
     except duckdb.Error as exc:
       raise ExecutionError(f"use could not read Parquet file: {path}") from exc
 
@@ -76,7 +98,13 @@ class DuckDBBackend:
       raise ExecutionError("active dataset is not available")
     row_count = row_count_row[0]
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
-    return DatasetInfo(path=path, row_count=row_count, columns=columns)
+    return DatasetInfo(
+      path=path,
+      row_count=row_count,
+      columns=columns,
+      execution_mode="lazy" if self._active_storage == "view" else "eager",
+      lazy_engine=self._lazy_engine,
+    )
 
   def run_sql(self, query: str) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
     _require_result_query(query)
@@ -555,9 +583,18 @@ class DuckDBBackend:
 
   def _replace_active(self, select_sql: str, command_name: str) -> None:
     try:
-      self._connection.execute(
-        f"create or replace temp table __tabdat_next as {select_sql}",
-      )
+      if self._active_storage == "view":
+        self._connection.execute(
+          f"create or replace temp table __tabdat_next as {select_sql}",
+        )
+        self._connection.execute(f"drop view {ACTIVE_TABLE}")
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from __tabdat_next"
+        )
+        self._connection.execute("drop table __tabdat_next")
+        self._active_storage = "table"
+        return
+      self._connection.execute(f"create or replace temp table __tabdat_next as {select_sql}")
       self._connection.execute(
         f"create or replace temp table {ACTIVE_TABLE} as select * from __tabdat_next"
       )

@@ -38,6 +38,21 @@ from tabdat.parser import parse_command, parse_expression
 
 def test_parse_use_command() -> None:
   assert parse_command("use data.parquet") == UseCommand(Path("data.parquet"))
+  assert parse_command("use data.parquet, lazy") == UseCommand(
+    Path("data.parquet"),
+    execution_mode="lazy",
+    lazy_engine="duckdb",
+  )
+  assert parse_command("use data.parquet, lazy engine=duckdb") == UseCommand(
+    Path("data.parquet"),
+    execution_mode="lazy",
+    lazy_engine="duckdb",
+  )
+  assert parse_command("use data.parquet, lazy engine=polars") == UseCommand(
+    Path("data.parquet"),
+    execution_mode="lazy",
+    lazy_engine="polars",
+  )
 
 
 def test_parse_describe_command() -> None:
@@ -253,6 +268,12 @@ def test_parse_exit_aliases() -> None:
     "",
     "use",
     "use one.parquet two.parquet",
+    "use data.parquet,",
+    "use data.parquet, eager",
+    "use data.parquet, lazy=true",
+    "use data.parquet, lazy lazy",
+    "use data.parquet, engine=duckdb",
+    "use data.parquet, lazy engine=spark",
     "describe age",
     "describe if age > 18",
     "exit now",

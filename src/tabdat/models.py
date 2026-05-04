@@ -62,6 +62,8 @@ class CommandOption:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class UseCommand:
   path: Path
+  execution_mode: Literal["eager", "lazy"] = "eager"
+  lazy_engine: Literal["duckdb", "polars"] | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -232,6 +234,8 @@ class DatasetInfo:
   path: Path
   row_count: int
   columns: tuple[ColumnInfo, ...]
+  execution_mode: Literal["eager", "lazy"] = "eager"
+  lazy_engine: Literal["duckdb", "polars"] | None = None
 
   @property
   def column_count(self) -> int:
