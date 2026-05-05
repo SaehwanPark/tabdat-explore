@@ -323,13 +323,15 @@ class Executor:
     self.state.active_table_name = None
 
   def _should_activate_named_table(self, command: UseCommand) -> bool:
+    table_name = command.path.as_posix()
+    if table_name in self.state.tables:
+      if command.execution_mode != "eager" or command.lazy_engine is not None:
+        raise ExecutionError("use options are not supported for named table activation")
+      return True
     if command.execution_mode != "eager" or command.lazy_engine is not None:
       return False
-    table_name = command.path.as_posix()
     if command.path.exists():
       return False
-    if table_name in self.state.tables:
-      return True
     if command.path.suffix:
       return False
     if "/" in table_name:

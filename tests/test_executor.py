@@ -542,6 +542,22 @@ def test_use_unknown_named_table_reports_specific_error() -> None:
     executor.close()
 
 
+def test_use_named_table_rejects_options(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand("select sex, count(*) as n from active group by sex order by sex", into="summary")
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="use options are not supported for named table activation",
+    ):
+      executor.execute(UseCommand(Path("summary"), execution_mode="lazy", lazy_engine="duckdb"))
+  finally:
+    executor.close()
+
+
 def test_sql_reports_user_facing_errors(sample_parquet: Path) -> None:
   executor = Executor()
   try:
