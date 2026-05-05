@@ -1,12 +1,12 @@
 # Integrated E2E Run Report
 
-Status: pending execution.
+Status: pass.
 
 The integrated public-dataset harness lives in `integrated_testing/run_e2e.py`.
 
 ## Validation Commands
 
-Pending:
+Executed successfully:
 
 ```bash
 uv run pytest
@@ -18,12 +18,26 @@ uv run python integrated_testing/run_e2e.py
 
 ## Observations
 
-- Pending integrated run.
+- `s1_titanic_batch_core` passed against `artifacts/e2e/data/titanic.parquet`.
+- `s2_interactive_shell_contract` passed with isolated history under `artifacts/e2e/home`.
+- `s3_taxi_lazy_scale` passed against the NYC taxi January 2023 Parquet dataset, including SVG
+  plot checks and Parquet persistence.
+- `s4_penguins_script_repro` passed with explicit config, nested `run`, multiline SQL, PNG plot
+  output, and Parquet export.
 
 ## Fixes
 
-- Pending integrated run.
+- Fixed a harness setup defect where DuckDB path parameters in a single CSV-to-Parquet `COPY`
+  statement were bound in the wrong order.
+- Corrected the E2E test plan expectations to match current product contracts: tabulate output
+  uses `Row %` / `Col %`, and prompt-toolkit may show completion candidates without rewriting the
+  buffer when a prefix is ambiguous.
+- Fixed interactive shell Ctrl-C handling so completion interrupts return to the prompt instead of
+  exiting with a traceback.
 
 ## Residual Risks
 
-- Pending integrated run.
+- The public dataset URLs are external dependencies; future failures should distinguish network
+  or source availability from TabDat behavior.
+- The TTY harness validates observable prompt-toolkit output, but terminal CPR warnings are ignored
+  because they are environment-dependent and not product pass/fail signals.
