@@ -119,8 +119,6 @@ def parse_command(text: str) -> Command:
     return _parse_sql(stripped)
   if command_name == "run":
     return _parse_run(stripped)
-  if command_name == "set":
-    return _parse_set(stripped)
 
   return _parse_structured_command(stripped)
 
@@ -251,6 +249,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "bar":
     return _parse_bar(parts)
+
+  if parts.name == "set":
+    return _parse_set(parts)
 
   if parts.name == "save":
     return _parse_save_or_export(parts, "save")
@@ -423,16 +424,17 @@ def _parse_run(text: str) -> RunCommand:
   return RunCommand(path=Path(path_parts[0]))
 
 
-def _parse_set(text: str) -> SetCommand:
-  parts = text.split()
-  if len(parts) != 3:
+def _parse_set(parts: _CommandParts) -> SetCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError("set expects syntax: set name value")
-  name = parts[1].lower()
+  if len(parts.arguments) != 2:
+    raise ParseError("set expects syntax: set name value")
+  name = parts.arguments[0].lower()
   if name not in {"graph_format", "artifact_dir", "graph_open"}:
-    raise ParseError(f"unknown setting: {parts[1]}")
+    raise ParseError(f"unknown setting: {parts.arguments[0]}")
   return SetCommand(
     name=cast(Literal["graph_format", "artifact_dir", "graph_open"], name),
-    value=parts[2],
+    value=parts.arguments[1],
   )
 
 

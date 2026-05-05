@@ -228,6 +228,10 @@ def test_parse_phase_9_configuration_and_persistence_commands() -> None:
     "artifact_dir",
     "artifacts/custom",
   )
+  assert parse_command('set artifact_dir "my plots"') == SetCommand(
+    "artifact_dir",
+    "my plots",
+  )
   assert parse_command("set graph_open off") == SetCommand("graph_open", "off")
   assert parse_command("save output.parquet") == SaveCommand(Path("output.parquet"))
   assert parse_command("export output.parquet, replace") == ExportCommand(

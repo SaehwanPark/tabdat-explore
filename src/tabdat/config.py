@@ -27,6 +27,8 @@ def load_config(path: Path) -> TabDatConfig:
     raise TabDatError(f"config path is not a file: {path}")
   try:
     data = tomllib.loads(normalized.read_text(encoding="utf-8"))
+  except OSError as exc:
+    raise TabDatError(f"config file could not be read: {path}") from exc
   except UnicodeDecodeError as exc:
     raise TabDatError(f"config file is not valid UTF-8: {path}") from exc
   except tomllib.TOMLDecodeError as exc:
