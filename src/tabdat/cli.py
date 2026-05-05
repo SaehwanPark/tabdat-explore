@@ -83,6 +83,9 @@ def _run_shell(executor: Executor) -> int:
     try:
       command_text = session.prompt("tabdat> ")
       command_text = _read_multiline_sql(command_text, session.prompt)
+    except KeyboardInterrupt:
+      print()
+      continue
     except EOFError:
       print()
       return 0

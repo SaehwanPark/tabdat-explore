@@ -89,6 +89,8 @@ display formatting.
 - Initial command scope is in `docs/command_glossary_v0.md`.
 - Package metadata is in `pyproject.toml`.
 - Phase handoff artifacts live under `_workspace/`.
+- Integrated public-dataset E2E tooling lives under `integrated_testing/`; generated datasets,
+  run logs, plots, and Parquet outputs are ignored.
 - Runtime modules live under `src/tabdat/`.
 - Local functional helpers live in `src/tabdat/monads.py`.
 - Focused tests live under `tests/`.

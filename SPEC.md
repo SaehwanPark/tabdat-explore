@@ -79,12 +79,15 @@ This file tracks feature state for spec-driven development. Product intent lives
   - config-aware plot artifact defaults
   - live row counting for `count` and unknown initial row counts for lazy loads
   - `save` / `export` Parquet persistence for session-local transformations
+- Completed the integrated public-dataset E2E checkpoint:
+  - reusable harness for the Titanic, shell, NYC taxi lazy-scale, and Penguins script scenarios
+  - captured deterministic stdout/stderr, exit-code, artifact, plot, and Parquet checks
+  - fixed interactive shell Ctrl-C handling during prompt-toolkit completion
 
 ## Present
 
-- Execute `docs/e2e_public_dataset_test_plan.md` against pinned public datasets before starting
-  Phase 10 work.
 - Phase 9 is complete for the first configuration and persistence slice.
+- Integrated public-dataset E2E testing is complete for the Phase 1 through Phase 9 checkpoint.
 
 ## Future
 

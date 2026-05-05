@@ -6,6 +6,8 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added an integrated public-dataset E2E harness and run documentation for the Titanic batch,
+  interactive shell, NYC taxi lazy-scale, and Penguins script reproducibility scenarios.
 - Added Phase 9 configuration and persistence with `.tabdat.toml`, `--config <path>`, runtime
   `set graph_format`, `set artifact_dir`, and `set graph_open`, config-aware plot defaults,
   live `count` execution for lazy datasets, and Parquet `save` / `export`.
@@ -46,3 +48,8 @@ All notable project changes are tracked here.
 ### Removed
 
 - Removed the external PyMonad dependency in favor of local `tabdat.monads` helpers.
+
+### Fixed
+
+- Fixed interactive shell Ctrl-C handling so prompt-toolkit completion interrupts return to the
+  prompt instead of terminating with a traceback.
