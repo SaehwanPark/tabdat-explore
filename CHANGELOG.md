@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 8 scripting and reproducibility with `tabdat -f <script>`, positional script
+  execution, interactive and nested `run <script>`, deterministic script metadata, command
+  transcripts, multiline SQL script blocks, line-numbered script errors, and script-mode plot
+  auto-open suppression.
 - Added local typed monad helpers for parser failure composition and pure-core absence handling.
 - Added Phase 7 lazy execution entrypoint with `use <path>, lazy`, optional
   `engine=duckdb|polars` selection, DuckDB `read_parquet` scan views for lazy loading, typed

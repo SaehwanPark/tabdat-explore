@@ -65,31 +65,24 @@ This file tracks feature state for spec-driven development. Product intent lives
   - focused parser, executor, and CLI tests for lazy command flows
 - Replaced the external PyMonad dependency with local typed monad helpers for parser failure
   composition and future pure-core absence handling.
+- Implemented Phase 8 scripting and reproducibility:
+  - script execution from files via `tabdat -f <script>` and `tabdat <script>`
+  - interactive and nested `run <script>` with relative nested path resolution
+  - whole-line script comments, blank-line skipping, and multiline `sql """..."""` blocks
+  - deterministic script metadata and command transcripts
+  - fail-fast script errors with file and line number diagnostics
+  - script-mode plot auto-open suppression and golden mini-session coverage
+  - lazy-mode documentation for materialization limits and experimental Polars selection
 
 ## Present
 
-- Phase 7 is complete for the first lazy execution slice.
-- The current runtime does not yet include scripts.
-- Accepted reviewer feedback is being folded into Phase 8+ planning only; completed Phase 0-7
-  behavior remains historical unless a future task explicitly revisits it.
+- Phase 8 is complete for the first scripting and reproducibility slice.
 
 ## Future
 
-- Phase 8 scripting and reproducibility:
-  - add script execution from files via `tabdat -f <script>`, `tabdat <script>`, and interactive
-    `run <script>`
-  - introduce a script parser layer for command sequences, with AST room for later loops,
-    macros, script-level conditionals, and error-control constructs
-  - keep row-level `if` expressions separate from future script-level `if` / `else`
-  - add deterministic logging, script-run metadata, and golden-output tests for complete mini
-    sessions
+- Phase 8 follow-up:
   - dogfood a complete public-dataset EDA using only `tabdat` before adding many more commands
-- Phase 8 lazy and backend honesty:
-  - avoid lazy load-time full counts unless requested
-  - document which commands preserve lazy scans and which commands materialize intermediate
-    results
-  - either hide `engine=polars` until Polars has real execution coverage or mark it clearly
-    experimental in help, metadata, and docs
+  - revisit lazy load-time full counts after script metadata no longer depends on row counts
 - Phase 9 configuration and persistence:
   - define configuration behavior for graph format, artifact directory, and auto-open defaults
   - add a `save` / `export` command contract for persisting session-local transformations

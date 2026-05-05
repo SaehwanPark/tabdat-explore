@@ -88,6 +88,15 @@ Run a result-producing SQL query over the active dataset exposed as `active`.
 
 Phase 4 focus.
 
+## Scripting
+
+### `run`
+
+Run a TabDat script file in the current session.
+
+Phase 8 focus: one command per non-empty line, whole-line comments, multiline SQL blocks, relative
+nested paths, recursion rejection, and deterministic script transcripts.
+
 ## Deferred Commands
 
 The following commands are important but should remain outside the v0 command set until the core workflow is stable:

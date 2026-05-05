@@ -36,6 +36,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "histogram",
   "scatter",
   "bar",
+  "run",
   "by",
   "exit",
   "quit",

@@ -1,40 +1,42 @@
-# Phase 7 Request Summary
+# Phase 8 Request Summary
 
 ## Goal
 
-Implement roadmap Phase 7: lazy execution and performance optimization for larger Parquet
-workflows.
+Implement roadmap Phase 8: scripting and reproducibility, after a small lazy-mode honesty pass.
 
 ## Requested Workflow
 
 - Use a temporary branch.
 - Commit meaningful implementation checkpoints.
 - Document carefully.
-- Create and submit a PR when fully done.
+- Open a PR when fully done.
 
 ## Phase Fit
 
-Roadmap Phase 7 covers:
+Roadmap Phase 8 covers:
 
-- explicit `lazy` mode in `use`
-- pushdown-oriented operations such as filter, select, and groupby
-- avoiding unnecessary materialization for large data workflows
-- tight DuckDB integration with optional Polars lazy pipeline direction
+- script execution from files
+- a script parser layer for command sequences
+- deterministic batch output and reproducibility metadata
+- golden-output tests for complete mini sessions
+- documentation of lazy-mode materialization limits and Polars experimental status
 
 ## Touched Surfaces
 
-- command parser and models
-- executor load dispatch and session metadata
-- DuckDB backend load strategy
-- formatter and CLI smoke behavior
-- runtime dependencies
-- focused tests
-- SDD state docs
-- workspace implementation and QA reports
+- CLI argument handling and batch runner
+- parser and command models for `run <script>`
+- script parsing and execution layer
+- executor integration for interactive or nested `run`
+- formatter output for script metadata
+- focused parser, CLI, script, and golden-output tests
+- SDD state docs and workspace delivery artifacts
 
 ## Assumptions
 
-- `use <path>` remains eager for compatibility.
-- Lazy loading is opt-in through `use <path>, lazy`.
-- DuckDB is the default lazy engine.
-- `engine=polars` is accepted as an explicit optional lazy engine selector.
+- Script files are UTF-8 text.
+- Empty lines and whole-line `#` comments are ignored.
+- Inline comments, macros, loops, and script-level conditionals are deferred.
+- Multiline `sql """..."""` blocks are supported.
+- Scripts fail fast on the first parse or execution error.
+- `exit` and `quit` stop the current script successfully.
+- Plot auto-open is disabled for scripts.
