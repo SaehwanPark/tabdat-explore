@@ -1,12 +1,13 @@
 """Command executor and session state."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from tabdat.backend import DuckDBBackend
 from tabdat.config import TabDatConfig, set_config_value
-from tabdat.errors import ExecutionError
+from tabdat.errors import ExecutionError, NoActiveDatasetError, UnknownTableError
 from tabdat.models import (
+  ActivateResult,
   BarCommand,
   ByCommand,
   CodebookCommand,
@@ -53,6 +54,8 @@ from tabdat.visualization import default_plot_path, save_bar, save_histogram, sa
 @dataclass
 class SessionState:
   active_dataset: DatasetInfo | None = None
+  active_table_name: str | None = None
+  tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
 
 
@@ -71,13 +74,7 @@ class Executor:
 
   def execute(self, command: Command) -> Result | None:
     if isinstance(command, UseCommand):
-      dataset = self.backend.inspect_parquet(
-        command.path,
-        execution_mode=command.execution_mode,
-        lazy_engine=command.lazy_engine,
-      )
-      self.state.active_dataset = dataset
-      return LoadResult(dataset=dataset)
+      return self._execute_use(command)
 
     if isinstance(command, DescribeCommand):
       dataset = self._require_active_dataset("describe")
@@ -114,53 +111,22 @@ class Executor:
       )
 
     if isinstance(command, KeepCommand):
-      dataset = self._require_active_dataset("keep")
-      if command.condition is not None:
-        next_dataset = self.backend.filter_rows(dataset, command.condition, keep=True)
-        self.state.active_dataset = next_dataset
-        return TransformResult("Kept matching rows", next_dataset)
-      next_dataset = self.backend.keep_columns(dataset, command.variables)
-      self.state.active_dataset = next_dataset
-      return TransformResult("Kept selected columns", next_dataset)
+      return self._execute_keep(command)
 
     if isinstance(command, DropCommand):
-      dataset = self._require_active_dataset("drop")
-      if command.condition is not None:
-        next_dataset = self.backend.filter_rows(dataset, command.condition, keep=False)
-        self.state.active_dataset = next_dataset
-        return TransformResult("Dropped matching rows", next_dataset)
-      next_dataset = self.backend.drop_columns(dataset, command.variables)
-      self.state.active_dataset = next_dataset
-      return TransformResult("Dropped selected columns", next_dataset)
+      return self._execute_drop(command)
 
     if isinstance(command, SelectCommand):
-      dataset = self._require_active_dataset("select")
-      next_dataset = self.backend.keep_columns(dataset, command.variables)
-      self.state.active_dataset = next_dataset
-      return TransformResult("Selected columns", next_dataset)
+      return self._execute_select(command)
 
     if isinstance(command, RenameCommand):
-      dataset = self._require_active_dataset("rename")
-      next_dataset = self.backend.rename_column(dataset, command.old_name, command.new_name)
-      self.state.active_dataset = next_dataset
-      return TransformResult(f"Renamed {command.old_name} to {command.new_name}", next_dataset)
+      return self._execute_rename(command)
 
     if isinstance(command, GenerateCommand):
-      dataset = self._require_active_dataset("generate")
-      next_dataset = self.backend.generate_column(dataset, command.variable, command.expression)
-      self.state.active_dataset = next_dataset
-      return TransformResult(f"Generated {command.variable}", next_dataset)
+      return self._execute_generate(command)
 
     if isinstance(command, ReplaceCommand):
-      dataset = self._require_active_dataset("replace")
-      next_dataset = self.backend.replace_column(
-        dataset,
-        command.variable,
-        command.expression,
-        command.condition,
-      )
-      self.state.active_dataset = next_dataset
-      return TransformResult(f"Replaced {command.variable}", next_dataset)
+      return self._execute_replace(command)
 
     if isinstance(command, TabulateCommand):
       dataset = self._require_active_dataset("tabulate")
@@ -175,24 +141,10 @@ class Executor:
       return TableResult(headers=headers, rows=table_rows)
 
     if isinstance(command, CollapseCommand):
-      dataset = self._require_active_dataset("collapse")
-      next_dataset = self.backend.collapse(
-        dataset,
-        command.statistic,
-        command.variables,
-        command.groups,
-      )
-      self.state.active_dataset = next_dataset
-      return TransformResult("Collapsed dataset", next_dataset)
+      return self._execute_collapse(command)
 
     if isinstance(command, SqlCommand):
-      dataset = self._require_active_dataset("sql")
-      if command.into is not None:
-        next_dataset = self.backend.replace_active_with_sql(dataset, command.query)
-        self.state.active_dataset = next_dataset
-        return SqlCreateResult(command.into, next_dataset)
-      sql_headers, sql_rows = self.backend.run_sql(command.query)
-      return TableResult(headers=sql_headers, rows=sql_rows)
+      return self._execute_sql(command)
 
     if isinstance(command, HistogramCommand):
       dataset = self._require_active_dataset("histogram")
@@ -260,10 +212,131 @@ class Executor:
       graph_format=self.state.config.graph_format,
     )
 
+  def _execute_use(self, command: UseCommand) -> LoadResult | ActivateResult:
+    if self._should_activate_named_table(command):
+      table_name = command.path.as_posix()
+      dataset = self.state.tables.get(table_name)
+      if dataset is None:
+        raise UnknownTableError(f"unknown table: {table_name}")
+      activated = self.backend.activate_named_table(table_name)
+      self._set_active_dataset(activated, active_table_name=table_name)
+      return ActivateResult(table_name=table_name, dataset=activated)
+
+    dataset = self.backend.inspect_parquet(
+      command.path,
+      execution_mode=command.execution_mode,
+      lazy_engine=command.lazy_engine,
+    )
+    self.state.active_table_name = None
+    self._set_active_dataset(dataset, active_table_name=None)
+    return LoadResult(dataset=dataset)
+
+  def _execute_keep(self, command: KeepCommand) -> TransformResult:
+    dataset = self._require_active_dataset("keep")
+    if command.condition is not None:
+      next_dataset = self.backend.filter_rows(dataset, command.condition, keep=True)
+      return self._record_transform("Kept matching rows", next_dataset)
+    next_dataset = self.backend.keep_columns(dataset, command.variables)
+    return self._record_transform("Kept selected columns", next_dataset)
+
+  def _execute_drop(self, command: DropCommand) -> TransformResult:
+    dataset = self._require_active_dataset("drop")
+    if command.condition is not None:
+      next_dataset = self.backend.filter_rows(dataset, command.condition, keep=False)
+      return self._record_transform("Dropped matching rows", next_dataset)
+    next_dataset = self.backend.drop_columns(dataset, command.variables)
+    return self._record_transform("Dropped selected columns", next_dataset)
+
+  def _execute_select(self, command: SelectCommand) -> TransformResult:
+    dataset = self._require_active_dataset("select")
+    next_dataset = self.backend.keep_columns(dataset, command.variables)
+    return self._record_transform("Selected columns", next_dataset)
+
+  def _execute_rename(self, command: RenameCommand) -> TransformResult:
+    dataset = self._require_active_dataset("rename")
+    next_dataset = self.backend.rename_column(dataset, command.old_name, command.new_name)
+    return self._record_transform(f"Renamed {command.old_name} to {command.new_name}", next_dataset)
+
+  def _execute_generate(self, command: GenerateCommand) -> TransformResult:
+    dataset = self._require_active_dataset("generate")
+    next_dataset = self.backend.generate_column(dataset, command.variable, command.expression)
+    return self._record_transform(f"Generated {command.variable}", next_dataset)
+
+  def _execute_replace(self, command: ReplaceCommand) -> TransformResult:
+    dataset = self._require_active_dataset("replace")
+    next_dataset = self.backend.replace_column(
+      dataset,
+      command.variable,
+      command.expression,
+      command.condition,
+    )
+    return self._record_transform(f"Replaced {command.variable}", next_dataset)
+
+  def _execute_collapse(self, command: CollapseCommand) -> TransformResult:
+    dataset = self._require_active_dataset("collapse")
+    next_dataset = self.backend.collapse(
+      dataset,
+      command.statistic,
+      command.variables,
+      command.groups,
+    )
+    return self._record_transform("Collapsed dataset", next_dataset)
+
+  def _execute_sql(self, command: SqlCommand) -> SqlCreateResult | TableResult:
+    dataset = self._require_active_dataset("sql")
+    if command.into is not None:
+      next_dataset = self.backend.create_named_table_from_sql(
+        dataset,
+        command.query,
+        command.into,
+      )
+      self._set_active_dataset(next_dataset, active_table_name=command.into)
+      return SqlCreateResult(command.into, next_dataset)
+    sql_headers, sql_rows = self.backend.run_sql(command.query)
+    return TableResult(headers=sql_headers, rows=sql_rows)
+
+  def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
+    self._set_active_dataset(dataset)
+    return TransformResult(message, dataset)
+
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
-      raise ExecutionError(f"{command_name} requires an active dataset; run use <path> first")
+      raise NoActiveDatasetError(f"{command_name} requires an active dataset; run use <path> first")
     return self.state.active_dataset
+
+  def _set_active_dataset(
+    self,
+    dataset: DatasetInfo,
+    *,
+    active_table_name: str | None = None,
+  ) -> None:
+    self.state.active_dataset = dataset
+    if active_table_name is not None:
+      self.state.active_table_name = active_table_name
+      self.state.tables[active_table_name] = dataset
+      return
+    if self.state.active_table_name is not None:
+      updated = self.backend.store_active_as_named_table(self.state.active_table_name)
+      self.state.active_dataset = updated
+      self.state.tables[self.state.active_table_name] = updated
+      return
+    self.state.active_table_name = None
+
+  def _should_activate_named_table(self, command: UseCommand) -> bool:
+    table_name = command.path.as_posix()
+    if table_name in self.state.tables:
+      if command.execution_mode != "eager" or command.lazy_engine is not None:
+        raise ExecutionError("use options are not supported for named table activation")
+      return True
+    if command.execution_mode != "eager" or command.lazy_engine is not None:
+      return False
+    if command.path.exists():
+      return False
+    if command.path.suffix:
+      return False
+    if "/" in table_name:
+      return False
+    raise UnknownTableError(f"unknown table: {table_name}")
 
   def _execute_by(self, command: ByCommand) -> TableResult:
     dataset = self._require_active_dataset("by")

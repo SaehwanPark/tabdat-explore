@@ -157,6 +157,34 @@ def test_cli_runs_phase_4_sql_flow(sample_parquet: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_10_named_table_activation_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "sql select sex, count(*) as n from active group by sex order by sex into summary",
+      "-c",
+      "keep sex",
+      "-c",
+      "use summary",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Created summary: 2 rows, 2 columns" in captured.out
+  assert "Kept selected columns: 2 rows, 1 columns" in captured.out
+  assert "Activated: summary (2 rows, 1 columns)" in captured.out
+  assert "sex" in captured.out
+  assert "F" in captured.out
+  assert "M" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

@@ -5,7 +5,13 @@ from typing import Literal, cast
 
 import duckdb
 
-from tabdat.errors import ExecutionError
+from tabdat.errors import (
+  BackendExecutionError,
+  ExecutionError,
+  ReservedNameError,
+  TypeMismatchExecutionError,
+  UnknownVariableError,
+)
 from tabdat.models import (
   BinaryExpression,
   CodebookRow,
@@ -120,6 +126,43 @@ class DuckDBBackend:
       raise ExecutionError("count failed")
     return cast(int, row_count_row[0])
 
+  def create_named_table_from_sql(
+    self,
+    dataset: DatasetInfo,
+    query: str,
+    table_name: str,
+  ) -> DatasetInfo:
+    _validate_user_table_name(table_name)
+    _require_result_query(query)
+    self._bind_active_view()
+    internal_name = _named_table_identifier(table_name)
+    try:
+      self._connection.execute(
+        f"create or replace temp table {_quote_identifier(internal_name)} as {query}"
+      )
+    except duckdb.Error as exc:
+      raise BackendExecutionError("sql failed") from exc
+    self._activate_relation(internal_name, "sql")
+    return self.active_dataset_info(Path(table_name))
+
+  def activate_named_table(self, table_name: str) -> DatasetInfo:
+    _validate_user_table_name(table_name)
+    internal_name = _named_table_identifier(table_name)
+    self._activate_relation(internal_name, "use")
+    return self.active_dataset_info(Path(table_name))
+
+  def store_active_as_named_table(self, table_name: str) -> DatasetInfo:
+    _validate_user_table_name(table_name)
+    internal_name = _named_table_identifier(table_name)
+    try:
+      self._connection.execute(
+        f"create or replace temp table {_quote_identifier(internal_name)} as "
+        f"select * from {ACTIVE_TABLE}"
+      )
+    except duckdb.Error as exc:
+      raise BackendExecutionError(f"could not update table: {table_name}") from exc
+    return self.active_dataset_info(Path(table_name))
+
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
@@ -170,7 +213,9 @@ class DuckDBBackend:
       variable for variable in requested if not _is_numeric_type(column_types[variable])
     )
     if non_numeric:
-      raise ExecutionError(f"summarize requires numeric variables: {', '.join(non_numeric)}")
+      raise TypeMismatchExecutionError(
+        f"summarize requires numeric variables: {', '.join(non_numeric)}"
+      )
 
     return tuple(self._summarize_variable(variable) for variable in requested)
 
@@ -195,7 +240,9 @@ class DuckDBBackend:
       variable for variable in requested if not _is_numeric_type(column_types[variable])
     )
     if non_numeric:
-      raise ExecutionError(f"summarize requires numeric variables: {', '.join(non_numeric)}")
+      raise TypeMismatchExecutionError(
+        f"summarize requires numeric variables: {', '.join(non_numeric)}"
+      )
 
     group_sql = ", ".join(_quote_identifier(group) for group in groups)
     aggregate_sql = ", ".join(
@@ -404,7 +451,7 @@ class DuckDBBackend:
         variable for variable in variables if not _is_numeric_type(column_types[variable])
       )
       if non_numeric:
-        raise ExecutionError(
+        raise TypeMismatchExecutionError(
           f"collapse {statistic} requires numeric variables: {', '.join(non_numeric)}"
         )
 
@@ -439,7 +486,9 @@ class DuckDBBackend:
         variable for variable in variables if not _is_numeric_type(column_types[variable])
       )
       if non_numeric:
-        raise ExecutionError(f"plot requires numeric variables: {', '.join(non_numeric)}")
+        raise TypeMismatchExecutionError(
+          f"plot requires numeric variables: {', '.join(non_numeric)}"
+        )
     select_sql = _select_list(variables)
     return self._fetch_table(f"select {select_sql} from {ACTIVE_TABLE}", "plot")
 
@@ -633,6 +682,18 @@ class DuckDBBackend:
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
 
+  def _activate_relation(self, relation_name: str, command_name: str) -> None:
+    quoted_relation = _quote_identifier(relation_name)
+    try:
+      self._drop_active_relation()
+      self._connection.execute(
+        f"create or replace temp table {ACTIVE_TABLE} as select * from {quoted_relation}"
+      )
+      self._active_storage = "table"
+      self._lazy_engine = None
+    except duckdb.Error as exc:
+      raise BackendExecutionError(f"{command_name} failed") from exc
+
   def _drop_active_relation(self) -> None:
     if self._active_storage == "view":
       self._connection.execute(f"drop view if exists {ACTIVE_TABLE}")
@@ -670,7 +731,7 @@ def _require_columns(
 ) -> None:
   missing = tuple(variable for variable in variables if variable not in column_types)
   if missing:
-    raise ExecutionError(f"{command_name} unknown variable: {', '.join(missing)}")
+    raise UnknownVariableError(f"{command_name} unknown variable: {', '.join(missing)}")
 
 
 def _select_list(variables: tuple[str, ...]) -> str:
@@ -691,3 +752,15 @@ def _require_result_query(query: str) -> None:
   first_word = query.lstrip().split(maxsplit=1)[0].lower() if query.strip() else ""
   if first_word not in {"select", "with"}:
     raise ExecutionError("sql only supports select or with queries in Phase 4")
+
+
+def _validate_user_table_name(table_name: str) -> None:
+  if not table_name.isidentifier():
+    raise ReservedNameError(f"invalid table name: {table_name}")
+  normalized = table_name.lower()
+  if normalized == "active" or normalized.startswith("__tabdat_"):
+    raise ReservedNameError(f"reserved table name: {table_name}")
+
+
+def _named_table_identifier(table_name: str) -> str:
+  return f"__tabdat_named_{table_name}"

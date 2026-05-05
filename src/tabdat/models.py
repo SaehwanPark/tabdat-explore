@@ -275,6 +275,12 @@ class LoadResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ActivateResult:
+  table_name: str
+  dataset: DatasetInfo
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class DescribeResult:
   dataset: DatasetInfo
 
@@ -358,6 +364,7 @@ class SaveResult:
 
 Result = (
   LoadResult
+  | ActivateResult
   | DescribeResult
   | SummarizeResult
   | CodebookResult

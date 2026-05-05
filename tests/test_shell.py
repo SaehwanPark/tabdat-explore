@@ -5,7 +5,7 @@ from prompt_toolkit.document import Document
 from prompt_toolkit.history import InMemoryHistory
 
 from tabdat.executor import Executor
-from tabdat.models import UseCommand
+from tabdat.models import SqlCommand, UseCommand
 from tabdat.shell import TabdatCompleter, TabdatLexer, create_prompt_session
 
 
@@ -128,6 +128,18 @@ def test_completer_suggests_sql_helpers() -> None:
     executor.close()
 
   assert completions == ["group by"]
+
+
+def test_completer_suggests_named_tables_for_use(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(SqlCommand("select sex from active order by sex", into="summary"))
+    completions = _completion_texts(TabdatCompleter(executor), "use s")
+  finally:
+    executor.close()
+
+  assert completions == ["summary"]
 
 
 def test_completer_suggests_visualization_columns_and_options(sample_parquet: Path) -> None:

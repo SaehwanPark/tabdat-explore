@@ -1,8 +1,9 @@
 # TabDat-Explore
 
 TabDat-Explore is a terminal-native exploratory data analysis tool for modern tabular data.
-It is Stata-inspired in feel, but not Stata-compatible. The current implementation uses a
-single active dataset, DuckDB for execution, and Parquet as the primary input format.
+It is Stata-inspired in feel, but not Stata-compatible. The current implementation uses one active
+dataset, a session-local named table registry, DuckDB for execution, and Parquet as the primary
+input format.
 
 ## What It Does
 
@@ -21,6 +22,7 @@ command line. The current CLI supports:
 - grouped aggregation with `collapse`
 - grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
+- session-local named tables with `sql ... into <table>` and `use <table>`
 - artifact plots with `histogram`, `scatter`, and `bar`
 - opt-in lazy Parquet loading with `use data.parquet, lazy`
 - script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
@@ -30,7 +32,7 @@ command line. The current CLI supports:
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the first configuration and persistence slice of the roadmap.
+The repository has completed the first execution and state foundations slice of the roadmap.
 
 ## Quickstart
 
@@ -128,6 +130,9 @@ M    25
 tabdat> sql select sex, count(*) as n from active group by sex into summary
 Created summary: 2 rows, 2 columns
 
+tabdat> use summary
+Activated: summary (2 rows, 2 columns)
+
 tabdat> histogram age
 Saved plot: artifacts/plots/histogram-age.svg
 
@@ -142,7 +147,8 @@ tabdat> run analysis.td
 
 ## Design Notes
 
-- One active dataset per session keeps the mental model simple.
+- One active dataset remains the default command target, while session-local named tables let SQL
+  `into` results be reactivated later with `use <table>`.
 - DuckDB is the primary execution engine.
 - Parquet is the primary data format.
 - `use data.parquet` remains eager. `use data.parquet, lazy` creates a DuckDB Parquet scan view and
@@ -151,8 +157,8 @@ tabdat> run analysis.td
 - Lazy `use` validates readability and schema through DuckDB, but does not count rows at load time.
   Run `count` for a live row count. Transformations currently materialize the active relation after
   the first lazy transformation.
-- SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
-  dataset with the query result and does not persist a file.
+- SQL is an escape hatch, not the main interface. `sql ... into <table>` creates a session-local
+  named table, makes it active, and does not persist a file.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
   `-c` and script runs only print the saved path.
 - Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Generated names
@@ -164,6 +170,8 @@ tabdat> run analysis.td
 - Scripts print deterministic run metadata, echo each command as `. <command>`, fail fast on the
   first error, and include file and line number diagnostics. Macros, loops, inline comments, and
   script-level conditionals are deferred.
+- Named table registries are not persisted across CLI sessions; use `save` or `export` for durable
+  Parquet output.
 - Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation
   and error messages.
 - The terminal experience is part of the product, not an afterthought.

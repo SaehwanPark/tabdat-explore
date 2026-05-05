@@ -1,60 +1,48 @@
-# Phase 9 Implementation Report
+# Phase 10 Implementation Report
 
 ## Summary
 
-Implemented Phase 9 configuration and persistence on branch
-`codex/tmp-phase9-config-persistence`.
+Implemented the first Phase 10 execution and state foundations slice on branch
+`codex/tmp-phase10-execution-state-foundations`.
 
 ## Implemented Behavior
 
-- Added typed runtime config with defaults for graph format, artifact directory, and graph open.
-- Added `.tabdat.toml` auto-loading and `--config <path>`.
-- Added `set graph_format`, `set artifact_dir`, and `set graph_open`.
-- Made generated plot paths config-aware.
-- Preserved script and `-c` non-opening plot behavior while making interactive open respect
-  `graph_open`.
-- Added `save` and `export` for local Parquet persistence with `replace` overwrite control.
-- Changed lazy `use` to avoid load-time full row counts.
-- Changed `count` to query the active relation live.
+- Added a lightweight session-local named table registry.
+- Changed `sql ... into <table>` to create a named table, make it active, and keep its metadata in
+  executor state.
+- Added `use <table>` activation for registered named tables.
+- Added `Activated: <table> (N rows, M columns)` output.
+- Added named table completions for interactive `use`.
+- Extracted state-changing executor behavior into private command handlers and shared transform
+  recording.
+- Added specific `ExecutionError` subclasses for missing active datasets, missing variables, type
+  mismatches, missing tables, reserved names, and backend failures.
 
 ## Files Changed
 
-- `src/tabdat/config.py`
+- `src/tabdat/errors.py`
 - `src/tabdat/models.py`
-- `src/tabdat/parser.py`
-- `src/tabdat/executor.py`
 - `src/tabdat/backend.py`
-- `src/tabdat/visualization.py`
+- `src/tabdat/executor.py`
 - `src/tabdat/formatter.py`
-- `src/tabdat/cli.py`
 - `src/tabdat/shell.py`
-- focused parser, executor, and CLI tests
+- focused parser, executor, CLI, and shell tests
 - README, SDD docs, and workspace artifacts
 
 ## Validation
 
-- `uv run pytest`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py`
+- `uv run pytest tests/test_executor.py tests/test_cli.py`
 - `uv run mypy`
 - `uv run ruff check .`
-- `uv run ruff format --check .`
 
-Focused validation passed after implementation. Final validation is recorded in the delivery
-summary.
-
-## Dogfood
-
-Ran a full script flow with `use`, `set`, `keep if`, `count`, `histogram`, and `save`:
-
-```text
-uv run tabdat -f /tmp/tabdat_phase9_dogfood.td
-```
-
-The run produced a PNG plot under `/tmp/tabdat_phase9_artifacts/plots/` and a filtered Parquet
-dataset at `/tmp/tabdat_phase9_filtered.parquet`.
+Final full validation is recorded in the delivery summary.
 
 ## Known Limits
 
-- Config search is project-local or explicit only.
-- Persistence supports Parquet only.
-- Generated plot names are stable and may overwrite previous generated artifacts.
+- Named tables are session-local only.
+- `active` remains the only supported SQL binding for the current active dataset; broad multi-table
+  SQL over registered names is deferred.
+- `use <table>` accepts no options.
+- Joins, append/stack, reshape, and persistence catalogs are deferred to later phases.
 - `engine=polars` remains experimental metadata; execution still uses the DuckDB relation boundary.

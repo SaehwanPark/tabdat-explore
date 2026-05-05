@@ -1,78 +1,81 @@
-# Phase 9 Configuration And Persistence Contract
+# Phase 10 Execution And State Foundations Contract
 
 ## Roadmap Phase
 
-Phase 9: Configuration & Environment.
+Phase 10: Execution & State Foundations.
 
-## Config Loading
-
-- At startup, TabDat loads `.tabdat.toml` from the current working directory if present.
-- `--config <path>` loads an explicit TOML config file and takes the place of `.tabdat.toml`.
-- Supported keys:
-  - `graph_format = "svg" | "png"`
-  - `artifact_dir = "<path>"`
-  - `graph_open = true | false`
-- Unknown keys, missing config files, invalid TOML, and invalid values are user-facing errors.
-
-## `set`
+## Named Table Registry
 
 Syntax:
 
 ```text
-set graph_format svg
-set graph_format png
-set artifact_dir artifacts
-set graph_open on
-set graph_open off
+sql <select-or-with-query> into <table>
+use <table>
 ```
 
-- Updates runtime config for the current executor session.
-- Affects later commands in the same shell, script, or repeated `-c` command run.
-- Prints `Set <name>: <value>`.
+- `sql ... into <table>` evaluates a result-producing query over the current active dataset exposed
+  as `active`.
+- The result is stored in a session-local named table registry under `<table>`.
+- The created table becomes the active dataset immediately.
+- Previously active named tables remain registered and can be reactivated with `use <table>`.
+- `use <path>` continues to load local `.parquet` files and registers the loaded dataset as
+  `active`.
+- `use <table>` is only table activation when `<table>` matches an existing registered table name
+  and does not resolve as a local file path.
+- Valid table names use identifier syntax: letters, numbers, and underscores, starting with a
+  letter or underscore.
+- Reserved names are rejected for user-created tables: `active` and names beginning with
+  `__tabdat_`.
 
-## Plot Defaults
+## Output
 
-- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`.
-- Explicit `saving(...)` keeps overriding directory and extension.
-- Interactive shell auto-open respects `graph_open`.
-- Batch `-c` and script runs do not auto-open plots.
-- Generated plot names are stable and may overwrite existing artifacts.
+- `sql ... into <table>` prints `Created <table>: N rows, M columns`.
+- `use <table>` prints `Activated: <table> (N rows, M columns)`.
+- Existing `use <path>` output remains `Loaded: <path> (...)`.
+- Existing command error formatting remains `Error: <message>`.
 
-## `save` / `export`
+## Execution Semantics
 
-Syntax:
+- Named tables are session-local DuckDB relations and are not written to disk unless `save` or
+  `export` is run.
+- The current active dataset remains the default target for inspection, transformation, SQL, plots,
+  and persistence commands.
+- Transformations replace the active relation and update active metadata.
+- SQL can reference the current active dataset through `active`; arbitrary multi-table SQL over the
+  registry is deferred.
+- Lazy `use <path>, lazy` still creates a DuckDB scan view and reports an unknown row count until a
+  live count or materializing command runs.
+- Most transformations materialize the active relation after the first lazy transformation.
+- `engine=polars` remains experimental metadata; command execution still uses the DuckDB relation
+  boundary.
 
-```text
-save output.parquet
-save output.parquet, replace
-export output.parquet
-export output.parquet, replace
-```
+## Specific Execution Errors
 
-- Requires an active dataset.
-- Writes the active relation to local Parquet.
-- Refuses to overwrite existing files unless `replace` is supplied.
-- Creates parent directories when needed.
-- Prints `Saved: <path> (N rows, M columns)`.
-
-## Lazy Row Count Cleanup
-
-- Lazy `use` validates readability and schema without a load-time full `count(*)`.
-- Lazy load output displays an unknown row count until a live count or materializing transform runs.
-- `count` always queries the active relation live.
+- Missing active dataset uses `NoActiveDatasetError`.
+- Missing columns use `UnknownVariableError`.
+- Type-specific command failures use `TypeMismatchExecutionError`.
+- Missing named tables use `UnknownTableError`.
+- Reserved or invalid table names use `ReservedNameError`.
+- Backend failures use `BackendExecutionError`.
+- All subclasses inherit from `ExecutionError`, preserving current CLI behavior.
 
 ## Non-Goals
 
-- No user-level config search path.
-- No CSV, Feather, or Arrow export in this slice.
-- No named table registry.
-- No timestamped plot naming by default.
+- No join, append, reshape, or broad multi-table workflow commands.
+- No `use <table>, options`; named table activation accepts no `use` options.
+- No persistent named table catalog across sessions.
+- No Polars-native execution lowering.
+- No plugin, R integration, or analytical command expansion.
 
 ## Acceptance Criteria
 
-- Parser tests cover valid and invalid `set`, `save`, and `export`.
-- Executor/backend tests cover config mutation, plot defaults, live lazy counts, and Parquet writes.
-- CLI tests cover explicit config loading, runtime settings, save output, and invalid config errors.
+- Parser tests cover `use <table>` activation syntax and still cover valid/invalid `sql into`
+  names.
+- Executor/backend tests cover named table creation, activation, active metadata updates, and
+  specific error subclasses.
+- CLI tests cover repeated `-c` named-table workflows and deterministic output.
+- Documentation states the registry is session-local and that `active` remains the primary command
+  target.
 - Full validation passes:
   - `uv run pytest`
   - `uv run mypy`
