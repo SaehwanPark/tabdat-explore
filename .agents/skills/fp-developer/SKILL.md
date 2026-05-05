@@ -269,10 +269,10 @@ Use:
 
 * `mypy` for static type checking
 * `pydantic` for validated boundary models
-* `pymonad` for functional absence/failure/composition primitives
+* local `Option` / `Result` helpers for explicit absence, recoverable failure, and composition
 * `pytest` for tests
 
-Add any missing dependencies via configured dependency manager (`uv` preferred). If project dependency policy blocks adding `pymonad`, use lightweight local `Result` / `Option` helpers as a fallback.
+Prefer lightweight local `Option` / `Result` helpers for absence, recoverable failure, and composable pipelines. Add only the minimal helper code the project needs; do not introduce a third-party monad dependency for new work.
 
 ## Python Rules
 
@@ -345,7 +345,7 @@ def add_item(items: tuple[str, ...], item: str) -> tuple[str, ...]:
 
 Use `Optional` only for true absence.
 
-Use PyMonad for absence and recoverable failure when dependency policy allows.
+Prefer local `Option` / `Result`-style values for absence and recoverable failure when they clarify composition.
 
 Prefer:
 
@@ -355,9 +355,9 @@ Prefer:
 
 Avoid deeply nested conditionals or exception-driven control flow for expected domain failures.
 
-Keep monadic values in the pure/domain layer where they clarify composition. Convert at impure edges when frameworks, serializers, or external APIs expect plain Python values.
+Keep these values in the pure/domain layer where they clarify composition. Convert at impure edges when frameworks, serializers, or external APIs expect plain Python values.
 
-If `pymonad` is not available, use lightweight structured results for recoverable failure.
+If the project needs concrete helpers, define small local dataclasses or classes rather than adding a new package.
 
 ```python
 from dataclasses import dataclass
