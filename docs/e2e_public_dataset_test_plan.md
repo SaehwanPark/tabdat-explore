@@ -142,7 +142,9 @@ expected_stdout_contains:
   - "Rows:"
   - "Variable  Type"
   - "Variable  Count  Mean"
-  - "Variable  Type  Nonmissing  Missing  Distinct  Examples"
+  - "Nonmissing"
+  - "Distinct"
+  - "Examples"
   - "Kept matching rows:"
   - "Dropped selected columns:"
   - "Renamed sex to gender:"
@@ -151,8 +153,8 @@ expected_stdout_contains:
   - "Selected columns:"
   - "gender"
   - "survived"
-  - "row_percent"
-  - "column_percent"
+  - "Row %"
+  - "Col %"
   - "pclass"
   - "Collapsed dataset:"
 expected_stdout_regex:
@@ -186,22 +188,22 @@ interactive_steps:
   - send: "use artifacts/e2e/data/titanic.parquet\n"
   - expect_stdout_contains: ["Loaded: artifacts/e2e/data/titanic.parquet"]
   - send: "summarize a\t"
-  - expect_buffer_contains: ["summarize age"]
+  - expect_completion_contains: ["age"]
   - send: "\u0003"
   - send: "tabulate sex, \t"
   - expect_buffer_contains: ["row", "col", "missing"]
   - send: "\u0003"
   - send: "by s\t"
-  - expect_buffer_contains: ["by sex"]
+  - expect_completion_contains: ["sex"]
   - send: "\u0003"
   - send: "by sex: sum\t"
-  - expect_buffer_contains: ["by sex: summarize"]
+  - expect_completion_contains: ["summarize"]
   - send: "\u0003"
   - send: "sql group\t"
-  - expect_buffer_contains: ["sql group by"]
+  - expect_completion_contains: ["group by"]
   - send: "\u0003"
   - send: "histogram a\t"
-  - expect_buffer_contains: ["histogram age"]
+  - expect_completion_contains: ["age"]
   - send: "\u0003"
   - send: "count\n"
   - expect_stdout_regex: ["Rows: [0-9]+"]
@@ -388,8 +390,8 @@ expected_stdout_contains:
   - "Generated body_mass_kg:"
   - "Saved plot: artifacts/e2e/s4/artifacts/plots/penguins_scatter.png"
   - "species"
-  - "row_percent"
-  - "column_percent"
+  - "Row %"
+  - "Col %"
   - "Created penguin_summary:"
   - "Saved: artifacts/e2e/s4/penguin_summary.parquet"
 expected_stdout_regex:

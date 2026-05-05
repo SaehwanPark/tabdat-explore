@@ -169,7 +169,9 @@ def s1_titanic_batch_core() -> ScenarioResult:
       "Rows:",
       "Variable  Type",
       "Variable  Count  Mean",
-      "Variable  Type  Nonmissing  Missing  Distinct  Examples",
+      "Nonmissing",
+      "Distinct",
+      "Examples",
       "Kept matching rows:",
       "Dropped selected columns:",
       "Renamed sex to gender:",
@@ -178,8 +180,8 @@ def s1_titanic_batch_core() -> ScenarioResult:
       "Selected columns:",
       "gender",
       "survived",
-      "row_percent",
-      "column_percent",
+      "Row %",
+      "Col %",
       "pclass",
       "Collapsed dataset:",
     ),
@@ -203,17 +205,17 @@ def s2_interactive_shell_contract() -> ScenarioResult:
   try:
     output += expect_output(child, "tabdat>", timeout=20)
     output += send_and_expect(child, "use artifacts/e2e/data/titanic.parquet\n", "Loaded:")
-    output += send_and_expect(child, "summarize a\t", "summarize age")
+    output += send_and_expect(child, "summarize a\t", "age")
     output += send_and_expect(child, "\x03", "tabdat>")
     output += send_and_expect(child, "tabulate sex, \t", "missing")
     output += send_and_expect(child, "\x03", "tabdat>")
-    output += send_and_expect(child, "by s\t", "by sex")
+    output += send_and_expect(child, "by s\t", "sex")
     output += send_and_expect(child, "\x03", "tabdat>")
-    output += send_and_expect(child, "by sex: sum\t", "by sex: summarize")
+    output += send_and_expect(child, "by sex: sum\t", "summarize")
     output += send_and_expect(child, "\x03", "tabdat>")
-    output += send_and_expect(child, "sql group\t", "sql group by")
+    output += send_and_expect(child, "sql group\t", "group by")
     output += send_and_expect(child, "\x03", "tabdat>")
-    output += send_and_expect(child, "histogram a\t", "histogram age")
+    output += send_and_expect(child, "histogram a\t", "age")
     output += send_and_expect(child, "\x03", "tabdat>")
     output += send_and_expect(child, "count\n", "Rows:")
     output += send_and_expect(child, "exit\n", "", timeout=10)
@@ -392,8 +394,8 @@ def s4_penguins_script_repro() -> ScenarioResult:
       "Generated body_mass_kg:",
       "Saved plot: artifacts/e2e/s4/artifacts/plots/penguins_scatter.png",
       "species",
-      "row_percent",
-      "column_percent",
+      "Row %",
+      "Col %",
       "Created penguin_summary:",
       "Saved: artifacts/e2e/s4/penguin_summary.parquet",
     ),

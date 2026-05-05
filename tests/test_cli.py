@@ -6,8 +6,10 @@ from tabdat.cli import (
   _has_open_sql_triple_quote,
   _open_command_for_platform,
   _open_plot_if_needed,
+  _run_shell,
   main,
 )
+from tabdat.executor import Executor
 from tabdat.models import PlotResult
 
 
@@ -31,6 +33,32 @@ def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
   assert "Variable  Type" in captured.out
   assert "Variable  Count  Mean" in captured.out
   assert "age       3      42" in captured.out
+  assert captured.err == ""
+
+
+def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
+  class InterruptThenEofSession:
+    def __init__(self) -> None:
+      self.calls = 0
+
+    def prompt(self, prompt_text: str) -> str:
+      self.calls += 1
+      if self.calls == 1:
+        raise KeyboardInterrupt
+      raise EOFError
+
+  session = InterruptThenEofSession()
+  executor = Executor()
+  try:
+    monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: session)
+    exit_code = _run_shell(executor)
+  finally:
+    executor.close()
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert session.calls == 2
   assert captured.err == ""
 
 
