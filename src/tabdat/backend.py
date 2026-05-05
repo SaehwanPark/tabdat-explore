@@ -1,7 +1,7 @@
 """DuckDB-backed dataset operations."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import duckdb
 
@@ -73,7 +73,6 @@ class DuckDBBackend:
         self._connection.execute(
           f"create or replace temp view {NEXT_ACTIVE_VIEW} as {read_sql}",
         )
-        self._connection.execute(f"select count(*) from {NEXT_ACTIVE_VIEW}").fetchone()
         self._drop_active_relation()
         self._connection.execute(f"create or replace temp view {ACTIVE_TABLE} as {read_sql}")
         self._connection.execute(f"drop view {NEXT_ACTIVE_VIEW}")
@@ -100,13 +99,10 @@ class DuckDBBackend:
   def active_dataset_info(self, path: Path) -> DatasetInfo:
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
-      row_count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
     except duckdb.Error as exc:
       raise ExecutionError("active dataset is not available") from exc
-    if row_count_row is None:
-      raise ExecutionError("active dataset is not available")
-    row_count = row_count_row[0]
     columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
+    row_count = None if self._active_storage == "view" else self.active_row_count()
     return DatasetInfo(
       path=path,
       row_count=row_count,
@@ -114,6 +110,32 @@ class DuckDBBackend:
       execution_mode="lazy" if self._active_storage == "view" else "eager",
       lazy_engine=self._lazy_engine,
     )
+
+  def active_row_count(self) -> int:
+    try:
+      row_count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
+    except duckdb.Error as exc:
+      raise ExecutionError("count failed") from exc
+    if row_count_row is None:
+      raise ExecutionError("count failed")
+    return cast(int, row_count_row[0])
+
+  def save_active_parquet(self, path: Path, *, replace: bool) -> None:
+    normalized = path.expanduser()
+    if normalized.suffix.lower() != ".parquet":
+      raise ExecutionError("save only supports .parquet files in Phase 9")
+    if normalized.exists() and not replace:
+      raise ExecutionError(f"save target already exists: {path}")
+    if normalized.exists() and not normalized.is_file():
+      raise ExecutionError(f"save target is not a file: {path}")
+    normalized.parent.mkdir(parents=True, exist_ok=True)
+    try:
+      self._connection.execute(
+        f"copy (select * from {ACTIVE_TABLE}) to ? (format parquet)",
+        [str(normalized)],
+      )
+    except duckdb.Error as exc:
+      raise ExecutionError(f"save failed: {path}") from exc
 
   def run_sql(self, query: str) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
     _require_result_query(query)

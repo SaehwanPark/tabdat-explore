@@ -10,6 +10,7 @@ from enum import Enum, auto
 from pathlib import Path
 
 from tabdat import __version__
+from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_result
@@ -29,6 +30,7 @@ def main(argv: Sequence[str] | None = None) -> int:
   parser = argparse.ArgumentParser(prog="tabdat")
   parser.add_argument("-c", "--command", action="append", help="run a command and exit")
   parser.add_argument("-f", "--file", type=Path, help="run a TabDat script file and exit")
+  parser.add_argument("--config", type=Path, help="load a TabDat TOML config file")
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
@@ -37,7 +39,13 @@ def main(argv: Sequence[str] | None = None) -> int:
   if args.file is not None and args.script is not None:
     parser.error("-f/--file cannot be combined with a positional script")
 
-  executor = Executor()
+  try:
+    config = load_config(args.config) if args.config is not None else load_default_config()
+  except TabDatError as exc:
+    print(f"Error: {exc}", file=sys.stderr)
+    return 1
+
+  executor = Executor(config=config)
   try:
     if args.command:
       return _run_commands(args.command, executor)
@@ -82,7 +90,7 @@ def _run_shell(executor: Executor) -> int:
     status = _run_one(
       command_text,
       executor,
-      open_plots=True,
+      open_plots=executor.state.config.graph_open,
       run_script=lambda path: _run_script_status(
         path,
         executor,
@@ -163,7 +171,7 @@ def _run_script_status(
     raise ScriptError(path, 1, "recursive script inclusion is not supported")
 
   commands = read_script(resolved_path)
-  _print_script_metadata(resolved_path)
+  _print_script_metadata(resolved_path, executor.state.config)
   next_stack = active_stack + (resolved_path,)
 
   for script_command in commands:
@@ -202,10 +210,16 @@ def _resolve_script_path(path: Path, base_dir: Path | None) -> Path:
   return candidate.expanduser().resolve()
 
 
-def _print_script_metadata(path: Path) -> None:
+def _print_script_metadata(path: Path, config: TabDatConfig) -> None:
   print(f"Script: {_display_script_path(path)}")
   print(f"TabDat: {__version__}")
   print(f"Python: {platform.python_version()}")
+  print(
+    "Config: "
+    f"graph_format={config.graph_format}, "
+    f"artifact_dir={config.artifact_dir}, "
+    f"graph_open={'on' if config.graph_open else 'off'}"
+  )
 
 
 def _display_script_path(path: Path) -> str:

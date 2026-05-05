@@ -17,6 +17,7 @@ from tabdat.models import (
   DescribeCommand,
   DropCommand,
   ExitCommand,
+  ExportCommand,
   Expression,
   FunctionCallExpression,
   GenerateCommand,
@@ -29,8 +30,10 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   RunCommand,
+  SaveCommand,
   ScatterCommand,
   SelectCommand,
+  SetCommand,
   SqlCommand,
   StringExpression,
   SummarizeCommand,
@@ -62,6 +65,9 @@ _EXECUTABLE_COMMANDS = {
   "scatter",
   "bar",
   "run",
+  "set",
+  "save",
+  "export",
   "exit",
   "quit",
 }
@@ -244,6 +250,15 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
   if parts.name == "bar":
     return _parse_bar(parts)
 
+  if parts.name == "set":
+    return _parse_set(parts)
+
+  if parts.name == "save":
+    return _parse_save_or_export(parts, "save")
+
+  if parts.name == "export":
+    return _parse_save_or_export(parts, "export")
+
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError(f"{parts.name} does not accept arguments, if clauses, or options")
@@ -409,6 +424,20 @@ def _parse_run(text: str) -> RunCommand:
   return RunCommand(path=Path(path_parts[0]))
 
 
+def _parse_set(parts: _CommandParts) -> SetCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError("set expects syntax: set name value")
+  if len(parts.arguments) != 2:
+    raise ParseError("set expects syntax: set name value")
+  name = parts.arguments[0].lower()
+  if name not in {"graph_format", "artifact_dir", "graph_open"}:
+    raise ParseError(f"unknown setting: {parts.arguments[0]}")
+  return SetCommand(
+    name=cast(Literal["graph_format", "artifact_dir", "graph_open"], name),
+    value=parts.arguments[1],
+  )
+
+
 def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand | DropCommand:
   if parts.options or parts.expression is not None:
     raise ParseError(f"{command_name} does not accept options or assignment syntax")
@@ -529,6 +558,21 @@ def _parse_bar(parts: _CommandParts) -> BarCommand:
     include_missing="missing" in option_names,
     open_artifact="noopen" not in option_names,
   )
+
+
+def _parse_save_or_export(parts: _CommandParts, command_name: str) -> SaveCommand | ExportCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(f"{command_name} does not accept if clauses or assignment syntax")
+  if len(parts.arguments) != 1:
+    raise ParseError(f"{command_name} expects exactly one path")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"replace"}
+  if unsupported:
+    raise ParseError(f"{command_name} unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, command_name, {"replace"})
+  if command_name == "save":
+    return SaveCommand(path=Path(parts.arguments[0]), replace="replace" in option_names)
+  return ExportCommand(path=Path(parts.arguments[0]), replace="replace" in option_names)
 
 
 def _single_integer_option(

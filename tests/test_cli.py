@@ -165,6 +165,7 @@ def test_cli_runs_phase_7_lazy_use_flow(sample_parquet: Path, capsys) -> None:
   assert exit_code == 0
   assert "Loaded:" in captured.out
   assert "lazy=polars" in captured.out
+  assert "unknown rows" in captured.out
   assert "Selected columns: 3 rows, 2 columns" in captured.out
   assert "age  sex" in captured.out
   assert "30   F" in captured.out
@@ -195,6 +196,7 @@ def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, caps
   assert f"Script: {script_path}" in captured.out
   assert "TabDat: 0.1.0" in captured.out
   assert "Python:" in captured.out
+  assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=on" in captured.out
   assert f". use {sample_parquet}" in captured.out
   assert "Kept matching rows: 2 rows, 4 columns" in captured.out
   assert "sex  n" in captured.out
@@ -318,6 +320,86 @@ def test_cli_phase_8_rejects_conflicting_script_arguments(
 
   assert exc_info.value.code == 2
   assert "-c/--command cannot be combined with script execution" in captured.err
+
+
+def test_cli_phase_9_loads_explicit_config(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  config_path = tmp_path / "tabdat.toml"
+  artifact_dir = tmp_path / "configured"
+  config_path.write_text(
+    f'graph_format = "png"\nartifact_dir = "{artifact_dir}"\ngraph_open = false\n',
+    encoding="utf-8",
+  )
+
+  exit_code = main(
+    [
+      "--config",
+      str(config_path),
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "histogram age",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  plot_path = artifact_dir / "plots" / "histogram-age.png"
+
+  assert exit_code == 0
+  assert f"Saved plot: {plot_path}" in captured.out
+  assert plot_path.exists()
+  assert captured.err == ""
+
+
+def test_cli_phase_9_runtime_set_and_save(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  artifact_dir = tmp_path / "plots"
+  output_path = tmp_path / "filtered.parquet"
+
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "set graph_format png",
+      "-c",
+      f"set artifact_dir {artifact_dir}",
+      "-c",
+      "keep if age >= 42",
+      "-c",
+      "histogram age",
+      "-c",
+      f"save {output_path}",
+    ]
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Set graph_format: png" in captured.out
+  assert f"Set artifact_dir: {artifact_dir}" in captured.out
+  assert f"Saved plot: {artifact_dir / 'plots' / 'histogram-age.png'}" in captured.out
+  assert f"Saved: {output_path} (2 rows, 4 columns)" in captured.out
+  assert output_path.exists()
+  assert captured.err == ""
+
+
+def test_cli_phase_9_reports_invalid_config(tmp_path: Path, capsys) -> None:
+  config_path = tmp_path / "bad.toml"
+  config_path.write_text('graph_format = "pdf"\n', encoding="utf-8")
+
+  exit_code = main(["--config", str(config_path), "-c", "count"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "Error: graph_format must be svg or png" in captured.err
 
 
 def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:

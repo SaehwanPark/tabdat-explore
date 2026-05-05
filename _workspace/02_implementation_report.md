@@ -1,21 +1,35 @@
-# Phase 8 Implementation Report
+# Phase 9 Implementation Report
 
 ## Summary
 
-Implemented the first Phase 8 scripting and reproducibility slice on branch
-`codex/phase8-scripting-repro`.
+Implemented Phase 9 configuration and persistence on branch
+`codex/tmp-phase9-config-persistence`.
 
 ## Implemented Behavior
 
-- Added `tabdat -f <script>` and `tabdat <script>` script entry points.
-- Added `run <script>` parsing for interactive and nested script execution.
-- Added a script parser for UTF-8 files with blank-line skipping, whole-line `#` comments, one
-  command per line, and multiline `sql """..."""` blocks.
-- Added deterministic script metadata and command transcripts.
-- Added file and line number diagnostics for script parse and execution errors.
-- Disabled plot auto-open during script execution.
-- Rejected recursive nested script inclusion and resolved nested relative paths from the containing
-  script directory.
+- Added typed runtime config with defaults for graph format, artifact directory, and graph open.
+- Added `.tabdat.toml` auto-loading and `--config <path>`.
+- Added `set graph_format`, `set artifact_dir`, and `set graph_open`.
+- Made generated plot paths config-aware.
+- Preserved script and `-c` non-opening plot behavior while making interactive open respect
+  `graph_open`.
+- Added `save` and `export` for local Parquet persistence with `replace` overwrite control.
+- Changed lazy `use` to avoid load-time full row counts.
+- Changed `count` to query the active relation live.
+
+## Files Changed
+
+- `src/tabdat/config.py`
+- `src/tabdat/models.py`
+- `src/tabdat/parser.py`
+- `src/tabdat/executor.py`
+- `src/tabdat/backend.py`
+- `src/tabdat/visualization.py`
+- `src/tabdat/formatter.py`
+- `src/tabdat/cli.py`
+- `src/tabdat/shell.py`
+- focused parser, executor, and CLI tests
+- README, SDD docs, and workspace artifacts
 
 ## Validation
 
@@ -24,12 +38,23 @@ Implemented the first Phase 8 scripting and reproducibility slice on branch
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 
-All validation passed during implementation before documentation updates. Full final validation is
-recorded in the delivery summary.
+Focused validation passed after implementation. Final validation is recorded in the delivery
+summary.
+
+## Dogfood
+
+Ran a full script flow with `use`, `set`, `keep if`, `count`, `histogram`, and `save`:
+
+```text
+uv run tabdat -f /tmp/tabdat_phase9_dogfood.td
+```
+
+The run produced a PNG plot under `/tmp/tabdat_phase9_artifacts/plots/` and a filtered Parquet
+dataset at `/tmp/tabdat_phase9_filtered.parquet`.
 
 ## Known Limits
 
-- No macros, loops, inline comments, or script-level conditionals.
-- Lazy loads still validate metadata through DuckDB.
-- `engine=polars` remains an experimental metadata selector; command execution still runs through
-  the DuckDB relation boundary.
+- Config search is project-local or explicit only.
+- Persistence supports Parquet only.
+- Generated plot names are stable and may overwrite previous generated artifacts.
+- `engine=polars` remains experimental metadata; execution still uses the DuckDB relation boundary.

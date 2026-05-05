@@ -1,93 +1,79 @@
-# Phase 8 Scripting Contract
+# Phase 9 Configuration And Persistence Contract
 
-## Request Summary
+## Roadmap Phase
 
-Add deterministic script execution so users can rerun command sequences outside the interactive
-shell.
+Phase 9: Configuration & Environment.
 
-## Command Surface
+## Config Loading
 
-### CLI Script Entry Points
+- At startup, TabDat loads `.tabdat.toml` from the current working directory if present.
+- `--config <path>` loads an explicit TOML config file and takes the place of `.tabdat.toml`.
+- Supported keys:
+  - `graph_format = "svg" | "png"`
+  - `artifact_dir = "<path>"`
+  - `graph_open = true | false`
+- Unknown keys, missing config files, invalid TOML, and invalid values are user-facing errors.
 
-Syntax:
-
-```text
-tabdat -f analysis.td
-tabdat analysis.td
-```
-
-- Both forms run a script file and exit.
-- `-c/--command` command mode remains supported.
-- `-c/--command` cannot be combined with `-f` or positional script execution.
-- `-f` cannot be combined with positional script execution.
-
-### `run`
+## `set`
 
 Syntax:
 
 ```text
-run analysis.td
+set graph_format svg
+set graph_format png
+set artifact_dir artifacts
+set graph_open on
+set graph_open off
 ```
 
-- Runs a script from an interactive shell or from another script.
-- Accepts exactly one script path.
-- Relative nested `run` paths resolve from the containing script directory.
-- Recursive script inclusion is rejected.
+- Updates runtime config for the current executor session.
+- Affects later commands in the same shell, script, or repeated `-c` command run.
+- Prints `Set <name>: <value>`.
 
-## Script Syntax
+## Plot Defaults
 
-- Scripts are UTF-8 text files.
-- Empty lines are ignored.
-- Lines whose first non-space character is `#` are ignored.
-- Each remaining line is one TabDat command, except multiline SQL:
+- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`.
+- Explicit `saving(...)` keeps overriding directory and extension.
+- Interactive shell auto-open respects `graph_open`.
+- Batch `-c` and script runs do not auto-open plots.
+- Generated plot names are stable and may overwrite existing artifacts.
+
+## `save` / `export`
+
+Syntax:
 
 ```text
-sql """
-select *
-from active
-"""
+save output.parquet
+save output.parquet, replace
+export output.parquet
+export output.parquet, replace
 ```
 
-- Row-level command `if` clauses keep their existing meaning.
-- Script-level `if` / `else`, loops, macros, and error-control forms are not supported in this
-  slice.
+- Requires an active dataset.
+- Writes the active relation to local Parquet.
+- Refuses to overwrite existing files unless `replace` is supplied.
+- Creates parent directories when needed.
+- Prints `Saved: <path> (N rows, M columns)`.
 
-## Execution Behavior
+## Lazy Row Count Cleanup
 
-- A script run uses one executor session, so commands share active dataset state.
-- Script runs print deterministic metadata before command output:
-  - script path
-  - TabDat package version
-  - Python version
-- Each executed command is echoed as `. <command>` before its result.
-- Plot auto-open is disabled for script execution.
-- `exit` or `quit` stops the current script successfully.
-- Nested `run` prints metadata for the nested script before its commands.
+- Lazy `use` validates readability and schema without a load-time full `count(*)`.
+- Lazy load output displays an unknown row count until a live count or materializing transform runs.
+- `count` always queries the active relation live.
 
-## Error Behavior
+## Non-Goals
 
-- Script execution fails fast on the first parse or execution error.
-- Script errors are printed to stderr and include script path and starting line number.
-- Failed scripts return CLI exit code `1`.
-- Missing files, directories, invalid UTF-8, recursion, parse errors, and execution errors are
-  script errors.
-
-## Lazy-Mode Honesty
-
-- `engine=polars` remains accepted but is marked experimental in docs and metadata wording.
-- Lazy load validates readability and metadata through DuckDB.
-- The docs identify that transformations currently materialize the active relation after the first
-  lazy transformation.
+- No user-level config search path.
+- No CSV, Feather, or Arrow export in this slice.
+- No named table registry.
+- No timestamped plot naming by default.
 
 ## Acceptance Criteria
 
-- Parser tests cover `run` syntax.
-- Script parser tests cover comments, blank lines, multiline SQL, and unterminated multiline SQL.
-- CLI tests cover `-f`, positional script execution, invalid argument combinations, and script
-  failures with line numbers.
-- Script execution tests cover nested `run`, relative path resolution, recursion rejection, exit,
-  and deterministic mini-session output.
-- Validation passes:
+- Parser tests cover valid and invalid `set`, `save`, and `export`.
+- Executor/backend tests cover config mutation, plot defaults, live lazy counts, and Parquet writes.
+- CLI tests cover explicit config loading, runtime settings, save output, and invalid config errors.
+- Full validation passes:
   - `uv run pytest`
   - `uv run mypy`
   - `uv run ruff check .`

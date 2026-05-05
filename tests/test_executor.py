@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from tabdat.config import TabDatConfig
 from tabdat.errors import ExecutionError
 from tabdat.executor import Executor
 from tabdat.models import (
@@ -29,8 +30,12 @@ from tabdat.models import (
   PreviewResult,
   RenameCommand,
   ReplaceCommand,
+  SaveCommand,
+  SaveResult,
   ScatterCommand,
   SelectCommand,
+  SetCommand,
+  SetResult,
   SqlCommand,
   SqlCreateResult,
   StringExpression,
@@ -70,7 +75,7 @@ def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> Non
     executor.close()
 
   assert isinstance(result, LoadResult)
-  assert result.dataset.row_count == 3
+  assert result.dataset.row_count is None
   assert result.dataset.column_count == 4
   assert result.dataset.execution_mode == "lazy"
   assert result.dataset.lazy_engine == engine
@@ -87,6 +92,18 @@ def test_failing_lazy_use_preserves_existing_active_dataset(
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="use could not read Parquet file"):
       executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    result = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+
+
+def test_count_queries_lazy_active_dataset(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="duckdb"))
     result = executor.execute(CountCommand())
   finally:
     executor.close()
@@ -522,6 +539,52 @@ def test_phase_6_visualizations_write_svg_artifacts(
   assert isinstance(bar, PlotResult)
   assert bar.path == bar_path
   assert bar_path.read_text().lstrip().startswith("<svg")
+
+
+def test_phase_9_set_updates_plot_defaults(sample_parquet: Path, tmp_path: Path) -> None:
+  executor = Executor(config=TabDatConfig(artifact_dir=tmp_path / "artifacts"))
+  try:
+    result = executor.execute(SetCommand("graph_format", "png"))
+    executor.execute(UseCommand(sample_parquet))
+    plot = executor.execute(HistogramCommand("age"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, SetResult)
+  assert result.value == "png"
+  assert isinstance(plot, PlotResult)
+  assert plot.path == tmp_path / "artifacts" / "plots" / "histogram-age.png"
+  assert plot.path.exists()
+
+
+def test_phase_9_save_writes_transformed_active_dataset(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  output_path = tmp_path / "filtered.parquet"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(
+          left=IdentifierExpression("age"),
+          operator=">=",
+          right=NumberExpression(42),
+        )
+      )
+    )
+    result = executor.execute(SaveCommand(output_path))
+    with pytest.raises(ExecutionError, match="save target already exists"):
+      executor.execute(SaveCommand(output_path))
+    replaced = executor.execute(SaveCommand(output_path, replace=True))
+  finally:
+    executor.close()
+
+  assert isinstance(result, SaveResult)
+  assert result.dataset.row_count == 2
+  assert output_path.exists()
+  assert isinstance(replaced, SaveResult)
 
 
 def test_phase_6_visualizations_report_user_facing_errors(

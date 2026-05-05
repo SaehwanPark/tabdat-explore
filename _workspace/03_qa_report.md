@@ -1,29 +1,34 @@
-# Phase 8 QA Report
+# Phase 9 QA Report
 
 Status: pass
 
-## Scope Reviewed
+## Boundaries Checked
 
-- Parser/model contract for `run <script>`.
-- Script parsing behavior for comments, blank lines, multiline SQL, and missing files.
-- CLI entry points for `-f`, positional scripts, and invalid argument combinations.
-- Script execution behavior for deterministic metadata, command echoes, nested relative `run`,
-  recursion rejection, line-numbered errors, and `exit`.
-- Documentation updates for feature state and lazy-mode honesty.
+- Product contract to parser models for `set`, `save`, and `export`.
+- Parser models to executor session state and backend calls.
+- Config loading to CLI startup and script metadata.
+- Runtime config to visualization default path generation.
+- Lazy load metadata to formatter output and live `count`.
+- Backend Parquet writes to formatter output and CLI smoke tests.
+- README, SPEC, ARCHITECTURE, CHANGELOG, and workspace artifacts against implemented behavior.
 
-## Validation
+## Validation Evidence
 
-- Focused validation during implementation:
-  - `uv run pytest tests/test_parser.py tests/test_script.py tests/test_cli.py`
+- Focused validation:
+  - `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py`
   - `uv run mypy`
+  - `uv run ruff check . --fix`
 - Full validation before final delivery:
   - `uv run pytest`
   - `uv run mypy`
   - `uv run ruff check .`
   - `uv run ruff format --check .`
+- Dogfood script:
+  - `uv run tabdat -f /tmp/tabdat_phase9_dogfood.td`
 
 ## Residual Risk
 
-- Script transcript formatting is intentionally minimal; future script-level constructs may require
-  richer script AST nodes.
-- Polars lazy execution remains experimental and user-facing docs now state that explicitly.
+- Stable generated plot names can overwrite previous artifacts. This is documented and explicit
+  `saving(...)` remains the deterministic path override.
+- Project-local config keeps the first slice small; user-level config discovery is deferred.
+- Parquet-only persistence is intentionally narrow.

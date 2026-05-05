@@ -1,20 +1,21 @@
-# Phase 8 Delivery Summary
+# Phase 9 Delivery Summary
 
 ## Summary
 
-Implemented Phase 8 scripting and reproducibility on branch `codex/phase8-scripting-repro`.
+Implemented Phase 9 configuration and persistence on branch
+`codex/tmp-phase9-config-persistence`.
 
 ## Changed Behavior
 
-- `tabdat -f <script>` runs a TabDat script file.
-- `tabdat <script>` runs a positional TabDat script file.
-- `run <script>` runs a script from the current session, including nested scripts.
-- Scripts support blank lines, whole-line `#` comments, one command per line, and multiline
-  `sql """..."""` blocks.
-- Script output includes deterministic metadata and `. <command>` echoes.
-- Script failures include file and line number diagnostics and return exit code `1`.
-- Script plot commands save artifacts without auto-opening them.
-- Docs now mark `engine=polars` as experimental and document lazy materialization limits.
+- `.tabdat.toml` loads automatically from the current working directory.
+- `--config <path>` loads an explicit TOML config.
+- `set graph_format`, `set artifact_dir`, and `set graph_open` update runtime behavior.
+- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`.
+- Lazy `use` no longer performs a load-time full row count.
+- `count` now queries the active relation live.
+- `save` and `export` persist the active dataset to local Parquet, with `replace` required for
+  overwrites.
+- Script metadata now includes relevant config values.
 
 ## Validation
 
@@ -22,9 +23,12 @@ Implemented Phase 8 scripting and reproducibility on branch `codex/phase8-script
 - `uv run mypy`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
+- `uv run tabdat -f /tmp/tabdat_phase9_dogfood.td`
 
 ## Known Limits
 
-- No macros, loops, inline comments, or script-level conditionals.
-- No config file or persistent export behavior.
-- Polars-native command execution is not implemented.
+- Config file discovery is limited to `.tabdat.toml` in the current working directory unless
+  `--config` is supplied.
+- Persistence supports `.parquet` only.
+- Generated plot filenames are stable and can overwrite prior generated plots.
+- No named table registry yet.

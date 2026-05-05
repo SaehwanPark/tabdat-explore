@@ -12,9 +12,15 @@ SUPPORTED_PLOT_EXTENSIONS = {".svg", ".png"}
 DEFAULT_PLOT_DIR = Path("artifacts") / "plots"
 
 
-def default_plot_path(command_name: str, variables: Sequence[str]) -> Path:
+def default_plot_path(
+  command_name: str,
+  variables: Sequence[str],
+  *,
+  artifact_dir: Path = DEFAULT_PLOT_DIR.parent,
+  graph_format: str = "svg",
+) -> Path:
   slug = "-".join((command_name, *(_slug_part(variable) for variable in variables)))
-  return DEFAULT_PLOT_DIR / f"{slug}.svg"
+  return artifact_dir / "plots" / f"{slug}.{graph_format}"
 
 
 def save_histogram(
