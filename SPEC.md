@@ -63,6 +63,8 @@ This file tracks feature state for spec-driven development. Product intent lives
   - DuckDB `read_parquet` scan views for lazy load-time pushdown
   - typed dataset execution-mode metadata and CLI output for lazy sessions
   - focused parser, executor, and CLI tests for lazy command flows
+- Replaced the external PyMonad dependency with local typed monad helpers for parser failure
+  composition and future pure-core absence handling.
 
 ## Present
 

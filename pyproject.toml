@@ -10,7 +10,6 @@ dependencies = [
     "prompt-toolkit>=3.0.52",
     "pydantic>=2.13.3",
     "polars>=1.36.1",
-    "pymonad>=2.4.0",
     "vl-convert-python>=1.9.0.post1",
 ]
 
@@ -48,7 +47,7 @@ strict_equality = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["duckdb", "pymonad.*"]
+module = ["duckdb"]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]

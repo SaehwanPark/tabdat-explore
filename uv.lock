@@ -420,15 +420,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pymonad"
-version = "2.4.0"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/3b/4e/68803065743007b7dc000c543f45f6e407f8a1cbc673fdab016df3ca4b44/PyMonad-2.4.0.tar.gz", hash = "sha256:6b9d98e40bf2e0f1cc1900309365f9ba4997f3432a1d6e71f80f41ace2890204", size = 22870, upload-time = "2021-05-14T16:44:14.838Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8d/42/461af4ed7ea252b46c53b59f965d5f1eda971eef4d0c12f8320286578bf3/PyMonad-2.4.0-py3-none-any.whl", hash = "sha256:e78d9bf3b0712b165d4f43c29b0c1b23ed3ff11dbae1a6d61402cda7f0827d1a", size = 29141, upload-time = "2021-05-14T16:44:13.269Z" },
-]
-
-[[package]]
 name = "pytest"
 version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -558,7 +549,6 @@ dependencies = [
     { name = "polars" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
-    { name = "pymonad" },
     { name = "vl-convert-python" },
 ]
 
@@ -576,7 +566,6 @@ requires-dist = [
     { name = "polars", specifier = ">=1.36.1" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
     { name = "pydantic", specifier = ">=2.13.3" },
-    { name = "pymonad", specifier = ">=2.4.0" },
     { name = "vl-convert-python", specifier = ">=1.9.0.post1" },
 ]
 

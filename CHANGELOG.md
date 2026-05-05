@@ -6,6 +6,7 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added local typed monad helpers for parser failure composition and pure-core absence handling.
 - Added Phase 7 lazy execution entrypoint with `use <path>, lazy`, optional
   `engine=duckdb|polars` selection, DuckDB `read_parquet` scan views for lazy loading, typed
   execution-mode metadata, and CLI output that identifies lazy sessions.
@@ -34,3 +35,7 @@ All notable project changes are tracked here.
 - Added the v0 command glossary with the initial 12-command surface.
 - Added SDD state files with feature status and planned architecture.
 - Added repository guidance for 2-space tab size and proactive linting/formatting.
+
+### Removed
+
+- Removed the external PyMonad dependency in favor of local `tabdat.monads` helpers.

@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, NoReturn, cast
 
-from pymonad.either import Either, Left, Right
-
 from tabdat.errors import ParseError
 from tabdat.models import (
   BarCommand,
@@ -40,6 +38,7 @@ from tabdat.models import (
   UnaryExpression,
   UseCommand,
 )
+from tabdat.monads import Either, Left, Right
 
 _EXECUTABLE_COMMANDS = {
   "use",
