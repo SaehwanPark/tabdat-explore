@@ -1,13 +1,15 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 7 lazy execution entrypoint slice. This document
-records the implemented shell UX, command-language model, active DuckDB relation model, lazy load
-boundary, plot artifact boundary, and the boundaries future phases should preserve.
+TabDat-Explore has completed the roadmap Phase 8 scripting and reproducibility slice. This
+document records the implemented shell UX, script runner, command-language model, active DuckDB
+relation model, lazy load boundary, plot artifact boundary, and the boundaries future phases should
+preserve.
 
 ## Runtime Flow
 
 ```text
 CLI Shell / prompt-toolkit UX
+  -> Script Runner when executing files
   -> Command Parser
   -> Executor
   -> DuckDB Backend / Lazy Scan Boundary
@@ -20,19 +22,28 @@ CLI Shell / prompt-toolkit UX
 
 ### CLI Shell
 
-Owns user interaction, command input, script entry points in later phases, and terminal output
-formatting. Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for
-history, inline history suggestions, syntax highlighting, and context-aware completions. Repeated
-`-c` commands bypass prompt-toolkit and remain the smoke-testable batch workflow.
+Owns user interaction, command input, script entry points, and terminal output formatting.
+Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for history, inline
+history suggestions, syntax highlighting, and context-aware completions. Repeated `-c` commands
+bypass prompt-toolkit and remain the smoke-testable batch workflow. Script execution is available
+through `tabdat -f <script>`, `tabdat <script>`, and `run <script>`.
+
+### Script Runner
+
+Owns UTF-8 script file reads, line-oriented script parsing, deterministic metadata output, command
+echoes, nested `run` path resolution, recursion rejection, and file/line diagnostics. Script files
+support whole-line `#` comments, blank lines, one command per line, and multiline SQL blocks.
+Script execution shares one executor state and disables plot auto-open so runs are reproducible in
+batch contexts.
 
 ### Command Parser
 
 Converts command text into internal command objects. The parser owns tokenization, varlist and
-option parsing, `if` clauses, and expression AST construction. `use <path>, lazy` and
-`use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields. It may represent
-parsed-only future commands, but execution remains an executor responsibility. Recoverable parser
-failures compose through the local `tabdat.monads.Either` helper rather than an external monad
-package.
+option parsing, `if` clauses, expression AST construction, and `run <script>` commands. `use
+<path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
+It may represent parsed-only future commands, but execution remains an executor or CLI-edge
+responsibility. Recoverable parser failures compose through the local `tabdat.monads.Either` helper
+rather than an external monad package.
 
 ### Executor
 
@@ -88,6 +99,8 @@ display formatting.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
 - Phase 7 lazy loading is executable through `use <path>, lazy` and
   `use <path>, lazy engine=duckdb|polars`; plain `use <path>` remains eager.
+- Phase 8 scripting is executable through `tabdat -f <script>`, `tabdat <script>`, and
+  `run <script>`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset metadata from executor state but does not validate or mutate
   session state.
@@ -100,5 +113,9 @@ display formatting.
 - Keep public behavior documented before implementation.
 - Keep transformation state session-local until a save/write command is explicitly designed.
 - Keep chart rendering separate from backend data extraction.
+- Keep script orchestration at the CLI edge; command semantics should still enter through the
+  parser/executor boundary.
+- Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
+  contract exists.
 - Use 2-space tab size across project files.
 - Run configured linting and formatting proactively before commits.

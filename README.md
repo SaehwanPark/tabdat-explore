@@ -23,11 +23,11 @@ command line. The current CLI supports:
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
 - artifact plots with `histogram`, `scatter`, and `bar`
 - opt-in lazy Parquet loading with `use data.parquet, lazy`
+- script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the lazy execution entrypoint phase of the roadmap. Scripting is
-planned later.
+The repository has completed the first scripting and reproducibility slice of the roadmap.
 
 ## Quickstart
 
@@ -49,7 +49,20 @@ planned later.
    uv run tabdat -c "use data.parquet, lazy" -c "keep if age >= 18" -c "summarize age bmi"
    ```
 
-3. Start the interactive shell:
+   `engine=polars` is currently accepted as an experimental metadata selector. Command execution
+   still runs through the DuckDB relation boundary.
+
+3. Run a script:
+
+   ```bash
+   uv run tabdat -f analysis.td
+   uv run tabdat analysis.td
+   ```
+
+   Script files use one command per non-empty line. Whole-line `#` comments are ignored, and
+   multiline `sql """..."""` blocks are supported.
+
+4. Start the interactive shell:
 
    ```bash
    uv run tabdat
@@ -93,6 +106,8 @@ Created summary: 2 rows, 2 columns
 
 tabdat> histogram age
 Saved plot: artifacts/plots/histogram-age.svg
+
+tabdat> run analysis.td
 ```
 
 ## Design Notes
@@ -102,11 +117,16 @@ Saved plot: artifacts/plots/histogram-age.svg
 - Parquet is the primary data format.
 - `use data.parquet` remains eager. `use data.parquet, lazy` creates a DuckDB Parquet scan view and
   reports the active lazy engine; `engine=duckdb|polars` can be supplied for explicit lazy-engine
-  selection.
+  selection. The Polars selector is experimental until Polars-native command execution is designed.
+- Lazy `use` still validates readability and metadata through DuckDB. Transformations currently
+  materialize the active relation after the first lazy transformation.
 - SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
   dataset with the query result and does not persist a file.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
-  `-c` runs only print the saved path.
+  `-c` and script runs only print the saved path.
+- Scripts print deterministic run metadata, echo each command as `. <command>`, fail fast on the
+  first error, and include file and line number diagnostics. Macros, loops, inline comments, and
+  script-level conditionals are deferred.
 - Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation
   and error messages.
 - The terminal experience is part of the product, not an afterthought.

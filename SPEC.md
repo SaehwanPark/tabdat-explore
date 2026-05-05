@@ -65,15 +65,18 @@ This file tracks feature state for spec-driven development. Product intent lives
   - focused parser, executor, and CLI tests for lazy command flows
 - Replaced the external PyMonad dependency with local typed monad helpers for parser failure
   composition and future pure-core absence handling.
+- Implemented Phase 8 scripting and reproducibility:
+  - script execution from files via `tabdat -f <script>` and `tabdat <script>`
+  - interactive and nested `run <script>` with relative nested path resolution
+  - whole-line script comments, blank-line skipping, and multiline `sql """..."""` blocks
+  - deterministic script metadata and command transcripts
+  - fail-fast script errors with file and line number diagnostics
+  - script-mode plot auto-open suppression and golden mini-session coverage
+  - lazy-mode documentation for materialization limits and experimental Polars selection
 
 ## Present
 
-- Phase 8 scripting and reproducibility is active:
-  - script execution from files via `tabdat -f <script>` and `tabdat <script>`
-  - interactive and nested `run <script>`
-  - deterministic script metadata and command transcripts
-  - golden-output tests for complete mini sessions
-  - lazy-mode honesty documentation for materialization limits and experimental Polars selection
+- Phase 8 is complete for the first scripting and reproducibility slice.
 
 ## Future
 

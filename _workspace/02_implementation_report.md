@@ -1,51 +1,35 @@
-# Phase 7 Implementation Report
+# Phase 8 Implementation Report
 
-## Contract Consumed
+## Summary
 
-`_workspace/01_product_command-contract.md`: Phase 7 Lazy Execution Contract.
+Implemented the first Phase 8 scripting and reproducibility slice on branch
+`codex/phase8-scripting-repro`.
 
-## Files Changed
+## Implemented Behavior
 
-- `pyproject.toml`, `uv.lock`
-- `src/tabdat/models.py`
-- `src/tabdat/parser.py`
-- `src/tabdat/backend.py`
-- `src/tabdat/executor.py`
-- `src/tabdat/formatter.py`
-- `tests/test_parser.py`
-- `tests/test_executor.py`
-- `tests/test_cli.py`
-- `README.md`
-- `SPEC.md`
-- `ARCHITECTURE.md`
-- `CHANGELOG.md`
-- `_workspace/*`
-
-## Implementation Notes
-
-- Models now carry typed load mode metadata on `UseCommand` and `DatasetInfo`.
-- Parser supports `use <path>, lazy` and `use <path>, lazy engine=duckdb|polars`, with focused
-  parse errors for invalid options.
-- Executor passes load mode through the backend and keeps the single active dataset state.
-- Backend preserves eager table loading by default and uses a DuckDB `read_parquet(...)` scan view
-  for lazy loads.
-- Backend stages new loads before swapping the active relation, so failed lazy loads preserve the
-  previous active dataset.
-- Session transformations continue to update the active dataset for later commands.
-- Formatter identifies lazy load sessions in CLI output as `lazy=<engine>`.
-- Polars is added as a runtime dependency and accepted as an explicit lazy engine selector; full
-  Polars-native command lowering remains a documented follow-up.
+- Added `tabdat -f <script>` and `tabdat <script>` script entry points.
+- Added `run <script>` parsing for interactive and nested script execution.
+- Added a script parser for UTF-8 files with blank-line skipping, whole-line `#` comments, one
+  command per line, and multiline `sql """..."""` blocks.
+- Added deterministic script metadata and command transcripts.
+- Added file and line number diagnostics for script parse and execution errors.
+- Disabled plot auto-open during script execution.
+- Rejected recursive nested script inclusion and resolved nested relative paths from the containing
+  script directory.
 
 ## Validation
 
-- `uv run pytest`: passed, 162 tests.
-- `uv run mypy`: passed.
-- `uv run ruff check .`: passed.
-- `uv run ruff format --check .`: passed.
+- `uv run pytest`
+- `uv run mypy`
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+
+All validation passed during implementation before documentation updates. Full final validation is
+recorded in the delivery summary.
 
 ## Known Limits
 
-- Lazy mode is opt-in; eager remains the default.
-- The first Phase 7 slice uses DuckDB scan views for lazy Parquet loading.
-- `engine=polars` is represented in command/session metadata but does not yet execute commands
-  through a separate Polars-native planner.
+- No macros, loops, inline comments, or script-level conditionals.
+- Lazy loads still validate metadata through DuckDB.
+- `engine=polars` remains an experimental metadata selector; command execution still runs through
+  the DuckDB relation boundary.

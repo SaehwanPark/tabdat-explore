@@ -1,47 +1,29 @@
-# Phase 7 QA Report
+# Phase 8 QA Report
 
-## Status
+Status: pass
 
-pass
+## Scope Reviewed
 
-## Boundaries Checked
+- Parser/model contract for `run <script>`.
+- Script parsing behavior for comments, blank lines, multiline SQL, and missing files.
+- CLI entry points for `-f`, positional scripts, and invalid argument combinations.
+- Script execution behavior for deterministic metadata, command echoes, nested relative `run`,
+  recursion rejection, line-numbered errors, and `exit`.
+- Documentation updates for feature state and lazy-mode honesty.
 
-- Product contract to parser:
-  - valid lazy `use` forms parse into typed `UseCommand` metadata
-  - invalid option combinations raise parse errors
-- Parser to executor:
-  - executor passes `execution_mode` and `lazy_engine` to backend loading
-- Executor to backend:
-  - eager loading remains table-backed and unchanged
-  - lazy loading creates an active scan view and records engine metadata
-  - failed lazy loads preserve the previous active dataset
-- Backend to formatter and CLI:
-  - lazy dataset metadata appears in load output
-  - subsequent commands continue to operate on the active dataset
-- Tests to claimed behavior:
-  - parser, executor, and CLI tests cover the new lazy load path
-- Docs to implementation:
-  - docs mark Phase 7 as complete for lazy entrypoint and state Polars-native lowering as future
-    work
+## Validation
 
-## Blocking Issues
+- Focused validation during implementation:
+  - `uv run pytest tests/test_parser.py tests/test_script.py tests/test_cli.py`
+  - `uv run mypy`
+- Full validation before final delivery:
+  - `uv run pytest`
+  - `uv run mypy`
+  - `uv run ruff check .`
+  - `uv run ruff format --check .`
 
-None.
+## Residual Risk
 
-## Non-Blocking Follow-Ups
-
-- Implement a true Polars-native planner for command lowering if Phase 7 is expanded beyond the
-  current engine-selector entrypoint.
-- Replace transform checkpoint materialization with stable relational plan aliases if DuckDB view
-  replacement semantics become a bottleneck.
-
-## Validation Evidence
-
-- `uv run pytest`: passed, 162 tests.
-- `uv run mypy`: passed.
-- `uv run ruff check .`: passed.
-- `uv run ruff format --check .`: passed.
-
-## Recommended Next Action
-
-Commit documentation and QA artifacts, push the branch, and open the PR.
+- Script transcript formatting is intentionally minimal; future script-level constructs may require
+  richer script AST nodes.
+- Polars lazy execution remains experimental and user-facing docs now state that explicitly.

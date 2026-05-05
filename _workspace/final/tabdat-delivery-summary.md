@@ -1,16 +1,20 @@
-# Phase 7 Delivery Summary
+# Phase 8 Delivery Summary
 
 ## Summary
 
-Implemented Phase 7 lazy execution entrypoint on branch `phase7-lazy-execution`.
+Implemented Phase 8 scripting and reproducibility on branch `codex/phase8-scripting-repro`.
 
 ## Changed Behavior
 
-- `use <path>` remains eager.
-- `use <path>, lazy` loads Parquet through a DuckDB scan view.
-- `use <path>, lazy engine=duckdb|polars` records the explicit lazy engine selection.
-- CLI load output identifies lazy sessions as `lazy=<engine>`.
-- Failed lazy loads preserve the previous active dataset.
+- `tabdat -f <script>` runs a TabDat script file.
+- `tabdat <script>` runs a positional TabDat script file.
+- `run <script>` runs a script from the current session, including nested scripts.
+- Scripts support blank lines, whole-line `#` comments, one command per line, and multiline
+  `sql """..."""` blocks.
+- Script output includes deterministic metadata and `. <command>` echoes.
+- Script failures include file and line number diagnostics and return exit code `1`.
+- Script plot commands save artifacts without auto-opening them.
+- Docs now mark `engine=polars` as experimental and document lazy materialization limits.
 
 ## Validation
 
@@ -19,14 +23,8 @@ Implemented Phase 7 lazy execution entrypoint on branch `phase7-lazy-execution`.
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 
-All validation passed.
-
 ## Known Limits
 
-- Full Polars-native command planning is not yet implemented.
-- Transform commands currently checkpoint the active relation after the first lazy transformation.
-
-## Next Useful Work
-
-- Add a native Polars lowering layer for the supported expression and transformation subset.
-- Add plan-level tests that assert when DuckDB relation operations remain non-materialized.
+- No macros, loops, inline comments, or script-level conditionals.
+- No config file or persistent export behavior.
+- Polars-native command execution is not implemented.
