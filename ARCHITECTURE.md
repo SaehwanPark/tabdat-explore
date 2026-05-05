@@ -1,9 +1,9 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 8 scripting and reproducibility slice. This
+TabDat-Explore has completed the roadmap Phase 9 configuration and persistence slice. This
 document records the implemented shell UX, script runner, command-language model, active DuckDB
-relation model, lazy load boundary, plot artifact boundary, and the boundaries future phases should
-preserve.
+relation model, lazy load boundary, runtime configuration, plot artifact boundary, persistence
+boundary, and the boundaries future phases should preserve.
 
 ## Runtime Flow
 
@@ -26,7 +26,8 @@ Owns user interaction, command input, script entry points, and terminal output f
 Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for history, inline
 history suggestions, syntax highlighting, and context-aware completions. Repeated `-c` commands
 bypass prompt-toolkit and remain the smoke-testable batch workflow. Script execution is available
-through `tabdat -f <script>`, `tabdat <script>`, and `run <script>`.
+through `tabdat -f <script>`, `tabdat <script>`, and `run <script>`. Config loading happens at
+CLI startup from either `--config <path>` or project-local `.tabdat.toml`.
 
 ### Script Runner
 
@@ -48,8 +49,10 @@ rather than an external monad package.
 ### Executor
 
 Dispatches executable commands, maintains session state, and coordinates with the backend. For the
-MVP, session state contains one active dataset. Parsed-only Phase 2 command forms must fail with an
-unsupported-command execution error until a later command contract defines execution.
+MVP, session state contains one active dataset and one typed runtime config. Parsed-only Phase 2
+command forms must fail with an unsupported-command execution error until a later command contract
+defines execution. Runtime `set` commands update session config and affect later commands in the
+same shell, command sequence, or script.
 
 ### DuckDB Backend
 
@@ -59,9 +62,11 @@ load-time projection, filtering, grouping, and terminal query operations can be 
 Session transformations replace the active relation for later commands. The optional `polars`
 engine selector is accepted and recorded for Phase 7 workflows, while command execution continues
 through the DuckDB relation boundary until deeper Polars-native lowering is designed. No persistent
-write/save behavior exists yet. SQL commands bind the active relation as the user-facing DuckDB view
-`active`; `sql ... into <table>` replaces the active dataset with the query result while using
-`<table>` as the displayed result name.
+write registry exists, but `save` / `export` can persist the active relation to local Parquet. SQL
+commands bind the active relation as the user-facing DuckDB view `active`; `sql ... into <table>`
+replaces the active dataset with the query result while using `<table>` as the displayed result
+name. Initial lazy loads report an unknown row count until a live count or materializing operation
+runs.
 
 For visualization commands, the backend extracts typed rows or frequency counts from the active
 table. It does not construct charts or write artifact files.
@@ -69,9 +74,9 @@ table. It does not construct charts or write artifact files.
 ### Visualization Artifact Renderer
 
 Owns Altair chart construction and SVG/PNG artifact writes. Default plot artifacts are written
-under `artifacts/plots/`, and explicit `saving(...)` paths create parent directories as needed.
-Interactive shell auto-open is a CLI-edge behavior; batch `-c` execution only prints the artifact
-path.
+under `<artifact_dir>/plots/` using `graph_format`, and explicit `saving(...)` paths create parent
+directories as needed. Interactive shell auto-open is a CLI-edge behavior controlled by
+`graph_open`; batch `-c` and script execution only print the artifact path.
 
 ### Formatter
 
@@ -101,6 +106,10 @@ display formatting.
   `use <path>, lazy engine=duckdb|polars`; plain `use <path>` remains eager.
 - Phase 8 scripting is executable through `tabdat -f <script>`, `tabdat <script>`, and
   `run <script>`.
+- Phase 9 config is executable through `.tabdat.toml`, `--config <path>`, and runtime `set`
+  commands.
+- Phase 9 persistence is executable through `save <path>[, replace]` and
+  `export <path>[, replace]` for local Parquet.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset metadata from executor state but does not validate or mutate
   session state.
@@ -111,7 +120,7 @@ display formatting.
 - Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
 - Do not add broad command grammar before a command contract needs it.
 - Keep public behavior documented before implementation.
-- Keep transformation state session-local until a save/write command is explicitly designed.
+- Keep transformation state session-local except for explicit `save` / `export`.
 - Keep chart rendering separate from backend data extraction.
 - Keep script orchestration at the CLI edge; command semantics should still enter through the
   parser/executor boundary.

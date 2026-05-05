@@ -73,20 +73,24 @@ This file tracks feature state for spec-driven development. Product intent lives
   - fail-fast script errors with file and line number diagnostics
   - script-mode plot auto-open suppression and golden mini-session coverage
   - lazy-mode documentation for materialization limits and experimental Polars selection
+- Implemented Phase 9 configuration and persistence:
+  - local `.tabdat.toml` and explicit `--config <path>` loading
+  - runtime `set graph_format`, `set artifact_dir`, and `set graph_open`
+  - config-aware plot artifact defaults
+  - live row counting for `count` and unknown initial row counts for lazy loads
+  - `save` / `export` Parquet persistence for session-local transformations
 
 ## Present
 
-- Phase 8 is complete for the first scripting and reproducibility slice.
+- Phase 9 is complete for the first configuration and persistence slice.
 
 ## Future
 
-- Phase 8 follow-up:
-  - dogfood a complete public-dataset EDA using only `tabdat` before adding many more commands
-  - revisit lazy load-time full counts after script metadata no longer depends on row counts
 - Phase 9 configuration and persistence:
-  - define configuration behavior for graph format, artifact directory, and auto-open defaults
-  - add a `save` / `export` command contract for persisting session-local transformations
-  - define plot artifact naming policy for both reproducible scripts and interactive reruns
+  - consider user-level config locations after project-local config behavior settles
+  - add CSV and Feather export only after the Parquet persistence contract is stable
+  - revisit timestamped or collision-avoiding plot names if stable overwrite behavior becomes
+    surprising in real interactive use
 - Phase 10+ architecture candidates:
   - consider a lightweight named table registry that augments the single active dataset model
   - consider executor handler registration or another dispatch refactor if script meta-commands

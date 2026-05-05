@@ -1,42 +1,35 @@
-# Phase 8 Request Summary
+# Phase 9 Request Summary
 
 ## Goal
 
-Implement roadmap Phase 8: scripting and reproducibility, after a small lazy-mode honesty pass.
+Move from the completed Phase 8 scripting slice into Phase 9 configuration and persistence.
 
 ## Requested Workflow
 
-- Use a temporary branch.
-- Commit meaningful implementation checkpoints.
-- Document carefully.
-- Open a PR when fully done.
+- Begin on a temporary branch.
+- Commit meaningful checkpoints during implementation.
+- Document the completed work carefully.
+- Open a PR when done.
 
 ## Phase Fit
 
-Roadmap Phase 8 covers:
-
-- script execution from files
-- a script parser layer for command sequences
-- deterministic batch output and reproducibility metadata
-- golden-output tests for complete mini sessions
-- documentation of lazy-mode materialization limits and Polars experimental status
+Phase 9 in `docs/dev_phase.md` covers predictable environment behavior, runtime configuration,
+plot defaults, and persistence of session-local transformations.
 
 ## Touched Surfaces
 
-- CLI argument handling and batch runner
-- parser and command models for `run <script>`
-- script parsing and execution layer
-- executor integration for interactive or nested `run`
-- formatter output for script metadata
-- focused parser, CLI, script, and golden-output tests
-- SDD state docs and workspace delivery artifacts
+- Parser and command models for `set`, `save`, and `export`.
+- Executor session state and config updates.
+- DuckDB backend row counting and Parquet writes.
+- Visualization artifact path defaults.
+- CLI config loading and script metadata.
+- Formatter output, tests, README, SDD docs, and handoff artifacts.
 
 ## Assumptions
 
-- Script files are UTF-8 text.
-- Empty lines and whole-line `#` comments are ignored.
-- Inline comments, macros, loops, and script-level conditionals are deferred.
-- Multiline `sql """..."""` blocks are supported.
-- Scripts fail fast on the first parse or execution error.
-- `exit` and `quit` stop the current script successfully.
-- Plot auto-open is disabled for scripts.
+- Implement the full Phase 9 vertical slice: config, runtime settings, plot defaults, and Parquet
+  persistence.
+- Project-local `.tabdat.toml` and explicit `--config <path>` are enough for this slice.
+- `save` and `export` are aliases that write local Parquet only.
+- Generated plot names remain stable and may overwrite; explicit `saving(...)` is the reproducible
+  escape hatch.

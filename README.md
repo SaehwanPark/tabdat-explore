@@ -24,10 +24,13 @@ command line. The current CLI supports:
 - artifact plots with `histogram`, `scatter`, and `bar`
 - opt-in lazy Parquet loading with `use data.parquet, lazy`
 - script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
+- project-local or explicit config for graph defaults
+- runtime settings with `set graph_format`, `set artifact_dir`, and `set graph_open`
+- Parquet persistence with `save` and `export`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the first scripting and reproducibility slice of the roadmap.
+The repository has completed the first configuration and persistence slice of the roadmap.
 
 ## Quickstart
 
@@ -62,7 +65,28 @@ The repository has completed the first scripting and reproducibility slice of th
    Script files use one command per non-empty line. Whole-line `#` comments are ignored, and
    multiline `sql """..."""` blocks are supported.
 
-4. Start the interactive shell:
+4. Configure plot defaults when needed:
+
+   ```toml
+   # .tabdat.toml
+   graph_format = "png"
+   artifact_dir = "artifacts"
+   graph_open = false
+   ```
+
+   Or load an explicit config:
+
+   ```bash
+   uv run tabdat --config project.tabdat.toml -f analysis.td
+   ```
+
+5. Persist a transformed dataset:
+
+   ```bash
+   uv run tabdat -c "use data.parquet" -c "keep if age >= 18" -c "save adults.parquet"
+   ```
+
+6. Start the interactive shell:
 
    ```bash
    uv run tabdat
@@ -107,6 +131,12 @@ Created summary: 2 rows, 2 columns
 tabdat> histogram age
 Saved plot: artifacts/plots/histogram-age.svg
 
+tabdat> set graph_format png
+Set graph_format: png
+
+tabdat> save transformed.parquet
+Saved: transformed.parquet (3 rows, 4 columns)
+
 tabdat> run analysis.td
 ```
 
@@ -118,12 +148,19 @@ tabdat> run analysis.td
 - `use data.parquet` remains eager. `use data.parquet, lazy` creates a DuckDB Parquet scan view and
   reports the active lazy engine; `engine=duckdb|polars` can be supplied for explicit lazy-engine
   selection. The Polars selector is experimental until Polars-native command execution is designed.
-- Lazy `use` still validates readability and metadata through DuckDB. Transformations currently
-  materialize the active relation after the first lazy transformation.
+- Lazy `use` validates readability and schema through DuckDB, but does not count rows at load time.
+  Run `count` for a live row count. Transformations currently materialize the active relation after
+  the first lazy transformation.
 - SQL is an escape hatch, not the main interface. `sql ... into <table>` replaces the active
   dataset with the query result and does not persist a file.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
   `-c` and script runs only print the saved path.
+- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Generated names
+  are stable and may overwrite prior outputs; use `saving(...)` for explicit artifact paths.
+- Runtime settings apply for the current session only. `.tabdat.toml` and `--config <path>` support
+  `graph_format`, `artifact_dir`, and `graph_open`.
+- `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
+  Parquet. Existing files require `replace`.
 - Scripts print deterministic run metadata, echo each command as `. <command>`, fail fast on the
   first error, and include file and line number diagnostics. Macros, loops, inline comments, and
   script-level conditionals are deferred.
