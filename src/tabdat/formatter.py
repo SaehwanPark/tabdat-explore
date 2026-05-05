@@ -11,6 +11,8 @@ from tabdat.models import (
   PlotResult,
   PreviewResult,
   Result,
+  SaveResult,
+  SetResult,
   SqlCreateResult,
   SummarizeResult,
   TableResult,
@@ -28,14 +30,14 @@ def format_result(result: Result) -> str:
     )
     return (
       f"Loaded: {_display_path(dataset.path)} "
-      f"({dataset.row_count} rows, {dataset.column_count} columns{mode})"
+      f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns{mode})"
     )
 
   if isinstance(result, DescribeResult):
     dataset = result.dataset
     lines = [
       f"Dataset: {_display_path(dataset.path)}",
-      f"Rows: {dataset.row_count}",
+      f"Rows: {_row_count(dataset.row_count)}",
       f"Columns: {dataset.column_count}",
       "",
     ]
@@ -89,11 +91,14 @@ def format_result(result: Result) -> str:
 
   if isinstance(result, TransformResult):
     dataset = result.dataset
-    return f"{result.message}: {dataset.row_count} rows, {dataset.column_count} columns"
+    return f"{result.message}: {_row_count(dataset.row_count)} rows, {dataset.column_count} columns"
 
   if isinstance(result, SqlCreateResult):
     dataset = result.dataset
-    return f"Created {result.table_name}: {dataset.row_count} rows, {dataset.column_count} columns"
+    return (
+      f"Created {result.table_name}: "
+      f"{_row_count(dataset.row_count)} rows, {dataset.column_count} columns"
+    )
 
   if isinstance(result, TableResult):
     table_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
@@ -102,7 +107,23 @@ def format_result(result: Result) -> str:
   if isinstance(result, PlotResult):
     return f"Saved plot: {_display_path(result.path)}"
 
+  if isinstance(result, SetResult):
+    return f"Set {result.name}: {result.value}"
+
+  if isinstance(result, SaveResult):
+    dataset = result.dataset
+    return (
+      f"Saved: {_display_path(result.path)} "
+      f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns)"
+    )
+
   raise TypeError(f"Unsupported result: {type(result).__name__}")
+
+
+def _row_count(row_count: int | None) -> str:
+  if row_count is None:
+    return "unknown"
+  return str(row_count)
 
 
 def _table(headers: Sequence[str], rows: Iterable[Sequence[str]]) -> list[str]:

@@ -14,6 +14,7 @@ from tabdat.models import (
   DescribeCommand,
   DropCommand,
   ExitCommand,
+  ExportCommand,
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
@@ -25,8 +26,10 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   RunCommand,
+  SaveCommand,
   ScatterCommand,
   SelectCommand,
+  SetCommand,
   SqlCommand,
   StringExpression,
   SummarizeCommand,
@@ -219,6 +222,20 @@ def test_parse_phase_8_run_command() -> None:
   assert parse_command("run analysis.td") == RunCommand(Path("analysis.td"))
 
 
+def test_parse_phase_9_configuration_and_persistence_commands() -> None:
+  assert parse_command("set graph_format png") == SetCommand("graph_format", "png")
+  assert parse_command("set artifact_dir artifacts/custom") == SetCommand(
+    "artifact_dir",
+    "artifacts/custom",
+  )
+  assert parse_command("set graph_open off") == SetCommand("graph_open", "off")
+  assert parse_command("save output.parquet") == SaveCommand(Path("output.parquet"))
+  assert parse_command("export output.parquet, replace") == ExportCommand(
+    Path("output.parquet"),
+    replace=True,
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -351,6 +368,13 @@ def test_parse_exit_aliases() -> None:
     "bar sex, missing=true",
     "run",
     "run first.td second.td",
+    "set",
+    "set graph_format",
+    "set unknown on",
+    "save",
+    "save out.parquet, force",
+    "save out.parquet, replace=true",
+    "export",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],

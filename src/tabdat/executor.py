@@ -1,8 +1,10 @@
 """Command executor and session state."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from tabdat.backend import DuckDBBackend
+from tabdat.config import TabDatConfig, set_config_value
 from tabdat.errors import ExecutionError
 from tabdat.models import (
   BarCommand,
@@ -18,6 +20,7 @@ from tabdat.models import (
   DescribeResult,
   DropCommand,
   ExitCommand,
+  ExportCommand,
   GenerateCommand,
   HeadCommand,
   HistogramCommand,
@@ -28,8 +31,12 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   Result,
+  SaveCommand,
+  SaveResult,
   ScatterCommand,
   SelectCommand,
+  SetCommand,
+  SetResult,
   SqlCommand,
   SqlCreateResult,
   SummarizeCommand,
@@ -46,12 +53,18 @@ from tabdat.visualization import default_plot_path, save_bar, save_histogram, sa
 @dataclass
 class SessionState:
   active_dataset: DatasetInfo | None = None
+  config: TabDatConfig = TabDatConfig()
 
 
 class Executor:
-  def __init__(self, backend: DuckDBBackend | None = None) -> None:
+  def __init__(
+    self,
+    backend: DuckDBBackend | None = None,
+    *,
+    config: TabDatConfig | None = None,
+  ) -> None:
     self.backend = backend or DuckDBBackend()
-    self.state = SessionState()
+    self.state = SessionState(config=config or TabDatConfig())
 
   def close(self) -> None:
     self.backend.close()
@@ -81,8 +94,8 @@ class Executor:
       return CodebookResult(rows=codebook_rows)
 
     if isinstance(command, CountCommand):
-      dataset = self._require_active_dataset("count")
-      return CountResult(row_count=dataset.row_count)
+      self._require_active_dataset("count")
+      return CountResult(row_count=self.backend.active_row_count())
 
     if isinstance(command, HeadCommand):
       dataset = self._require_active_dataset("head")
@@ -184,7 +197,7 @@ class Executor:
     if isinstance(command, HistogramCommand):
       dataset = self._require_active_dataset("histogram")
       rows = self.backend.plot_rows(dataset, (command.variable,), numeric=True)
-      path = command.saving or default_plot_path("histogram", (command.variable,))
+      path = command.saving or self._default_plot_path("histogram", (command.variable,))
       saved_path = save_histogram(rows, command.variable, path, bins=command.bins)
       return PlotResult(path=saved_path, should_open=command.open_artifact)
 
@@ -198,6 +211,8 @@ class Executor:
       path = command.saving or default_plot_path(
         "scatter",
         (command.y_variable, command.x_variable),
+        artifact_dir=self.state.config.artifact_dir,
+        graph_format=self.state.config.graph_format,
       )
       saved_path = save_scatter(rows, command.y_variable, command.x_variable, path)
       return PlotResult(path=saved_path, should_open=command.open_artifact)
@@ -209,7 +224,7 @@ class Executor:
         command.variable,
         include_missing=command.include_missing,
       )
-      path = command.saving or default_plot_path("bar", (command.variable,))
+      path = command.saving or self._default_plot_path("bar", (command.variable,))
       saved_path = save_bar(rows, command.variable, path)
       return PlotResult(path=saved_path, should_open=command.open_artifact)
 
@@ -219,7 +234,31 @@ class Executor:
     if isinstance(command, ExitCommand):
       return None
 
+    if isinstance(command, SetCommand):
+      self.state.config = set_config_value(self.state.config, command.name, command.value)
+      return SetResult(command.name, _setting_display_value(command.name, self.state.config))
+
+    if isinstance(command, SaveCommand | ExportCommand):
+      dataset = self._require_active_dataset("save")
+      self.backend.save_active_parquet(command.path, replace=command.replace)
+      saved_dataset = DatasetInfo(
+        path=command.path,
+        row_count=self.backend.active_row_count(),
+        columns=dataset.columns,
+        execution_mode="eager",
+        lazy_engine=None,
+      )
+      return SaveResult(command.path, saved_dataset)
+
     raise ExecutionError("unsupported command")
+
+  def _default_plot_path(self, command_name: str, variables: tuple[str, ...]) -> Path:
+    return default_plot_path(
+      command_name,
+      variables,
+      artifact_dir=self.state.config.artifact_dir,
+      graph_format=self.state.config.graph_format,
+    )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
@@ -288,3 +327,13 @@ def _is_numeric_type(data_type: str) -> bool:
     "DECIMAL",
   )
   return normalized.startswith(numeric_prefixes)
+
+
+def _setting_display_value(name: str, config: TabDatConfig) -> str:
+  if name == "graph_format":
+    return config.graph_format
+  if name == "artifact_dir":
+    return str(config.artifact_dir)
+  if name == "graph_open":
+    return "on" if config.graph_open else "off"
+  raise ExecutionError(f"unknown setting: {name}")

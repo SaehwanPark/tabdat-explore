@@ -194,6 +194,24 @@ class RunCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SetCommand:
+  name: Literal["graph_format", "artifact_dir", "graph_open"]
+  value: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class SaveCommand:
+  path: Path
+  replace: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ExportCommand:
+  path: Path
+  replace: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -225,6 +243,9 @@ Command = (
   | ByCommand
   | ExitCommand
   | RunCommand
+  | SetCommand
+  | SaveCommand
+  | ExportCommand
   | ParsedCommand
 )
 
@@ -238,7 +259,7 @@ class ColumnInfo:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasetInfo:
   path: Path
-  row_count: int
+  row_count: int | None
   columns: tuple[ColumnInfo, ...]
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
@@ -323,6 +344,18 @@ class PlotResult:
   should_open: bool
 
 
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class SetResult:
+  name: str
+  value: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class SaveResult:
+  path: Path
+  dataset: DatasetInfo
+
+
 Result = (
   LoadResult
   | DescribeResult
@@ -334,4 +367,6 @@ Result = (
   | SqlCreateResult
   | TableResult
   | PlotResult
+  | SetResult
+  | SaveResult
 )
