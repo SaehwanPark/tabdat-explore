@@ -194,6 +194,7 @@ def test_parse_phase_3_grouping_commands() -> None:
 
 
 def test_parse_phase_4_sql_commands() -> None:
+  assert parse_command("use summary") == UseCommand(Path("summary"))
   assert parse_command(
     "sql select sex, avg(bmi) as mean_bmi from active group by sex"
   ) == SqlCommand(query="select sex, avg(bmi) as mean_bmi from active group by sex")

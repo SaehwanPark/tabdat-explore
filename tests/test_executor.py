@@ -3,9 +3,16 @@ from pathlib import Path
 import pytest
 
 from tabdat.config import TabDatConfig
-from tabdat.errors import ExecutionError
+from tabdat.errors import (
+  ExecutionError,
+  NoActiveDatasetError,
+  TypeMismatchExecutionError,
+  UnknownTableError,
+  UnknownVariableError,
+)
 from tabdat.executor import Executor
 from tabdat.models import (
+  ActivateResult,
   BarCommand,
   BinaryExpression,
   ByCommand,
@@ -499,10 +506,46 @@ def test_sql_into_replaces_active_dataset(sample_parquet: Path) -> None:
   assert preview.rows == (("F", 2), ("M", 1))
 
 
+def test_sql_into_registers_named_table_for_later_activation(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select sex, count(*) as n from active group by sex order by sex",
+        into="summary",
+      )
+    )
+    executor.execute(KeepCommand(variables=("sex",)))
+    transformed_summary = executor.execute(DescribeCommand())
+    activated = executor.execute(UseCommand(Path("summary")))
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(transformed_summary, DescribeResult)
+  assert [column.name for column in transformed_summary.dataset.columns] == ["sex"]
+  assert isinstance(activated, ActivateResult)
+  assert activated.table_name == "summary"
+  assert [column.name for column in activated.dataset.columns] == ["sex"]
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("sex",)
+  assert preview.rows == (("F",), ("M",))
+
+
+def test_use_unknown_named_table_reports_specific_error() -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(UnknownTableError, match="unknown table: missing_table"):
+      executor.execute(UseCommand(Path("missing_table")))
+  finally:
+    executor.close()
+
+
 def test_sql_reports_user_facing_errors(sample_parquet: Path) -> None:
   executor = Executor()
   try:
-    with pytest.raises(ExecutionError, match="sql requires an active dataset"):
+    with pytest.raises(NoActiveDatasetError, match="sql requires an active dataset"):
       executor.execute(SqlCommand("select * from active"))
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="sql only supports select or with queries"):
@@ -638,8 +681,20 @@ def test_phase_3_transformations_report_user_facing_errors(sample_parquet: Path)
 def test_phase_3_inspection_commands_require_active_dataset(command, message: str) -> None:
   executor = Executor()
   try:
-    with pytest.raises(ExecutionError, match=message):
+    with pytest.raises(NoActiveDatasetError, match=message):
       executor.execute(command)
+  finally:
+    executor.close()
+
+
+def test_unknown_variable_and_type_errors_are_specific(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="summarize unknown variable"):
+      executor.execute(SummarizeCommand(("missing",)))
+    with pytest.raises(TypeMismatchExecutionError, match="summarize requires numeric variables"):
+      executor.execute(SummarizeCommand(("sex",)))
   finally:
     executor.close()
 

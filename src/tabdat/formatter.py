@@ -4,6 +4,7 @@ from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 from tabdat.models import (
+  ActivateResult,
   CodebookResult,
   CountResult,
   DescribeResult,
@@ -31,6 +32,13 @@ def format_result(result: Result) -> str:
     return (
       f"Loaded: {_display_path(dataset.path)} "
       f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns{mode})"
+    )
+
+  if isinstance(result, ActivateResult):
+    dataset = result.dataset
+    return (
+      f"Activated: {result.table_name} "
+      f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns)"
     )
 
   if isinstance(result, DescribeResult):
