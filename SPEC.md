@@ -96,11 +96,42 @@ This file tracks feature state for spec-driven development. Product intent lives
   - add CSV and Feather export only after the Parquet persistence contract is stable
   - revisit timestamped or collision-avoiding plot names if stable overwrite behavior becomes
     surprising in real interactive use
-- Phase 10+ architecture candidates:
-  - consider a lightweight named table registry that augments the single active dataset model
-  - consider executor handler registration or another dispatch refactor if script meta-commands
-    make the central executor difficult to maintain
-  - add specific execution error subclasses when CLI or script diagnostics need
-    context-sensitive handling
+- Phase 10 execution and state foundations:
+  - add a lightweight named table registry that augments the single active dataset model
+  - refactor executor dispatch when command handlers or script meta-commands make the current
+    central dispatcher difficult to maintain
+  - add specific execution error subclasses for context-sensitive CLI and script diagnostics
   - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
     honest and test-covered
+- Phase 11 data workflow and reproducibility primitives:
+  - add multi-table data-management support such as joins, append/stack, and reshape workflows
+  - add panel identifier handling and script-level reproducibility primitives such as seeding,
+    reusable variables/macros, and minimal control flow
+  - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet
+    and DB connections
+- Phase 12 estimation substrate:
+  - add reusable statistical primitives, simulation/resampling utilities, and shared least
+    squares, MLE, and GMM estimation interfaces
+  - define a stable internal result contract for coefficients, inference, diagnostics,
+    predictions, and model metadata
+- Phase 13 core linear econometrics:
+  - add OLS/WLS, robust and cluster-robust inference, GLS, prediction/fitted-value workflows,
+    and linear-model diagnostics
+- Phase 14 endogeneity and panel foundations:
+  - add IV/2SLS, weak-instrument and overidentification diagnostics, panel indexing semantics,
+    fixed effects, random effects, and Hausman-style comparisons
+- Phase 15 nonlinear estimation core:
+  - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
+    variable models such as Tobit, truncated regression, and sample selection
+- Phase 16 specialized likelihood models:
+  - add discrete-choice systems, count models, mixture/hurdle/zero-inflated models, and
+    duration/survival models
+- Phase 17 advanced empirical methods:
+  - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
+    semiparametric/nonparametric methods, and causal-inference workflows
+- Phase 18 ecosystem and extension layer:
+  - add a plugin system, broader remote connectors, and R integration only after command and
+    analytical result interfaces are stable
+- Phase 19 modern extensions:
+  - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
+    late-stage extensions

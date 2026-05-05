@@ -321,22 +321,229 @@ set graph_open off
 
 ---
 
-## Phase 10 — Extensions & Ecosystem (Later)
+## Phase 10 — Execution & State Foundations
 
-**Goal:** Expand capability without bloating core.
+**Goal:** Strengthen execution boundaries before analytical expansion.
 
-### Possible Additions
+### Coverage
 
-* R integration (`rpy2`)
-* Plugin system
-* Remote data (S3, DB connections)
-* Interactive HTML plots
-* Advanced stats modules
 * Lightweight named table registry that augments, but does not replace, the single active
-  dataset model.
+  dataset model
 * Executor dispatch refactor if command handlers or script meta-commands make the central
-  dispatcher difficult to maintain.
-* More specific error subclasses for context-sensitive CLI and script diagnostics.
+  dispatcher difficult to maintain
+* More specific error subclasses for context-sensitive CLI and script diagnostics
+* Honest lazy/materialization contract and deeper Polars-boundary decisions
+
+### Non-goals
+
+* No broad analytical command expansion yet
+* No plugin or R integration yet
+
+### Exit Gate
+
+* Multi-table session state, execution dispatch, and lazy-mode boundaries are stable enough to
+  support later estimation commands without immediate redesign
+
+---
+
+## Phase 11 — Data Workflow & Reproducibility Primitives
+
+**Goal:** Support estimation-ready data workflows inside `tabdat`.
+
+### Coverage
+
+* Join / merge-style commands for multi-table workflows
+* Append / stack and reshape wide/long support
+* Panel identifier handling and related dataset metadata
+* Script-level reproducibility primitives such as seeding, reusable variables/macros, and
+  minimal control-flow constructs
+* Remote data access in the narrowest useful form, starting with DuckDB-friendly sources such
+  as S3/object-store Parquet and DB connections
+
+### Non-goals
+
+* No general plugin system
+* No large analytical model catalog yet
+
+### Exit Gate
+
+* Users can build reproducible estimation-ready datasets without leaving `tabdat`
+
+---
+
+## Phase 12 — Estimation Substrate
+
+**Goal:** Build reusable estimation engines and statistical primitives.
+
+### Coverage
+
+* Statistical primitives: distributions, moments, covariance infrastructure
+* Simulation and resampling utilities, including bootstrap support
+* Reusable least-squares, generic MLE, and GMM estimation interfaces
+* Shared internal result contract for coefficients, standard errors, diagnostics, predictions,
+  and model metadata
+
+### Non-goals
+
+* No large family of end-user model commands yet
+* No late-stage ecosystem extensions yet
+
+### Exit Gate
+
+* Core estimators can be implemented as thin command layers over shared estimation machinery
+
+---
+
+## Phase 13 — Core Linear Econometrics
+
+**Goal:** Deliver the standard cross-sectional linear analysis workflow.
+
+### Coverage
+
+* OLS and weighted least squares
+* Robust and cluster-robust inference
+* Generalized least squares
+* Prediction, fitted values, and residual workflows
+* Linear-model diagnostics
+* Interactive HTML output for model inspection only if it materially improves regression
+  diagnostics over artifact-based static output
+
+### Non-goals
+
+* No IV, panel, or nonlinear models yet
+
+### Exit Gate
+
+* Linear econometric analysis is solid enough to dogfood on real analytical projects
+
+---
+
+## Phase 14 — Endogeneity & Panel Foundations
+
+**Goal:** Cover the standard linear microeconometrics baseline.
+
+### Coverage
+
+* Instrumental variables and 2SLS
+* Weak-instrument and overidentification diagnostics
+* Control-function entry points where they fit the linear workflow
+* Panel indexing semantics and within/between transformations
+* Fixed effects, random effects, and Hausman-style comparisons
+
+### Non-goals
+
+* No nonlinear or limited dependent variable families yet
+
+### Exit Gate
+
+* The tool supports the common cross-sectional and panel linear identification workflows
+
+---
+
+## Phase 15 — Nonlinear Estimation Core
+
+**Goal:** Extend the estimation stack beyond linear models.
+
+### Coverage
+
+* Binary choice models such as logit and probit
+* Marginal effects and nonlinear prediction workflows
+* General nonlinear regression
+* Limited dependent variable models such as Tobit, truncated regression, and sample selection
+
+### Non-goals
+
+* No broad discrete-choice tree or mixture-model catalog yet
+
+### Exit Gate
+
+* Nonlinear cross-sectional estimation is a first-class workflow built on the shared MLE layer
+
+---
+
+## Phase 16 — Specialized Likelihood Models
+
+**Goal:** Broaden the applied-micro model catalog.
+
+### Coverage
+
+* Discrete-choice systems: multinomial, conditional, and nested logit
+* Count models: Poisson, negative binomial, and overdispersion-aware workflows
+* Mixture, hurdle, and zero-inflated models
+* Duration and survival models
+
+### Non-goals
+
+* No advanced panel GMM, causal, or semiparametric expansion yet
+
+### Exit Gate
+
+* The core applied-micro model families are broadly covered without bespoke execution stacks for
+  each family
+
+---
+
+## Phase 17 — Advanced Empirical Methods
+
+**Goal:** Add the methods that depend on a mature estimation base.
+
+### Coverage
+
+* Dynamic and advanced panel GMM workflows
+* Nonlinear panel models
+* Quantile and distributional methods
+* Semiparametric and nonparametric methods
+* Causal inference workflows, including treatment-effects, matching/weighting, and endogenous
+  treatment cases
+
+### Non-goals
+
+* No plugin, R, ML, Bayesian, or spatial ecosystem expansion yet
+
+### Exit Gate
+
+* Research-grade empirical methods are available without destabilizing the simpler command
+  surface
+
+---
+
+## Phase 18 — Ecosystem & Extension Layer
+
+**Goal:** Expose stable extension points after the analytical core settles.
+
+### Coverage
+
+* Plugin system built on stable command and result interfaces
+* R integration (`rpy2`) only after the interoperability boundary is clear
+* Broader remote connectors beyond the first DuckDB-friendly sources
+
+### Non-goals
+
+* No requirement to expand core estimators while extension interfaces are still settling
+
+### Exit Gate
+
+* External integrations build on stable analytical APIs rather than forcing core redesign
+
+---
+
+## Phase 19 — Modern Extensions
+
+**Goal:** Add broad methods that should remain explicitly late-stage.
+
+### Coverage
+
+* Machine learning integration
+* Bayesian workflows
+* Spatial models
+
+### Non-goals
+
+* No pressure to make these methods define the core product architecture
+
+### Exit Gate
+
+* Modern extensions are available as additions to a stable econometrics-first system
 
 ---
 

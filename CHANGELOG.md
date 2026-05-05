@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Reorganized the post-Phase-9 roadmap across `docs/dev_phase.md` and `SPEC.md` into an
+  interleaved Phase 10-19 sequence that stages execution/state foundations, reproducibility and
+  data-workflow primitives, core econometrics coverage, advanced empirical methods, and late
+  ecosystem extensions coherently.
 - Added an integrated public-dataset E2E harness and run documentation for the Titanic batch,
   interactive shell, NYC taxi lazy-scale, and Penguins script reproducibility scenarios.
 - Added Phase 9 configuration and persistence with `.tabdat.toml`, `--config <path>`, runtime
