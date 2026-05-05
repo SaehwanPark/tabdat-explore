@@ -216,6 +216,25 @@ def test_cli_runs_positional_phase_8_script(sample_parquet: Path, tmp_path: Path
   assert captured.err == ""
 
 
+def test_cli_runs_phase_8_script_from_command_mode(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "analysis.td"
+  script_path.write_text(f"use {sample_parquet}\ncount\n", encoding="utf-8")
+
+  exit_code = main(["-c", f"run {script_path}"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Script: {script_path}" in captured.out
+  assert ". count" in captured.out
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_phase_8_script_reports_line_number(
   sample_parquet: Path,
   tmp_path: Path,

@@ -51,7 +51,17 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _run_commands(commands: Sequence[str], executor: Executor) -> int:
   for command_text in commands:
-    status = _run_one(command_text, executor, open_plots=False)
+    status = _run_one(
+      command_text,
+      executor,
+      open_plots=False,
+      run_script=lambda path: _run_script_status(
+        path,
+        executor,
+        base_dir=None,
+        active_stack=(),
+      ),
+    )
     if status is _RunStatus.ERROR:
       return 1
     if status is _RunStatus.STOP:
@@ -69,7 +79,18 @@ def _run_shell(executor: Executor) -> int:
       print()
       return 0
 
-    if _run_one(command_text, executor, open_plots=True) is _RunStatus.STOP:
+    status = _run_one(
+      command_text,
+      executor,
+      open_plots=True,
+      run_script=lambda path: _run_script_status(
+        path,
+        executor,
+        base_dir=None,
+        active_stack=(),
+      ),
+    )
+    if status is _RunStatus.STOP:
       return 0
 
 
