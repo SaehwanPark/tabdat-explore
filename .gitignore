@@ -12,3 +12,7 @@ wheels/
 
 # macOS artifacts
 .DS_Store
+
+# Integrated test artifacts
+artifacts/
+integrated_testing/reports/
