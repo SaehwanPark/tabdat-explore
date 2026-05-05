@@ -82,6 +82,8 @@ This file tracks feature state for spec-driven development. Product intent lives
 
 ## Present
 
+- Execute `docs/e2e_public_dataset_test_plan.md` against pinned public datasets before starting
+  Phase 10 work.
 - Phase 9 is complete for the first configuration and persistence slice.
 
 ## Future
