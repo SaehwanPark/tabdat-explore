@@ -106,9 +106,9 @@ def ensure_csv_parquet(url: str, csv_path: Path, parquet_path: Path) -> None:
   con = duckdb.connect()
   try:
     con.execute(
-      "copy (select * from read_csv_auto(?)) to ? (format parquet)",
-      [str(csv_path), str(parquet_path)],
+      "create or replace table _e2e_source as select * from read_csv_auto(?)", [str(csv_path)]
     )
+    con.execute("copy _e2e_source to ? (format parquet)", [str(parquet_path)])
   finally:
     con.close()
 
