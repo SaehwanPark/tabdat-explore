@@ -22,13 +22,12 @@ Keep this file short and repo-wide. Detailed reusable workflows live under `.age
 - For reusable agent workflows, use `.agents/skills/tabdat-orchestrator/SKILL.md` and `docs/harness/tabdat/team-spec.md`.
 - Note this project should follow: FP-style (use `fp-developer` skill whenever writing or editing codebase), SDD (spec-driven), TDD (test-driven)
 - Focus on type safety via `mypy` and `pydantic`: Use `mypy` to prevent bugs by analyzing code for errors before execution, use `pydantic` to ensure data integrity by ensuring data structures conform to defined types.
-- Use `pymonad` for more consistent functional programming
+- Use local `tabdat.monads` helpers for explicit functional error and absence handling.
 
 ## Recommended Tools
 - `pytest`
 - `mypy`: you may install via `uv`
 - `pydantic`: you may install via `uv`
-- `pymonad`: you may install via `uv`
 - `gh`
 - `hf`
 

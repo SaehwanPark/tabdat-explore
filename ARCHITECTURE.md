@@ -30,7 +30,9 @@ history, inline history suggestions, syntax highlighting, and context-aware comp
 Converts command text into internal command objects. The parser owns tokenization, varlist and
 option parsing, `if` clauses, and expression AST construction. `use <path>, lazy` and
 `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields. It may represent
-parsed-only future commands, but execution remains an executor responsibility.
+parsed-only future commands, but execution remains an executor responsibility. Recoverable parser
+failures compose through the local `tabdat.monads.Either` helper rather than an external monad
+package.
 
 ### Executor
 
@@ -72,6 +74,7 @@ display formatting.
 - Package metadata is in `pyproject.toml`.
 - Phase handoff artifacts live under `_workspace/`.
 - Runtime modules live under `src/tabdat/`.
+- Local functional helpers live in `src/tabdat/monads.py`.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
 - Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
