@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 10 execution and state foundations with a lightweight session-local named table
+  registry, `use <table>` activation, typed execution error subclasses, executor state-handler
+  extraction, and named table shell completions.
 - Reorganized the post-Phase-9 roadmap across `docs/dev_phase.md` and `SPEC.md` into an
   interleaved Phase 10-19 sequence that stages execution/state foundations, reproducibility and
   data-workflow primitives, core econometrics coverage, advanced empirical methods, and late

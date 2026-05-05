@@ -301,9 +301,7 @@ class Executor:
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
-      raise NoActiveDatasetError(
-        f"{command_name} requires an active dataset; run use <path> first"
-      )
+      raise NoActiveDatasetError(f"{command_name} requires an active dataset; run use <path> first")
     return self.state.active_dataset
 
   def _set_active_dataset(

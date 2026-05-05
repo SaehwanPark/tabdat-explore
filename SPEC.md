@@ -83,11 +83,18 @@ This file tracks feature state for spec-driven development. Product intent lives
   - reusable harness for the Titanic, shell, NYC taxi lazy-scale, and Penguins script scenarios
   - captured deterministic stdout/stderr, exit-code, artifact, plot, and Parquet checks
   - fixed interactive shell Ctrl-C handling during prompt-toolkit completion
+- Implemented Phase 10 execution and state foundations:
+  - lightweight session-local named table registry
+  - `sql ... into <table>` named table creation and activation
+  - `use <table>` named table reactivation
+  - executor state-handler extraction for state-changing commands
+  - specific execution error subclasses for missing active data, missing variables, type
+    mismatches, missing tables, reserved names, and backend failures
+  - named table shell completions
 
 ## Present
 
-- Phase 9 is complete for the first configuration and persistence slice.
-- Integrated public-dataset E2E testing is complete for the Phase 1 through Phase 9 checkpoint.
+- Phase 10 is complete for the first execution and state foundations slice.
 
 ## Future
 
@@ -97,10 +104,6 @@ This file tracks feature state for spec-driven development. Product intent lives
   - revisit timestamped or collision-avoiding plot names if stable overwrite behavior becomes
     surprising in real interactive use
 - Phase 10 execution and state foundations:
-  - add a lightweight named table registry that augments the single active dataset model
-  - refactor executor dispatch when command handlers or script meta-commands make the current
-    central dispatcher difficult to maintain
-  - add specific execution error subclasses for context-sensitive CLI and script diagnostics
   - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
     honest and test-covered
 - Phase 11 data workflow and reproducibility primitives:

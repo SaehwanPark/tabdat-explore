@@ -1,9 +1,9 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed the roadmap Phase 9 configuration and persistence slice. This
+TabDat-Explore has completed the first roadmap Phase 10 execution and state foundations slice. This
 document records the implemented shell UX, script runner, command-language model, active DuckDB
-relation model, lazy load boundary, runtime configuration, plot artifact boundary, persistence
-boundary, and the boundaries future phases should preserve.
+relation model, session-local named table registry, lazy load boundary, runtime configuration, plot
+artifact boundary, persistence boundary, and the boundaries future phases should preserve.
 
 ## Runtime Flow
 
@@ -61,12 +61,13 @@ a session-local active DuckDB table. Lazy loading creates a DuckDB `read_parquet
 load-time projection, filtering, grouping, and terminal query operations can be pushed into DuckDB.
 Session transformations replace the active relation for later commands. The optional `polars`
 engine selector is accepted and recorded for Phase 7 workflows, while command execution continues
-through the DuckDB relation boundary until deeper Polars-native lowering is designed. No persistent
-write registry exists, but `save` / `export` can persist the active relation to local Parquet. SQL
-commands bind the active relation as the user-facing DuckDB view `active`; `sql ... into <table>`
-replaces the active dataset with the query result while using `<table>` as the displayed result
-name. Initial lazy loads report an unknown row count until a live count or materializing operation
-runs.
+through the DuckDB relation boundary until deeper Polars-native lowering is designed. A
+session-local named table registry stores SQL `into` results under safe internal DuckDB relation
+names; `use <table>` reactivates a registered table, while the active relation remains the default
+target for non-SQL commands. No persistent registry exists, but `save` / `export` can persist the
+active relation to local Parquet. SQL commands bind the active relation as the user-facing DuckDB
+view `active`. Initial lazy loads report an unknown row count until a live count or materializing
+operation runs.
 
 For visualization commands, the backend extracts typed rows or frequency counts from the active
 table. It does not construct charts or write artifact files.
@@ -101,7 +102,8 @@ display formatting.
 - The supported `by:` child commands are `summarize` and `count`.
 - Phase 4 SQL is executable for result-producing `select` and `with` queries through `sql`.
 - Multiline SQL can be entered with `sql """..."""`.
-- `sql ... into <table>` replaces the active dataset with the SQL result; `use` remains path-only.
+- `sql ... into <table>` creates a session-local named table and makes it active.
+- `use <table>` reactivates a registered named table; `use <path>` remains local Parquet loading.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
 - Phase 7 lazy loading is executable through `use <path>, lazy` and
@@ -113,8 +115,8 @@ display formatting.
 - Phase 9 persistence is executable through `save <path>[, replace]` and
   `export <path>[, replace]` for local Parquet.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
-- Autocomplete reads active dataset metadata from executor state but does not validate or mutate
-  session state.
+- Autocomplete reads active dataset and named table metadata from executor state but does not
+  validate or mutate session state.
 - Inline suggestions are history-based and persisted via `~/.tabdat_history`.
 
 ## Development Boundaries
@@ -126,6 +128,7 @@ display formatting.
 - Keep chart rendering separate from backend data extraction.
 - Keep script orchestration at the CLI edge; command semantics should still enter through the
   parser/executor boundary.
+- Keep named tables session-local until a future persistence/catalog contract exists.
 - Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
   contract exists.
 - Use 2-space tab size across project files.

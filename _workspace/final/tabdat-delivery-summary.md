@@ -1,21 +1,17 @@
-# Phase 9 Delivery Summary
+# Phase 10 Delivery Summary
 
 ## Summary
 
-Implemented Phase 9 configuration and persistence on branch
-`codex/tmp-phase9-config-persistence`.
+Implemented Phase 10 execution and state foundations on branch
+`codex/tmp-phase10-execution-state-foundations`.
 
 ## Changed Behavior
 
-- `.tabdat.toml` loads automatically from the current working directory.
-- `--config <path>` loads an explicit TOML config.
-- `set graph_format`, `set artifact_dir`, and `set graph_open` update runtime behavior.
-- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`.
-- Lazy `use` no longer performs a load-time full row count.
-- `count` now queries the active relation live.
-- `save` and `export` persist the active dataset to local Parquet, with `replace` required for
-  overwrites.
-- Script metadata now includes relevant config values.
+- `sql ... into <table>` now creates a session-local named table and makes it active.
+- `use <table>` reactivates a registered named table in the same executor session.
+- Interactive `use` completions include registered named tables.
+- State-changing executor command paths are split into private handlers.
+- Execution errors now have specific subclasses while preserving user-facing CLI formatting.
 
 ## Validation
 
@@ -23,12 +19,11 @@ Implemented Phase 9 configuration and persistence on branch
 - `uv run mypy`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
-- `uv run tabdat -f /tmp/tabdat_phase9_dogfood.td`
 
 ## Known Limits
 
-- Config file discovery is limited to `.tabdat.toml` in the current working directory unless
-  `--config` is supplied.
-- Persistence supports `.parquet` only.
-- Generated plot filenames are stable and can overwrite prior generated plots.
-- No named table registry yet.
+- Named tables are session-local only.
+- No join, append, reshape, persistent table catalog, plugin layer, or Polars-native execution was
+  added in this slice.
+- SQL still exposes the current active dataset through `active`; broad named-table SQL bindings are
+  deferred.

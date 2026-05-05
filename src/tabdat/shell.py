@@ -109,6 +109,10 @@ class TabdatCompleter(Completer):
       return
 
     command_name = stripped.split(maxsplit=1)[0].lower()
+    if command_name == "use":
+      yield from _matching_completions(self._executor.state.tables.keys(), word)
+      return
+
     if command_name == "sql":
       yield from _matching_completions(_SQL_SUGGESTIONS, word)
       return
