@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tabdat.cli import (
   _has_open_sql_triple_quote,
   _open_command_for_platform,
@@ -167,6 +169,136 @@ def test_cli_runs_phase_7_lazy_use_flow(sample_parquet: Path, capsys) -> None:
   assert "age  sex" in captured.out
   assert "30   F" in captured.out
   assert captured.err == ""
+
+
+def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "analysis.td"
+  plot_path = tmp_path / "age.svg"
+  script_path.write_text(
+    "\n".join(
+      [
+        "# mini session",
+        f"use {sample_parquet}",
+        "keep if age >= 42",
+        "sql select sex, count(*) as n from active group by sex order by sex",
+        f"histogram age, saving({plot_path})",
+      ]
+    ),
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Script: {script_path}" in captured.out
+  assert "TabDat: 0.1.0" in captured.out
+  assert "Python:" in captured.out
+  assert f". use {sample_parquet}" in captured.out
+  assert "Kept matching rows: 2 rows, 4 columns" in captured.out
+  assert "sex  n" in captured.out
+  assert f"Saved plot: {plot_path}" in captured.out
+  assert plot_path.read_text().lstrip().startswith("<svg")
+  assert captured.err == ""
+
+
+def test_cli_runs_positional_phase_8_script(sample_parquet: Path, tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "analysis.td"
+  script_path.write_text(f"use {sample_parquet}\ncount\n", encoding="utf-8")
+
+  exit_code = main([str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_8_script_reports_line_number(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "bad.td"
+  script_path.write_text(f"use {sample_parquet}\nsummarize missing\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert f"Error: {script_path}:2: summarize unknown variable: missing" in captured.err
+
+
+def test_cli_phase_8_nested_run_resolves_relative_paths(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_dir = tmp_path / "scripts"
+  script_dir.mkdir()
+  child = script_dir / "child.td"
+  parent = script_dir / "parent.td"
+  child.write_text("count\n", encoding="utf-8")
+  parent.write_text(f"use {sample_parquet}\nrun child.td\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(parent)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Script: {parent}" in captured.out
+  assert f"Script: {child}" in captured.out
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_8_rejects_recursive_run(tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "loop.td"
+  script_path.write_text("run loop.td\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "recursive script inclusion is not supported" in captured.err
+
+
+def test_cli_phase_8_script_exit_stops_successfully(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "exit.td"
+  script_path.write_text(f"use {sample_parquet}\nexit\nsummarize missing\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert ". exit" in captured.out
+  assert "summarize missing" not in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_8_rejects_conflicting_script_arguments(
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "analysis.td"
+  script_path.write_text("count\n", encoding="utf-8")
+
+  with pytest.raises(SystemExit) as exc_info:
+    main(["-c", "count", "-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exc_info.value.code == 2
+  assert "-c/--command cannot be combined with script execution" in captured.err
 
 
 def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:

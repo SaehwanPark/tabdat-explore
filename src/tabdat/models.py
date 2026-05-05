@@ -189,6 +189,11 @@ class ExitCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class RunCommand:
+  path: Path
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -219,6 +224,7 @@ Command = (
   | BarCommand
   | ByCommand
   | ExitCommand
+  | RunCommand
   | ParsedCommand
 )
 

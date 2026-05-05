@@ -28,6 +28,7 @@ from tabdat.models import (
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  RunCommand,
   ScatterCommand,
   SelectCommand,
   SqlCommand,
@@ -60,6 +61,7 @@ _EXECUTABLE_COMMANDS = {
   "histogram",
   "scatter",
   "bar",
+  "run",
   "exit",
   "quit",
 }
@@ -109,6 +111,8 @@ def parse_command(text: str) -> Command:
     return _parse_by(stripped)
   if command_name == "sql":
     return _parse_sql(stripped)
+  if command_name == "run":
+    return _parse_run(stripped)
 
   return _parse_structured_command(stripped)
 
@@ -393,6 +397,16 @@ def _validate_sql_table_name(table_name: str) -> None:
   normalized = table_name.lower()
   if normalized == "active" or normalized.startswith("__tabdat_"):
     raise ParseError(f"sql into cannot use reserved table name: {table_name}")
+
+
+def _parse_run(text: str) -> RunCommand:
+  body = text[3:].strip()
+  if not body:
+    raise ParseError("run expects exactly one path: run <script>")
+  path_parts = body.split()
+  if len(path_parts) != 1:
+    raise ParseError("run expects exactly one path: run <script>")
+  return RunCommand(path=Path(path_parts[0]))
 
 
 def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand | DropCommand:

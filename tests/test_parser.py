@@ -24,6 +24,7 @@ from tabdat.models import (
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  RunCommand,
   ScatterCommand,
   SelectCommand,
   SqlCommand,
@@ -214,6 +215,10 @@ def test_parse_phase_4_sql_commands() -> None:
   )
 
 
+def test_parse_phase_8_run_command() -> None:
+  assert parse_command("run analysis.td") == RunCommand(Path("analysis.td"))
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -344,6 +349,8 @@ def test_parse_exit_aliases() -> None:
     "bar sex age",
     "bar sex, bins=20",
     "bar sex, missing=true",
+    "run",
+    "run first.td second.td",
     'summarize age if sex == "F',
     "summarize age if age $ 18",
   ],
