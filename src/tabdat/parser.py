@@ -1,8 +1,9 @@
 """Command parser for the early TabDat command language."""
 
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, NoReturn, cast
+from typing import Any, Literal, NoReturn, cast
 
 from tabdat.errors import ParseError
 from tabdat.models import (
@@ -42,7 +43,7 @@ from tabdat.models import (
   UnaryExpression,
   UseCommand,
 )
-from tabdat.monads import Either, Left, Right
+from tabdat.monads import Err, Ok, Result, result, result_either
 
 _EXECUTABLE_COMMANDS = {
   "use",
@@ -124,31 +125,39 @@ def parse_command(text: str) -> Command:
 
 
 def _parse_structured_command(text: str) -> Command:
-  command = (
-    _tokenize_either(text).then(_parse_command_parts_either).then(_build_command_from_parts_either)
-  )
-  return cast(Command, command.either(_raise_parse_error, lambda command: command))
+  command = _parse_structured_command_result(text)
+  return result_either(command, _raise_parse_error, lambda parsed: parsed)
 
 
-def _parse_command_parts_either(tokens: tuple[_Token, ...]) -> Either[str, _CommandParts]:
+@result.block
+def _parse_structured_command_result(
+  text: str,
+) -> Generator[Result[Any, str], Any, Command]:
+  tokens = yield _tokenize_result(text)
+  parts = yield _parse_command_parts_result(tokens)
+  command = yield _build_command_from_parts_result(parts)
+  return cast(Command, command)
+
+
+def _parse_command_parts_result(tokens: tuple[_Token, ...]) -> Result[_CommandParts, str]:
   try:
-    return Right(_parse_command_parts(tokens))
+    return Ok(_parse_command_parts(tokens))
   except ParseError as exc:
-    return Left(str(exc))
+    return Err(str(exc))
 
 
-def _build_command_from_parts_either(parts: _CommandParts) -> Either[str, Command]:
+def _build_command_from_parts_result(parts: _CommandParts) -> Result[Command, str]:
   try:
-    return Right(_build_command_from_parts(parts))
+    return Ok(_build_command_from_parts(parts))
   except ParseError as exc:
-    return Left(str(exc))
+    return Err(str(exc))
 
 
-def _tokenize_either(text: str) -> Either[str, tuple[_Token, ...]]:
+def _tokenize_result(text: str) -> Result[tuple[_Token, ...], str]:
   try:
-    return Right(_tokenize(text))
+    return Ok(_tokenize(text))
   except ParseError as exc:
-    return Left(str(exc))
+    return Err(str(exc))
 
 
 def _raise_parse_error(message: str) -> NoReturn:

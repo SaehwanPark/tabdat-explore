@@ -50,6 +50,11 @@ wheels = [
 ]
 
 [[package]]
+name = "comp-builders"
+version = "1.0.0"
+source = { git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9#16c5be2cf112469e24992281df1d6daf5a1eefa9" }
+
+[[package]]
 name = "duckdb"
 version = "1.5.2"
 source = { registry = "https://pypi.org/simple" }
@@ -545,6 +550,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "altair" },
+    { name = "comp-builders" },
     { name = "duckdb" },
     { name = "polars" },
     { name = "prompt-toolkit" },
@@ -562,6 +568,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.1.0" },
+    { name = "comp-builders", git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9" },
     { name = "duckdb", specifier = ">=1.4.3" },
     { name = "polars", specifier = ">=1.36.1" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },

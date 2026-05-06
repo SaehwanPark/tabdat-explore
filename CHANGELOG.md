@@ -9,6 +9,8 @@ All notable project changes are tracked here.
 - Added Phase 10 execution and state foundations with a lightweight session-local named table
   registry, `use <table>` activation, typed execution error subclasses, executor state-handler
   extraction, and named table shell completions.
+- Added `comp-builders` as the functional helper implementation behind `tabdat.monads`, including
+  `Result`, `Option`, `Validation`, builder re-exports, and small edge conversion helpers.
 - Reorganized the post-Phase-9 roadmap across `docs/dev_phase.md` and `SPEC.md` into an
   interleaved Phase 10-19 sequence that stages execution/state foundations, reproducibility and
   data-workflow primitives, core econometrics coverage, advanced empirical methods, and late
@@ -55,6 +57,11 @@ All notable project changes are tracked here.
 ### Removed
 
 - Removed the external PyMonad dependency in favor of local `tabdat.monads` helpers.
+
+### Changed
+
+- Changed structured parser failure composition from handwritten `Either` helpers to
+  `comp-builders` `Result` values while preserving the public `ParseError` behavior.
 
 ### Fixed
 

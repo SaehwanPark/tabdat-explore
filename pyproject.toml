@@ -11,6 +11,7 @@ dependencies = [
     "pydantic>=2.13.3",
     "polars>=1.36.1",
     "vl-convert-python>=1.9.0.post1",
+    "comp-builders @ git+https://github.com/SaehwanPark/comp-builders.git@16c5be2cf112469e24992281df1d6daf5a1eefa9",
 ]
 
 [project.scripts]
@@ -52,6 +53,9 @@ ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tabdat"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]
