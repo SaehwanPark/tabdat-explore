@@ -43,8 +43,9 @@ Converts command text into internal command objects. The parser owns tokenizatio
 option parsing, `if` clauses, expression AST construction, and `run <script>` commands. `use
 <path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
-responsibility. Recoverable parser failures compose through the local `tabdat.monads.Either` helper
-rather than an external monad package.
+responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
+by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
+`ParseError` exceptions only at the public parser edge.
 
 ### Executor
 
@@ -93,7 +94,8 @@ display formatting.
 - Integrated public-dataset E2E tooling lives under `integrated_testing/`; generated datasets,
   run logs, plots, and Parquet outputs are ignored.
 - Runtime modules live under `src/tabdat/`.
-- Local functional helpers live in `src/tabdat/monads.py`.
+- Functional helper imports live in `src/tabdat/monads.py`, which re-exports the project-approved
+  `comp-builders` primitives and small edge conversion helpers.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
 - Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
@@ -124,6 +126,9 @@ display formatting.
 - Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
 - Do not add broad command grammar before a command contract needs it.
 - Keep public behavior documented before implementation.
+- Import `Result`, `Option`, and `Validation` through `tabdat.monads`; do not import
+  `comp-builders` directly from feature modules unless a future design records a reason to bypass
+  the local boundary.
 - Keep transformation state session-local except for explicit `save` / `export`.
 - Keep chart rendering separate from backend data extraction.
 - Keep script orchestration at the CLI edge; command semantics should still enter through the

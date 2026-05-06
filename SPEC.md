@@ -91,10 +91,16 @@ This file tracks feature state for spec-driven development. Product intent lives
   - specific execution error subclasses for missing active data, missing variables, type
     mismatches, missing tables, reserved names, and backend failures
   - named table shell completions
+- Adopted `comp-builders` behind the local `tabdat.monads` boundary:
+  - `Result`, `Option`, and `Validation` are now imported through `tabdat.monads`
+  - parser recoverable failures compose with a `@result.block`
+  - edge helpers convert functional values back to public parser exceptions or plain values
 
 ## Present
 
-- Phase 10 is complete for the first execution and state foundations slice.
+- Phase 10 is complete for the first execution and state foundations slice. Functional helper
+  imports should go through `tabdat.monads`, which delegates to `comp-builders` while preserving a
+  stable repo-local boundary.
 
 ## Future
 
