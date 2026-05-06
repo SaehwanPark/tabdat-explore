@@ -7,7 +7,7 @@ stable repo-local vocabulary while the implementation delegates to comp-builders
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast, overload
+from typing import NoReturn, overload
 
 from comp_builders import (
   Err,
@@ -23,9 +23,8 @@ from comp_builders import (
   result,
   validation,
 )
-from comp_builders.option import _Nothing
 
-type MaybeValue[T] = Some[T] | _Nothing
+type MaybeValue[T] = Some[T] | Option[NoReturn]
 
 
 def result_either[T, E, U](
@@ -51,8 +50,8 @@ def option_maybe[T, U](
   match value:
     case Some(present):
       return some_fn(present)
-    case _Nothing():
-      return default
+  if value is Nothing:
+    return default
   raise TypeError(f"unsupported Option value: {type(value).__name__}")
 
 
@@ -61,13 +60,13 @@ def option_to_result[T, E](value: Option[T], error: E) -> Result[T, E]:
   match value:
     case Some(present):
       return Ok(present)
-    case _Nothing():
-      return Err(error)
+  if value is Nothing:
+    return Err(error)
   raise TypeError(f"unsupported Option value: {type(value).__name__}")
 
 
 @overload
-def maybe_from_optional(value: None) -> _Nothing: ...
+def maybe_from_optional(value: None) -> Option[NoReturn]: ...
 
 
 @overload
@@ -76,7 +75,7 @@ def maybe_from_optional[T](value: T) -> Some[T]: ...
 
 def maybe_from_optional[T](value: T | None) -> MaybeValue[T]:
   if value is None:
-    return cast(_Nothing, Nothing)
+    return Nothing
   return Some(value)
 
 

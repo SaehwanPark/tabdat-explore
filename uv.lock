@@ -52,7 +52,7 @@ wheels = [
 [[package]]
 name = "comp-builders"
 version = "1.0.0"
-source = { git = "https://github.com/SaehwanPark/comp-builders.git#16c5be2cf112469e24992281df1d6daf5a1eefa9" }
+source = { git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9#16c5be2cf112469e24992281df1d6daf5a1eefa9" }
 
 [[package]]
 name = "duckdb"
@@ -568,7 +568,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.1.0" },
-    { name = "comp-builders", git = "https://github.com/SaehwanPark/comp-builders.git" },
+    { name = "comp-builders", git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9" },
     { name = "duckdb", specifier = ">=1.4.3" },
     { name = "polars", specifier = ">=1.36.1" },
     { name = "prompt-toolkit", specifier = ">=3.0.52" },
