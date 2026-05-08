@@ -1,9 +1,9 @@
-# Phase 11 Reshape Command Contract
+# Phase 11 Panel Metadata Command Contract
 
 ## Request Summary
 
-Add the next Phase 11 data workflow primitive: narrow active-dataset reshape commands for
-estimation-ready data preparation.
+Add the next unfinished Phase 11 data workflow primitive: session-local panel identifier metadata
+for estimation-ready datasets.
 
 ## Roadmap Phase
 
@@ -12,72 +12,73 @@ Phase 11: Data Workflow & Reproducibility Primitives.
 ## Command Syntax
 
 ```stata
-reshape long <stublist>, i(<id_vars>) j(<name_var>)
-reshape wide <value_vars>, i(<id_vars>) j(<name_var>)
+panel <id_var> <time_var>
+panel
+panel clear
 ```
 
 Rules:
 
-- `long` and `wide` are the only supported reshape directions.
-- `i(...)` is required and must contain one or more identifier variables.
-- `j(...)` is required and must contain exactly one output/input variable name.
-- `reshape long` requires one or more stubs. Each stub matches active columns named
-  `<stub>_<j_value>`.
-- `reshape wide` requires one or more value variables. Output columns are named
-  `<value_var>_<j_value>`.
-- `if` clauses, assignment syntax, duplicate variables, duplicate options, and unknown options are
-  rejected.
+- `panel <id_var> <time_var>` records the active dataset's panel identifier and time variable.
+- `panel` reports the active dataset's current panel metadata.
+- `panel clear` removes panel metadata from the active dataset.
+- `panel` forms do not accept `if` clauses, assignment syntax, comma options, or extra arguments.
+- `<id_var>` and `<time_var>` must be distinct valid variable names.
 
 ## Examples
 
 ```stata
-reshape long income cost, i(id) j(year)
+panel firm_id year
+panel
+panel clear
 ```
-
-Turns `income_2020`, `income_2021`, `cost_2020`, and `cost_2021` into rows containing `id`,
-`year`, `income`, and `cost`.
-
-```stata
-reshape wide income cost, i(id) j(year)
-```
-
-Turns rows containing `id`, `year`, `income`, and `cost` into one row per `id` with columns such as
-`income_2020`, `income_2021`, `cost_2020`, and `cost_2021`.
 
 ## Execution Semantics
 
-- Requires an active dataset.
-- Uses DuckDB SQL over the active relation.
-- Replaces the active dataset with the reshape result.
-- Materializes the reshape result eagerly, including after lazy inputs.
-- `reshape long` preserves id columns first, then the `j` column, then stub value columns.
-- `reshape wide` preserves id columns first, then generated value columns ordered by observed
-  `j` values.
+- Requires an active dataset for every `panel` form.
+- Validates both variables exist in the active dataset.
+- Rejects missing values in either panel variable.
+- Rejects duplicate `(id_var, time_var)` pairs.
+- Stores metadata in session state only. `save` and `export` remain data-only Parquet persistence.
+- `use <path>` starts with no panel metadata.
+- `use <table>` restores panel metadata from the named table snapshot.
+- `panel` updates the active dataset and active named-table snapshot when applicable.
+- Row filters preserve panel metadata.
+- `rename` updates metadata if renaming the id or time variable.
+- `generate` preserves metadata.
+- `replace` preserves metadata and revalidates if replacing the id or time variable.
+- `keep`, `drop`, and `select` preserve metadata only when both panel variables remain; otherwise
+  they clear it.
+- `join`, `append`, `reshape`, `collapse`, and `sql ... into` clear panel metadata conservatively.
 
 ## User-Facing Output
 
-- Long success: `Reshaped long: N rows, M columns`.
-- Wide success: `Reshaped wide: N rows, M columns`.
+- Set: `Panel set: id=<id_var>, time=<time_var>`.
+- Report: `Panel: id=<id_var>, time=<time_var>`.
+- No panel: `Panel: none`.
+- Clear: `Panel cleared`.
 
 ## User-Facing Errors
 
-- Missing active dataset: `reshape requires an active dataset; run use <path> first`.
-- Missing variable: `reshape unknown variable: <name>`.
-- Missing long stub columns: `reshape long found no columns for stub: <stub>`.
-- Incomplete long stub groups: `reshape long missing column: <stub>_<j_value>`.
-- Wide output conflict: `reshape wide output column already exists: <name>`.
-- Unsupported malformed syntax uses parser errors beginning with `reshape expects syntax:`.
+- Missing active dataset: `panel requires an active dataset; run use <path> first`.
+- Missing variable: `panel unknown variable: <name>`.
+- Missing values: `panel variables cannot contain missing values: <name>`.
+- Duplicate keys: `panel id/time pairs must be unique`.
 
 ## Non-Goals
 
-- No custom separators, wildcard stub discovery, automatic panel metadata, file or named-table
-  inputs, permissive type coercion, aliases, script macros, seeding, control flow, or remote access.
+- No `xtset` compatibility alias.
+- No durable metadata persistence.
+- No panel-balancedness diagnostics.
+- No estimation commands.
+- No script variables/macros, seeding, control flow, remote access, or Phase 12 estimation
+  substrate work.
 
 ## Acceptance Criteria
 
-- Parser tests cover valid long/wide syntax and malformed syntax/options.
-- Executor/backend tests cover successful long and wide reshapes, missing active datasets, missing
-  variables, missing stub columns, incomplete stub groups, and output-name conflicts.
-- CLI smoke tests cover a repeated `-c` reshape workflow with deterministic output.
-- Shell tests confirm `reshape` command completion.
-- Documentation records the Phase 11 reshape boundary and remaining future Phase 11 work.
+- Parser tests cover valid report/set/clear syntax and malformed syntax/options.
+- Executor/backend tests cover successful set/report/clear, missing active data, unknown variables,
+  missing values, duplicate pairs, metadata preservation, and conservative clearing.
+- CLI smoke tests cover a repeated `-c` panel workflow with deterministic output.
+- Shell tests confirm `panel` command completion and active column completions.
+- Documentation records the Phase 11 panel boundary and remaining future Phase 11 work.

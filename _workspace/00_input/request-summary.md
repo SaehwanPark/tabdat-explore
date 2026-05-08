@@ -1,38 +1,33 @@
-# Phase 11 Reshape Request Summary
+# Phase 11 Panel Metadata Request Summary
 
 ## Goal
 
-Continue Phase 11 data workflow primitives after the completed named-table join and append slices by
-adding a narrow reshape wide/long checkpoint.
+Implement the next unfinished Phase 11 prerequisite before moving to Phase 12: session-local panel
+identifier metadata for estimation-ready data workflows.
 
 ## Phase Fit
 
-Phase 11 in `docs/dev_phase.md` covers estimation-ready data workflows, including join /
-merge-style commands, append/stack, reshape wide/long, panel identifiers, script reproducibility
-primitives, and narrow remote access. Join and append are already complete, so reshape is the next
-data-shaping prerequisite before Phase 12 estimation substrate work.
+Roadmap Phase 11: Data Workflow & Reproducibility Primitives.
 
-## Touched Surfaces
+Prior phases and completed Phase 11 slices were validated before implementation:
 
-- Command contract for `reshape long` and `reshape wide`.
-- Parser and pydantic command models.
-- Executor state transition and active dataset replacement.
-- DuckDB backend materialization for wide-to-long and long-to-wide transforms.
-- CLI and shell command coverage.
-- Focused parser, executor/backend, CLI, and shell tests.
-- SPEC, ARCHITECTURE, CHANGELOG, implementation report, QA report, and delivery summary.
+- `uv run pytest`
+- `uv run mypy`
+- `uv run ruff check .`
+- `uv run ruff format --check .`
 
-## Assumptions
+## Scope
 
-- Implement only local active-dataset reshape operations in this slice.
-- `reshape long <stublist>, i(<id_vars>) j(<name_var>)` expects active columns named
-  `<stub>_<j_value>`.
-- `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` pivots long data into columns named
-  `<value_var>_<j_value>`.
-- Reshape results replace the active dataset and are materialized eagerly.
+- Add `panel <id_var> <time_var>`, `panel`, and `panel clear`.
+- Store panel metadata on the active dataset and named-table snapshots where applicable.
+- Validate active data, variable existence, missing values, and duplicate id/time pairs.
+- Preserve or clear metadata deterministically across existing transformations.
+- Update parser, executor, backend validation helpers, formatter, shell completions, focused tests,
+  and durable docs.
 
 ## Non-Goals
 
-- No multi-table reshape, custom separators, aliases, wildcard stub discovery, type coercion
-  policy, panel metadata, script variables/macros, seeding, control flow, remote access, or Phase 12
-  estimation substrate work.
+- No durable metadata persistence in Parquet output.
+- No estimation commands.
+- No `xtset` compatibility alias.
+- No script macros, seeding, control flow, or remote access.
