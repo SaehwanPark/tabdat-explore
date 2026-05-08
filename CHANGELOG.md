@@ -86,5 +86,7 @@ All notable project changes are tracked here.
 
 ### Fixed
 
+- Fixed current Pyright type-check failures in parser option extraction, optional-value monad
+  helpers, and integrated E2E PTY spawning.
 - Fixed interactive shell Ctrl-C handling so prompt-toolkit completion interrupts return to the
   prompt instead of terminating with a traceback.
