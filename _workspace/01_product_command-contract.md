@@ -1,81 +1,84 @@
-# Phase 10 Execution And State Foundations Contract
+# Phase 11 Join/Merge Command Contract
 
 ## Roadmap Phase
 
-Phase 10: Execution & State Foundations.
+Phase 11: Data Workflow & Reproducibility Primitives.
 
-## Named Table Registry
-
-Syntax:
+## Command Syntax
 
 ```text
-sql <select-or-with-query> into <table>
-use <table>
+join <table> on <keylist>
+join <table> on <keylist>, how=inner|left
+join <table> on <keylist>, suffix(<suffix>)
 ```
 
-- `sql ... into <table>` evaluates a result-producing query over the current active dataset exposed
-  as `active`.
-- The result is stored in a session-local named table registry under `<table>`.
-- The created table becomes the active dataset immediately.
-- Previously active named tables remain registered and can be reactivated with `use <table>`.
-- `use <path>` continues to load local `.parquet` files and registers the loaded dataset as
-  `active`.
-- `use <table>` is only table activation when `<table>` matches an existing registered table name
-  and does not resolve as a local file path.
-- Valid table names use identifier syntax: letters, numbers, and underscores, starting with a
-  letter or underscore.
-- Reserved names are rejected for user-created tables: `active` and names beginning with
-  `__tabdat_`.
+- `<table>` must name an existing session-local named table created by `sql ... into <table>`.
+- `<keylist>` is one or more same-name equality keys present on both the active dataset and the
+  named table.
+- `how=inner` is the default join kind.
+- `how=left` preserves all active-dataset rows.
+- `suffix(<suffix>)` renames colliding right-side non-key columns; the default suffix is `_right`.
+- Duplicate key names are rejected.
 
-## Output
+## Examples
 
-- `sql ... into <table>` prints `Created <table>: N rows, M columns`.
-- `use <table>` prints `Activated: <table> (N rows, M columns)`.
-- Existing `use <path>` output remains `Loaded: <path> (...)`.
-- Existing command error formatting remains `Error: <message>`.
+```text
+use patients.parquet
+sql select patient_id, clinic from active into clinics
+use visits.parquet
+join clinics on patient_id
+```
+
+Expected output:
+
+```text
+Joined clinics: N rows, M columns
+```
+
+```text
+join lookup on id, how=left suffix(_lookup)
+```
+
+Expected behavior: all active rows are retained; right-side non-key column collisions are suffixed
+with `_lookup`.
 
 ## Execution Semantics
 
-- Named tables are session-local DuckDB relations and are not written to disk unless `save` or
-  `export` is run.
-- The current active dataset remains the default target for inspection, transformation, SQL, plots,
-  and persistence commands.
-- Transformations replace the active relation and update active metadata.
-- SQL can reference the current active dataset through `active`; arbitrary multi-table SQL over the
-  registry is deferred.
-- Lazy `use <path>, lazy` still creates a DuckDB scan view and reports an unknown row count until a
-  live count or materializing command runs.
-- Most transformations materialize the active relation after the first lazy transformation.
-- `engine=polars` remains experimental metadata; command execution still uses the DuckDB relation
-  boundary.
+- `join` requires an active dataset and a registered named table.
+- The join result replaces the active dataset.
+- Named tables remain session-local and unchanged by the join.
+- SQL generation happens inside the DuckDB backend. The executor owns session-state lookup and
+  active dataset replacement.
+- The current active dataset remains the default command target after the join.
+- Joined results are materialized as eager DuckDB temp tables, even if either input originated from
+  a lazy load.
 
-## Specific Execution Errors
+## User-Facing Errors
 
-- Missing active dataset uses `NoActiveDatasetError`.
-- Missing columns use `UnknownVariableError`.
-- Type-specific command failures use `TypeMismatchExecutionError`.
-- Missing named tables use `UnknownTableError`.
-- Reserved or invalid table names use `ReservedNameError`.
-- Backend failures use `BackendExecutionError`.
-- All subclasses inherit from `ExecutionError`, preserving current CLI behavior.
+- Missing active dataset: `join requires an active dataset; run use <path> first`.
+- Unknown named table: `unknown table: <table>`.
+- Missing active-side key: `join unknown variable: <key>`.
+- Missing right-side key: `join unknown variable in <table>: <key>`.
+- Invalid table name: `invalid table name: <table>`.
+- Reserved table name: `reserved table name: <table>`.
+- Unsupported syntax, options, join kinds, empty suffixes, or duplicate keys are parse errors.
 
 ## Non-Goals
 
-- No join, append, reshape, or broad multi-table workflow commands.
-- No `use <table>, options`; named table activation accepts no `use` options.
-- No persistent named table catalog across sessions.
-- No Polars-native execution lowering.
-- No plugin, R integration, or analytical command expansion.
+- No Stata-compatible `_merge` indicator or cardinality validation.
+- No right/full/cross joins.
+- No different-name key mapping.
+- No arbitrary SQL access to all registered named tables.
+- No append/stack, reshape, panel metadata, remote data access, or script-level reproducibility
+  primitives in this slice.
 
 ## Acceptance Criteria
 
-- Parser tests cover `use <table>` activation syntax and still cover valid/invalid `sql into`
-  names.
-- Executor/backend tests cover named table creation, activation, active metadata updates, and
-  specific error subclasses.
-- CLI tests cover repeated `-c` named-table workflows and deterministic output.
-- Documentation states the registry is session-local and that `active` remains the primary command
-  target.
+- Parser tests cover valid join forms and malformed syntax/options.
+- Executor/backend tests cover inner joins, left joins, multi-key joins, collision suffixing,
+  unknown tables, missing keys, and missing active datasets.
+- CLI smoke tests cover a repeated `-c` named-table join workflow and deterministic output.
+- Documentation records the Phase 11 join boundary and remaining future Phase 11 work.
 - Full validation passes:
   - `uv run pytest`
   - `uv run mypy`

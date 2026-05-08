@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 11 data workflow primitive with `join <table> on <keylist>`, `how=inner|left`,
+  right-side collision suffixing, active dataset replacement, and focused parser, executor/backend,
+  and CLI coverage.
 - Added Phase 10 execution and state foundations with a lightweight session-local named table
   registry, `use <table>` activation, typed execution error subclasses, executor state-handler
   extraction, and named table shell completions.

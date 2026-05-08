@@ -163,6 +163,51 @@ class DuckDBBackend:
       raise BackendExecutionError(f"could not update table: {table_name}") from exc
     return self.active_dataset_info(Path(table_name))
 
+  def join_named_table(
+    self,
+    dataset: DatasetInfo,
+    right_dataset: DatasetInfo,
+    *,
+    table_name: str,
+    keys: tuple[str, ...],
+    how: Literal["inner", "left"],
+    suffix: str,
+  ) -> DatasetInfo:
+    _validate_user_table_name(table_name)
+    left_types = {column.name: column.data_type for column in dataset.columns}
+    right_types = {column.name: column.data_type for column in right_dataset.columns}
+    _require_columns("join", left_types, keys)
+    missing_right = tuple(key for key in keys if key not in right_types)
+    if missing_right:
+      raise UnknownVariableError(
+        f"join unknown variable in {table_name}: {', '.join(missing_right)}"
+      )
+
+    internal_name = _named_table_identifier(table_name)
+    right_selects = _right_join_selects(right_dataset, keys, left_types, suffix)
+    select_sql = ", ".join(
+      f"left_table.{_quote_identifier(column.name)}" for column in dataset.columns
+    )
+    if right_selects:
+      select_sql = f"{select_sql}, {', '.join(right_selects)}"
+    predicates = " and ".join(
+      f"left_table.{_quote_identifier(key)} = right_table.{_quote_identifier(key)}" for key in keys
+    )
+    self._replace_active(
+      f"""
+      select {select_sql}
+      from (
+        select row_number() over () as __tabdat_join_order, *
+        from {ACTIVE_TABLE}
+      ) as left_table
+      {how} join {_quote_identifier(internal_name)} as right_table
+        on {predicates}
+      order by left_table.__tabdat_join_order
+      """,
+      "join",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
@@ -736,6 +781,35 @@ def _require_columns(
 
 def _select_list(variables: tuple[str, ...]) -> str:
   return ", ".join(_quote_identifier(variable) for variable in variables)
+
+
+def _right_join_selects(
+  right_dataset: DatasetInfo,
+  keys: tuple[str, ...],
+  left_types: dict[str, str],
+  suffix: str,
+) -> tuple[str, ...]:
+  selects: list[str] = []
+  used_output_names = set(left_types)
+  for column in right_dataset.columns:
+    if column.name in keys:
+      continue
+    base_output_name = f"{column.name}{suffix}" if column.name in used_output_names else column.name
+    output_name = _unique_output_name(base_output_name, used_output_names)
+    used_output_names.add(output_name)
+    selects.append(
+      f"right_table.{_quote_identifier(column.name)} as {_quote_identifier(output_name)}"
+    )
+  return tuple(selects)
+
+
+def _unique_output_name(candidate: str, used_names: set[str]) -> str:
+  if candidate not in used_names:
+    return candidate
+  counter = 2
+  while f"{candidate}_{counter}" in used_names:
+    counter += 1
+  return f"{candidate}_{counter}"
 
 
 def _quote_identifier(identifier: str) -> str:

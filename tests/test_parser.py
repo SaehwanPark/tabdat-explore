@@ -20,6 +20,7 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  JoinCommand,
   KeepCommand,
   NumberExpression,
   ParsedCommand,
@@ -56,6 +57,19 @@ def test_parse_use_command() -> None:
     Path("data.parquet"),
     execution_mode="lazy",
     lazy_engine="polars",
+  )
+
+
+def test_parse_phase_11_join_command() -> None:
+  assert parse_command("join lookup on id") == JoinCommand(
+    table_name="lookup",
+    keys=("id",),
+  )
+  assert parse_command("join lookup on firm_id year, how=left suffix(_lookup)") == JoinCommand(
+    table_name="lookup",
+    keys=("firm_id", "year"),
+    how="left",
+    suffix="_lookup",
   )
 
 
@@ -301,6 +315,17 @@ def test_parse_exit_aliases() -> None:
     "use data.parquet, lazy lazy",
     "use data.parquet, engine=duckdb",
     "use data.parquet, lazy engine=spark",
+    "join",
+    "join lookup",
+    "join lookup id",
+    "join lookup on",
+    "join lookup on id id",
+    "join lookup on id, how=right",
+    "join lookup on id, suffix()",
+    "join lookup on id, suffix(_x) suffix(_y)",
+    "join lookup on id, replace",
+    "join active on id",
+    "join bad-name on id",
     "describe age",
     "describe if age > 18",
     "exit now",

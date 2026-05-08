@@ -25,6 +25,7 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  JoinCommand,
   KeepCommand,
   NumberExpression,
   ParsedCommand,
@@ -61,6 +62,7 @@ _EXECUTABLE_COMMANDS = {
   "replace",
   "tabulate",
   "collapse",
+  "join",
   "sql",
   "histogram",
   "scatter",
@@ -249,6 +251,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "collapse":
     return _parse_collapse(parts)
+
+  if parts.name == "join":
+    return _parse_join(parts)
 
   if parts.name == "histogram":
     return _parse_histogram(parts)
@@ -509,6 +514,37 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
   )
 
 
+def _parse_join(parts: _CommandParts) -> JoinCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("join expects syntax: join <table> on <keylist>")
+  if len(parts.arguments) < 3:
+    raise ParseError("join expects syntax: join <table> on <keylist>")
+  table_name = parts.arguments[0]
+  if parts.arguments[1].lower() != "on":
+    raise ParseError("join expects syntax: join <table> on <keylist>")
+  keys = parts.arguments[2:]
+  if len(set(keys)) != len(keys):
+    raise ParseError("join key list contains duplicates")
+  _validate_sql_table_name(table_name)
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"how", "suffix"}
+  if unsupported:
+    raise ParseError(f"join unsupported option: {', '.join(sorted(unsupported))}")
+  how = _single_text_option(parts.options, "how", "join") or "inner"
+  if how not in {"inner", "left"}:
+    raise ParseError("join how must be inner or left")
+  suffix = _single_text_option(parts.options, "suffix", "join") or "_right"
+  if not suffix:
+    raise ParseError("join suffix cannot be empty")
+  return JoinCommand(
+    table_name=table_name,
+    keys=keys,
+    how=cast(Literal["inner", "left"], how),
+    suffix=suffix,
+  )
+
+
 def _parse_histogram(parts: _CommandParts) -> HistogramCommand:
   if parts.condition is not None or parts.expression is not None:
     raise ParseError("histogram does not accept if clauses or assignment syntax")
@@ -618,6 +654,26 @@ def _single_path_option(
   if not isinstance(value, str):
     raise ParseError(f"{command_name} option {name} expects a path")
   return Path(value)
+
+
+def _single_text_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> str | None:
+  matched = tuple(option for option in options if option.name == name)
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option {name} may only be supplied once")
+  value = matched[0].value
+  if isinstance(value, tuple):
+    if len(value) != 1:
+      raise ParseError(f"{command_name} option {name} expects one value")
+    return value[0]
+  if not isinstance(value, str):
+    raise ParseError(f"{command_name} option {name} expects a value")
+  return value
 
 
 def _require_flag_options(

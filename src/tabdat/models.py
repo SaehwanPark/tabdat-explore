@@ -148,6 +148,14 @@ class CollapseCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class JoinCommand:
+  table_name: str
+  keys: tuple[str, ...]
+  how: Literal["inner", "left"] = "inner"
+  suffix: str = "_right"
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -236,6 +244,7 @@ Command = (
   | ReplaceCommand
   | TabulateCommand
   | CollapseCommand
+  | JoinCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand

@@ -95,12 +95,18 @@ This file tracks feature state for spec-driven development. Product intent lives
   - `Result`, `Option`, and `Validation` are now imported through `tabdat.monads`
   - parser recoverable failures compose with a `@result.block`
   - edge helpers convert functional values back to public parser exceptions or plain values
+- Implemented the first Phase 11 data workflow primitive:
+  - `join <table> on <keylist>` over session-local named tables
+  - `how=inner|left` join kinds with `inner` as the default
+  - `suffix(<suffix>)` for right-side non-key column collisions
+  - active dataset replacement with deterministic DuckDB materialization
+  - focused parser, executor/backend, and CLI coverage
 
 ## Present
 
-- Phase 10 is complete for the first execution and state foundations slice. Functional helper
-  imports should go through `tabdat.monads`, which delegates to `comp-builders` while preserving a
-  stable repo-local boundary.
+- Phase 11 has started with same-name equality joins against session-local named tables.
+  Functional helper imports should continue to go through `tabdat.monads`, which delegates to
+  `comp-builders` while preserving a stable repo-local boundary.
 
 ## Future
 
@@ -113,7 +119,9 @@ This file tracks feature state for spec-driven development. Product intent lives
   - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
     honest and test-covered
 - Phase 11 data workflow and reproducibility primitives:
-  - add multi-table data-management support such as joins, append/stack, and reshape workflows
+  - extend join workflows with additional ergonomics only after the initial same-name equality join
+    contract is dogfooded
+  - add append/stack and reshape workflows
   - add panel identifier handling and script-level reproducibility primitives such as seeding,
     reusable variables/macros, and minimal control flow
   - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet

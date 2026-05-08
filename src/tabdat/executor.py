@@ -25,6 +25,7 @@ from tabdat.models import (
   GenerateCommand,
   HeadCommand,
   HistogramCommand,
+  JoinCommand,
   KeepCommand,
   LoadResult,
   PlotResult,
@@ -142,6 +143,9 @@ class Executor:
 
     if isinstance(command, CollapseCommand):
       return self._execute_collapse(command)
+
+    if isinstance(command, JoinCommand):
+      return self._execute_join(command)
 
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
@@ -294,6 +298,21 @@ class Executor:
       return SqlCreateResult(command.into, next_dataset)
     sql_headers, sql_rows = self.backend.run_sql(command.query)
     return TableResult(headers=sql_headers, rows=sql_rows)
+
+  def _execute_join(self, command: JoinCommand) -> TransformResult:
+    active_dataset = self._require_active_dataset("join")
+    right_dataset = self.state.tables.get(command.table_name)
+    if right_dataset is None:
+      raise UnknownTableError(f"unknown table: {command.table_name}")
+    next_dataset = self.backend.join_named_table(
+      active_dataset,
+      right_dataset,
+      table_name=command.table_name,
+      keys=command.keys,
+      how=command.how,
+      suffix=command.suffix,
+    )
+    return self._record_transform(f"Joined {command.table_name}", next_dataset)
 
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self._set_active_dataset(dataset)
