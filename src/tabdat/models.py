@@ -296,7 +296,7 @@ class PanelMetadata:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasetInfo:
-  path: Path
+  path: Path | str
   row_count: int | None
   columns: tuple[ColumnInfo, ...]
   execution_mode: Literal["eager", "lazy"] = "eager"

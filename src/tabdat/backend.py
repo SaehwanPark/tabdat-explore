@@ -54,7 +54,7 @@ REMOTE_PARQUET_SCHEMES = {"http", "https", "s3"}
 @dataclass(frozen=True)
 class ParquetSource:
   read_path: str
-  display_path: Path
+  display_path: Path | str
   is_remote: bool
 
 
@@ -107,7 +107,7 @@ class DuckDBBackend:
 
     return self.active_dataset_info(source.display_path)
 
-  def active_dataset_info(self, path: Path) -> DatasetInfo:
+  def active_dataset_info(self, path: Path | str) -> DatasetInfo:
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
     except duckdb.Error as exc:
@@ -1083,7 +1083,7 @@ def resolve_parquet_source(path: Path | str) -> ParquetSource:
       raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
     if not parsed.path.lower().endswith(".parquet"):
       raise ExecutionError("use only supports .parquet files")
-    return ParquetSource(read_path=path, display_path=Path(path), is_remote=True)
+    return ParquetSource(read_path=path, display_path=path, is_remote=True)
 
   normalized = Path(path).expanduser()
   if normalized.suffix.lower() != ".parquet":

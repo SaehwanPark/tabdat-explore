@@ -644,6 +644,23 @@ def test_cli_phase_11_script_reports_unterminated_if(
   assert f"Error: {script_path}:1: if block is missing end" in captured.err
 
 
+def test_cli_phase_11_inactive_branch_skips_macro_expansion(
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "skip_macro.td"
+  script_path.write_text("if false\nuse $missing\nelse\nseed 1\nend\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert ". use $missing" not in captured.out
+  assert "Seed: 1" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_phase_9_loads_explicit_config(
   sample_parquet: Path,
   tmp_path: Path,

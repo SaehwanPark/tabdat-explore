@@ -201,6 +201,12 @@ def _run_script_status(
   block_state: ScriptBlockState | None = None
 
   for script_command in commands:
+    if block_state is not None and not block_state.current_branch_active:
+      stripped = script_command.text.strip()
+      command_name = stripped.split(maxsplit=1)[0].lower() if stripped else ""
+      if command_name not in {"if", "else", "end"}:
+        continue
+
     try:
       expanded_text = expand_script_macros(
         script_command.text,
@@ -250,9 +256,6 @@ def _run_script_status(
         raise ScriptError(resolved_path, script_command.start_line, "end without matching if")
       print(f". {expanded_text}")
       block_state = None
-      continue
-
-    if block_state is not None and not block_state.current_branch_active:
       continue
 
     print(f". {expanded_text}")

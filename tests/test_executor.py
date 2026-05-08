@@ -108,6 +108,7 @@ def test_resolve_remote_parquet_source() -> None:
   source = resolve_parquet_source("https://example.com/data.parquet")
 
   assert source.read_path == "https://example.com/data.parquet"
+  assert source.display_path == "https://example.com/data.parquet"
   assert source.is_remote is True
 
 
