@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the second Phase 11 data workflow primitive with `append <table>`, strict same-column
+  schema validation, active-dataset column order preservation, active dataset replacement, and
+  focused parser, executor/backend, CLI, and shell coverage.
 - Added the first Phase 11 data workflow primitive with `join <table> on <keylist>`, `how=inner|left`,
   right-side collision suffixing, active dataset replacement, and focused parser, executor/backend,
   and CLI coverage.

@@ -7,6 +7,7 @@ from typing import Any, Literal, NoReturn, cast
 
 from tabdat.errors import ParseError
 from tabdat.models import (
+  AppendCommand,
   BarCommand,
   BinaryExpression,
   ByCommand,
@@ -63,6 +64,7 @@ _EXECUTABLE_COMMANDS = {
   "tabulate",
   "collapse",
   "join",
+  "append",
   "sql",
   "histogram",
   "scatter",
@@ -254,6 +256,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "join":
     return _parse_join(parts)
+
+  if parts.name == "append":
+    return _parse_append(parts)
 
   if parts.name == "histogram":
     return _parse_histogram(parts)
@@ -543,6 +548,16 @@ def _parse_join(parts: _CommandParts) -> JoinCommand:
     how=cast(Literal["inner", "left"], how),
     suffix=suffix,
   )
+
+
+def _parse_append(parts: _CommandParts) -> AppendCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError("append expects syntax: append <table>")
+  if len(parts.arguments) != 1:
+    raise ParseError("append expects syntax: append <table>")
+  table_name = parts.arguments[0]
+  _validate_sql_table_name(table_name)
+  return AppendCommand(table_name=table_name)
 
 
 def _parse_histogram(parts: _CommandParts) -> HistogramCommand:

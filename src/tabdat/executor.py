@@ -8,6 +8,7 @@ from tabdat.config import TabDatConfig, set_config_value
 from tabdat.errors import ExecutionError, NoActiveDatasetError, UnknownTableError
 from tabdat.models import (
   ActivateResult,
+  AppendCommand,
   BarCommand,
   ByCommand,
   CodebookCommand,
@@ -146,6 +147,9 @@ class Executor:
 
     if isinstance(command, JoinCommand):
       return self._execute_join(command)
+
+    if isinstance(command, AppendCommand):
+      return self._execute_append(command)
 
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
@@ -314,8 +318,25 @@ class Executor:
     )
     return self._record_transform(f"Joined {command.table_name}", next_dataset)
 
+  def _execute_append(self, command: AppendCommand) -> TransformResult:
+    active_dataset = self._require_active_dataset("append")
+    append_dataset = self.state.tables.get(command.table_name)
+    if append_dataset is None:
+      raise UnknownTableError(f"unknown table: {command.table_name}")
+    next_dataset = self.backend.append_named_table(
+      active_dataset,
+      append_dataset,
+      table_name=command.table_name,
+    )
+    return self._record_detached_transform(f"Appended {command.table_name}", next_dataset)
+
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self._set_active_dataset(dataset)
+    return TransformResult(message, dataset)
+
+  def _record_detached_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
+    self.state.active_dataset = dataset
+    self.state.active_table_name = None
     return TransformResult(message, dataset)
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:

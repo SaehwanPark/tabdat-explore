@@ -32,6 +32,8 @@ COMMAND_NAMES: tuple[str, ...] = (
   "replace",
   "tabulate",
   "collapse",
+  "join",
+  "append",
   "sql",
   "histogram",
   "scatter",
@@ -109,7 +111,7 @@ class TabdatCompleter(Completer):
       return
 
     command_name = stripped.split(maxsplit=1)[0].lower()
-    if command_name == "use":
+    if command_name in {"use", "join", "append"}:
       yield from _matching_completions(self._executor.state.tables.keys(), word)
       return
 

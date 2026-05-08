@@ -156,6 +156,11 @@ class JoinCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class AppendCommand:
+  table_name: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -245,6 +250,7 @@ Command = (
   | TabulateCommand
   | CollapseCommand
   | JoinCommand
+  | AppendCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand

@@ -4,6 +4,7 @@ import pytest
 
 from tabdat.errors import ParseError
 from tabdat.models import (
+  AppendCommand,
   BarCommand,
   BinaryExpression,
   ByCommand,
@@ -71,6 +72,10 @@ def test_parse_phase_11_join_command() -> None:
     how="left",
     suffix="_lookup",
   )
+
+
+def test_parse_phase_11_append_command() -> None:
+  assert parse_command("append followup") == AppendCommand(table_name="followup")
 
 
 def test_parse_describe_command() -> None:
@@ -326,6 +331,12 @@ def test_parse_exit_aliases() -> None:
     "join lookup on id, replace",
     "join active on id",
     "join bad-name on id",
+    "append",
+    "append followup extra",
+    "append followup, replace",
+    "append followup if age > 18",
+    "append active",
+    "append bad-name",
     "describe age",
     "describe if age > 18",
     "exit now",
