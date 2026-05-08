@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the third Phase 11 data workflow primitive with `reshape long` and `reshape wide` over the
+  active dataset, required `i(...)` and `j(...)` options, eager DuckDB materialization, active
+  dataset replacement, deterministic output, and focused parser, executor/backend, CLI, and shell
+  coverage.
 - Added the second Phase 11 data workflow primitive with `append <table>`, strict same-column
   schema validation, active-dataset column order preservation, active dataset replacement, and
   focused parser, executor/backend, CLI, and shell coverage.

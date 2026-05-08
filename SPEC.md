@@ -107,12 +107,19 @@ This file tracks feature state for spec-driven development. Product intent lives
   - active-dataset column order preservation
   - active dataset replacement with deterministic DuckDB materialization
   - focused parser, executor/backend, CLI, and shell coverage
+- Implemented the third Phase 11 data workflow primitive:
+  - `reshape long <stublist>, i(<id_vars>) j(<name_var>)`
+  - `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)`
+  - active-dataset wide-to-long and long-to-wide DuckDB materialization
+  - deterministic active dataset replacement and terminal output
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
-- Phase 11 has started with same-name equality joins and strict named-table append workflows.
-  Functional helper imports should continue to go through `tabdat.monads`, which delegates to
-  `comp-builders` while preserving a stable repo-local boundary.
+- Phase 11 has started with same-name equality joins, strict named-table append workflows, and
+  narrow active-dataset reshape workflows. Functional helper imports should continue to go through
+  `tabdat.monads`, which delegates to `comp-builders` while preserving a stable repo-local
+  boundary.
 
 ## Future
 
@@ -129,7 +136,7 @@ This file tracks feature state for spec-driven development. Product intent lives
     contract is dogfooded
   - extend append/stack workflows only after the initial strict named-table append contract is
     dogfooded
-  - add reshape workflows
+  - extend reshape workflows only after the initial wide/long contract is dogfooded
   - add panel identifier handling and script-level reproducibility primitives such as seeding,
     reusable variables/macros, and minimal control flow
   - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet

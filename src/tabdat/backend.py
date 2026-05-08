@@ -274,7 +274,7 @@ class DuckDBBackend:
       f"""
       select *
       from (
-        {' union all '.join(selects)}
+        {" union all ".join(selects)}
       )
       order by {order_sql}, {_quote_identifier(j_variable)}
       """,

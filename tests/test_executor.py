@@ -429,19 +429,13 @@ def test_phase_11_reshape_reports_dataset_and_variable_errors(
   executor = Executor()
   try:
     with pytest.raises(NoActiveDatasetError, match="reshape requires an active dataset"):
-      executor.execute(
-        ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year")
-      )
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(UnknownVariableError, match="reshape unknown variable: id"):
-      executor.execute(
-        ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year")
-      )
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
     executor.execute(UseCommand(path))
     with pytest.raises(ExecutionError, match="reshape output column already exists: year"):
-      executor.execute(
-        ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year")
-      )
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
     executor.execute(DropCommand(("year", "income")))
     with pytest.raises(UnknownVariableError, match="reshape long found no columns for stub: bmi"):
       executor.execute(ReshapeCommand("long", ("bmi",), identifiers=("id",), j_variable="year"))

@@ -4,8 +4,8 @@ TabDat-Explore has started roadmap Phase 11 data workflow primitives after compl
 execution and state foundations slice. This
 document records the implemented shell UX, script runner, command-language model, active DuckDB
 relation model, session-local named table registry, lazy load boundary, runtime configuration, plot
-artifact boundary, persistence boundary, join and append boundaries, and the boundaries future
-phases should preserve.
+artifact boundary, persistence boundary, join, append, and reshape boundaries, and the boundaries
+future phases should preserve.
 
 ## Runtime Flow
 
@@ -57,7 +57,8 @@ runtime config. Parsed-only Phase 2 command forms must fail with an unsupported-
 error until a later command contract defines execution. Runtime `set` commands update session config
 and affect later commands in the same shell, command sequence, or script. `join` and `append`
 validate active state and named-table lookup at the executor boundary before asking the backend to
-materialize the next active relation.
+materialize the next active relation. `reshape` validates active state at the executor boundary and
+delegates active-dataset wide/long materialization to the backend.
 
 ### DuckDB Backend
 
@@ -74,8 +75,11 @@ named table using same-name equality keys, supports `inner` and `left` joins, su
 non-key column collisions, and materializes the result as the new eager active relation.
 `append <table>` vertically stacks a registered named table under the active relation after strict
 same-column and compatible-type validation, preserving active-dataset column order and
-materializing the result as the new eager active relation. No persistent registry exists, but
-`save` / `export` can persist the active relation to local Parquet.
+materializing the result as the new eager active relation. `reshape long <stublist>, i(...) j(...)`
+converts active wide columns named `<stub>_<j_value>` into long rows, while
+`reshape wide <value_vars>, i(...) j(...)` pivots long rows into `<value_var>_<j_value>` columns;
+both replace the active relation with an eager materialized result. No persistent registry exists,
+but `save` / `export` can persist the active relation to local Parquet.
 SQL commands bind the active relation as the user-facing DuckDB view `active`. Initial lazy loads
 report an unknown row count until a live count or materializing operation runs.
 
@@ -119,6 +123,9 @@ display formatting.
   the active dataset with the joined result.
 - `append <table>` appends a registered named table to the active dataset and replaces the active
   dataset with the appended result.
+- `reshape long <stublist>, i(<id_vars>) j(<name_var>)` and
+  `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` reshape only the active dataset and
+  replace it with an eager materialized result.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
 - Phase 7 lazy loading is executable through `use <path>, lazy` and
@@ -151,6 +158,8 @@ display formatting.
   workflow contract is written.
 - Keep `append` scoped to named-table inputs with strict same-column schemas until a broader stack
   or union contract is written.
+- Keep `reshape` scoped to active-dataset wide/long forms with required `i(...)` and `j(...)`
+  options until panel metadata, aliases, or broader reshape ergonomics are designed.
 - Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
   contract exists.
 - Use 2-space tab size across project files.
