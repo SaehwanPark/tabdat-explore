@@ -7,7 +7,7 @@ stable repo-local vocabulary while the implementation delegates to comp-builders
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import NoReturn, overload
+from typing import NoReturn
 
 from comp_builders import (
   Err,
@@ -63,14 +63,6 @@ def option_to_result[T, E](value: Option[T], error: E) -> Result[T, E]:
   if value is Nothing:
     return Err(error)
   raise TypeError(f"unsupported Option value: {type(value).__name__}")
-
-
-@overload
-def maybe_from_optional(value: None) -> Option[NoReturn]: ...
-
-
-@overload
-def maybe_from_optional[T](value: T) -> Some[T]: ...
 
 
 def maybe_from_optional[T](value: T | None) -> MaybeValue[T]:

@@ -493,7 +493,7 @@ class PtyChild:
   closed: bool = False
 
 
-def spawn_pty(argv: Sequence[str], *, env: dict[str, str]) -> PtyChild:
+def spawn_pty(argv: tuple[str, ...], *, env: dict[str, str]) -> PtyChild:
   pid, fd = pty.fork()
   if pid == 0:
     os.chdir(REPO_ROOT)

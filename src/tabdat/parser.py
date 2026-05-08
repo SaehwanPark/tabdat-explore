@@ -726,7 +726,7 @@ def _single_integer_option(
   *,
   minimum: int,
 ) -> int | None:
-  matched = tuple(option for option in options if option.name == name)
+  matched = [option for option in options if option.name == name]
   if not matched:
     return None
   if len(matched) > 1:
@@ -744,7 +744,7 @@ def _single_path_option(
   name: str,
   command_name: str,
 ) -> Path | None:
-  matched = tuple(option for option in options if option.name == name)
+  matched = [option for option in options if option.name == name]
   if not matched:
     return None
   if len(matched) > 1:
@@ -760,7 +760,7 @@ def _single_text_option(
   name: str,
   command_name: str,
 ) -> str | None:
-  matched = tuple(option for option in options if option.name == name)
+  matched = [option for option in options if option.name == name]
   if not matched:
     return None
   if len(matched) > 1:
@@ -780,7 +780,7 @@ def _single_tuple_option(
   name: str,
   command_name: str,
 ) -> tuple[str, ...] | None:
-  matched = tuple(option for option in options if option.name == name)
+  matched = [option for option in options if option.name == name]
   if not matched:
     return None
   if len(matched) > 1:
