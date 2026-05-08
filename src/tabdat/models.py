@@ -161,6 +161,14 @@ class AppendCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ReshapeCommand:
+  direction: Literal["long", "wide"]
+  variables: tuple[str, ...]
+  identifiers: tuple[str, ...]
+  j_variable: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -251,6 +259,7 @@ Command = (
   | CollapseCommand
   | JoinCommand
   | AppendCommand
+  | ReshapeCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand

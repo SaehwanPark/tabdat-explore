@@ -1,17 +1,17 @@
-# Phase 11 Append Delivery Summary
+# Phase 11 Reshape Delivery Summary
 
 ## Summary
 
-Implemented the second Phase 11 data workflow primitive on branch
-`codex/tmp-phase11-append-stack`.
+Implemented the third Phase 11 data workflow primitive on branch
+`codex/tmp-phase11-reshape-wide-long`.
 
 ## Changed Behavior
 
-- `append <table>` appends a session-local named table to the active dataset.
-- The active dataset and appended named table must have the same column names and compatible types.
-- Output column order follows the active dataset.
-- Successful appends print `Appended <table>: N rows, M columns`.
-- The append result replaces the active dataset for later commands.
+- `reshape long <stublist>, i(<id_vars>) j(<name_var>)` reshapes active wide data into long rows.
+- `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` pivots active long data into wide columns.
+- Reshape results replace the active dataset and are materialized eagerly.
+- Successful commands print `Reshaped long: N rows, M columns` or
+  `Reshaped wide: N rows, M columns`.
 
 ## Validation
 
@@ -22,9 +22,8 @@ Implemented the second Phase 11 data workflow primitive on branch
 
 ## Known Limits
 
-- Only session-local named tables can be appended.
-- `stack` is not an alias yet.
-- Missing, extra, or mismatched-type columns are rejected.
-- No source indicator, permissive missing-column filling, type coercion policy, file-path append,
-  reshape, panel metadata, remote data access, script variables, seeding, or control flow was added
-  in this slice.
+- Only active-dataset reshape is supported.
+- Long reshape requires `<stub>_<j_value>` source columns.
+- Wide reshape emits `<value_var>_<j_value>` columns.
+- No custom separators, aliases, panel metadata, script variables/macros, seeding, control flow,
+  remote access, or Phase 12 estimation substrate work was added.

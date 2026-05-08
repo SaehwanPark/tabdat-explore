@@ -242,6 +242,78 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def reshape_long(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    identifiers: tuple[str, ...],
+    j_variable: str,
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("reshape", column_types, identifiers)
+    _reject_existing_column("reshape", column_types, j_variable)
+    j_values = _long_j_values(dataset, variables)
+    for variable in variables:
+      _require_long_stub_columns(column_types, variable, j_values)
+
+    id_sql = _select_list(identifiers)
+    selects = []
+    for j_value in j_values:
+      value_sql = ", ".join(
+        f"{_quote_identifier(variable + '_' + j_value)} as {_quote_identifier(variable)}"
+        for variable in variables
+      )
+      selects.append(
+        f"""
+        select {id_sql}, {_quote_literal(j_value)} as {_quote_identifier(j_variable)}, {value_sql}
+        from {ACTIVE_TABLE}
+        """
+      )
+    order_sql = ", ".join(_quote_identifier(identifier) for identifier in identifiers)
+    self._replace_active(
+      f"""
+      select *
+      from (
+        {" union all ".join(selects)}
+      )
+      order by {order_sql}, {_quote_identifier(j_variable)}
+      """,
+      "reshape",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def reshape_wide(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    identifiers: tuple[str, ...],
+    j_variable: str,
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("reshape", column_types, identifiers + (j_variable,) + variables)
+    j_values = self._wide_j_values(j_variable)
+    if not j_values:
+      raise ExecutionError("reshape wide found no j values")
+    _require_wide_output_names(column_types, variables, identifiers, j_variable, j_values)
+
+    id_sql = _select_list(identifiers)
+    aggregate_sql = ", ".join(
+      f"max(case when cast({_quote_identifier(j_variable)} as varchar) = {_quote_literal(j_value)} "
+      f"then {_quote_identifier(variable)} end) as {_quote_identifier(variable + '_' + j_value)}"
+      for variable in variables
+      for j_value in j_values
+    )
+    self._replace_active(
+      f"""
+      select {id_sql}, {aggregate_sql}
+      from {ACTIVE_TABLE}
+      group by {id_sql}
+      order by {id_sql}
+      """,
+      "reshape",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
@@ -797,6 +869,16 @@ class DuckDBBackend:
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
 
+  def _wide_j_values(self, j_variable: str) -> tuple[str, ...]:
+    quoted_j = _quote_identifier(j_variable)
+    sql = f"""
+      select distinct cast({quoted_j} as varchar) as j_value
+      from {ACTIVE_TABLE}
+      where {quoted_j} is not null
+      order by j_value
+    """
+    return tuple(str(row[0]) for row in self._fetch_table(sql, "reshape"))
+
 
 def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper()
@@ -830,6 +912,59 @@ def _require_matching_types(
 
 def _select_list(variables: tuple[str, ...]) -> str:
   return ", ".join(_quote_identifier(variable) for variable in variables)
+
+
+def _reject_existing_column(command_name: str, column_types: dict[str, str], variable: str) -> None:
+  if variable in column_types:
+    raise ExecutionError(f"{command_name} output column already exists: {variable}")
+
+
+def _long_j_values(dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[str, ...]:
+  values: list[str] = []
+  seen: set[str] = set()
+  for variable in variables:
+    prefix = f"{variable}_"
+    variable_values = tuple(
+      column.name.removeprefix(prefix)
+      for column in dataset.columns
+      if column.name.startswith(prefix) and column.name != prefix
+    )
+    if not variable_values:
+      raise UnknownVariableError(f"reshape long found no columns for stub: {variable}")
+    for value in variable_values:
+      if value not in seen:
+        seen.add(value)
+        values.append(value)
+  return tuple(values)
+
+
+def _require_long_stub_columns(
+  column_types: dict[str, str],
+  variable: str,
+  j_values: tuple[str, ...],
+) -> None:
+  prefix = f"{variable}_"
+  if not any(column.startswith(prefix) and column != prefix for column in column_types):
+    raise UnknownVariableError(f"reshape long found no columns for stub: {variable}")
+  for j_value in j_values:
+    column_name = f"{variable}_{j_value}"
+    if column_name not in column_types:
+      raise UnknownVariableError(f"reshape long missing column: {column_name}")
+
+
+def _require_wide_output_names(
+  column_types: dict[str, str],
+  variables: tuple[str, ...],
+  identifiers: tuple[str, ...],
+  j_variable: str,
+  j_values: tuple[str, ...],
+) -> None:
+  source_columns = set(variables + identifiers + (j_variable,))
+  for variable in variables:
+    for j_value in j_values:
+      output_name = f"{variable}_{j_value}"
+      if output_name in column_types and output_name not in source_columns:
+        raise ExecutionError(f"reshape wide output column already exists: {output_name}")
 
 
 def _right_join_selects(

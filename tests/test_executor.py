@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from tabdat.config import TabDatConfig
@@ -39,6 +40,7 @@ from tabdat.models import (
   PreviewResult,
   RenameCommand,
   ReplaceCommand,
+  ReshapeCommand,
   SaveCommand,
   SaveResult,
   ScatterCommand,
@@ -56,6 +58,14 @@ from tabdat.models import (
   TransformResult,
   UseCommand,
 )
+
+
+def _write_sql_parquet(path: Path, query: str) -> None:
+  connection = duckdb.connect(database=":memory:")
+  try:
+    connection.execute(f"copy ({query}) to ? (format parquet)", [str(path)])
+  finally:
+    connection.close()
 
 
 def test_use_loads_active_dataset(sample_parquet: Path) -> None:
@@ -333,6 +343,167 @@ def test_phase_11_append_reports_table_schema_errors(sample_parquet: Path) -> No
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(TypeMismatchExecutionError, match="append type mismatch for age"):
       executor.execute(AppendCommand(table_name="bad_type"))
+  finally:
+    executor.close()
+
+
+def test_phase_11_reshape_long_wide_roundtrip(tmp_path: Path) -> None:
+  path = tmp_path / "wide.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 10.0, 12.0, 100.0, 120.0),
+        (2, 20.0, 21.0, 200.0, 210.0)
+    ) as wide(id, income_2020, income_2021, cost_2020, cost_2021)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    long_result = executor.execute(
+      ReshapeCommand(
+        direction="long",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    long_preview = executor.execute(HeadCommand(5))
+    wide_result = executor.execute(
+      ReshapeCommand(
+        direction="wide",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    wide_preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(long_result, TransformResult)
+  assert long_result.message == "Reshaped long"
+  assert [column.name for column in long_result.dataset.columns] == ["id", "year", "income", "cost"]
+  assert long_result.dataset.row_count == 4
+  assert isinstance(long_preview, PreviewResult)
+  assert long_preview.rows == (
+    (1, "2020", 10.0, 100.0),
+    (1, "2021", 12.0, 120.0),
+    (2, "2020", 20.0, 200.0),
+    (2, "2021", 21.0, 210.0),
+  )
+  assert isinstance(wide_result, TransformResult)
+  assert wide_result.message == "Reshaped wide"
+  assert [column.name for column in wide_result.dataset.columns] == [
+    "id",
+    "income_2020",
+    "income_2021",
+    "cost_2020",
+    "cost_2021",
+  ]
+  assert wide_result.dataset.row_count == 2
+  assert isinstance(wide_preview, PreviewResult)
+  assert wide_preview.rows == (
+    (1, 10.0, 12.0, 100.0, 120.0),
+    (2, 20.0, 21.0, 200.0, 210.0),
+  )
+
+
+def test_phase_11_reshape_reports_dataset_and_variable_errors(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "partial.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 10.0, 12.0, 100.0, '2020', 10.0),
+        (2, 20.0, 21.0, 200.0, '2021', 20.0)
+    ) as partial(id, income_2020, income_2021, cost_2020, year, income)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="reshape requires an active dataset"):
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="reshape unknown variable: id"):
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="reshape output column already exists: year"):
+      executor.execute(ReshapeCommand("long", ("income",), identifiers=("id",), j_variable="year"))
+    executor.execute(DropCommand(("year", "income")))
+    with pytest.raises(UnknownVariableError, match="reshape long found no columns for stub: bmi"):
+      executor.execute(ReshapeCommand("long", ("bmi",), identifiers=("id",), j_variable="year"))
+    with pytest.raises(UnknownVariableError, match="reshape long missing column: cost_2021"):
+      executor.execute(
+        ReshapeCommand(
+          "long",
+          ("income", "cost"),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_11_reshape_long_validates_j_values_across_all_stubs(tmp_path: Path) -> None:
+  path = tmp_path / "ragged_wide.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 10.0, 100.0, 300.0),
+        (2, 20.0, 200.0, 400.0)
+    ) as ragged(id, income_2020, cost_2020, cost_2022)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(UnknownVariableError, match="reshape long missing column: income_2022"):
+      executor.execute(
+        ReshapeCommand(
+          "long",
+          ("income", "cost"),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_11_reshape_wide_reports_output_conflict(tmp_path: Path) -> None:
+  path = tmp_path / "long_conflict.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, '2020', 10.0, 999.0),
+        (1, '2021', 12.0, 999.0)
+    ) as long_data(id, year, income, income_2020)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="reshape wide output column already exists"):
+      executor.execute(
+        ReshapeCommand(
+          "wide",
+          ("income",),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
   finally:
     executor.close()
 

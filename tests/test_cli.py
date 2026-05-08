@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from tabdat.cli import (
@@ -11,6 +12,14 @@ from tabdat.cli import (
 )
 from tabdat.executor import Executor
 from tabdat.models import PlotResult
+
+
+def _write_sql_parquet(path: Path, query: str) -> None:
+  connection = duckdb.connect(database=":memory:")
+  try:
+    connection.execute(f"copy ({query}) to ? (format parquet)", [str(path)])
+  finally:
+    connection.close()
 
 
 def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
@@ -234,6 +243,39 @@ def test_cli_runs_phase_11_append_named_table_flow(sample_parquet: Path, capsys)
   assert "Created followup: 1 rows, 4 columns" in captured.out
   assert "Appended followup: 4 rows, 4 columns" in captured.out
   assert "Rows: 4" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_11_reshape_long_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "wide.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 10.0, 12.0),
+        (2, 20.0, 21.0)
+    ) as wide(id, income_2020, income_2021)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "reshape long income, i(id) j(year)",
+      "-c",
+      "head 4",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Reshaped long: 4 rows, 3 columns" in captured.out
+  assert "id  year  income" in captured.out
+  assert "1   2020  10" in captured.out
+  assert "2   2021  21" in captured.out
   assert captured.err == ""
 
 

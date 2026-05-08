@@ -27,6 +27,7 @@ from tabdat.models import (
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  ReshapeCommand,
   RunCommand,
   SaveCommand,
   ScatterCommand,
@@ -76,6 +77,23 @@ def test_parse_phase_11_join_command() -> None:
 
 def test_parse_phase_11_append_command() -> None:
   assert parse_command("append followup") == AppendCommand(table_name="followup")
+
+
+def test_parse_phase_11_reshape_commands() -> None:
+  assert parse_command("reshape long income cost, i(id) j(year)") == ReshapeCommand(
+    direction="long",
+    variables=("income", "cost"),
+    identifiers=("id",),
+    j_variable="year",
+  )
+  assert parse_command("reshape wide income cost, i(firm_id person_id) j(year)") == (
+    ReshapeCommand(
+      direction="wide",
+      variables=("income", "cost"),
+      identifiers=("firm_id", "person_id"),
+      j_variable="year",
+    )
+  )
 
 
 def test_parse_describe_command() -> None:
@@ -337,6 +355,21 @@ def test_parse_exit_aliases() -> None:
     "append followup if age > 18",
     "append active",
     "append bad-name",
+    "reshape",
+    "reshape wider income, i(id) j(year)",
+    "reshape long, i(id) j(year)",
+    "reshape long income if age > 18, i(id) j(year)",
+    "reshape long income = cost, i(id) j(year)",
+    "reshape long income, i(id)",
+    "reshape long income, j(year)",
+    "reshape long income, i() j(year)",
+    "reshape long income, i(id) j(year month)",
+    "reshape long income income, i(id) j(year)",
+    "reshape long income, i(id id) j(year)",
+    "reshape long income, i(id) j(income)",
+    "reshape long income, i(income) j(year)",
+    "reshape long income, i(id) j(year), extra",
+    "reshape long income, i(id) j(year) replace",
     "describe age",
     "describe if age > 18",
     "exit now",
