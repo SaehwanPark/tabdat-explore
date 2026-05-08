@@ -288,6 +288,29 @@ def test_phase_11_append_named_table_aligns_columns_by_active_order(
   )
 
 
+def test_phase_11_append_preserves_active_named_table_snapshot(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(SqlCommand("select * from active where age = 30", into="base"))
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(SqlCommand("select * from active where age = 42", into="followup"))
+    executor.execute(UseCommand(Path("base")))
+    result = executor.execute(AppendCommand(table_name="followup"))
+    appended_count = executor.execute(CountCommand())
+    executor.execute(UseCommand(Path("base")))
+    base_count = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.row_count == 2
+  assert isinstance(appended_count, CountResult)
+  assert appended_count.row_count == 2
+  assert isinstance(base_count, CountResult)
+  assert base_count.row_count == 1
+
+
 def test_phase_11_append_reports_table_schema_errors(sample_parquet: Path) -> None:
   executor = Executor()
   try:

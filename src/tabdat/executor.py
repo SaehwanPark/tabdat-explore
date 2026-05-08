@@ -328,10 +328,15 @@ class Executor:
       append_dataset,
       table_name=command.table_name,
     )
-    return self._record_transform(f"Appended {command.table_name}", next_dataset)
+    return self._record_detached_transform(f"Appended {command.table_name}", next_dataset)
 
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self._set_active_dataset(dataset)
+    return TransformResult(message, dataset)
+
+  def _record_detached_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
+    self.state.active_dataset = dataset
+    self.state.active_table_name = None
     return TransformResult(message, dataset)
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
