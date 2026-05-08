@@ -212,6 +212,31 @@ def test_cli_runs_phase_11_join_named_table_flow(sample_parquet: Path, capsys) -
   assert captured.err == ""
 
 
+def test_cli_runs_phase_11_append_named_table_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "sql select age, bmi, sex, cost from active where age > 42 into followup",
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "append followup",
+      "-c",
+      "count",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Created followup: 1 rows, 4 columns" in captured.out
+  assert "Appended followup: 4 rows, 4 columns" in captured.out
+  assert "Rows: 4" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

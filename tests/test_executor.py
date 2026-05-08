@@ -13,6 +13,7 @@ from tabdat.errors import (
 from tabdat.executor import Executor
 from tabdat.models import (
   ActivateResult,
+  AppendCommand,
   BarCommand,
   BinaryExpression,
   ByCommand,
@@ -252,6 +253,63 @@ def test_phase_11_join_reports_table_and_key_errors(sample_parquet: Path) -> Non
       executor.execute(JoinCommand(table_name="lookup", keys=("missing",)))
     with pytest.raises(UnknownVariableError, match="join unknown variable in lookup: age"):
       executor.execute(JoinCommand(table_name="lookup", keys=("age",)))
+  finally:
+    executor.close()
+
+
+def test_phase_11_append_named_table_aligns_columns_by_active_order(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select sex, cost, bmi, age from active where age > 42",
+        into="followup",
+      )
+    )
+    executor.execute(UseCommand(sample_parquet))
+    result = executor.execute(AppendCommand(table_name="followup"))
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.message == "Appended followup"
+  assert result.dataset.row_count == 4
+  assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    (30, 22.5, "F", 100.0),
+    (42, 25.0, "M", 150.0),
+    (54, 27.5, "F", None),
+    (54, 27.5, "F", None),
+  )
+
+
+def test_phase_11_append_reports_table_schema_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="append requires an active dataset"):
+      executor.execute(AppendCommand(table_name="followup"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownTableError, match="unknown table: followup"):
+      executor.execute(AppendCommand(table_name="followup"))
+    executor.execute(SqlCommand("select age, bmi, sex from active", into="missing_cost"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="append unknown variable in missing_cost: cost"):
+      executor.execute(AppendCommand(table_name="missing_cost"))
+    executor.execute(SqlCommand("select *, 1 as extra from active", into="extra_column"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="append unknown variable: extra"):
+      executor.execute(AppendCommand(table_name="extra_column"))
+    executor.execute(
+      SqlCommand("select cast(age as varchar) as age, bmi, sex, cost from active", into="bad_type")
+    )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(TypeMismatchExecutionError, match="append type mismatch for age"):
+      executor.execute(AppendCommand(table_name="bad_type"))
   finally:
     executor.close()
 

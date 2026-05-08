@@ -208,6 +208,40 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def append_named_table(
+    self,
+    dataset: DatasetInfo,
+    append_dataset: DatasetInfo,
+    *,
+    table_name: str,
+  ) -> DatasetInfo:
+    _validate_user_table_name(table_name)
+    left_types = {column.name: column.data_type for column in dataset.columns}
+    right_types = {column.name: column.data_type for column in append_dataset.columns}
+    _require_columns("append", left_types, tuple(right_types))
+    missing_right = tuple(
+      column.name for column in dataset.columns if column.name not in right_types
+    )
+    if missing_right:
+      raise UnknownVariableError(
+        f"append unknown variable in {table_name}: {', '.join(missing_right)}"
+      )
+    _require_matching_types("append", left_types, right_types, tuple(left_types))
+
+    internal_name = _named_table_identifier(table_name)
+    select_sql = _select_list(tuple(column.name for column in dataset.columns))
+    self._replace_active(
+      f"""
+      select {select_sql}
+      from {ACTIVE_TABLE}
+      union all
+      select {select_sql}
+      from {_quote_identifier(internal_name)}
+      """,
+      "append",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
@@ -777,6 +811,21 @@ def _require_columns(
   missing = tuple(variable for variable in variables if variable not in column_types)
   if missing:
     raise UnknownVariableError(f"{command_name} unknown variable: {', '.join(missing)}")
+
+
+def _require_matching_types(
+  command_name: str,
+  left_types: dict[str, str],
+  right_types: dict[str, str],
+  variables: tuple[str, ...],
+) -> None:
+  for variable in variables:
+    left_type = left_types[variable]
+    right_type = right_types[variable]
+    if left_type.upper() != right_type.upper():
+      raise TypeMismatchExecutionError(
+        f"{command_name} type mismatch for {variable}: {left_type} vs {right_type}"
+      )
 
 
 def _select_list(variables: tuple[str, ...]) -> str:
