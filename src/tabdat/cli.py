@@ -16,7 +16,15 @@ from tabdat.executor import Executor
 from tabdat.formatter import format_result
 from tabdat.models import ExitCommand, PlotResult, Result, RunCommand
 from tabdat.parser import parse_command
-from tabdat.script import ScriptError, read_script
+from tabdat.script import (
+  LetDirective,
+  ScriptContext,
+  ScriptError,
+  SeedDirective,
+  expand_script_macros,
+  parse_script_directive,
+  read_script,
+)
 from tabdat.shell import create_prompt_session
 
 
@@ -68,6 +76,7 @@ def _run_commands(commands: Sequence[str], executor: Executor) -> int:
         executor,
         base_dir=None,
         active_stack=(),
+        context=ScriptContext.empty(),
       ),
     )
     if status is _RunStatus.ERROR:
@@ -99,6 +108,7 @@ def _run_shell(executor: Executor) -> int:
         executor,
         base_dir=None,
         active_stack=(),
+        context=ScriptContext.empty(),
       ),
     )
     if status is _RunStatus.STOP:
@@ -155,7 +165,13 @@ def _run_script(
   active_stack: tuple[Path, ...] = (),
 ) -> int:
   try:
-    status = _run_script_status(path, executor, base_dir=base_dir, active_stack=active_stack)
+    status = _run_script_status(
+      path,
+      executor,
+      base_dir=base_dir,
+      active_stack=active_stack,
+      context=ScriptContext.empty(),
+    )
   except ScriptError as exc:
     print(f"Error: {exc}", file=sys.stderr)
     return 1
@@ -168,17 +184,42 @@ def _run_script_status(
   *,
   base_dir: Path | None,
   active_stack: tuple[Path, ...],
+  context: ScriptContext,
 ) -> _RunStatus:
   resolved_path = _resolve_script_path(path, base_dir)
   if resolved_path in active_stack:
     raise ScriptError(path, 1, "recursive script inclusion is not supported")
 
   commands = read_script(resolved_path)
-  _print_script_metadata(resolved_path, executor.state.config)
+  _print_script_metadata(resolved_path, executor.state.config, context)
   next_stack = active_stack + (resolved_path,)
 
   for script_command in commands:
-    print(f". {script_command.text}")
+    try:
+      expanded_text = expand_script_macros(
+        script_command.text,
+        context,
+        path=resolved_path,
+        line=script_command.start_line,
+      )
+    except ScriptError:
+      raise
+    print(f". {expanded_text}")
+
+    directive = parse_script_directive(
+      expanded_text,
+      context,
+      path=resolved_path,
+      line=script_command.start_line,
+    )
+    if isinstance(directive, SeedDirective):
+      context.seed = directive.value
+      print(f"Seed: {directive.value}")
+      continue
+    if isinstance(directive, LetDirective):
+      context.macros[directive.name] = directive.value
+      print(f"Macro set: {directive.name}")
+      continue
 
     def run_nested(nested_path: Path) -> _RunStatus:
       return _run_script_status(
@@ -186,11 +227,12 @@ def _run_script_status(
         executor,
         base_dir=resolved_path.parent,
         active_stack=next_stack,
+        context=context,
       )
 
     try:
       status, result = _execute_one(
-        script_command.text,
+        expanded_text,
         executor,
         run_script=run_nested,
       )
@@ -213,10 +255,11 @@ def _resolve_script_path(path: Path, base_dir: Path | None) -> Path:
   return candidate.expanduser().resolve()
 
 
-def _print_script_metadata(path: Path, config: TabDatConfig) -> None:
+def _print_script_metadata(path: Path, config: TabDatConfig, context: ScriptContext) -> None:
   print(f"Script: {_display_script_path(path)}")
   print(f"TabDat: {__version__}")
   print(f"Python: {platform.python_version()}")
+  print(f"Seed: {context.seed if context.seed is not None else 'none'}")
   print(
     "Config: "
     f"graph_format={config.graph_format}, "

@@ -1,16 +1,44 @@
 """Script parsing helpers for deterministic TabDat command files."""
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from tabdat.errors import TabDatError
 
+_MACRO_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_MACRO_REFERENCE_PATTERN = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
+
 
 @dataclass(frozen=True)
 class ScriptCommand:
   text: str
   start_line: int
+
+
+@dataclass(frozen=True)
+class SeedDirective:
+  value: int
+
+
+@dataclass(frozen=True)
+class LetDirective:
+  name: str
+  value: str
+
+
+@dataclass
+class ScriptContext:
+  macros: dict[str, str]
+  seed: int | None = None
+
+  @classmethod
+  def empty(cls) -> "ScriptContext":
+    return cls(macros={})
+
+
+ScriptDirective = SeedDirective | LetDirective
 
 
 class ScriptError(TabDatError):
@@ -71,6 +99,68 @@ def parse_script(text: str, *, path: Path = Path("<script>")) -> tuple[ScriptCom
     raise ScriptError(path, pending_start, 'sql multiline query is missing closing """')
 
   return tuple(commands)
+
+
+def expand_script_macros(text: str, context: ScriptContext, *, path: Path, line: int) -> str:
+  def replacement(match: re.Match[str]) -> str:
+    name = match.group(1)
+    value = context.macros.get(name)
+    if value is None:
+      raise ScriptError(path, line, f"undefined macro: {name}")
+    return value
+
+  return _MACRO_REFERENCE_PATTERN.sub(replacement, text)
+
+
+def parse_script_directive(
+  text: str,
+  context: ScriptContext,
+  *,
+  path: Path,
+  line: int,
+) -> ScriptDirective | None:
+  stripped = text.strip()
+  command_name = stripped.split(maxsplit=1)[0].lower() if stripped else ""
+  if command_name == "seed":
+    return _parse_seed_directive(stripped, path=path, line=line)
+  if command_name == "let":
+    return _parse_let_directive(stripped, context, path=path, line=line)
+  return None
+
+
+def _parse_seed_directive(text: str, *, path: Path, line: int) -> SeedDirective:
+  parts = text.split()
+  if len(parts) != 2:
+    raise ScriptError(path, line, "seed expects an integer")
+  try:
+    value = int(parts[1])
+  except ValueError as exc:
+    raise ScriptError(path, line, "seed expects an integer") from exc
+  return SeedDirective(value=value)
+
+
+def _parse_let_directive(
+  text: str,
+  context: ScriptContext,
+  *,
+  path: Path,
+  line: int,
+) -> LetDirective:
+  body = text[3:].strip()
+  name, separator, value = body.partition("=")
+  if not separator:
+    raise ScriptError(path, line, "let expects syntax: let <name> = <value>")
+  name = name.strip()
+  value = value.strip()
+  if not name:
+    raise ScriptError(path, line, "let expects syntax: let <name> = <value>")
+  if not _MACRO_NAME_PATTERN.fullmatch(name):
+    raise ScriptError(path, line, f"macro name must be an identifier: {name}")
+  if not value:
+    raise ScriptError(path, line, f"macro value cannot be empty: {name}")
+  if name in context.macros:
+    raise ScriptError(path, line, f"macro already defined: {name}")
+  return LetDirective(name=name, value=value)
 
 
 def _starts_multiline_sql(stripped_line: str) -> bool:
