@@ -654,12 +654,15 @@ def test_phase_11_panel_metadata_revalidates_replace_and_clears_materializers(
     executor.execute(PanelCommand("set", "firm_id", "year"))
     with pytest.raises(ExecutionError, match="panel id/time pairs must be unique"):
       executor.execute(ReplaceCommand("year", NumberExpression(2020)))
+    preview_after_failed_replace = executor.execute(HeadCommand(5))
     executor.execute(UseCommand(path))
     executor.execute(PanelCommand("set", "firm_id", "year"))
     collapsed = executor.execute(CollapseCommand("mean", ("income",), ("firm_id",)))
   finally:
     executor.close()
 
+  assert isinstance(preview_after_failed_replace, PreviewResult)
+  assert preview_after_failed_replace.rows == ((1, 2020, 10.0), (1, 2021, 12.0))
   assert isinstance(collapsed, TransformResult)
   assert collapsed.dataset.panel_metadata is None
 

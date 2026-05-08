@@ -291,16 +291,23 @@ class Executor:
 
   def _execute_replace(self, command: ReplaceCommand) -> TransformResult:
     dataset = self._require_active_dataset("replace")
-    next_dataset = self.backend.replace_column(
-      dataset,
-      command.variable,
-      command.expression,
-      command.condition,
-    )
-    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     metadata = dataset.panel_metadata
     if _touches_panel_metadata(metadata, command.variable) and metadata is not None:
-      self.backend.validate_panel_metadata(next_dataset, metadata)
+      next_dataset = self.backend.replace_column_with_panel_validation(
+        dataset,
+        command.variable,
+        command.expression,
+        command.condition,
+        metadata,
+      )
+    else:
+      next_dataset = self.backend.replace_column(
+        dataset,
+        command.variable,
+        command.expression,
+        command.condition,
+      )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Replaced {command.variable}", next_dataset)
 
   def _execute_collapse(self, command: CollapseCommand) -> TransformResult:

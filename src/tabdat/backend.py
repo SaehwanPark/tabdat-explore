@@ -579,6 +579,24 @@ class DuckDBBackend:
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "replace")
     return self.active_dataset_info(dataset.path)
 
+  def replace_column_with_panel_validation(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+    condition: Expression | None,
+    metadata: PanelMetadata,
+  ) -> DatasetInfo:
+    try:
+      self._connection.execute("begin transaction")
+      next_dataset = self.replace_column(dataset, variable, expression, condition)
+      self.validate_panel_metadata(next_dataset, metadata)
+      self._connection.execute("commit")
+    except Exception:
+      self._rollback_transaction()
+      raise
+    return next_dataset
+
   def tabulate(
     self,
     dataset: DatasetInfo,
@@ -920,6 +938,12 @@ class DuckDBBackend:
     if row is None:
       raise ExecutionError(f"{command_name} failed")
     return tuple(row)
+
+  def _rollback_transaction(self) -> None:
+    try:
+      self._connection.execute("rollback")
+    except duckdb.Error:
+      pass
 
 
 def _is_numeric_type(data_type: str) -> bool:
