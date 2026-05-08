@@ -35,6 +35,9 @@ from tabdat.models import (
   KeepCommand,
   LoadResult,
   NumberExpression,
+  PanelCommand,
+  PanelMetadata,
+  PanelResult,
   ParsedCommand,
   PlotResult,
   PreviewResult,
@@ -506,6 +509,159 @@ def test_phase_11_reshape_wide_reports_output_conflict(tmp_path: Path) -> None:
       )
   finally:
     executor.close()
+
+
+def test_phase_11_panel_set_report_clear_and_named_table_restore(tmp_path: Path) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0),
+        (1, 2021, 12.0),
+        (2, 2020, 20.0)
+    ) as panel_data(firm_id, year, income)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    report_before = executor.execute(PanelCommand(action="report"))
+    executor.execute(SqlCommand("select * from active", into="snapshot"))
+    set_result = executor.execute(PanelCommand("set", "firm_id", "year"))
+    report_after = executor.execute(PanelCommand(action="report"))
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="clear"))
+    cleared = executor.execute(PanelCommand(action="report"))
+    executor.execute(UseCommand(Path("snapshot")))
+    restored = executor.execute(PanelCommand(action="report"))
+  finally:
+    executor.close()
+
+  assert report_before == PanelResult(action="report")
+  assert set_result == PanelResult("set", PanelMetadata("firm_id", "year"))
+  assert report_after == PanelResult("report", PanelMetadata("firm_id", "year"))
+  assert cleared == PanelResult(action="report")
+  assert restored == PanelResult("report", PanelMetadata("firm_id", "year"))
+
+
+def test_phase_11_panel_reports_validation_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  bad_path = tmp_path / "bad_panel.parquet"
+  _write_sql_parquet(
+    bad_path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0),
+        (1, 2020, 12.0),
+        (2, null, 20.0)
+    ) as panel_data(firm_id, year, income)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="panel requires an active dataset"):
+      executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="panel unknown variable: firm_id"):
+      executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(UseCommand(bad_path))
+    with pytest.raises(ExecutionError, match="panel variables cannot contain missing values: year"):
+      executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(
+      DropCommand(
+        condition=BinaryExpression(
+          IdentifierExpression("firm_id"),
+          "==",
+          NumberExpression(2),
+        )
+      )
+    )
+    with pytest.raises(ExecutionError, match="panel id/time pairs must be unique"):
+      executor.execute(PanelCommand("set", "firm_id", "year"))
+  finally:
+    executor.close()
+
+
+def test_phase_11_panel_metadata_preservation_and_clearing(tmp_path: Path) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0),
+        (1, 2021, 12.0),
+        (2, 2020, 20.0)
+    ) as panel_data(firm_id, year, income)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    kept_rows = executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(
+          IdentifierExpression("income"),
+          ">",
+          NumberExpression(10),
+        )
+      )
+    )
+    renamed = executor.execute(RenameCommand("firm_id", "id"))
+    generated = executor.execute(
+      GenerateCommand(
+        "double_income",
+        BinaryExpression(IdentifierExpression("income"), "*", NumberExpression(2)),
+      )
+    )
+    selected = executor.execute(SelectCommand(("id", "year", "double_income")))
+    dropped = executor.execute(DropCommand(("year",)))
+  finally:
+    executor.close()
+
+  assert isinstance(kept_rows, TransformResult)
+  assert kept_rows.dataset.panel_metadata == PanelMetadata("firm_id", "year")
+  assert isinstance(renamed, TransformResult)
+  assert renamed.dataset.panel_metadata == PanelMetadata("id", "year")
+  assert isinstance(generated, TransformResult)
+  assert generated.dataset.panel_metadata == PanelMetadata("id", "year")
+  assert isinstance(selected, TransformResult)
+  assert selected.dataset.panel_metadata == PanelMetadata("id", "year")
+  assert isinstance(dropped, TransformResult)
+  assert dropped.dataset.panel_metadata is None
+
+
+def test_phase_11_panel_metadata_revalidates_replace_and_clears_materializers(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0),
+        (1, 2021, 12.0)
+    ) as panel_data(firm_id, year, income)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    with pytest.raises(ExecutionError, match="panel id/time pairs must be unique"):
+      executor.execute(ReplaceCommand("year", NumberExpression(2020)))
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    collapsed = executor.execute(CollapseCommand("mean", ("income",), ("firm_id",)))
+  finally:
+    executor.close()
+
+  assert isinstance(collapsed, TransformResult)
+  assert collapsed.dataset.panel_metadata is None
 
 
 @pytest.mark.parametrize("engine", ["duckdb", "polars"])

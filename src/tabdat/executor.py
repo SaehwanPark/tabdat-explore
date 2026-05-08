@@ -1,6 +1,6 @@
 """Command executor and session state."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from tabdat.backend import DuckDBBackend
@@ -29,6 +29,9 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LoadResult,
+  PanelCommand,
+  PanelMetadata,
+  PanelResult,
   PlotResult,
   PreviewResult,
   RenameCommand,
@@ -155,6 +158,9 @@ class Executor:
     if isinstance(command, ReshapeCommand):
       return self._execute_reshape(command)
 
+    if isinstance(command, PanelCommand):
+      return self._execute_panel(command)
+
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
 
@@ -211,6 +217,7 @@ class Executor:
         columns=dataset.columns,
         execution_mode="eager",
         lazy_engine=None,
+        panel_metadata=dataset.panel_metadata,
       )
       return SaveResult(command.path, saved_dataset)
 
@@ -231,6 +238,7 @@ class Executor:
       if dataset is None:
         raise UnknownTableError(f"unknown table: {table_name}")
       activated = self.backend.activate_named_table(table_name)
+      activated = replace(activated, panel_metadata=dataset.panel_metadata)
       self._set_active_dataset(activated, active_table_name=table_name)
       return ActivateResult(table_name=table_name, dataset=activated)
 
@@ -247,31 +255,38 @@ class Executor:
     dataset = self._require_active_dataset("keep")
     if command.condition is not None:
       next_dataset = self.backend.filter_rows(dataset, command.condition, keep=True)
+      next_dataset = _preserve_panel_metadata(dataset, next_dataset)
       return self._record_transform("Kept matching rows", next_dataset)
     next_dataset = self.backend.keep_columns(dataset, command.variables)
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform("Kept selected columns", next_dataset)
 
   def _execute_drop(self, command: DropCommand) -> TransformResult:
     dataset = self._require_active_dataset("drop")
     if command.condition is not None:
       next_dataset = self.backend.filter_rows(dataset, command.condition, keep=False)
+      next_dataset = _preserve_panel_metadata(dataset, next_dataset)
       return self._record_transform("Dropped matching rows", next_dataset)
     next_dataset = self.backend.drop_columns(dataset, command.variables)
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform("Dropped selected columns", next_dataset)
 
   def _execute_select(self, command: SelectCommand) -> TransformResult:
     dataset = self._require_active_dataset("select")
     next_dataset = self.backend.keep_columns(dataset, command.variables)
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform("Selected columns", next_dataset)
 
   def _execute_rename(self, command: RenameCommand) -> TransformResult:
     dataset = self._require_active_dataset("rename")
     next_dataset = self.backend.rename_column(dataset, command.old_name, command.new_name)
+    next_dataset = _rename_panel_metadata(dataset, next_dataset, command.old_name, command.new_name)
     return self._record_transform(f"Renamed {command.old_name} to {command.new_name}", next_dataset)
 
   def _execute_generate(self, command: GenerateCommand) -> TransformResult:
     dataset = self._require_active_dataset("generate")
     next_dataset = self.backend.generate_column(dataset, command.variable, command.expression)
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Generated {command.variable}", next_dataset)
 
   def _execute_replace(self, command: ReplaceCommand) -> TransformResult:
@@ -282,6 +297,10 @@ class Executor:
       command.expression,
       command.condition,
     )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    metadata = dataset.panel_metadata
+    if _touches_panel_metadata(metadata, command.variable) and metadata is not None:
+      self.backend.validate_panel_metadata(next_dataset, metadata)
     return self._record_transform(f"Replaced {command.variable}", next_dataset)
 
   def _execute_collapse(self, command: CollapseCommand) -> TransformResult:
@@ -292,7 +311,7 @@ class Executor:
       command.variables,
       command.groups,
     )
-    return self._record_transform("Collapsed dataset", next_dataset)
+    return self._record_detached_transform("Collapsed dataset", next_dataset)
 
   def _execute_sql(self, command: SqlCommand) -> SqlCreateResult | TableResult:
     dataset = self._require_active_dataset("sql")
@@ -352,6 +371,22 @@ class Executor:
     )
     return self._record_detached_transform("Reshaped wide", next_dataset)
 
+  def _execute_panel(self, command: PanelCommand) -> PanelResult:
+    dataset = self._require_active_dataset("panel")
+    if command.action == "report":
+      return PanelResult(action="report", metadata=dataset.panel_metadata)
+    if command.action == "clear":
+      cleared = replace(dataset, panel_metadata=None)
+      self._set_active_dataset(cleared)
+      return PanelResult(action="clear")
+    if command.id_variable is None or command.time_variable is None:
+      raise ExecutionError("panel expects syntax: panel [<id_var> <time_var>|clear]")
+    metadata = PanelMetadata(command.id_variable, command.time_variable)
+    self.backend.validate_panel_metadata(dataset, metadata)
+    updated = replace(dataset, panel_metadata=metadata)
+    self._set_active_dataset(updated)
+    return PanelResult(action="set", metadata=metadata)
+
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self._set_active_dataset(dataset)
     return TransformResult(message, dataset)
@@ -379,6 +414,7 @@ class Executor:
       return
     if self.state.active_table_name is not None:
       updated = self.backend.store_active_as_named_table(self.state.active_table_name)
+      updated = replace(updated, panel_metadata=dataset.panel_metadata)
       self.state.active_dataset = updated
       self.state.tables[self.state.active_table_name] = updated
       return
@@ -472,3 +508,33 @@ def _setting_display_value(name: str, config: TabDatConfig) -> str:
   if name == "graph_open":
     return "on" if config.graph_open else "off"
   raise ExecutionError(f"unknown setting: {name}")
+
+
+def _preserve_panel_metadata(previous: DatasetInfo, next_dataset: DatasetInfo) -> DatasetInfo:
+  metadata = previous.panel_metadata
+  if metadata is None:
+    return next_dataset
+  next_columns = {column.name for column in next_dataset.columns}
+  if metadata.id_variable in next_columns and metadata.time_variable in next_columns:
+    return replace(next_dataset, panel_metadata=metadata)
+  return replace(next_dataset, panel_metadata=None)
+
+
+def _rename_panel_metadata(
+  previous: DatasetInfo,
+  next_dataset: DatasetInfo,
+  old_name: str,
+  new_name: str,
+) -> DatasetInfo:
+  metadata = previous.panel_metadata
+  if metadata is None:
+    return next_dataset
+  id_variable = new_name if metadata.id_variable == old_name else metadata.id_variable
+  time_variable = new_name if metadata.time_variable == old_name else metadata.time_variable
+  return replace(next_dataset, panel_metadata=PanelMetadata(id_variable, time_variable))
+
+
+def _touches_panel_metadata(metadata: PanelMetadata | None, variable: str) -> bool:
+  if metadata is None:
+    return False
+  return variable in {metadata.id_variable, metadata.time_variable}

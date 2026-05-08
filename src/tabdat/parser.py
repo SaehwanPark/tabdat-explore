@@ -29,6 +29,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   NumberExpression,
+  PanelCommand,
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
@@ -67,6 +68,7 @@ _EXECUTABLE_COMMANDS = {
   "join",
   "append",
   "reshape",
+  "panel",
   "sql",
   "histogram",
   "scatter",
@@ -264,6 +266,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "reshape":
     return _parse_reshape(parts)
+
+  if parts.name == "panel":
+    return _parse_panel(parts)
 
   if parts.name == "histogram":
     return _parse_histogram(parts)
@@ -606,6 +611,26 @@ def _parse_reshape(parts: _CommandParts) -> ReshapeCommand:
     variables=variables,
     identifiers=identifiers,
     j_variable=j_variable,
+  )
+
+
+def _parse_panel(parts: _CommandParts) -> PanelCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError("panel expects syntax: panel [<id_var> <time_var>|clear]")
+  if not parts.arguments:
+    return PanelCommand(action="report")
+  if parts.arguments[0] == "clear":
+    if parts.arguments == ("clear",):
+      return PanelCommand(action="clear")
+    raise ParseError("panel expects syntax: panel [<id_var> <time_var>|clear]")
+  if len(parts.arguments) != 2:
+    raise ParseError("panel expects syntax: panel [<id_var> <time_var>|clear]")
+  if parts.arguments[0] == parts.arguments[1]:
+    raise ParseError("panel id and time variables must be distinct")
+  return PanelCommand(
+    action="set",
+    id_variable=parts.arguments[0],
+    time_variable=parts.arguments[1],
   )
 
 

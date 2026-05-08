@@ -24,6 +24,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   NumberExpression,
+  PanelCommand,
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
@@ -94,6 +95,16 @@ def test_parse_phase_11_reshape_commands() -> None:
       j_variable="year",
     )
   )
+
+
+def test_parse_phase_11_panel_commands() -> None:
+  assert parse_command("panel") == PanelCommand(action="report")
+  assert parse_command("panel firm_id year") == PanelCommand(
+    action="set",
+    id_variable="firm_id",
+    time_variable="year",
+  )
+  assert parse_command("panel clear") == PanelCommand(action="clear")
 
 
 def test_parse_describe_command() -> None:
@@ -370,6 +381,12 @@ def test_parse_exit_aliases() -> None:
     "reshape long income, i(income) j(year)",
     "reshape long income, i(id) j(year), extra",
     "reshape long income, i(id) j(year) replace",
+    "panel firm_id year extra",
+    "panel firm_id if year > 2020",
+    "panel firm_id year, replace",
+    "panel firm_id = year",
+    "panel firm_id firm_id",
+    "panel clear now",
     "describe age",
     "describe if age > 18",
     "exit now",

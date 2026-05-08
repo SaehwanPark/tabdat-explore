@@ -9,6 +9,7 @@ from tabdat.models import (
   CountResult,
   DescribeResult,
   LoadResult,
+  PanelResult,
   PlotResult,
   PreviewResult,
   Result,
@@ -100,6 +101,17 @@ def format_result(result: Result) -> str:
   if isinstance(result, TransformResult):
     dataset = result.dataset
     return f"{result.message}: {_row_count(dataset.row_count)} rows, {dataset.column_count} columns"
+
+  if isinstance(result, PanelResult):
+    if result.action == "clear":
+      return "Panel cleared"
+    if result.metadata is None:
+      return "Panel: none"
+    prefix = "Panel set" if result.action == "set" else "Panel"
+    return (
+      f"{prefix}: id={result.metadata.id_variable}, "
+      f"time={result.metadata.time_variable}"
+    )
 
   if isinstance(result, SqlCreateResult):
     dataset = result.dataset

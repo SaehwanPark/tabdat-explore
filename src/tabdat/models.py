@@ -169,6 +169,13 @@ class ReshapeCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PanelCommand:
+  action: Literal["report", "set", "clear"]
+  id_variable: str | None = None
+  time_variable: str | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -260,6 +267,7 @@ Command = (
   | JoinCommand
   | AppendCommand
   | ReshapeCommand
+  | PanelCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand
@@ -281,12 +289,19 @@ class ColumnInfo:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PanelMetadata:
+  id_variable: str
+  time_variable: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasetInfo:
   path: Path
   row_count: int | None
   columns: tuple[ColumnInfo, ...]
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
+  panel_metadata: PanelMetadata | None = None
 
   @property
   def column_count(self) -> int:
@@ -357,6 +372,12 @@ class TransformResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PanelResult:
+  action: Literal["report", "set", "clear"]
+  metadata: PanelMetadata | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCreateResult:
   table_name: str
   dataset: DatasetInfo
@@ -395,6 +416,7 @@ Result = (
   | CountResult
   | PreviewResult
   | TransformResult
+  | PanelResult
   | SqlCreateResult
   | TableResult
   | PlotResult
