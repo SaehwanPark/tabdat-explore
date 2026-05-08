@@ -28,6 +28,32 @@ class LetDirective:
   value: str
 
 
+@dataclass(frozen=True)
+class IfDirective:
+  active: bool
+
+
+@dataclass(frozen=True)
+class ElseDirective:
+  pass
+
+
+@dataclass(frozen=True)
+class EndDirective:
+  pass
+
+
+@dataclass(frozen=True)
+class ScriptBlockState:
+  start_line: int
+  condition_active: bool
+  in_else: bool = False
+
+  @property
+  def current_branch_active(self) -> bool:
+    return not self.condition_active if self.in_else else self.condition_active
+
+
 @dataclass
 class ScriptContext:
   macros: dict[str, str]
@@ -39,6 +65,7 @@ class ScriptContext:
 
 
 ScriptDirective = SeedDirective | LetDirective
+ControlFlowDirective = IfDirective | ElseDirective | EndDirective
 
 
 class ScriptError(TabDatError):
@@ -126,6 +153,54 @@ def parse_script_directive(
   if command_name == "let":
     return _parse_let_directive(stripped, context, path=path, line=line)
   return None
+
+
+def parse_control_flow_directive(
+  text: str,
+  *,
+  path: Path,
+  line: int,
+) -> ControlFlowDirective | None:
+  stripped = text.strip()
+  command_name, _, body = stripped.partition(" ")
+  normalized = command_name.lower()
+  if normalized == "if":
+    condition = body.strip()
+    if not condition:
+      raise ScriptError(path, line, "if expects a condition")
+    return IfDirective(active=evaluate_script_condition(condition, path=path, line=line))
+  if normalized == "else":
+    if body.strip():
+      raise ScriptError(path, line, "else does not accept a condition")
+    return ElseDirective()
+  if normalized == "end":
+    if body.strip():
+      raise ScriptError(path, line, "end does not accept arguments")
+    return EndDirective()
+  return None
+
+
+def evaluate_script_condition(condition: str, *, path: Path, line: int) -> bool:
+  normalized = condition.strip().lower()
+  if normalized in {"true", "on", "1"}:
+    return True
+  if normalized in {"false", "off", "0"}:
+    return False
+
+  for operator in ("==", "!="):
+    left, separator, right = condition.partition(operator)
+    if separator:
+      left_value = left.strip()
+      right_value = right.strip()
+      if not left_value or not right_value:
+        raise ScriptError(
+          path,
+          line,
+          "if condition expects true/false, 1/0, on/off, ==, or !=",
+        )
+      return left_value == right_value if operator == "==" else left_value != right_value
+
+  raise ScriptError(path, line, "if condition expects true/false, 1/0, on/off, ==, or !=")
 
 
 def _parse_seed_directive(text: str, *, path: Path, line: int) -> SeedDirective:

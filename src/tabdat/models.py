@@ -61,7 +61,7 @@ class CommandOption:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class UseCommand:
-  path: Path
+  path: Path | str
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
 

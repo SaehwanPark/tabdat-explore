@@ -61,6 +61,14 @@ def test_parse_use_command() -> None:
     execution_mode="lazy",
     lazy_engine="polars",
   )
+  assert parse_command("use https://example.com/data.parquet") == UseCommand(
+    "https://example.com/data.parquet"
+  )
+  assert parse_command("use s3://bucket/data.parquet, lazy") == UseCommand(
+    "s3://bucket/data.parquet",
+    execution_mode="lazy",
+    lazy_engine="duckdb",
+  )
 
 
 def test_parse_phase_11_join_command() -> None:

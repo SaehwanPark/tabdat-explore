@@ -233,7 +233,7 @@ class Executor:
 
   def _execute_use(self, command: UseCommand) -> LoadResult | ActivateResult:
     if self._should_activate_named_table(command):
-      table_name = command.path.as_posix()
+      table_name = _use_table_name(command)
       dataset = self.state.tables.get(table_name)
       if dataset is None:
         raise UnknownTableError(f"unknown table: {table_name}")
@@ -428,7 +428,9 @@ class Executor:
     self.state.active_table_name = None
 
   def _should_activate_named_table(self, command: UseCommand) -> bool:
-    table_name = command.path.as_posix()
+    if isinstance(command.path, str):
+      return False
+    table_name = _use_table_name(command)
     if table_name in self.state.tables:
       if command.execution_mode != "eager" or command.lazy_engine is not None:
         raise ExecutionError("use options are not supported for named table activation")
@@ -515,6 +517,12 @@ def _setting_display_value(name: str, config: TabDatConfig) -> str:
   if name == "graph_open":
     return "on" if config.graph_open else "off"
   raise ExecutionError(f"unknown setting: {name}")
+
+
+def _use_table_name(command: UseCommand) -> str:
+  if isinstance(command.path, str):
+    return command.path
+  return command.path.as_posix()
 
 
 def _preserve_panel_metadata(previous: DatasetInfo, next_dataset: DatasetInfo) -> DatasetInfo:
