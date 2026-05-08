@@ -1,35 +1,35 @@
-# Phase 10 Request Summary
+# Phase 11 Request Summary
 
 ## Goal
 
-Move from the completed Phase 9 and integrated E2E checkpoint into Phase 10 execution and state
-foundations.
+Move from the completed Phase 10 execution/state foundations into the first Phase 11 data workflow
+primitive: named-table joins.
 
 ## Requested Workflow
 
 - Begin on a temporary branch.
 - Commit meaningful checkpoints during implementation.
 - Document completed work carefully.
-- Open a PR when done.
+- Open a PR and mark it ready for review when done.
 
 ## Phase Fit
 
-Phase 10 in `docs/dev_phase.md` covers execution/state foundations before analytical expansion:
-named table state, executor dispatch maintainability, specific execution errors, and honest lazy
-materialization boundaries.
+Phase 11 in `docs/dev_phase.md` covers estimation-ready data workflows, including join /
+merge-style commands for multi-table workflows. The first slice should build directly on the Phase
+10 session-local named table registry.
 
 ## Touched Surfaces
 
-- Parser and command models for named-table `use` activation.
-- Executor session state, active dataset tracking, and command dispatch.
-- DuckDB backend relation registry and SQL `into` persistence in session state.
-- Typed execution errors and user-facing diagnostics.
-- Formatter output, shell completions, focused tests, README, SDD docs, and handoff artifacts.
+- Parser and command models for `join <table> on <keylist>` syntax.
+- Executor session state and active dataset replacement after a join.
+- DuckDB backend named-table joins, key validation, and collision suffixing.
+- Formatter output, focused parser/executor/CLI tests, SDD docs, and handoff artifacts.
 
 ## Assumptions
 
-- Implement a lightweight session-local table registry that augments the active dataset model.
-- `sql ... into <table>` registers the result as a named table and makes it active.
-- `use <table>` activates a registered table; `use <path>` continues to load local Parquet.
-- No joins, appends, reshape commands, user-level persistence, plugin system, or Polars-native
-  lowering in this slice.
+- Implement `join`, not a Stata-compatible `merge` command.
+- Right-side inputs are existing session-local named tables only.
+- Only same-name equality keys are supported in this slice.
+- Supported join kinds are `inner` and `left`; `inner` is the default.
+- Append/stack, reshape, panel metadata, remote data access, script variables, seeding, and control
+  flow remain later Phase 11 slices.
