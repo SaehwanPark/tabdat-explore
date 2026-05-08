@@ -21,6 +21,7 @@ from tabdat.models import (
   FunctionCallExpression,
   IdentifierExpression,
   NumberExpression,
+  PanelMetadata,
   StringExpression,
   SummaryRow,
   UnaryExpression,
@@ -314,6 +315,18 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def validate_panel_metadata(self, dataset: DatasetInfo, metadata: PanelMetadata) -> None:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    variables = (metadata.id_variable, metadata.time_variable)
+    _require_columns("panel", column_types, variables)
+    missing_variables = tuple(variable for variable in variables if self._has_nulls(variable))
+    if missing_variables:
+      raise ExecutionError(
+        f"panel variables cannot contain missing values: {', '.join(missing_variables)}"
+      )
+    if self._has_duplicate_panel_pairs(metadata):
+      raise ExecutionError("panel id/time pairs must be unique")
+
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
@@ -565,6 +578,24 @@ class DuckDBBackend:
     )
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "replace")
     return self.active_dataset_info(dataset.path)
+
+  def replace_column_with_panel_validation(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+    condition: Expression | None,
+    metadata: PanelMetadata,
+  ) -> DatasetInfo:
+    try:
+      self._connection.execute("begin transaction")
+      next_dataset = self.replace_column(dataset, variable, expression, condition)
+      self.validate_panel_metadata(next_dataset, metadata)
+      self._connection.execute("commit")
+    except Exception:
+      self._rollback_transaction()
+      raise
+    return next_dataset
 
   def tabulate(
     self,
@@ -878,6 +909,41 @@ class DuckDBBackend:
       order by j_value
     """
     return tuple(str(row[0]) for row in self._fetch_table(sql, "reshape"))
+
+  def _has_nulls(self, variable: str) -> bool:
+    quoted_variable = _quote_identifier(variable)
+    sql = f"select exists(select 1 from {ACTIVE_TABLE} where {quoted_variable} is null)"
+    row = self._fetch_one(sql, "panel")
+    return bool(row[0])
+
+  def _has_duplicate_panel_pairs(self, metadata: PanelMetadata) -> bool:
+    id_sql = _quote_identifier(metadata.id_variable)
+    time_sql = _quote_identifier(metadata.time_variable)
+    sql = f"""
+      select exists(
+        select 1
+        from {ACTIVE_TABLE}
+        group by {id_sql}, {time_sql}
+        having count(*) > 1
+      )
+    """
+    row = self._fetch_one(sql, "panel")
+    return bool(row[0])
+
+  def _fetch_one(self, sql: str, command_name: str) -> tuple[object, ...]:
+    try:
+      row = self._connection.execute(sql).fetchone()
+    except duckdb.Error as exc:
+      raise ExecutionError(f"{command_name} failed") from exc
+    if row is None:
+      raise ExecutionError(f"{command_name} failed")
+    return tuple(row)
+
+  def _rollback_transaction(self) -> None:
+    try:
+      self._connection.execute("rollback")
+    except duckdb.Error:
+      pass
 
 
 def _is_numeric_type(data_type: str) -> bool:

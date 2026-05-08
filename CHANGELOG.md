@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 11 panel metadata with `panel <id_var> <time_var>`, `panel`, and `panel clear`,
+  DuckDB-backed missing-value and duplicate id/time validation, session-local metadata
+  preservation/clearing across state-changing commands, deterministic CLI output, and focused
+  parser, executor/backend, CLI, and shell coverage.
 - Added the third Phase 11 data workflow primitive with `reshape long` and `reshape wide` over the
   active dataset, required `i(...)` and `j(...)` options, eager DuckDB materialization, active
   dataset replacement, deterministic output, and focused parser, executor/backend, CLI, and shell

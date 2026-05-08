@@ -279,6 +279,46 @@ def test_cli_runs_phase_11_reshape_long_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_11_panel_metadata_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0),
+        (1, 2021, 12.0),
+        (2, 2020, 20.0)
+    ) as panel_data(firm_id, year, income)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "panel",
+      "-c",
+      "panel clear",
+      "-c",
+      "panel",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Panel: none" in captured.out
+  assert "Panel set: id=firm_id, time=year" in captured.out
+  assert "Panel: id=firm_id, time=year" in captured.out
+  assert "Panel cleared" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(
