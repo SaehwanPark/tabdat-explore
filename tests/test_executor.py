@@ -194,6 +194,7 @@ def test_phase_11_join_supports_multiple_keys_and_collision_suffix(
         into="lookup",
       )
     )
+    executor.execute(UseCommand(sample_parquet))
     result = executor.execute(
       JoinCommand(table_name="lookup", keys=("sex", "age"), suffix="_lookup")
     )
@@ -226,6 +227,7 @@ def test_phase_11_join_reports_table_and_key_errors(sample_parquet: Path) -> Non
         into="lookup",
       )
     )
+    executor.execute(UseCommand(sample_parquet))
     with pytest.raises(UnknownVariableError, match="join unknown variable: missing"):
       executor.execute(JoinCommand(table_name="lookup", keys=("missing",)))
     with pytest.raises(UnknownVariableError, match="join unknown variable in lookup: age"):

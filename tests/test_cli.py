@@ -207,8 +207,8 @@ def test_cli_runs_phase_11_join_named_table_flow(sample_parquet: Path, capsys) -
   assert "Created sex_lookup: 2 rows, 2 columns" in captured.out
   assert "Joined sex_lookup: 3 rows, 5 columns" in captured.out
   assert "age  bmi   sex  cost   mean_bmi" in captured.out
-  assert "30   22.5  F    100    25" in captured.out
-  assert "42   25    M    150    25" in captured.out
+  assert "30   22.5  F    100.0  25" in captured.out
+  assert "42   25.0  M    150.0  25" in captured.out
   assert captured.err == ""
 
 
