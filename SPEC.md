@@ -126,13 +126,18 @@ This file tracks feature state for spec-driven development. Product intent lives
   - `$name` macro expansion for later script entries and nested `run` scripts
   - top-level script-scoped macro and seed state with line-numbered diagnostics
   - focused script parser/helper and CLI coverage
+- Completed the remaining Phase 11 prerequisites:
+  - minimal script-only `if` / `else` / `end` control flow with literal and token-comparison
+    conditions
+  - branch skipping without command echo or execution for inactive script branches
+  - narrow remote Parquet loading for `http://`, `https://`, and `s3://` URIs through DuckDB
+  - focused script helper, CLI, parser, backend classification, model, and validation coverage
 
 ## Present
 
-- Phase 11 has same-name equality joins, strict named-table append workflows, narrow
-  active-dataset reshape workflows, session-local panel metadata, and script-local seed/macro
-  primitives. Functional helper imports should continue to go through `tabdat.monads`, which
-  delegates to `comp-builders` while preserving a stable repo-local boundary.
+- Phase 12 estimation substrate is next. Functional helper imports should continue to go through
+  `tabdat.monads`, which delegates to `comp-builders` while preserving a stable repo-local
+  boundary.
 
 ## Future
 
@@ -150,9 +155,10 @@ This file tracks feature state for spec-driven development. Product intent lives
   - extend append/stack workflows only after the initial strict named-table append contract is
     dogfooded
   - extend reshape workflows only after the initial wide/long contract is dogfooded
-  - add minimal script-level control flow only after seed and macro primitives are dogfooded
-  - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet
-    and DB connections
+  - extend script control flow beyond the initial non-nested conditional contract only after it is
+    dogfooded
+  - add remote credentials, database connections, and broader object-store behavior only after the
+    URI-based Parquet contract is dogfooded
 - Phase 12 estimation substrate:
   - add reusable statistical primitives, simulation/resampling utilities, and shared least
     squares, MLE, and GMM estimation interfaces

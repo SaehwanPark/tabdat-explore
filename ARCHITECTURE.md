@@ -1,11 +1,11 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has started roadmap Phase 11 data workflow primitives after completing the Phase 10
-execution and state foundations slice. This document records the implemented shell UX, script
+TabDat-Explore has completed roadmap Phase 11 data workflow primitives and is ready for Phase 12
+estimation substrate work. This document records the implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
-lazy load boundary, runtime configuration, plot artifact boundary, persistence boundary, join,
-append, reshape, panel metadata, and script primitive boundaries, and the boundaries future phases
-should preserve.
+lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
+join, append, reshape, panel metadata, and script primitive boundaries, and the boundaries future
+phases should preserve.
 
 ## Runtime Flow
 
@@ -36,11 +36,12 @@ CLI startup from either `--config <path>` or project-local `.tabdat.toml`.
 Owns UTF-8 script file reads, line-oriented script parsing, script-local directive state,
 deterministic metadata output, command echoes, nested `run` path resolution, recursion rejection,
 and file/line diagnostics. Script files support whole-line `#` comments, blank lines, one command
-per line, multiline SQL blocks, script-only `seed <integer>` metadata, and script-only
-`let <name> = <value>` macros. `$name` macro expansion happens at the script edge before command
-parsing or execution. Nested `run` scripts share the parent script's macro and seed state, while
-each top-level script run starts with empty directive state. Script execution shares one executor
-state and disables plot auto-open so runs are reproducible in batch contexts.
+per line, multiline SQL blocks, script-only `seed <integer>` metadata, script-only
+`let <name> = <value>` macros, and minimal non-nested `if` / `else` / `end` conditionals. `$name`
+macro expansion happens at the script edge before command parsing, condition evaluation, or
+execution. Nested `run` scripts share the parent script's macro and seed state, while each
+top-level script run starts with empty directive state. Script execution shares one executor state
+and disables plot auto-open so runs are reproducible in batch contexts.
 
 ### Command Parser
 
@@ -70,6 +71,8 @@ preserves or clears metadata across state-changing commands according to the com
 Owns data access and query execution. Parquet is the primary initial format. Eager loading creates
 a session-local active DuckDB table. Lazy loading creates a DuckDB `read_parquet(...)` scan view so
 load-time projection, filtering, grouping, and terminal query operations can be pushed into DuckDB.
+Local paths and `http://`, `https://`, or `s3://` Parquet URIs share this DuckDB loading boundary;
+remote credentials and non-Parquet remote formats are not part of the current contract.
 Session transformations replace the active relation for later commands. The optional `polars`
 engine selector is accepted and recorded for Phase 7 workflows, while command execution continues
 through the DuckDB relation boundary until deeper Polars-native lowering is designed. A
@@ -144,6 +147,9 @@ display formatting.
   `run <script>`.
 - Script-only `seed <integer>` and `let <name> = <value>` directives are available in script files;
   `$name` macro references expand in later script entries and nested `run` scripts.
+- Script-only non-nested `if` / `else` / `end` conditionals are available in script files.
+- `use` can load local Parquet paths or DuckDB-readable `http://`, `https://`, and `s3://` Parquet
+  URIs.
 - Phase 9 config is executable through `.tabdat.toml`, `--config <path>`, and runtime `set`
   commands.
 - Phase 9 persistence is executable through `save <path>[, replace]` and
@@ -167,6 +173,10 @@ display formatting.
   parser/executor boundary.
 - Keep `seed` and `let` script-only at the script runner edge until a future command contract
   defines interactive or executor-level semantics.
+- Keep `if` / `else` / `end` script-only at the script runner edge until a future command contract
+  defines richer scripting semantics.
+- Keep remote loading scoped to DuckDB-readable Parquet URIs until credentials, DB connections, or
+  broader remote data access are explicitly designed.
 - Keep named tables session-local until a future persistence/catalog contract exists.
 - Keep `join` scoped to named-table inputs and same-name equality keys until a broader multi-table
   workflow contract is written.

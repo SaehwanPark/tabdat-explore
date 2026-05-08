@@ -1,31 +1,29 @@
-# Phase 11 Script Primitives Delivery Summary
+# Phase 11 Completion Delivery Summary
 
 ## Summary
 
-Implemented Phase 11 script-local seed and macro primitives on branch
-`codex/tmp-phase11-script-primitives`.
+Finished the remaining Phase 11 prerequisites on branch `codex/tmp-phase11-finish-prereqs`.
 
 ## Changed Behavior
 
-- `seed <integer>` is available as a script-only directive and records deterministic script-run
-  metadata.
-- `let <name> = <value>` is available as a script-only directive and defines a plain text macro.
-- `$name` macro references expand in later script entries and nested `run` scripts before command
-  parsing or execution.
-- Each top-level script run starts with empty macro and seed state; nested scripts share parent
-  state.
-- Script failures for invalid directives or undefined macros include source file and line number.
+- Scripts support non-nested `if` / `else` / `end` control flow.
+- Conditions support `true`/`false`, `on`/`off`, `1`/`0`, `==`, and `!=`.
+- Macro expansion runs before condition evaluation.
+- Inactive script branches are skipped without echoing or executing their commands.
+- `use` accepts DuckDB-readable remote Parquet URIs with `http://`, `https://`, and `s3://`.
+- Local Parquet loading and named-table activation behavior is preserved.
 
 ## Validation
 
-- `uv run pytest`
-- `uv run mypy`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
+- Focused Phase 11 tests passed.
+- `uv run pytest` passed with 301 tests.
+- `uv run mypy` passed.
+- `uv run ruff check .` passed.
+- `uv run ruff format --check .` passed.
 
 ## Known Limits
 
-- `seed` is metadata-only until future random, simulation, or resampling commands exist.
-- Macros are plain text replacements with no quoting, escaping, overwrite, or unset behavior.
-- Script loops, conditionals, inline comments, remote access, and Phase 12 estimation substrate
-  work remain out of scope.
+- Script conditionals are intentionally non-nested.
+- No loops, inline comments, richer boolean expressions, or script-level error-control forms.
+- Remote credentials, database connections, and non-Parquet remote formats remain out of scope.
+- Phase 12 estimation substrate work is the next planned phase.

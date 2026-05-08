@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Completed the remaining Phase 11 prerequisites with script-only non-nested `if` / `else` / `end`
+  conditionals, macro-expanded condition evaluation, inactive branch skipping, and narrow
+  DuckDB-backed remote Parquet loading for `http://`, `https://`, and `s3://` URIs.
 - Added Phase 11 script reproducibility primitives with script-only `seed <integer>` metadata,
   script-only `let <name> = <value>` macros, `$name` expansion in later script entries and nested
   `run` scripts, deterministic expanded command transcripts, line-numbered script diagnostics, and
