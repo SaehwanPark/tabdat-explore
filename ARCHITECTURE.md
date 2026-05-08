@@ -4,8 +4,8 @@ TabDat-Explore has started roadmap Phase 11 data workflow primitives after compl
 execution and state foundations slice. This
 document records the implemented shell UX, script runner, command-language model, active DuckDB
 relation model, session-local named table registry, lazy load boundary, runtime configuration, plot
-artifact boundary, persistence boundary, join, append, and reshape boundaries, and the boundaries
-future phases should preserve.
+artifact boundary, persistence boundary, join, append, reshape, and panel metadata boundaries, and
+the boundaries future phases should preserve.
 
 ## Runtime Flow
 
@@ -58,7 +58,9 @@ error until a later command contract defines execution. Runtime `set` commands u
 and affect later commands in the same shell, command sequence, or script. `join` and `append`
 validate active state and named-table lookup at the executor boundary before asking the backend to
 materialize the next active relation. `reshape` validates active state at the executor boundary and
-delegates active-dataset wide/long materialization to the backend.
+delegates active-dataset wide/long materialization to the backend. `panel` stores session-local
+panel id/time metadata on active dataset snapshots, asks the backend to validate active rows, and
+preserves or clears metadata across state-changing commands according to the command contract.
 
 ### DuckDB Backend
 
@@ -78,8 +80,11 @@ same-column and compatible-type validation, preserving active-dataset column ord
 materializing the result as the new eager active relation. `reshape long <stublist>, i(...) j(...)`
 converts active wide columns named `<stub>_<j_value>` into long rows, while
 `reshape wide <value_vars>, i(...) j(...)` pivots long rows into `<value_var>_<j_value>` columns;
-both replace the active relation with an eager materialized result. No persistent registry exists,
-but `save` / `export` can persist the active relation to local Parquet.
+both replace the active relation with an eager materialized result. `panel <id_var> <time_var>`
+validates that id/time variables exist, contain no missing values, and uniquely identify active
+rows with DuckDB checks. Panel metadata is session-local, stored on `DatasetInfo`, restored through
+named-table activation when the snapshot carries it, and not persisted into Parquet files. No
+persistent registry exists, but `save` / `export` can persist the active relation to local Parquet.
 SQL commands bind the active relation as the user-facing DuckDB view `active`. Initial lazy loads
 report an unknown row count until a live count or materializing operation runs.
 
@@ -126,6 +131,8 @@ display formatting.
 - `reshape long <stublist>, i(<id_vars>) j(<name_var>)` and
   `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` reshape only the active dataset and
   replace it with an eager materialized result.
+- `panel <id_var> <time_var>`, `panel`, and `panel clear` manage session-local panel metadata for
+  the active dataset.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
 - Phase 7 lazy loading is executable through `use <path>, lazy` and
@@ -160,6 +167,8 @@ display formatting.
   or union contract is written.
 - Keep `reshape` scoped to active-dataset wide/long forms with required `i(...)` and `j(...)`
   options until panel metadata, aliases, or broader reshape ergonomics are designed.
+- Keep `panel` scoped to id/time metadata validation and reporting until balancedness diagnostics
+  or estimation commands define additional panel semantics.
 - Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
   contract exists.
 - Use 2-space tab size across project files.

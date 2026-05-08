@@ -108,10 +108,7 @@ def format_result(result: Result) -> str:
     if result.metadata is None:
       return "Panel: none"
     prefix = "Panel set" if result.action == "set" else "Panel"
-    return (
-      f"{prefix}: id={result.metadata.id_variable}, "
-      f"time={result.metadata.time_variable}"
-    )
+    return f"{prefix}: id={result.metadata.id_variable}, time={result.metadata.time_variable}"
 
   if isinstance(result, SqlCreateResult):
     dataset = result.dataset

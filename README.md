@@ -23,6 +23,7 @@ command line. The current CLI supports:
 - grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
 - session-local named tables with `sql ... into <table>` and `use <table>`
+- session-local panel metadata with `panel <id_var> <time_var>`, `panel`, and `panel clear`
 - artifact plots with `histogram`, `scatter`, and `bar`
 - opt-in lazy Parquet loading with `use data.parquet, lazy`
 - script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
@@ -133,8 +134,11 @@ Created summary: 2 rows, 2 columns
 tabdat> use summary
 Activated: summary (2 rows, 2 columns)
 
-tabdat> histogram age
-Saved plot: artifacts/plots/histogram-age.svg
+tabdat> panel sex age
+Panel set: id=sex, time=age
+
+tabdat> panel
+Panel: id=sex, time=age
 
 tabdat> set graph_format png
 Set graph_format: png
@@ -159,6 +163,8 @@ tabdat> run analysis.td
   the first lazy transformation.
 - SQL is an escape hatch, not the main interface. `sql ... into <table>` creates a session-local
   named table, makes it active, and does not persist a file.
+- Panel metadata is session-local and data-only commands do not write it into saved Parquet files.
+  The active id/time pair must have no missing values and must uniquely identify rows.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
   `-c` and script runs only print the saved path.
 - Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Generated names
