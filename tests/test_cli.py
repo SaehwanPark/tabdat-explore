@@ -185,6 +185,33 @@ def test_cli_runs_phase_10_named_table_activation_flow(sample_parquet: Path, cap
   assert captured.err == ""
 
 
+def test_cli_runs_phase_11_join_named_table_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "sql select sex, avg(bmi) as mean_bmi from active group by sex into sex_lookup",
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "join sex_lookup on sex",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Created sex_lookup: 2 rows, 2 columns" in captured.out
+  assert "Joined sex_lookup: 3 rows, 5 columns" in captured.out
+  assert "age  bmi   sex  cost   mean_bmi" in captured.out
+  assert "30   22.5  F    100    25" in captured.out
+  assert "42   25    M    150    25" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

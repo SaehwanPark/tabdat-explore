@@ -29,6 +29,7 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  JoinCommand,
   KeepCommand,
   LoadResult,
   NumberExpression,
@@ -117,6 +118,120 @@ def test_count_queries_lazy_active_dataset(sample_parquet: Path) -> None:
 
   assert isinstance(result, CountResult)
   assert result.row_count == 3
+
+
+def test_phase_11_inner_join_named_table(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select sex, avg(bmi) as mean_bmi from active group by sex",
+        into="sex_lookup",
+      )
+    )
+    executor.execute(UseCommand(sample_parquet))
+    result = executor.execute(JoinCommand(table_name="sex_lookup", keys=("sex",)))
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.message == "Joined sex_lookup"
+  assert result.dataset.row_count == 3
+  assert [column.name for column in result.dataset.columns] == [
+    "age",
+    "bmi",
+    "sex",
+    "cost",
+    "mean_bmi",
+  ]
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    (30, 22.5, "F", 100.0, 25.0),
+    (42, 25.0, "M", 150.0, 25.0),
+    (54, 27.5, "F", None, 25.0),
+  )
+
+
+def test_phase_11_left_join_preserves_active_rows(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select 'F' as sex, 'matched' as label from active limit 1",
+        into="female_lookup",
+      )
+    )
+    executor.execute(UseCommand(sample_parquet))
+    result = executor.execute(
+      JoinCommand(table_name="female_lookup", keys=("sex",), how="left")
+    )
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.row_count == 3
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    (30, 22.5, "F", 100.0, "matched"),
+    (42, 25.0, "M", 150.0, None),
+    (54, 27.5, "F", None, "matched"),
+  )
+
+
+def test_phase_11_join_supports_multiple_keys_and_collision_suffix(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select sex, age, cost, age + 1 as next_age from active",
+        into="lookup",
+      )
+    )
+    result = executor.execute(
+      JoinCommand(table_name="lookup", keys=("sex", "age"), suffix="_lookup")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.row_count == 3
+  assert [column.name for column in result.dataset.columns] == [
+    "age",
+    "bmi",
+    "sex",
+    "cost",
+    "cost_lookup",
+    "next_age",
+  ]
+
+
+def test_phase_11_join_reports_table_and_key_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="join requires an active dataset"):
+      executor.execute(JoinCommand(table_name="lookup", keys=("id",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownTableError, match="unknown table: lookup"):
+      executor.execute(JoinCommand(table_name="lookup", keys=("sex",)))
+    executor.execute(
+      SqlCommand(
+        "select sex, count(*) as n from active group by sex",
+        into="lookup",
+      )
+    )
+    with pytest.raises(UnknownVariableError, match="join unknown variable: missing"):
+      executor.execute(JoinCommand(table_name="lookup", keys=("missing",)))
+    with pytest.raises(UnknownVariableError, match="join unknown variable in lookup: age"):
+      executor.execute(JoinCommand(table_name="lookup", keys=("age",)))
+  finally:
+    executor.close()
 
 
 @pytest.mark.parametrize("engine", ["duckdb", "polars"])
