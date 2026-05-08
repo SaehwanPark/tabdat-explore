@@ -1,85 +1,80 @@
-# Phase 11 Script Primitives Command Contract
+# Phase 11 Completion Command Contract
 
 ## Request Summary
 
-Add the next unfinished Phase 11 reproducibility primitive slice: script-local seeds and reusable
-macros.
+Finish the remaining Phase 11 prerequisites before Phase 12 by adding minimal script control flow
+and narrow remote Parquet loading.
 
 ## Roadmap Phase
 
 Phase 11: Data Workflow & Reproducibility Primitives.
 
-## Script Syntax
+## Script Control Flow
+
+### Syntax
 
 ```stata
-seed <integer>
-let <name> = <value>
+if <condition>
+  command
+else
+  command
+end
 ```
 
 Rules:
 
-- `seed <integer>` records a deterministic integer seed for the current script run.
-- `let <name> = <value>` records a reusable script macro.
-- `$name` expands to a previously defined macro value in later script entries.
-- Macro names must be identifiers matching `[A-Za-z_][A-Za-z0-9_]*`.
-- Macro values are the trimmed text after `=`.
-- Macro values may reference previously defined macros.
-- `seed` may reference macros after expansion.
-- `seed` and `let` are script-only directives, not interactive or executor commands.
+- `if`, `else`, and `end` are script-only directives.
+- A block may omit `else`.
+- Conditions are evaluated after macro expansion.
+- Supported conditions:
+  - `true`, `on`, and `1` evaluate true.
+  - `false`, `off`, and `0` evaluate false.
+  - `<left> == <right>` and `<left> != <right>` compare trimmed token text.
+- Commands inside an inactive branch are skipped and not echoed.
+- Nested `if` blocks are not supported in this slice.
+- Existing `seed`, `let`, `$macro`, and nested `run` behavior remains unchanged.
 
-## Examples
+### User-Facing Errors
+
+- Missing condition: `if expects a condition`
+- Unsupported condition: `if condition expects true/false, 1/0, on/off, ==, or !=`
+- Stray `else`: `else without matching if`
+- Stray `end`: `end without matching if`
+- Duplicate `else`: `if block already has an else branch`
+- Nested blocks: `nested if blocks are not supported`
+- Unterminated block: `if block is missing end`
+
+## Remote Parquet Loading
+
+### Syntax
 
 ```stata
-seed 123
-let data = patients.parquet
-use $data
-let adults = age >= 18
-keep if $adults
+use https://example.com/data.parquet
+use s3://bucket/path/data.parquet, lazy
 ```
 
-## Execution Semantics
+Rules:
 
-- Script directive state is scoped to one top-level script run.
-- Nested `run <script>` calls share the parent script's macro and seed state.
-- A macro may only be defined once in a top-level script run.
-- Macro expansion happens immediately before a script entry is echoed and executed.
-- Expansion applies to regular commands and directive bodies.
-- Missing macro references fail before command parsing or execution.
-- `seed` updates script metadata only; no random operations are introduced in this slice.
-- `-c "run <script>"`, `tabdat -f <script>`, positional script execution, and interactive `run`
-  use the same directive semantics.
+- `use` accepts local paths and remote URIs with `http://`, `https://`, or `s3://`.
+- All `use` targets must end in `.parquet`.
+- Remote targets are passed to DuckDB `read_parquet`.
+- `use <uri>, lazy` creates the same DuckDB scan-view boundary as local lazy loads.
+- Unsupported URI schemes fail before DuckDB execution.
+- Local path validation remains unchanged.
+- Remote credentials, config, and DB connections are out of scope.
 
-## User-Facing Output
+### User-Facing Errors
 
-- `seed 123` echoes as `. seed 123` and prints `Seed: 123`.
-- `let data = patients.parquet` echoes as `. let data = patients.parquet` and prints
-  `Macro set: data`.
-- Regular commands echo after macro expansion, for example `. use patients.parquet`.
-- Script metadata prints `Seed: none` before any seed is set and the current seed for nested
-  scripts after a seed is set.
-
-## User-Facing Errors
-
-- Invalid seed: `seed expects an integer`
-- Invalid macro syntax: `let expects syntax: let <name> = <value>`
-- Invalid macro name: `macro name must be an identifier: <name>`
-- Empty macro value: `macro value cannot be empty: <name>`
-- Duplicate macro: `macro already defined: <name>`
-- Undefined macro: `undefined macro: <name>`
-
-## Non-Goals
-
-- No inline comments.
-- No macro overwrite or unset command.
-- No quoting or escaping rules beyond plain text replacement.
-- No control flow, loops, or conditionals.
-- No remote data access.
-- No random sampling, simulation, or estimation command behavior.
+- Unsupported remote scheme: `use remote Parquet supports http, https, and s3 URLs`
+- Non-Parquet target: `use only supports .parquet files`
 
 ## Acceptance Criteria
 
-- Script tests cover directive parsing, macro expansion, nested sharing, and diagnostics.
-- CLI tests cover deterministic top-level script output, nested script state sharing, and
-  line-numbered macro failures.
-- Existing command-mode, shell, parser, executor, and script behavior remains compatible.
-- Documentation records the Phase 11 script directive boundary and remaining future Phase 11 work.
+- Script helper tests cover conditional parsing/evaluation, branch selection, macro-expanded
+  conditions, and diagnostics.
+- CLI tests cover script output for true/false/else branches and line-numbered control-flow
+  failures.
+- Parser/backend tests cover remote `use` syntax and backend remote URI classification without
+  depending on live internet.
+- Existing parser, executor, CLI, shell, and script behavior remains compatible.
+- Durable docs and `_workspace/` artifacts record Phase 11 completion and remaining future work.

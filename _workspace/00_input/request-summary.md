@@ -1,32 +1,30 @@
-# Phase 11 Script Primitives Request Summary
+# Phase 11 Completion Request Summary
 
 ## Goal
 
-Implement the next unfinished Phase 11 prerequisite before moving to Phase 12: small script-level
-reproducibility primitives.
+Finish the remaining documented Phase 11 prerequisites before starting Phase 12.
 
 ## Phase Fit
 
 Roadmap Phase 11: Data Workflow & Reproducibility Primitives.
 
-Prior phases and completed Phase 11 slices were validated before implementation:
+Completed prerequisites were checked before this slice:
 
-- `uv run pytest`
-- `uv run mypy`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
+- `uv run pytest` passed with 282 tests.
+- `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` record Phase 0 through the completed Phase 11
+  slices.
 
 ## Scope
 
-- Add script-only `seed <integer>` for deterministic reproducibility metadata.
-- Add script-only `let <name> = <value>` macros.
-- Expand `$name` macro references in later script entries, including nested `run` scripts.
-- Keep macro and seed state scoped to one top-level script run.
-- Update script parsing/execution, focused tests, and durable docs.
+- Add minimal script-only conditional control flow.
+- Add narrow DuckDB-friendly remote Parquet loading for `http://`, `https://`, and `s3://` URIs.
+- Preserve existing local Parquet, script macro/seed, CLI, parser, executor, backend, and docs
+  behavior.
+- Update tests, handoff artifacts, and durable docs.
+- Commit meaningful checkpoints and open a ready-for-review PR.
 
 ## Non-Goals
 
-- No script loops, conditionals, or inline comments.
-- No random behavior or simulation commands.
-- No remote data access.
-- No Phase 12 estimation substrate work.
+- No loops, nested conditionals, richer boolean expressions, or inline comments.
+- No remote credentials/config commands or non-Parquet remote formats.
+- No Phase 12 estimation substrate work in this branch.
