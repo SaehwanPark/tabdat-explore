@@ -1,9 +1,9 @@
-# Phase 11 Panel Metadata Request Summary
+# Phase 11 Script Primitives Request Summary
 
 ## Goal
 
-Implement the next unfinished Phase 11 prerequisite before moving to Phase 12: session-local panel
-identifier metadata for estimation-ready data workflows.
+Implement the next unfinished Phase 11 prerequisite before moving to Phase 12: small script-level
+reproducibility primitives.
 
 ## Phase Fit
 
@@ -18,16 +18,15 @@ Prior phases and completed Phase 11 slices were validated before implementation:
 
 ## Scope
 
-- Add `panel <id_var> <time_var>`, `panel`, and `panel clear`.
-- Store panel metadata on the active dataset and named-table snapshots where applicable.
-- Validate active data, variable existence, missing values, and duplicate id/time pairs.
-- Preserve or clear metadata deterministically across existing transformations.
-- Update parser, executor, backend validation helpers, formatter, shell completions, focused tests,
-  and durable docs.
+- Add script-only `seed <integer>` for deterministic reproducibility metadata.
+- Add script-only `let <name> = <value>` macros.
+- Expand `$name` macro references in later script entries, including nested `run` scripts.
+- Keep macro and seed state scoped to one top-level script run.
+- Update script parsing/execution, focused tests, and durable docs.
 
 ## Non-Goals
 
-- No durable metadata persistence in Parquet output.
-- No estimation commands.
-- No `xtset` compatibility alias.
-- No script macros, seeding, control flow, or remote access.
+- No script loops, conditionals, or inline comments.
+- No random behavior or simulation commands.
+- No remote data access.
+- No Phase 12 estimation substrate work.
