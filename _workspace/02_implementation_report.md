@@ -1,38 +1,32 @@
-# Phase 10 Implementation Report
+# Phase 11 Implementation Report
 
 ## Summary
 
-Implemented the first Phase 10 execution and state foundations slice on branch
-`codex/tmp-phase10-execution-state-foundations`.
+Implemented the first Phase 11 data workflow primitive on branch
+`codex/tmp-phase11-join-merge`.
 
 ## Implemented Behavior
 
-- Added a lightweight session-local named table registry.
-- Changed `sql ... into <table>` to create a named table, make it active, and keep its metadata in
-  executor state.
-- Added `use <table>` activation for registered named tables.
-- Added `Activated: <table> (N rows, M columns)` output.
-- Added named table completions for interactive `use`.
-- Extracted state-changing executor behavior into private command handlers and shared transform
-  recording.
-- Added specific `ExecutionError` subclasses for missing active datasets, missing variables, type
-  mismatches, missing tables, reserved names, and backend failures.
+- Added `join <table> on <keylist>` command parsing.
+- Added `how=inner|left`, defaulting to `inner`.
+- Added `suffix(<suffix>)`, defaulting to `_right`, for right-side non-key column collisions.
+- Joined the active dataset with an existing session-local named table.
+- Replaced the active dataset with the materialized join result.
+- Preserved named tables as session-local inputs that are not mutated by joins.
+- Added deterministic left-row ordering for joined results.
 
 ## Files Changed
 
-- `src/tabdat/errors.py`
 - `src/tabdat/models.py`
-- `src/tabdat/backend.py`
+- `src/tabdat/parser.py`
 - `src/tabdat/executor.py`
-- `src/tabdat/formatter.py`
-- `src/tabdat/shell.py`
-- focused parser, executor, CLI, and shell tests
-- README, SDD docs, and workspace artifacts
+- `src/tabdat/backend.py`
+- focused parser, executor/backend, and CLI tests
+- `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and workspace artifacts
 
 ## Validation
 
 - `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py`
-- `uv run pytest tests/test_executor.py tests/test_cli.py`
 - `uv run mypy`
 - `uv run ruff check .`
 
@@ -40,9 +34,8 @@ Final full validation is recorded in the delivery summary.
 
 ## Known Limits
 
-- Named tables are session-local only.
-- `active` remains the only supported SQL binding for the current active dataset; broad multi-table
-  SQL over registered names is deferred.
-- `use <table>` accepts no options.
-- Joins, append/stack, reshape, and persistence catalogs are deferred to later phases.
-- `engine=polars` remains experimental metadata; execution still uses the DuckDB relation boundary.
+- Only same-name equality keys are supported.
+- Only `inner` and `left` joins are supported.
+- Right-side inputs must be session-local named tables.
+- No `_merge` indicator, cardinality validation, append/stack, reshape, panel metadata, remote data
+  access, script variables, seeding, or control flow was added in this slice.

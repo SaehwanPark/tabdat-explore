@@ -1,17 +1,17 @@
-# Phase 10 Delivery Summary
+# Phase 11 Delivery Summary
 
 ## Summary
 
-Implemented Phase 10 execution and state foundations on branch
-`codex/tmp-phase10-execution-state-foundations`.
+Implemented the first Phase 11 data workflow primitive on branch
+`codex/tmp-phase11-join-merge`.
 
 ## Changed Behavior
 
-- `sql ... into <table>` now creates a session-local named table and makes it active.
-- `use <table>` reactivates a registered named table in the same executor session.
-- Interactive `use` completions include registered named tables.
-- State-changing executor command paths are split into private handlers.
-- Execution errors now have specific subclasses while preserving user-facing CLI formatting.
+- `join <table> on <keylist>` joins the active dataset to a session-local named table.
+- `how=inner|left` selects the join kind, with `inner` as the default.
+- `suffix(<suffix>)` controls right-side non-key column collision names, defaulting to `_right`.
+- Successful joins print `Joined <table>: N rows, M columns`.
+- The join result replaces the active dataset for later commands.
 
 ## Validation
 
@@ -22,8 +22,7 @@ Implemented Phase 10 execution and state foundations on branch
 
 ## Known Limits
 
-- Named tables are session-local only.
-- No join, append, reshape, persistent table catalog, plugin layer, or Polars-native execution was
-  added in this slice.
-- SQL still exposes the current active dataset through `active`; broad named-table SQL bindings are
-  deferred.
+- Only same-name equality keys are supported.
+- Only session-local named tables can be right-side join inputs.
+- No append/stack, reshape, panel metadata, remote data access, script variables, seeding, or
+  control flow was added in this slice.

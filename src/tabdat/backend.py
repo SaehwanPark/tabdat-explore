@@ -191,8 +191,7 @@ class DuckDBBackend:
     if right_selects:
       select_sql = f"{select_sql}, {', '.join(right_selects)}"
     predicates = " and ".join(
-      f"left_table.{_quote_identifier(key)} = right_table.{_quote_identifier(key)}"
-      for key in keys
+      f"left_table.{_quote_identifier(key)} = right_table.{_quote_identifier(key)}" for key in keys
     )
     self._replace_active(
       f"""

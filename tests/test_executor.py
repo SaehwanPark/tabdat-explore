@@ -165,9 +165,7 @@ def test_phase_11_left_join_preserves_active_rows(sample_parquet: Path) -> None:
       )
     )
     executor.execute(UseCommand(sample_parquet))
-    result = executor.execute(
-      JoinCommand(table_name="female_lookup", keys=("sex",), how="left")
-    )
+    result = executor.execute(JoinCommand(table_name="female_lookup", keys=("sex",), how="left"))
     preview = executor.execute(HeadCommand(5))
   finally:
     executor.close()
