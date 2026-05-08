@@ -386,6 +386,7 @@ def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, caps
   assert f"Script: {script_path}" in captured.out
   assert "TabDat: 0.1.0" in captured.out
   assert "Python:" in captured.out
+  assert "Seed: none" in captured.out
   assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=on" in captured.out
   assert f". use {sample_parquet}" in captured.out
   assert "Kept matching rows: 2 rows, 4 columns" in captured.out
@@ -510,6 +511,84 @@ def test_cli_phase_8_rejects_conflicting_script_arguments(
 
   assert exc_info.value.code == 2
   assert "-c/--command cannot be combined with script execution" in captured.err
+
+
+def test_cli_phase_11_script_macros_and_seed(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "analysis.td"
+  script_path.write_text(
+    "\n".join(
+      [
+        "seed 123",
+        f"let data = {sample_parquet}",
+        "let adult_filter = age >= 42",
+        "use $data",
+        "keep if $adult_filter",
+        "count",
+      ]
+    ),
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Seed: none" in captured.out
+  assert ". seed 123" in captured.out
+  assert "Seed: 123" in captured.out
+  assert f". let data = {sample_parquet}" in captured.out
+  assert "Macro set: data" in captured.out
+  assert ". let adult_filter = age >= 42" in captured.out
+  assert "Macro set: adult_filter" in captured.out
+  assert f". use {sample_parquet}" in captured.out
+  assert ". keep if age >= 42" in captured.out
+  assert "Rows: 2" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_11_nested_script_shares_macros_and_seed(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_dir = tmp_path / "scripts"
+  script_dir.mkdir()
+  child = script_dir / "child.td"
+  parent = script_dir / "parent.td"
+  child.write_text("use $data\ncount\n", encoding="utf-8")
+  parent.write_text(f"seed 777\nlet data = {sample_parquet}\nrun child.td\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(parent)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Script: {parent}" in captured.out
+  assert f"Script: {child}" in captured.out
+  assert "Seed: 777" in captured.out
+  assert f". use {sample_parquet}" in captured.out
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_11_script_reports_macro_line_number(
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "bad.td"
+  script_path.write_text("seed 1\nuse $missing\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert f"Error: {script_path}:2: undefined macro: missing" in captured.err
 
 
 def test_cli_phase_9_loads_explicit_config(

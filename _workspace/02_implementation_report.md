@@ -1,40 +1,40 @@
-# Phase 11 Panel Metadata Implementation Report
+# Phase 11 Script Primitives Implementation Report
 
 ## Summary
 
-Implemented the next unfinished Phase 11 data workflow primitive on branch
-`codex/tmp-phase11-panel-metadata`.
+Implemented the next unfinished Phase 11 reproducibility primitive slice on branch
+`codex/tmp-phase11-script-primitives`.
 
 ## Contract Consumed
 
 `_workspace/01_product_command-contract.md` defines:
 
-- `panel <id_var> <time_var>`
-- `panel`
-- `panel clear`
+- script-only `seed <integer>`
+- script-only `let <name> = <value>`
+- `$name` macro expansion in later script entries and nested `run` scripts
 
 ## Implementation Notes
 
-- Added typed `PanelCommand`, `PanelMetadata`, and `PanelResult` models.
-- Added parser support for report, set, and clear panel forms.
-- Added DuckDB-backed validation for variable existence, missing id/time values, and duplicate
-  id/time pairs.
-- Stored metadata on `DatasetInfo` and preserved or cleared it across existing state-changing
-  commands.
-- Added formatter output and shell completions for `panel`.
-- Added focused parser, executor/backend, CLI, and shell coverage.
+- Added typed script directive and context models in `src/tabdat/script.py`.
+- Added macro expansion and directive parsing helpers with line-numbered `ScriptError` diagnostics.
+- Scoped macro and seed state to one top-level script run while sharing it with nested `run`
+  scripts.
+- Updated CLI script execution to expand macros before echoing and executing commands.
+- Added script metadata output for current seed state.
+- Added focused script helper and CLI coverage.
 - Updated SPEC, ARCHITECTURE, CHANGELOG, README, and workspace artifacts.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py`
+- `uv run pytest tests/test_script.py tests/test_cli.py`
 - `uv run mypy`
-- `uv run ruff check .`
+- `uv run ruff check src/tabdat/script.py src/tabdat/cli.py tests/test_script.py tests/test_cli.py`
 
 Full validation is recorded in the delivery summary after final checks.
 
 ## Known Limits
 
-- Panel metadata is session-local and not persisted in Parquet output.
-- No `xtset` alias, balancedness diagnostics, estimation commands, script variables/macros,
-  seeding, control flow, remote access, or Phase 12 estimation substrate work was added.
+- `seed` records deterministic metadata only; no random command behavior exists yet.
+- Macros are plain text replacements with no quoting, escaping, overwrite, or unset support.
+- Script loops, conditionals, inline comments, remote access, and Phase 12 estimation substrate
+  work were not added.

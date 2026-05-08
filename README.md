@@ -27,6 +27,7 @@ command line. The current CLI supports:
 - artifact plots with `histogram`, `scatter`, and `bar`
 - opt-in lazy Parquet loading with `use data.parquet, lazy`
 - script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
+- script-only `seed` metadata and `let` macros for reproducible scripts
 - project-local or explicit config for graph defaults
 - runtime settings with `set graph_format`, `set artifact_dir`, and `set graph_open`
 - Parquet persistence with `save` and `export`
@@ -65,8 +66,15 @@ The repository has completed the first execution and state foundations slice of 
    uv run tabdat analysis.td
    ```
 
-   Script files use one command per non-empty line. Whole-line `#` comments are ignored, and
-   multiline `sql """..."""` blocks are supported.
+   Script files use one command per non-empty line. Whole-line `#` comments are ignored,
+   multiline `sql """..."""` blocks are supported, and script-local `seed <integer>` plus
+   `let <name> = <value>` directives can make runs easier to reproduce.
+
+   ```stata
+   seed 123
+   let data = patients.parquet
+   use $data
+   ```
 
 4. Configure plot defaults when needed:
 
@@ -173,9 +181,11 @@ tabdat> run analysis.td
   `graph_format`, `artifact_dir`, and `graph_open`.
 - `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
   Parquet. Existing files require `replace`.
-- Scripts print deterministic run metadata, echo each command as `. <command>`, fail fast on the
-  first error, and include file and line number diagnostics. Macros, loops, inline comments, and
-  script-level conditionals are deferred.
+- Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
+  on the first error, and include file and line number diagnostics. `seed <integer>` records
+  script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`
+  in later script entries and nested `run` scripts. Loops, inline comments, and script-level
+  conditionals are deferred.
 - Named table registries are not persisted across CLI sessions; use `save` or `export` for durable
   Parquet output.
 - Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation

@@ -1,19 +1,20 @@
-# Phase 11 Panel Metadata Delivery Summary
+# Phase 11 Script Primitives Delivery Summary
 
 ## Summary
 
-Implemented Phase 11 session-local panel metadata on branch
-`codex/tmp-phase11-panel-metadata`.
+Implemented Phase 11 script-local seed and macro primitives on branch
+`codex/tmp-phase11-script-primitives`.
 
 ## Changed Behavior
 
-- `panel <id_var> <time_var>` sets active dataset panel metadata.
-- `panel` reports current panel metadata or `Panel: none`.
-- `panel clear` removes metadata from the active dataset.
-- Panel variables must exist, contain no missing values, and uniquely identify rows as an
-  `(id, time)` pair.
-- Metadata is preserved through compatible transformations, updated on rename, revalidated on
-  id/time replacement, and cleared conservatively for materializing commands.
+- `seed <integer>` is available as a script-only directive and records deterministic script-run
+  metadata.
+- `let <name> = <value>` is available as a script-only directive and defines a plain text macro.
+- `$name` macro references expand in later script entries and nested `run` scripts before command
+  parsing or execution.
+- Each top-level script run starts with empty macro and seed state; nested scripts share parent
+  state.
+- Script failures for invalid directives or undefined macros include source file and line number.
 
 ## Validation
 
@@ -24,6 +25,7 @@ Implemented Phase 11 session-local panel metadata on branch
 
 ## Known Limits
 
-- Metadata is session-local only and not written to Parquet.
-- No `xtset` alias, balancedness diagnostics, estimation commands, script variables/macros,
-  seeding, control flow, remote access, or Phase 12 estimation substrate work was added.
+- `seed` is metadata-only until future random, simulation, or resampling commands exist.
+- Macros are plain text replacements with no quoting, escaping, overwrite, or unset behavior.
+- Script loops, conditionals, inline comments, remote access, and Phase 12 estimation substrate
+  work remain out of scope.
