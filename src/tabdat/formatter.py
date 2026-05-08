@@ -173,7 +173,9 @@ def _format_cell(value: object) -> str:
   return str(value)
 
 
-def _display_path(path: Path) -> str:
+def _display_path(path: Path | str) -> str:
+  if isinstance(path, str):
+    return path
   try:
     return str(path.relative_to(Path.cwd()))
   except ValueError:

@@ -3,6 +3,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from tabdat.backend import resolve_parquet_source
 from tabdat.config import TabDatConfig
 from tabdat.errors import (
   ExecutionError,
@@ -101,6 +102,24 @@ def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> Non
   assert result.dataset.column_count == 4
   assert result.dataset.execution_mode == "lazy"
   assert result.dataset.lazy_engine == engine
+
+
+def test_resolve_remote_parquet_source() -> None:
+  source = resolve_parquet_source("https://example.com/data.parquet")
+
+  assert source.read_path == "https://example.com/data.parquet"
+  assert source.display_path == "https://example.com/data.parquet"
+  assert source.is_remote is True
+
+
+def test_resolve_remote_parquet_source_rejects_unsupported_scheme() -> None:
+  with pytest.raises(ExecutionError, match="use remote Parquet supports http, https, and s3 URLs"):
+    resolve_parquet_source("ftp://example.com/data.parquet")
+
+
+def test_resolve_remote_parquet_source_rejects_non_parquet() -> None:
+  with pytest.raises(ExecutionError, match="use only supports .parquet files"):
+    resolve_parquet_source("https://example.com/data.csv")
 
 
 def test_failing_lazy_use_preserves_existing_active_dataset(

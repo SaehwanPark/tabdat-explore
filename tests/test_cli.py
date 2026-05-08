@@ -591,6 +591,76 @@ def test_cli_phase_11_script_reports_macro_line_number(
   assert f"Error: {script_path}:2: undefined macro: missing" in captured.err
 
 
+def test_cli_phase_11_script_conditionals(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "conditionals.td"
+  script_path.write_text(
+    "\n".join(
+      [
+        "let mode = duckdb",
+        "if $mode == duckdb",
+        f"use {sample_parquet}",
+        "else",
+        "use skipped.parquet",
+        "end",
+        "if false",
+        "count",
+        "else",
+        "count",
+        "end",
+      ]
+    ),
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert ". if duckdb == duckdb" in captured.out
+  assert f". use {sample_parquet}" in captured.out
+  assert ". use skipped.parquet" not in captured.out
+  assert captured.out.count(". count") == 1
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_phase_11_script_reports_unterminated_if(
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "bad_if.td"
+  script_path.write_text("if false\ncount\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert f"Error: {script_path}:1: if block is missing end" in captured.err
+
+
+def test_cli_phase_11_inactive_branch_skips_macro_expansion(
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "skip_macro.td"
+  script_path.write_text("if false\nuse $missing\nelse\nseed 1\nend\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert ". use $missing" not in captured.out
+  assert "Seed: 1" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_phase_9_loads_explicit_config(
   sample_parquet: Path,
   tmp_path: Path,

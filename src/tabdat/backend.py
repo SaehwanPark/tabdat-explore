@@ -2,8 +2,10 @@
 
 from pathlib import Path
 from typing import Literal, cast
+from urllib.parse import urlparse
 
 import duckdb
+from pydantic.dataclasses import dataclass
 
 from tabdat.errors import (
   BackendExecutionError,
@@ -46,6 +48,14 @@ ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
 NEXT_ACTIVE_TABLE = "__tabdat_next"
 NEXT_ACTIVE_VIEW = "__tabdat_next_view"
+REMOTE_PARQUET_SCHEMES = {"http", "https", "s3"}
+
+
+@dataclass(frozen=True)
+class ParquetSource:
+  read_path: str
+  display_path: Path | str
+  is_remote: bool
 
 
 class DuckDBBackend:
@@ -61,22 +71,16 @@ class DuckDBBackend:
 
   def inspect_parquet(
     self,
-    path: Path,
+    path: Path | str,
     *,
     execution_mode: Literal["eager", "lazy"] = "eager",
     lazy_engine: Literal["duckdb", "polars"] | None = None,
   ) -> DatasetInfo:
-    normalized = path.expanduser()
-    if normalized.suffix.lower() != ".parquet":
-      raise ExecutionError("use only supports local .parquet files in Phase 1")
-    if not normalized.exists():
-      raise ExecutionError(f"use could not find file: {path}")
-    if not normalized.is_file():
-      raise ExecutionError(f"use expected a file path: {path}")
+    source = resolve_parquet_source(path)
 
     try:
       if execution_mode == "lazy":
-        read_sql = f"select * from read_parquet({_quote_literal(str(normalized))})"
+        read_sql = f"select * from read_parquet({_quote_literal(source.read_path)})"
         self._connection.execute(
           f"create or replace temp view {NEXT_ACTIVE_VIEW} as {read_sql}",
         )
@@ -88,7 +92,7 @@ class DuckDBBackend:
       else:
         self._connection.execute(
           f"create or replace temp table {NEXT_ACTIVE_TABLE} as select * from read_parquet(?)",
-          [str(normalized)],
+          [source.read_path],
         )
         self._drop_active_relation()
         self._connection.execute(
@@ -99,11 +103,11 @@ class DuckDBBackend:
         self._active_storage = "table"
     except duckdb.Error as exc:
       self._drop_load_staging_relations()
-      raise ExecutionError(f"use could not read Parquet file: {path}") from exc
+      raise ExecutionError(f"use could not read Parquet file: {source.read_path}") from exc
 
-    return self.active_dataset_info(normalized)
+    return self.active_dataset_info(source.display_path)
 
-  def active_dataset_info(self, path: Path) -> DatasetInfo:
+  def active_dataset_info(self, path: Path | str) -> DatasetInfo:
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
     except duckdb.Error as exc:
@@ -1070,6 +1074,25 @@ def _quote_identifier(identifier: str) -> str:
 def _quote_literal(value: str) -> str:
   escaped = value.replace("'", "''")
   return f"'{escaped}'"
+
+
+def resolve_parquet_source(path: Path | str) -> ParquetSource:
+  if isinstance(path, str) and "://" in path:
+    parsed = urlparse(path)
+    if parsed.scheme not in REMOTE_PARQUET_SCHEMES:
+      raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
+    if not parsed.path.lower().endswith(".parquet"):
+      raise ExecutionError("use only supports .parquet files")
+    return ParquetSource(read_path=path, display_path=path, is_remote=True)
+
+  normalized = Path(path).expanduser()
+  if normalized.suffix.lower() != ".parquet":
+    raise ExecutionError("use only supports .parquet files")
+  if not normalized.exists():
+    raise ExecutionError(f"use could not find file: {path}")
+  if not normalized.is_file():
+    raise ExecutionError(f"use expected a file path: {path}")
+  return ParquetSource(read_path=str(normalized), display_path=normalized, is_remote=False)
 
 
 def _require_result_query(query: str) -> None:

@@ -327,7 +327,7 @@ def _parse_use(text: str) -> UseCommand:
     raise ParseError("use expects exactly one path: use <path>")
 
   if not separator:
-    return UseCommand(path=Path(path_parts[0]))
+    return UseCommand(path=_parse_use_path(path_parts[0]))
 
   options = _parse_use_options(option_text)
   is_lazy = "lazy" in options
@@ -338,10 +338,20 @@ def _parse_use(text: str) -> UseCommand:
     raise ParseError("use engine option requires lazy mode")
   lazy_engine = cast(Literal["duckdb", "polars"] | None, engine)
   return UseCommand(
-    path=Path(path_parts[0]),
+    path=_parse_use_path(path_parts[0]),
     execution_mode="lazy" if is_lazy else "eager",
     lazy_engine=lazy_engine or ("duckdb" if is_lazy else None),
   )
+
+
+def _parse_use_path(path_text: str) -> Path | str:
+  if _is_remote_uri(path_text):
+    return path_text
+  return Path(path_text)
+
+
+def _is_remote_uri(path_text: str) -> bool:
+  return "://" in path_text
 
 
 def _parse_use_options(option_text: str) -> dict[str, str | bool]:

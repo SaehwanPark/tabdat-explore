@@ -3,12 +3,18 @@ from pathlib import Path
 import pytest
 
 from tabdat.script import (
+  ElseDirective,
+  EndDirective,
+  IfDirective,
   LetDirective,
+  ScriptBlockState,
   ScriptCommand,
   ScriptContext,
   ScriptError,
   SeedDirective,
+  evaluate_script_condition,
   expand_script_macros,
+  parse_control_flow_directive,
   parse_script,
   parse_script_directive,
   read_script,
@@ -146,3 +152,52 @@ def test_parse_script_let_directive_rejects_duplicate_name() -> None:
       path=Path("analysis.td"),
       line=1,
     )
+
+
+def test_parse_script_control_flow_directives() -> None:
+  assert parse_control_flow_directive("if true", path=Path("analysis.td"), line=1) == IfDirective(
+    active=True
+  )
+  assert parse_control_flow_directive("else", path=Path("analysis.td"), line=2) == ElseDirective()
+  assert parse_control_flow_directive("end", path=Path("analysis.td"), line=3) == EndDirective()
+  assert parse_control_flow_directive("count", path=Path("analysis.td"), line=4) is None
+
+
+def test_script_block_state_reports_current_branch_activity() -> None:
+  assert ScriptBlockState(start_line=1, condition_active=True).current_branch_active is True
+  assert (
+    ScriptBlockState(start_line=1, condition_active=True, in_else=True).current_branch_active
+    is False
+  )
+  assert (
+    ScriptBlockState(start_line=1, condition_active=False, in_else=True).current_branch_active
+    is True
+  )
+
+
+@pytest.mark.parametrize(
+  ("condition", "expected"),
+  [
+    ("true", True),
+    ("on", True),
+    ("1", True),
+    ("false", False),
+    ("off", False),
+    ("0", False),
+    ("duckdb == duckdb", True),
+    ("duckdb != polars", True),
+    ("duckdb == polars", False),
+  ],
+)
+def test_evaluate_script_condition(condition: str, expected: bool) -> None:
+  assert evaluate_script_condition(condition, path=Path("analysis.td"), line=1) is expected
+
+
+def test_evaluate_script_condition_rejects_unsupported_condition() -> None:
+  with pytest.raises(ScriptError, match="analysis.td:1: if condition expects"):
+    evaluate_script_condition("duckdb", path=Path("analysis.td"), line=1)
+
+
+def test_parse_script_control_flow_rejects_missing_condition() -> None:
+  with pytest.raises(ScriptError, match="analysis.td:1: if expects a condition"):
+    parse_control_flow_directive("if", path=Path("analysis.td"), line=1)

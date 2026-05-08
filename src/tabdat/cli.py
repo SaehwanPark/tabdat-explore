@@ -17,11 +17,16 @@ from tabdat.formatter import format_result
 from tabdat.models import ExitCommand, PlotResult, Result, RunCommand
 from tabdat.parser import parse_command
 from tabdat.script import (
+  ElseDirective,
+  EndDirective,
+  IfDirective,
   LetDirective,
+  ScriptBlockState,
   ScriptContext,
   ScriptError,
   SeedDirective,
   expand_script_macros,
+  parse_control_flow_directive,
   parse_script_directive,
   read_script,
 )
@@ -193,8 +198,15 @@ def _run_script_status(
   commands = read_script(resolved_path)
   _print_script_metadata(resolved_path, executor.state.config, context)
   next_stack = active_stack + (resolved_path,)
+  block_state: ScriptBlockState | None = None
 
   for script_command in commands:
+    if block_state is not None and not block_state.current_branch_active:
+      stripped = script_command.text.strip()
+      command_name = stripped.split(maxsplit=1)[0].lower() if stripped else ""
+      if command_name not in {"if", "else", "end"}:
+        continue
+
     try:
       expanded_text = expand_script_macros(
         script_command.text,
@@ -204,6 +216,48 @@ def _run_script_status(
       )
     except ScriptError:
       raise
+
+    control_directive = parse_control_flow_directive(
+      expanded_text,
+      path=resolved_path,
+      line=script_command.start_line,
+    )
+    if isinstance(control_directive, IfDirective):
+      if block_state is not None:
+        raise ScriptError(
+          resolved_path,
+          script_command.start_line,
+          "nested if blocks are not supported",
+        )
+      print(f". {expanded_text}")
+      block_state = ScriptBlockState(
+        start_line=script_command.start_line,
+        condition_active=control_directive.active,
+      )
+      continue
+    if isinstance(control_directive, ElseDirective):
+      if block_state is None:
+        raise ScriptError(resolved_path, script_command.start_line, "else without matching if")
+      if block_state.in_else:
+        raise ScriptError(
+          resolved_path,
+          script_command.start_line,
+          "if block already has an else branch",
+        )
+      print(f". {expanded_text}")
+      block_state = ScriptBlockState(
+        start_line=block_state.start_line,
+        condition_active=block_state.condition_active,
+        in_else=True,
+      )
+      continue
+    if isinstance(control_directive, EndDirective):
+      if block_state is None:
+        raise ScriptError(resolved_path, script_command.start_line, "end without matching if")
+      print(f". {expanded_text}")
+      block_state = None
+      continue
+
     print(f". {expanded_text}")
 
     directive = parse_script_directive(
@@ -246,6 +300,9 @@ def _run_script_status(
       raise ScriptError(resolved_path, script_command.start_line, "command failed")
     if status is _RunStatus.STOP:
       break
+
+  if block_state is not None:
+    raise ScriptError(resolved_path, block_state.start_line, "if block is missing end")
 
   return _RunStatus.CONTINUE
 
