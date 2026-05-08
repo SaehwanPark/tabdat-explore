@@ -34,6 +34,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "collapse",
   "join",
   "append",
+  "reshape",
   "sql",
   "histogram",
   "scatter",
@@ -61,6 +62,7 @@ _COLUMN_COMMANDS = {
   "histogram",
   "scatter",
   "bar",
+  "reshape",
 }
 _TABULATE_OPTIONS = ("row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)

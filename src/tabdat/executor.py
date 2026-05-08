@@ -33,6 +33,7 @@ from tabdat.models import (
   PreviewResult,
   RenameCommand,
   ReplaceCommand,
+  ReshapeCommand,
   Result,
   SaveCommand,
   SaveResult,
@@ -150,6 +151,9 @@ class Executor:
 
     if isinstance(command, AppendCommand):
       return self._execute_append(command)
+
+    if isinstance(command, ReshapeCommand):
+      return self._execute_reshape(command)
 
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
@@ -329,6 +333,24 @@ class Executor:
       table_name=command.table_name,
     )
     return self._record_detached_transform(f"Appended {command.table_name}", next_dataset)
+
+  def _execute_reshape(self, command: ReshapeCommand) -> TransformResult:
+    dataset = self._require_active_dataset("reshape")
+    if command.direction == "long":
+      next_dataset = self.backend.reshape_long(
+        dataset,
+        command.variables,
+        command.identifiers,
+        command.j_variable,
+      )
+      return self._record_detached_transform("Reshaped long", next_dataset)
+    next_dataset = self.backend.reshape_wide(
+      dataset,
+      command.variables,
+      command.identifiers,
+      command.j_variable,
+    )
+    return self._record_detached_transform("Reshaped wide", next_dataset)
 
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self._set_active_dataset(dataset)

@@ -33,10 +33,12 @@ def test_completer_suggests_command_names() -> None:
   executor = Executor()
   try:
     completions = _completion_texts(TabdatCompleter(executor), "sum")
+    reshape_completions = _completion_texts(TabdatCompleter(executor), "resh")
   finally:
     executor.close()
 
   assert completions == ["summarize"]
+  assert reshape_completions == ["reshape"]
 
 
 def test_completer_omits_columns_before_dataset_load() -> None:
