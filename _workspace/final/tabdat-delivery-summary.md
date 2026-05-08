@@ -1,17 +1,17 @@
-# Phase 11 Delivery Summary
+# Phase 11 Append Delivery Summary
 
 ## Summary
 
-Implemented the first Phase 11 data workflow primitive on branch
-`codex/tmp-phase11-join-merge`.
+Implemented the second Phase 11 data workflow primitive on branch
+`codex/tmp-phase11-append-stack`.
 
 ## Changed Behavior
 
-- `join <table> on <keylist>` joins the active dataset to a session-local named table.
-- `how=inner|left` selects the join kind, with `inner` as the default.
-- `suffix(<suffix>)` controls right-side non-key column collision names, defaulting to `_right`.
-- Successful joins print `Joined <table>: N rows, M columns`.
-- The join result replaces the active dataset for later commands.
+- `append <table>` appends a session-local named table to the active dataset.
+- The active dataset and appended named table must have the same column names and compatible types.
+- Output column order follows the active dataset.
+- Successful appends print `Appended <table>: N rows, M columns`.
+- The append result replaces the active dataset for later commands.
 
 ## Validation
 
@@ -22,7 +22,9 @@ Implemented the first Phase 11 data workflow primitive on branch
 
 ## Known Limits
 
-- Only same-name equality keys are supported.
-- Only session-local named tables can be right-side join inputs.
-- No append/stack, reshape, panel metadata, remote data access, script variables, seeding, or
-  control flow was added in this slice.
+- Only session-local named tables can be appended.
+- `stack` is not an alias yet.
+- Missing, extra, or mismatched-type columns are rejected.
+- No source indicator, permissive missing-column filling, type coercion policy, file-path append,
+  reshape, panel metadata, remote data access, script variables, seeding, or control flow was added
+  in this slice.

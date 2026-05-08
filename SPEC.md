@@ -101,10 +101,16 @@ This file tracks feature state for spec-driven development. Product intent lives
   - `suffix(<suffix>)` for right-side non-key column collisions
   - active dataset replacement with deterministic DuckDB materialization
   - focused parser, executor/backend, and CLI coverage
+- Implemented the second Phase 11 data workflow primitive:
+  - `append <table>` over session-local named tables
+  - strict same-column schema validation with compatible DuckDB types
+  - active-dataset column order preservation
+  - active dataset replacement with deterministic DuckDB materialization
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
-- Phase 11 has started with same-name equality joins against session-local named tables.
+- Phase 11 has started with same-name equality joins and strict named-table append workflows.
   Functional helper imports should continue to go through `tabdat.monads`, which delegates to
   `comp-builders` while preserving a stable repo-local boundary.
 
@@ -121,7 +127,9 @@ This file tracks feature state for spec-driven development. Product intent lives
 - Phase 11 data workflow and reproducibility primitives:
   - extend join workflows with additional ergonomics only after the initial same-name equality join
     contract is dogfooded
-  - add append/stack and reshape workflows
+  - extend append/stack workflows only after the initial strict named-table append contract is
+    dogfooded
+  - add reshape workflows
   - add panel identifier handling and script-level reproducibility primitives such as seeding,
     reusable variables/macros, and minimal control flow
   - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet

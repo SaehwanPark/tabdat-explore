@@ -4,8 +4,8 @@ TabDat-Explore has started roadmap Phase 11 data workflow primitives after compl
 execution and state foundations slice. This
 document records the implemented shell UX, script runner, command-language model, active DuckDB
 relation model, session-local named table registry, lazy load boundary, runtime configuration, plot
-artifact boundary, persistence boundary, join boundary, and the boundaries future phases should
-preserve.
+artifact boundary, persistence boundary, join and append boundaries, and the boundaries future
+phases should preserve.
 
 ## Runtime Flow
 
@@ -55,9 +55,9 @@ Dispatches executable commands, maintains session state, and coordinates with th
 MVP, session state contains one active dataset, a session-local named table registry, and one typed
 runtime config. Parsed-only Phase 2 command forms must fail with an unsupported-command execution
 error until a later command contract defines execution. Runtime `set` commands update session config
-and affect later commands in the same shell, command sequence, or script. `join` validates active
-state and named-table lookup at the executor boundary before asking the backend to materialize the
-joined active relation.
+and affect later commands in the same shell, command sequence, or script. `join` and `append`
+validate active state and named-table lookup at the executor boundary before asking the backend to
+materialize the next active relation.
 
 ### DuckDB Backend
 
@@ -71,8 +71,11 @@ session-local named table registry stores SQL `into` results under safe internal
 names; `use <table>` reactivates a registered table, while the active relation remains the default
 target for non-SQL commands. `join <table> on <keylist>` joins the active relation to a registered
 named table using same-name equality keys, supports `inner` and `left` joins, suffixes right-side
-non-key column collisions, and materializes the result as the new eager active relation. No
-persistent registry exists, but `save` / `export` can persist the active relation to local Parquet.
+non-key column collisions, and materializes the result as the new eager active relation.
+`append <table>` vertically stacks a registered named table under the active relation after strict
+same-column and compatible-type validation, preserving active-dataset column order and
+materializing the result as the new eager active relation. No persistent registry exists, but
+`save` / `export` can persist the active relation to local Parquet.
 SQL commands bind the active relation as the user-facing DuckDB view `active`. Initial lazy loads
 report an unknown row count until a live count or materializing operation runs.
 
@@ -114,6 +117,8 @@ display formatting.
 - `use <table>` reactivates a registered named table; `use <path>` remains local Parquet loading.
 - `join <table> on <keylist>` joins the active dataset with a registered named table and replaces
   the active dataset with the joined result.
+- `append <table>` appends a registered named table to the active dataset and replaces the active
+  dataset with the appended result.
 - Phase 5 prompt-toolkit UX is available for interactive sessions.
 - Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
 - Phase 7 lazy loading is executable through `use <path>, lazy` and
@@ -144,6 +149,8 @@ display formatting.
 - Keep named tables session-local until a future persistence/catalog contract exists.
 - Keep `join` scoped to named-table inputs and same-name equality keys until a broader multi-table
   workflow contract is written.
+- Keep `append` scoped to named-table inputs with strict same-column schemas until a broader stack
+  or union contract is written.
 - Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
   contract exists.
 - Use 2-space tab size across project files.
