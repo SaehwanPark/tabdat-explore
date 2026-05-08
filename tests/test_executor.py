@@ -211,6 +211,28 @@ def test_phase_11_join_supports_multiple_keys_and_collision_suffix(
   ]
 
 
+def test_phase_11_join_suffixing_keeps_output_names_unique(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(SqlCommand("select sex, cost from active", into="lookup"))
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(GenerateCommand("cost_lookup", NumberExpression(1)))
+    result = executor.execute(JoinCommand(table_name="lookup", keys=("sex",), suffix="_lookup"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert [column.name for column in result.dataset.columns] == [
+    "age",
+    "bmi",
+    "sex",
+    "cost",
+    "cost_lookup",
+    "cost_lookup_2",
+  ]
+
+
 def test_phase_11_join_reports_table_and_key_errors(sample_parquet: Path) -> None:
   executor = Executor()
   try:

@@ -790,14 +790,26 @@ def _right_join_selects(
   suffix: str,
 ) -> tuple[str, ...]:
   selects: list[str] = []
+  used_output_names = set(left_types)
   for column in right_dataset.columns:
     if column.name in keys:
       continue
-    output_name = f"{column.name}{suffix}" if column.name in left_types else column.name
+    base_output_name = f"{column.name}{suffix}" if column.name in used_output_names else column.name
+    output_name = _unique_output_name(base_output_name, used_output_names)
+    used_output_names.add(output_name)
     selects.append(
       f"right_table.{_quote_identifier(column.name)} as {_quote_identifier(output_name)}"
     )
   return tuple(selects)
+
+
+def _unique_output_name(candidate: str, used_names: set[str]) -> str:
+  if candidate not in used_names:
+    return candidate
+  counter = 2
+  while f"{candidate}_{counter}" in used_names:
+    counter += 1
+  return f"{candidate}_{counter}"
 
 
 def _quote_identifier(identifier: str) -> str:
