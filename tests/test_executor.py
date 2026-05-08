@@ -452,6 +452,34 @@ def test_phase_11_reshape_reports_dataset_and_variable_errors(
     executor.close()
 
 
+def test_phase_11_reshape_long_validates_j_values_across_all_stubs(tmp_path: Path) -> None:
+  path = tmp_path / "ragged_wide.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 10.0, 100.0, 300.0),
+        (2, 20.0, 200.0, 400.0)
+    ) as ragged(id, income_2020, cost_2020, cost_2022)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(UnknownVariableError, match="reshape long missing column: income_2022"):
+      executor.execute(
+        ReshapeCommand(
+          "long",
+          ("income", "cost"),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
+  finally:
+    executor.close()
+
+
 def test_phase_11_reshape_wide_reports_output_conflict(tmp_path: Path) -> None:
   path = tmp_path / "long_conflict.parquet"
   _write_sql_parquet(

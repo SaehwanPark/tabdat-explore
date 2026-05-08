@@ -920,16 +920,22 @@ def _reject_existing_column(command_name: str, column_types: dict[str, str], var
 
 
 def _long_j_values(dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[str, ...]:
-  first_stub = variables[0]
-  prefix = f"{first_stub}_"
-  values = tuple(
-    column.name.removeprefix(prefix)
-    for column in dataset.columns
-    if column.name.startswith(prefix) and column.name != prefix
-  )
-  if not values:
-    raise UnknownVariableError(f"reshape long found no columns for stub: {first_stub}")
-  return values
+  values: list[str] = []
+  seen: set[str] = set()
+  for variable in variables:
+    prefix = f"{variable}_"
+    variable_values = tuple(
+      column.name.removeprefix(prefix)
+      for column in dataset.columns
+      if column.name.startswith(prefix) and column.name != prefix
+    )
+    if not variable_values:
+      raise UnknownVariableError(f"reshape long found no columns for stub: {variable}")
+    for value in variable_values:
+      if value not in seen:
+        seen.add(value)
+        values.append(value)
+  return tuple(values)
 
 
 def _require_long_stub_columns(
