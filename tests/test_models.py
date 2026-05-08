@@ -8,7 +8,7 @@ from tabdat.models import CommandOption, HeadCommand, KeepCommand, UseCommand
   ("factory", "kwargs"),
   [
     (HeadCommand, {"limit": "5"}),
-    (UseCommand, {"path": "data.parquet"}),
+    (UseCommand, {"path": 123}),
     (KeepCommand, {"variables": ["age"]}),
     (CommandOption, {"name": 1}),
   ],
@@ -16,3 +16,7 @@ from tabdat.models import CommandOption, HeadCommand, KeepCommand, UseCommand
 def test_models_reject_invalid_runtime_types(factory: type, kwargs: dict[str, object]) -> None:
   with pytest.raises(ValidationError):
     factory(**kwargs)
+
+
+def test_use_command_accepts_remote_uri_string() -> None:
+  assert UseCommand("https://example.com/data.parquet").path == "https://example.com/data.parquet"
