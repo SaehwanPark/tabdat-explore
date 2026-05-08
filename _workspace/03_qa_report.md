@@ -1,25 +1,22 @@
-# Phase 11 Panel Metadata QA Report
+# Phase 11 Script Primitives QA Report
 
 Status: pass
 
 ## Boundaries Checked
 
-- Product contract to parser behavior for `panel`, `panel <id_var> <time_var>`, `panel clear`, and
-  malformed syntax/options.
-- Parser model to executor command dispatch and active-dataset requirements.
-- Executor state to DuckDB validation for missing id/time values and duplicate id/time pairs.
-- Metadata state transitions across filters, projection, rename, generate, replace, collapse,
-  named-table activation, and SQL materialization.
-- Formatter output to CLI repeated `-c` deterministic output.
-- Shell command and column completion behavior.
+- Product contract to script helper behavior for `seed`, `let`, macro expansion, and diagnostics.
+- Script helper behavior to CLI script execution for top-level files, command-mode `run`, and
+  nested `run` scripts.
+- Script directive boundary to parser/executor behavior, keeping `seed` and `let` script-only.
+- Deterministic transcript behavior for expanded commands and directive output.
 - SPEC, ARCHITECTURE, CHANGELOG, README, and workspace artifacts against implemented behavior.
 
 ## Validation Evidence
 
 - Focused validation:
-  - `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py`
+  - `uv run pytest tests/test_script.py tests/test_cli.py`
   - `uv run mypy`
-  - `uv run ruff check .`
+  - `uv run ruff check src/tabdat/script.py src/tabdat/cli.py tests/test_script.py tests/test_cli.py`
 
 Full validation before delivery:
 
@@ -30,7 +27,7 @@ Full validation before delivery:
 
 ## Residual Risk
 
-- Metadata is intentionally session-local and not durable.
-- `sql ... into`, `join`, `append`, `reshape`, and `collapse` conservatively clear metadata until
-  richer lineage semantics are designed.
-- No panel balancedness or time-order diagnostics exist yet.
+- Macro expansion is intentionally plain text and may need quoting/escaping once real-world script
+  patterns are dogfooded.
+- `seed` is metadata-only until future randomness, simulation, or resampling commands exist.
+- Minimal script control flow and remote data access remain unfinished Phase 11 work.

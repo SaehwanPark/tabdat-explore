@@ -120,13 +120,19 @@ This file tracks feature state for spec-driven development. Product intent lives
   - deterministic metadata preservation, renaming, revalidation, and clearing across existing
     state-changing commands
   - focused parser, executor/backend, CLI, and shell coverage
+- Implemented Phase 11 script reproducibility primitives:
+  - script-only `seed <integer>` metadata
+  - script-only `let <name> = <value>` macros
+  - `$name` macro expansion for later script entries and nested `run` scripts
+  - top-level script-scoped macro and seed state with line-numbered diagnostics
+  - focused script parser/helper and CLI coverage
 
 ## Present
 
 - Phase 11 has same-name equality joins, strict named-table append workflows, narrow
-  active-dataset reshape workflows, and session-local panel metadata. Functional helper imports
-  should continue to go through `tabdat.monads`, which delegates to `comp-builders` while
-  preserving a stable repo-local boundary.
+  active-dataset reshape workflows, session-local panel metadata, and script-local seed/macro
+  primitives. Functional helper imports should continue to go through `tabdat.monads`, which
+  delegates to `comp-builders` while preserving a stable repo-local boundary.
 
 ## Future
 
@@ -144,8 +150,7 @@ This file tracks feature state for spec-driven development. Product intent lives
   - extend append/stack workflows only after the initial strict named-table append contract is
     dogfooded
   - extend reshape workflows only after the initial wide/long contract is dogfooded
-  - add script-level reproducibility primitives such as seeding, reusable variables/macros, and
-    minimal control flow
+  - add minimal script-level control flow only after seed and macro primitives are dogfooded
   - add narrow remote data access for DuckDB-friendly sources such as S3/object-store Parquet
     and DB connections
 - Phase 12 estimation substrate:

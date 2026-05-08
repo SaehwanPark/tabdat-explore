@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 11 script reproducibility primitives with script-only `seed <integer>` metadata,
+  script-only `let <name> = <value>` macros, `$name` expansion in later script entries and nested
+  `run` scripts, deterministic expanded command transcripts, line-numbered script diagnostics, and
+  focused script helper and CLI coverage.
 - Added Phase 11 panel metadata with `panel <id_var> <time_var>`, `panel`, and `panel clear`,
   DuckDB-backed missing-value and duplicate id/time validation, session-local metadata
   preservation/clearing across state-changing commands, deterministic CLI output, and focused
