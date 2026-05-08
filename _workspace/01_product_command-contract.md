@@ -1,4 +1,4 @@
-# Phase 11 Join/Merge Command Contract
+# Phase 11 Append/Stack Command Contract
 
 ## Roadmap Phase
 
@@ -7,78 +7,70 @@ Phase 11: Data Workflow & Reproducibility Primitives.
 ## Command Syntax
 
 ```text
-join <table> on <keylist>
-join <table> on <keylist>, how=inner|left
-join <table> on <keylist>, suffix(<suffix>)
+append <table>
 ```
 
 - `<table>` must name an existing session-local named table created by `sql ... into <table>`.
-- `<keylist>` is one or more same-name equality keys present on both the active dataset and the
-  named table.
-- `how=inner` is the default join kind.
-- `how=left` preserves all active-dataset rows.
-- `suffix(<suffix>)` renames colliding right-side non-key columns; the default suffix is `_right`.
-- Duplicate key names are rejected.
+- The active dataset and named table must have the same column names.
+- Output column order follows the active dataset.
+- Compatible DuckDB types are required for columns with the same name.
+- No options are supported in this slice.
 
 ## Examples
 
 ```text
-use patients.parquet
-sql select patient_id, clinic from active into clinics
-use visits.parquet
-join clinics on patient_id
+use baseline.parquet
+sql select id, age, sex from active where age >= 65 into older
+use baseline.parquet
+keep if age < 65
+append older
 ```
 
 Expected output:
 
 ```text
-Joined clinics: N rows, M columns
+Appended older: N rows, M columns
 ```
-
-```text
-join lookup on id, how=left suffix(_lookup)
-```
-
-Expected behavior: all active rows are retained; right-side non-key column collisions are suffixed
-with `_lookup`.
 
 ## Execution Semantics
 
-- `join` requires an active dataset and a registered named table.
-- The join result replaces the active dataset.
-- Named tables remain session-local and unchanged by the join.
+- `append` requires an active dataset and a registered named table.
+- The append result replaces the active dataset.
+- Named tables remain session-local and unchanged by append.
 - SQL generation happens inside the DuckDB backend. The executor owns session-state lookup and
   active dataset replacement.
-- The current active dataset remains the default command target after the join.
-- Joined results are materialized as eager DuckDB temp tables, even if either input originated from
-  a lazy load.
+- The current active dataset remains the default command target after append.
+- Appended results are materialized as eager DuckDB temp tables, even if either input originated
+  from a lazy load.
 
 ## User-Facing Errors
 
-- Missing active dataset: `join requires an active dataset; run use <path> first`.
+- Missing active dataset: `append requires an active dataset; run use <path> first`.
 - Unknown named table: `unknown table: <table>`.
-- Missing active-side key: `join unknown variable: <key>`.
-- Missing right-side key: `join unknown variable in <table>: <key>`.
+- Missing active-side column: `append unknown variable: <column>`.
+- Missing named-table column: `append unknown variable in <table>: <column>`.
+- Type mismatch: `append type mismatch for <column>: <left_type> vs <right_type>`.
 - Invalid table name: `invalid table name: <table>`.
 - Reserved table name: `reserved table name: <table>`.
-- Unsupported syntax, options, join kinds, empty suffixes, or duplicate keys are parse errors.
+- Unsupported syntax or options are parse errors.
 
 ## Non-Goals
 
-- No Stata-compatible `_merge` indicator or cardinality validation.
-- No right/full/cross joins.
-- No different-name key mapping.
-- No arbitrary SQL access to all registered named tables.
-- No append/stack, reshape, panel metadata, remote data access, or script-level reproducibility
-  primitives in this slice.
+- No `stack` alias in this first append slice.
+- No source indicator column.
+- No missing-column filling or permissive union-by-name mode.
+- No type coercion policy beyond DuckDB-compatible strict validation.
+- No file-path append inputs.
+- No reshape, panel metadata, remote data access, or script-level reproducibility primitives in
+  this slice.
 
 ## Acceptance Criteria
 
-- Parser tests cover valid join forms and malformed syntax/options.
-- Executor/backend tests cover inner joins, left joins, multi-key joins, collision suffixing,
-  unknown tables, missing keys, and missing active datasets.
-- CLI smoke tests cover a repeated `-c` named-table join workflow and deterministic output.
-- Documentation records the Phase 11 join boundary and remaining future Phase 11 work.
+- Parser tests cover valid append syntax and malformed syntax/options.
+- Executor/backend tests cover successful append, column-order alignment, missing active datasets,
+  unknown tables, missing columns, and type mismatches.
+- CLI smoke tests cover a repeated `-c` named-table append workflow and deterministic output.
+- Documentation records the Phase 11 append boundary and remaining future Phase 11 work.
 - Full validation passes:
   - `uv run pytest`
   - `uv run mypy`

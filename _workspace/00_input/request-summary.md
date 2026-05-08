@@ -1,9 +1,9 @@
-# Phase 11 Request Summary
+# Phase 11 Append/Stack Request Summary
 
 ## Goal
 
-Move from the completed Phase 10 execution/state foundations into the first Phase 11 data workflow
-primitive: named-table joins.
+Continue Phase 11 data workflow primitives after the completed same-name equality join slice by
+adding a narrow append/stack checkpoint.
 
 ## Requested Workflow
 
@@ -15,21 +15,29 @@ primitive: named-table joins.
 ## Phase Fit
 
 Phase 11 in `docs/dev_phase.md` covers estimation-ready data workflows, including join /
-merge-style commands for multi-table workflows. The first slice should build directly on the Phase
-10 session-local named table registry.
+merge-style commands, append/stack, reshape, panel identifiers, script reproducibility primitives,
+and narrow remote access. Phase 11 has already started with named-table joins, and append/stack is
+the next selected unfinished primitive.
 
 ## Touched Surfaces
 
-- Parser and command models for `join <table> on <keylist>` syntax.
-- Executor session state and active dataset replacement after a join.
-- DuckDB backend named-table joins, key validation, and collision suffixing.
-- Formatter output, focused parser/executor/CLI tests, SDD docs, and handoff artifacts.
+- Parser and command models for `append <table>` syntax.
+- Executor session state and active dataset replacement after append.
+- DuckDB backend named-table vertical stacking with schema validation.
+- Formatter output through existing transform results.
+- Focused parser, executor/backend, and CLI tests.
+- SDD and workspace documentation.
 
 ## Assumptions
 
-- Implement `join`, not a Stata-compatible `merge` command.
-- Right-side inputs are existing session-local named tables only.
-- Only same-name equality keys are supported in this slice.
-- Supported join kinds are `inner` and `left`; `inner` is the default.
-- Append/stack, reshape, panel metadata, remote data access, script variables, seeding, and control
-  flow remain later Phase 11 slices.
+- Implement `append <table>` first, not a broader `stack` alias.
+- Append inputs are session-local named tables created by `sql ... into <table>`.
+- Appended datasets must have the same column names and compatible DuckDB types.
+- Column order follows the active dataset.
+- Reshape, panel metadata, remote data access, script variables, seeding, and control flow remain
+  later Phase 11 slices.
+
+## Non-Goals
+
+- No permissive missing-column filling, source indicator, type coercion policy, file-path append,
+  persistent table catalog, reshape, panel metadata, remote access, or script-level primitives.
