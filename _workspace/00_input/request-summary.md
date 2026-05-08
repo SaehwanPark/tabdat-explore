@@ -1,43 +1,38 @@
-# Phase 11 Append/Stack Request Summary
+# Phase 11 Reshape Request Summary
 
 ## Goal
 
-Continue Phase 11 data workflow primitives after the completed same-name equality join slice by
-adding a narrow append/stack checkpoint.
-
-## Requested Workflow
-
-- Begin on a temporary branch.
-- Commit meaningful checkpoints during implementation.
-- Document completed work carefully.
-- Open a PR and mark it ready for review when done.
+Continue Phase 11 data workflow primitives after the completed named-table join and append slices by
+adding a narrow reshape wide/long checkpoint.
 
 ## Phase Fit
 
 Phase 11 in `docs/dev_phase.md` covers estimation-ready data workflows, including join /
-merge-style commands, append/stack, reshape, panel identifiers, script reproducibility primitives,
-and narrow remote access. Phase 11 has already started with named-table joins, and append/stack is
-the next selected unfinished primitive.
+merge-style commands, append/stack, reshape wide/long, panel identifiers, script reproducibility
+primitives, and narrow remote access. Join and append are already complete, so reshape is the next
+data-shaping prerequisite before Phase 12 estimation substrate work.
 
 ## Touched Surfaces
 
-- Parser and command models for `append <table>` syntax.
-- Executor session state and active dataset replacement after append.
-- DuckDB backend named-table vertical stacking with schema validation.
-- Formatter output through existing transform results.
-- Focused parser, executor/backend, and CLI tests.
-- SDD and workspace documentation.
+- Command contract for `reshape long` and `reshape wide`.
+- Parser and pydantic command models.
+- Executor state transition and active dataset replacement.
+- DuckDB backend materialization for wide-to-long and long-to-wide transforms.
+- CLI and shell command coverage.
+- Focused parser, executor/backend, CLI, and shell tests.
+- SPEC, ARCHITECTURE, CHANGELOG, implementation report, QA report, and delivery summary.
 
 ## Assumptions
 
-- Implement `append <table>` first, not a broader `stack` alias.
-- Append inputs are session-local named tables created by `sql ... into <table>`.
-- Appended datasets must have the same column names and compatible DuckDB types.
-- Column order follows the active dataset.
-- Reshape, panel metadata, remote data access, script variables, seeding, and control flow remain
-  later Phase 11 slices.
+- Implement only local active-dataset reshape operations in this slice.
+- `reshape long <stublist>, i(<id_vars>) j(<name_var>)` expects active columns named
+  `<stub>_<j_value>`.
+- `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` pivots long data into columns named
+  `<value_var>_<j_value>`.
+- Reshape results replace the active dataset and are materialized eagerly.
 
 ## Non-Goals
 
-- No permissive missing-column filling, source indicator, type coercion policy, file-path append,
-  persistent table catalog, reshape, panel metadata, remote access, or script-level primitives.
+- No multi-table reshape, custom separators, aliases, wildcard stub discovery, type coercion
+  policy, panel metadata, script variables/macros, seeding, control flow, remote access, or Phase 12
+  estimation substrate work.

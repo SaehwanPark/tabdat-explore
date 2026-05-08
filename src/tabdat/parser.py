@@ -32,6 +32,7 @@ from tabdat.models import (
   ParsedCommand,
   RenameCommand,
   ReplaceCommand,
+  ReshapeCommand,
   RunCommand,
   SaveCommand,
   ScatterCommand,
@@ -65,6 +66,7 @@ _EXECUTABLE_COMMANDS = {
   "collapse",
   "join",
   "append",
+  "reshape",
   "sql",
   "histogram",
   "scatter",
@@ -260,6 +262,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
   if parts.name == "append":
     return _parse_append(parts)
 
+  if parts.name == "reshape":
+    return _parse_reshape(parts)
+
   if parts.name == "histogram":
     return _parse_histogram(parts)
 
@@ -433,6 +438,11 @@ def _validate_sql_table_name(table_name: str) -> None:
     raise ParseError(f"sql into cannot use reserved table name: {table_name}")
 
 
+def _require_unique(command_name: str, values: tuple[str, ...]) -> None:
+  if len(set(values)) != len(values):
+    raise ParseError(f"{command_name} variable list contains duplicates")
+
+
 def _parse_run(text: str) -> RunCommand:
   body = text[3:].strip()
   if not body:
@@ -558,6 +568,45 @@ def _parse_append(parts: _CommandParts) -> AppendCommand:
   table_name = parts.arguments[0]
   _validate_sql_table_name(table_name)
   return AppendCommand(table_name=table_name)
+
+
+def _parse_reshape(parts: _CommandParts) -> ReshapeCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("reshape expects syntax: reshape long|wide varlist, i(id_vars) j(name)")
+  if len(parts.arguments) < 2:
+    raise ParseError("reshape expects syntax: reshape long|wide varlist, i(id_vars) j(name)")
+
+  direction = parts.arguments[0].lower()
+  if direction not in {"long", "wide"}:
+    raise ParseError("reshape direction must be long or wide")
+  variables = parts.arguments[1:]
+  _require_unique("reshape", variables)
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"i", "j"}
+  if unsupported:
+    raise ParseError(f"reshape unsupported option: {', '.join(sorted(unsupported))}")
+
+  identifiers = _single_tuple_option(parts.options, "i", "reshape")
+  if identifiers is None or not identifiers:
+    raise ParseError("reshape expects exactly one i(id_vars) option")
+  _require_unique("reshape", identifiers)
+
+  j_values = _single_tuple_option(parts.options, "j", "reshape")
+  if j_values is None or len(j_values) != 1:
+    raise ParseError("reshape expects exactly one j(name) option")
+  j_variable = j_values[0]
+
+  overlaps = set(variables) & set(identifiers)
+  if overlaps or j_variable in variables or j_variable in identifiers:
+    raise ParseError("reshape variables, i(), and j() names must be distinct")
+
+  return ReshapeCommand(
+    direction=cast(Literal["long", "wide"], direction),
+    variables=variables,
+    identifiers=identifiers,
+    j_variable=j_variable,
+  )
 
 
 def _parse_histogram(parts: _CommandParts) -> HistogramCommand:
@@ -688,6 +737,22 @@ def _single_text_option(
     return value[0]
   if not isinstance(value, str):
     raise ParseError(f"{command_name} option {name} expects a value")
+  return value
+
+
+def _single_tuple_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> tuple[str, ...] | None:
+  matched = tuple(option for option in options if option.name == name)
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option {name} may only be supplied once")
+  value = matched[0].value
+  if not isinstance(value, tuple):
+    raise ParseError(f"{command_name} option {name} expects variables")
   return value
 
 
