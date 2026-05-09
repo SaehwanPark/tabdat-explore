@@ -132,11 +132,16 @@ This file tracks feature state for spec-driven development. Product intent lives
   - branch skipping without command echo or execution for inactive script branches
   - narrow remote Parquet loading for `http://`, `https://`, and `s3://` URIs through DuckDB
   - focused script helper, CLI, parser, backend classification, model, and validation coverage
+- Completed an SDD documentation compliance pass:
+  - confirmed root `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` coverage
+  - clarified that Phase 12 estimation substrate remains planned future work until implementation
+    begins
+  - preserved the local `tabdat.monads` boundary as an active contributor invariant
 
 ## Present
 
-- Phase 12 estimation substrate is next. Functional helper imports should continue to go through
-  `tabdat.monads`, which delegates to `comp-builders` while preserving a stable repo-local
+- No implementation feature is actively underway. Functional helper imports should continue to go
+  through `tabdat.monads`, which delegates to `comp-builders` while preserving a stable repo-local
   boundary.
 
 ## Future

@@ -81,6 +81,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Clarified SDD state so `SPEC.md` separates completed Phase 11 work, no active implementation,
+  and future Phase 12 estimation substrate planning.
 - Changed structured parser failure composition from handwritten `Either` helpers to
   `comp-builders` `Result` values while preserving the public `ParseError` behavior.
 
