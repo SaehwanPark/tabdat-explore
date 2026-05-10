@@ -356,7 +356,7 @@ def test_cli_runs_phase_7_lazy_use_flow(sample_parquet: Path, capsys) -> None:
   assert "Loaded:" in captured.out
   assert "lazy=polars" in captured.out
   assert "unknown rows" in captured.out
-  assert "Selected columns: 3 rows, 2 columns" in captured.out
+  assert "Selected columns: unknown rows, 2 columns" in captured.out
   assert "age  sex" in captured.out
   assert "30   F" in captured.out
   assert captured.err == ""
@@ -798,6 +798,7 @@ def test_cli_phase_9_runtime_set_and_save(
 ) -> None:
   artifact_dir = tmp_path / "plots"
   output_path = tmp_path / "filtered.parquet"
+  export_path = tmp_path / "filtered.csv"
 
   exit_code = main(
     [
@@ -813,6 +814,8 @@ def test_cli_phase_9_runtime_set_and_save(
       "histogram age",
       "-c",
       f"save {output_path}",
+      "-c",
+      f"export {export_path}",
     ]
   )
 
@@ -823,7 +826,9 @@ def test_cli_phase_9_runtime_set_and_save(
   assert f"Set artifact_dir: {artifact_dir}" in captured.out
   assert f"Saved plot: {artifact_dir / 'plots' / 'histogram-age.png'}" in captured.out
   assert f"Saved: {output_path} (2 rows, 4 columns)" in captured.out
+  assert f"Exported: {export_path} (2 rows, 4 columns)" in captured.out
   assert output_path.exists()
+  assert export_path.exists()
   assert captured.err == ""
 
 

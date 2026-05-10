@@ -1,10 +1,13 @@
 """DuckDB-backed dataset operations."""
 
+import tempfile
 from pathlib import Path
 from typing import Literal, cast
 from urllib.parse import urlparse
 
 import duckdb
+import polars as pl
+from polars.exceptions import PolarsError
 from pydantic.dataclasses import dataclass
 
 from tabdat.errors import (
@@ -65,6 +68,7 @@ class DuckDBBackend:
     self._connection = duckdb.connect(database=":memory:")
     self._active_storage: Literal["table", "view"] = "table"
     self._lazy_engine: Literal["duckdb", "polars"] | None = None
+    self._polars_lazy_frame: pl.LazyFrame | None = None
 
   def close(self) -> None:
     self._connection.close()
@@ -79,6 +83,26 @@ class DuckDBBackend:
     source = resolve_parquet_source(path)
 
     try:
+      if execution_mode == "lazy" and lazy_engine == "polars":
+        if source.is_remote:
+          raise ExecutionError("use lazy engine=polars only supports local Parquet paths")
+        next_lazy_frame = pl.scan_parquet(str(source.display_path))
+        schema = next_lazy_frame.collect_schema()
+        columns = tuple(
+          ColumnInfo(name=name, data_type=_polars_dtype_name(dtype))
+          for name, dtype in schema.items()
+        )
+        self._drop_active_relation()
+        self._polars_lazy_frame = next_lazy_frame
+        self._lazy_engine = "polars"
+        self._active_storage = "view"
+        return DatasetInfo(
+          path=source.display_path,
+          row_count=None,
+          columns=columns,
+          execution_mode="lazy",
+          lazy_engine="polars",
+        )
       if execution_mode == "lazy":
         read_sql = f"select * from read_parquet({_quote_literal(source.read_path)})"
         self._connection.execute(
@@ -101,13 +125,31 @@ class DuckDBBackend:
         self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
         self._lazy_engine = None
         self._active_storage = "table"
+        self._polars_lazy_frame = None
     except duckdb.Error as exc:
       self._drop_load_staging_relations()
+      raise ExecutionError(f"use could not read Parquet file: {source.read_path}") from exc
+    except (PolarsError, OSError) as exc:
       raise ExecutionError(f"use could not read Parquet file: {source.read_path}") from exc
 
     return self.active_dataset_info(source.display_path)
 
   def active_dataset_info(self, path: Path | str) -> DatasetInfo:
+    if self._polars_lazy_frame is not None:
+      try:
+        schema = self._polars_lazy_frame.collect_schema()
+      except PolarsError as exc:
+        raise ExecutionError("active dataset is not available") from exc
+      columns = tuple(
+        ColumnInfo(name=name, data_type=_polars_dtype_name(dtype)) for name, dtype in schema.items()
+      )
+      return DatasetInfo(
+        path=path,
+        row_count=None,
+        columns=columns,
+        execution_mode="lazy",
+        lazy_engine="polars",
+      )
     try:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
     except duckdb.Error as exc:
@@ -123,6 +165,8 @@ class DuckDBBackend:
     )
 
   def active_row_count(self) -> int:
+    if self._polars_lazy_frame is not None:
+      return self._polars_row_count()
     try:
       row_count_row = self._connection.execute(f"select count(*) from {ACTIVE_TABLE}").fetchone()
     except duckdb.Error as exc:
@@ -137,6 +181,8 @@ class DuckDBBackend:
     query: str,
     table_name: str,
   ) -> DatasetInfo:
+    if self._polars_lazy_frame is not None:
+      self.materialize_polars_lazy(dataset.path)
     _validate_user_table_name(table_name)
     _require_result_query(query)
     self._bind_active_view()
@@ -152,11 +198,14 @@ class DuckDBBackend:
 
   def activate_named_table(self, table_name: str) -> DatasetInfo:
     _validate_user_table_name(table_name)
+    self._polars_lazy_frame = None
     internal_name = _named_table_identifier(table_name)
     self._activate_relation(internal_name, "use")
     return self.active_dataset_info(Path(table_name))
 
   def store_active_as_named_table(self, table_name: str) -> DatasetInfo:
+    if self._polars_lazy_frame is not None:
+      self.materialize_polars_lazy(Path(table_name))
     _validate_user_table_name(table_name)
     internal_name = _named_table_identifier(table_name)
     try:
@@ -335,11 +384,14 @@ class DuckDBBackend:
     normalized = path.expanduser()
     if normalized.suffix.lower() != ".parquet":
       raise ExecutionError("save only supports .parquet files in Phase 9")
-    if normalized.exists() and not replace:
-      raise ExecutionError(f"save target already exists: {path}")
-    if normalized.exists() and not normalized.is_file():
-      raise ExecutionError(f"save target is not a file: {path}")
-    normalized.parent.mkdir(parents=True, exist_ok=True)
+    _prepare_output_path(normalized, path, replace=replace, command_name="save")
+    if self._polars_lazy_frame is not None:
+      frame = self._collect_polars_frame("save", path)
+      try:
+        frame.write_parquet(normalized)
+      except (PolarsError, OSError) as exc:
+        raise ExecutionError(f"save failed: {path}") from exc
+      return
     try:
       self._connection.execute(
         f"copy (select * from {ACTIVE_TABLE}) to ? (format parquet)",
@@ -347,6 +399,25 @@ class DuckDBBackend:
       )
     except duckdb.Error as exc:
       raise ExecutionError(f"save failed: {path}") from exc
+
+  def export_active_dataset(self, path: Path, *, replace: bool) -> None:
+    normalized = path.expanduser()
+    suffix = normalized.suffix.lower()
+    if suffix not in {".parquet", ".csv", ".feather"}:
+      raise ExecutionError("export only supports .parquet, .csv, and .feather files")
+    _prepare_output_path(normalized, path, replace=replace, command_name="export")
+    if suffix == ".parquet":
+      self.save_active_parquet(path, replace=replace)
+      return
+
+    frame = self._active_frame_for_export(command_name="export", path=path)
+    try:
+      if suffix == ".csv":
+        frame.write_csv(normalized)
+      else:
+        frame.write_ipc(normalized)
+    except (PolarsError, OSError) as exc:
+      raise ExecutionError(f"export failed: {path}") from exc
 
   def run_sql(self, query: str) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
     _require_result_query(query)
@@ -456,6 +527,8 @@ class DuckDBBackend:
     *,
     tail: bool = False,
   ) -> tuple[tuple[object, ...], ...]:
+    if self._polars_lazy_frame is not None:
+      return self._preview_polars_rows(limit, tail=tail)
     if limit == 0:
       return ()
 
@@ -487,6 +560,9 @@ class DuckDBBackend:
   def keep_columns(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> DatasetInfo:
     column_types = {column.name: column.data_type for column in dataset.columns}
     _require_columns("keep", column_types, variables)
+    if self._polars_lazy_frame is not None:
+      self._polars_lazy_frame = self._polars_lazy_frame.select(list(variables))
+      return self.active_dataset_info(dataset.path)
     self._replace_active(
       f"select {_select_list(variables)} from {ACTIVE_TABLE}",
       "keep",
@@ -499,6 +575,9 @@ class DuckDBBackend:
     remaining = tuple(column.name for column in dataset.columns if column.name not in variables)
     if not remaining:
       raise ExecutionError("drop would remove every column")
+    if self._polars_lazy_frame is not None:
+      self._polars_lazy_frame = self._polars_lazy_frame.select(list(remaining))
+      return self.active_dataset_info(dataset.path)
     self._replace_active(
       f"select {_select_list(remaining)} from {ACTIVE_TABLE}",
       "drop",
@@ -512,6 +591,11 @@ class DuckDBBackend:
     *,
     keep: bool,
   ) -> DatasetInfo:
+    if self._polars_lazy_frame is not None:
+      condition_expr = self._compile_polars_expression(dataset, condition)
+      predicate = condition_expr if keep else ~condition_expr
+      self._polars_lazy_frame = self._polars_lazy_frame.filter(predicate)
+      return self.active_dataset_info(dataset.path)
     condition_sql = self._compile_expression(dataset, condition)
     predicate = condition_sql if keep else f"not ({condition_sql})"
     command_name = "keep" if keep else "drop"
@@ -847,6 +931,58 @@ class DuckDBBackend:
       return f"{function_name}({arguments})"
     raise ExecutionError("unsupported expression")
 
+  def _compile_polars_expression(self, dataset: DatasetInfo, expression: Expression) -> pl.Expr:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if isinstance(expression, IdentifierExpression):
+      _require_columns("expression", column_types, (expression.name,))
+      return pl.col(expression.name)
+    if isinstance(expression, NumberExpression):
+      return pl.lit(expression.value)
+    if isinstance(expression, StringExpression):
+      return pl.lit(expression.value)
+    if isinstance(expression, UnaryExpression):
+      return -self._compile_polars_expression(dataset, expression.operand)
+    if isinstance(expression, BinaryExpression):
+      left = self._compile_polars_expression(dataset, expression.left)
+      right = self._compile_polars_expression(dataset, expression.right)
+      if expression.operator == "+":
+        return left + right
+      if expression.operator == "-":
+        return left - right
+      if expression.operator == "*":
+        return left * right
+      if expression.operator == "/":
+        return left / right
+      if expression.operator == "==":
+        return left == right
+      if expression.operator == "!=":
+        return left != right
+      if expression.operator == "<":
+        return left < right
+      if expression.operator == "<=":
+        return left <= right
+      if expression.operator == ">":
+        return left > right
+      if expression.operator == ">=":
+        return left >= right
+    if isinstance(expression, FunctionCallExpression):
+      function_name = expression.name.lower()
+      if function_name not in SUPPORTED_FUNCTIONS:
+        raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      arguments = tuple(
+        self._compile_polars_expression(dataset, argument) for argument in expression.arguments
+      )
+      return _compile_polars_function(function_name, arguments)
+    raise ExecutionError("unsupported expression")
+
+  def is_polars_lazy_active(self) -> bool:
+    return self._polars_lazy_frame is not None
+
+  def materialize_polars_lazy(self, path: Path | str) -> DatasetInfo:
+    frame = self._collect_polars_frame("materialize", path)
+    self._replace_active_with_frame(frame, command_name="materialize")
+    return self.active_dataset_info(path)
+
   def _replace_active(self, select_sql: str, command_name: str) -> None:
     try:
       if self._active_storage == "view":
@@ -859,12 +995,16 @@ class DuckDBBackend:
         )
         self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
         self._active_storage = "table"
+        self._lazy_engine = None
+        self._polars_lazy_frame = None
         return
       self._connection.execute(f"create or replace temp table {NEXT_ACTIVE_TABLE} as {select_sql}")
       self._connection.execute(
         f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
       )
       self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+      self._lazy_engine = None
+      self._polars_lazy_frame = None
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
 
@@ -877,6 +1017,7 @@ class DuckDBBackend:
       )
       self._active_storage = "table"
       self._lazy_engine = None
+      self._polars_lazy_frame = None
     except duckdb.Error as exc:
       raise BackendExecutionError(f"{command_name} failed") from exc
 
@@ -903,6 +1044,76 @@ class DuckDBBackend:
       return tuple(self._connection.execute(sql).fetchall())
     except duckdb.Error as exc:
       raise ExecutionError(f"{command_name} failed") from exc
+
+  def _preview_polars_rows(
+    self,
+    limit: int,
+    *,
+    tail: bool,
+  ) -> tuple[tuple[object, ...], ...]:
+    if limit == 0:
+      return ()
+    lazy_frame = self._require_polars_lazy_frame("preview")
+    try:
+      frame = lazy_frame.tail(limit).collect() if tail else lazy_frame.head(limit).collect()
+    except PolarsError as exc:
+      command_name = "tail" if tail else "head"
+      raise ExecutionError(f"{command_name} failed") from exc
+    return tuple(tuple(row) for row in frame.rows())
+
+  def _polars_row_count(self) -> int:
+    lazy_frame = self._require_polars_lazy_frame("count")
+    try:
+      frame = lazy_frame.select(pl.len().alias("count")).collect()
+    except PolarsError as exc:
+      raise ExecutionError("count failed") from exc
+    return int(frame.item(0, 0))
+
+  def _collect_polars_frame(self, command_name: str, path: Path | str) -> pl.DataFrame:
+    lazy_frame = self._require_polars_lazy_frame(command_name)
+    try:
+      return lazy_frame.collect()
+    except PolarsError as exc:
+      raise ExecutionError(f"{command_name} failed: {path}") from exc
+
+  def _active_frame_for_export(self, *, command_name: str, path: Path) -> pl.DataFrame:
+    if self._polars_lazy_frame is not None:
+      return self._collect_polars_frame(command_name, path)
+    try:
+      result = self._connection.execute(f"select * from {ACTIVE_TABLE}")
+      rows = result.fetchall()
+      headers = tuple(column[0] for column in result.description or ())
+    except duckdb.Error as exc:
+      raise ExecutionError(f"{command_name} failed: {path}") from exc
+    return pl.DataFrame(rows, schema=list(headers), orient="row")
+
+  def _replace_active_with_frame(self, frame: pl.DataFrame, *, command_name: str) -> None:
+    with tempfile.NamedTemporaryFile(suffix=".parquet") as temp_file:
+      temp_path = Path(temp_file.name)
+      try:
+        frame.write_parquet(temp_path)
+      except (PolarsError, OSError) as exc:
+        raise ExecutionError(f"{command_name} failed") from exc
+      try:
+        self._connection.execute(
+          f"create or replace temp table {NEXT_ACTIVE_TABLE} as select * from read_parquet(?)",
+          [str(temp_path)],
+        )
+        self._drop_active_relation()
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
+        )
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+      except duckdb.Error as exc:
+        raise ExecutionError(f"{command_name} failed") from exc
+    self._active_storage = "table"
+    self._lazy_engine = None
+    self._polars_lazy_frame = None
+
+  def _require_polars_lazy_frame(self, command_name: str) -> pl.LazyFrame:
+    if self._polars_lazy_frame is None:
+      raise ExecutionError(f"{command_name} failed")
+    return self._polars_lazy_frame
 
   def _wide_j_values(self, j_variable: str) -> tuple[str, ...]:
     quoted_j = _quote_identifier(j_variable)
@@ -1074,6 +1285,46 @@ def _quote_identifier(identifier: str) -> str:
 def _quote_literal(value: str) -> str:
   escaped = value.replace("'", "''")
   return f"'{escaped}'"
+
+
+def _prepare_output_path(
+  normalized: Path,
+  original: Path,
+  *,
+  replace: bool,
+  command_name: str,
+) -> None:
+  if normalized.exists() and not replace:
+    raise ExecutionError(f"{command_name} target already exists: {original}")
+  if normalized.exists() and not normalized.is_file():
+    raise ExecutionError(f"{command_name} target is not a file: {original}")
+  normalized.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _compile_polars_function(function_name: str, arguments: tuple[pl.Expr, ...]) -> pl.Expr:
+  if function_name == "abs" and len(arguments) == 1:
+    return arguments[0].abs()
+  if function_name == "ceil" and len(arguments) == 1:
+    return arguments[0].ceil()
+  if function_name == "floor" and len(arguments) == 1:
+    return arguments[0].floor()
+  if function_name == "ln" and len(arguments) == 1:
+    return arguments[0].log()
+  if function_name == "log" and len(arguments) == 1:
+    return arguments[0].log10()
+  if function_name == "lower" and len(arguments) == 1:
+    return arguments[0].str.to_lowercase()
+  if function_name == "round" and len(arguments) == 1:
+    return arguments[0].round(0)
+  if function_name == "sqrt" and len(arguments) == 1:
+    return arguments[0].sqrt()
+  if function_name == "upper" and len(arguments) == 1:
+    return arguments[0].str.to_uppercase()
+  raise ExecutionError(f"unsupported function in expression: {function_name}")
+
+
+def _polars_dtype_name(dtype: pl.DataType) -> str:
+  return str(dtype).upper()
 
 
 def resolve_parquet_source(path: Path | str) -> ParquetSource:

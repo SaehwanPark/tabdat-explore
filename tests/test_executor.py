@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import duckdb
+import polars as pl
 import pytest
 
 from tabdat.backend import resolve_parquet_source
@@ -27,6 +28,8 @@ from tabdat.models import (
   DescribeCommand,
   DescribeResult,
   DropCommand,
+  ExportCommand,
+  ExportResult,
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
@@ -141,16 +144,42 @@ def test_failing_lazy_use_preserves_existing_active_dataset(
   assert result.row_count == 3
 
 
-def test_count_queries_lazy_active_dataset(sample_parquet: Path) -> None:
+def test_failing_polars_lazy_use_preserves_existing_active_dataset(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  corrupt_parquet = tmp_path / "corrupt.parquet"
+  corrupt_parquet.write_text("not parquet")
   executor = Executor()
   try:
-    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="use could not read Parquet file"):
+      executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="polars"))
     result = executor.execute(CountCommand())
   finally:
     executor.close()
 
   assert isinstance(result, CountResult)
   assert result.row_count == 3
+
+
+@pytest.mark.parametrize("engine", ["duckdb", "polars"])
+def test_count_queries_lazy_active_dataset(sample_parquet: Path, engine: str) -> None:
+  executor = Executor()
+  try:
+    executor.execute(
+      UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    )
+    result = executor.execute(CountCommand())
+    active_dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+  assert active_dataset is not None
+  assert active_dataset.execution_mode == "lazy"
+  assert active_dataset.lazy_engine == engine
 
 
 def test_phase_11_inner_join_named_table(sample_parquet: Path) -> None:
@@ -1229,6 +1258,141 @@ def test_phase_9_save_writes_transformed_active_dataset(
   assert result.dataset.row_count == 2
   assert output_path.exists()
   assert isinstance(replaced, SaveResult)
+
+
+@pytest.mark.parametrize("suffix", [".parquet", ".csv", ".feather"])
+def test_phase_9_export_writes_supported_formats(
+  sample_parquet: Path,
+  tmp_path: Path,
+  suffix: str,
+) -> None:
+  output_path = tmp_path / f"filtered{suffix}"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(
+          left=IdentifierExpression("age"),
+          operator=">=",
+          right=NumberExpression(42),
+        )
+      )
+    )
+    result = executor.execute(ExportCommand(output_path))
+    with pytest.raises(ExecutionError, match="export target already exists"):
+      executor.execute(ExportCommand(output_path))
+    replaced = executor.execute(ExportCommand(output_path, replace=True))
+  finally:
+    executor.close()
+
+  assert isinstance(result, ExportResult)
+  assert result.dataset.row_count == 2
+  assert output_path.exists()
+  assert isinstance(replaced, ExportResult)
+  if suffix == ".parquet":
+    rows = duckdb.sql(
+      "select age, bmi, sex, cost from read_parquet(?)", params=[str(output_path)]
+    ).fetchall()
+    assert rows == [(42, 25.0, "M", 150.0), (54, 27.5, "F", None)]
+  elif suffix == ".csv":
+    assert output_path.read_text(encoding="utf-8").splitlines() == [
+      "age,bmi,sex,cost",
+      "42,25.0,M,150.0",
+      "54,27.5,F,",
+    ]
+  else:
+    frame = pl.read_ipc(output_path)
+    assert frame.rows() == [(42, 25.0, "M", 150.0), (54, 27.5, "F", None)]
+
+
+def test_phase_9_export_rejects_unsupported_suffix(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  output_path = tmp_path / "filtered.json"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(
+      ExecutionError,
+      match=r"export only supports \.parquet, \.csv, and \.feather files",
+    ):
+      executor.execute(ExportCommand(output_path))
+  finally:
+    executor.close()
+
+
+def test_phase_10_polars_lazy_column_and_row_transforms_preserve_lazy_state(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    selected = executor.execute(SelectCommand(("age", "sex", "cost")))
+    filtered = executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(
+          left=IdentifierExpression("age"),
+          operator=">=",
+          right=NumberExpression(42),
+        )
+      )
+    )
+    active_dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(selected, TransformResult)
+  assert selected.dataset.execution_mode == "lazy"
+  assert selected.dataset.lazy_engine == "polars"
+  assert selected.dataset.row_count is None
+  assert isinstance(filtered, TransformResult)
+  assert filtered.dataset.execution_mode == "lazy"
+  assert filtered.dataset.lazy_engine == "polars"
+  assert filtered.dataset.row_count is None
+  assert active_dataset is not None
+  assert active_dataset.execution_mode == "lazy"
+  assert active_dataset.lazy_engine == "polars"
+
+
+def test_phase_10_polars_lazy_unsupported_command_materializes_to_eager(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    result = executor.execute(GenerateCommand("age2", NumberExpression(2)))
+    count = executor.execute(CountCommand())
+    active_dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.execution_mode == "eager"
+  assert result.dataset.lazy_engine is None
+  assert result.dataset.row_count == 3
+  assert isinstance(count, CountResult)
+  assert count.row_count == 3
+  assert active_dataset is not None
+  assert active_dataset.execution_mode == "eager"
+  assert active_dataset.lazy_engine is None
+
+
+def test_phase_10_polars_lazy_set_does_not_materialize(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    result = executor.execute(SetCommand("graph_open", "off"))
+    active_dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(result, SetResult)
+  assert result.value == "off"
+  assert active_dataset is not None
+  assert active_dataset.execution_mode == "lazy"
+  assert active_dataset.lazy_engine == "polars"
 
 
 def test_phase_6_visualizations_report_user_facing_errors(

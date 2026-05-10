@@ -8,6 +8,7 @@ from tabdat.models import (
   CodebookResult,
   CountResult,
   DescribeResult,
+  ExportResult,
   LoadResult,
   PanelResult,
   PlotResult,
@@ -131,6 +132,13 @@ def format_result(result: Result) -> str:
     dataset = result.dataset
     return (
       f"Saved: {_display_path(result.path)} "
+      f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns)"
+    )
+
+  if isinstance(result, ExportResult):
+    dataset = result.dataset
+    return (
+      f"Exported: {_display_path(result.path)} "
       f"({_row_count(dataset.row_count)} rows, {dataset.column_count} columns)"
     )
 

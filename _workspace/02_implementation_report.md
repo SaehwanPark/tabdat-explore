@@ -1,4 +1,4 @@
-# Phase 11 Completion Implementation Report
+# Phase 9-10 Future Items Implementation Report
 
 ## Contract Consumed
 
@@ -6,35 +6,35 @@
 
 ## Files Changed
 
-- `src/tabdat/script.py`, `src/tabdat/cli.py`
-- `src/tabdat/models.py`, `src/tabdat/parser.py`, `src/tabdat/executor.py`, `src/tabdat/backend.py`
-- `tests/test_script.py`, `tests/test_cli.py`, `tests/test_parser.py`, `tests/test_executor.py`,
-  `tests/test_models.py`
+- `src/tabdat/backend.py`, `src/tabdat/executor.py`, `src/tabdat/models.py`,
+  `src/tabdat/formatter.py`
+- `tests/test_parser.py`, `tests/test_executor.py`, `tests/test_cli.py`
 - `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`
+- `_workspace/00_input/request-summary.md`, `_workspace/01_product_command-contract.md`
 
 ## Implementation Notes
 
-- Added script-only non-nested `if` / `else` / `end` handling at the script runner edge.
-- Added pure script helpers for condition evaluation and branch state.
-- Preserved macro expansion before condition evaluation and command execution.
-- Extended `UseCommand` to carry either local `Path` values or remote URI strings.
-- Preserved local named-table activation for `Path`-based `use` targets.
-- Added DuckDB remote Parquet source classification for `http://`, `https://`, and `s3://` URIs.
+- Kept `save` Parquet-only and added suffix-driven `.parquet`, `.csv`, and `.feather` `export`.
+- Added a distinct `ExportResult` / `Exported:` user-facing result path.
+- Added a bounded Polars lazy backend state for local Parquet loads.
+- Preserved lazy state through column projection, row filtering, describe/count/head/tail, and
+  export/save.
+- Added explicit eager fallback for unsupported commands before they enter the existing DuckDB
+  execution path.
+- Kept named-table, SQL, reshape, panel, and plotting behavior on the eager DuckDB path.
 
 ## Validation
 
-- `uv run pytest tests/test_script.py tests/test_cli.py::test_cli_phase_11_script_conditionals tests/test_cli.py::test_cli_phase_11_script_reports_unterminated_if tests/test_parser.py::test_parse_use_command tests/test_executor.py::test_resolve_remote_parquet_source tests/test_executor.py::test_resolve_remote_parquet_source_rejects_unsupported_scheme tests/test_executor.py::test_resolve_remote_parquet_source_rejects_non_parquet`
-- `uv run pytest tests/test_models.py`
-- `uv run pytest` passed with 301 tests.
-- `uv run mypy`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py`
+- `uv run pytest` passed with 319 tests.
+- `uv run pyright`
 - `uv run ruff check .`
-- `uv run ruff check src/tabdat/script.py src/tabdat/cli.py src/tabdat/backend.py src/tabdat/parser.py src/tabdat/models.py tests/test_script.py tests/test_cli.py tests/test_parser.py tests/test_executor.py`
-- `uv run ruff check tests/test_models.py`
 - `uv run ruff format --check .`
 
 ## Known Gaps
 
-- Script conditionals are intentionally non-nested and support only literal booleans plus simple
-  token equality/inequality.
-- Remote loading relies on DuckDB URI support; credentials and live network fixtures are out of
-  scope.
+- `engine=polars` remains intentionally bounded to local Parquet plus projection/filter/count and
+  preview operations.
+- Unsupported Polars-lazy commands materialize eagerly instead of attempting broad native parity.
+- Remote Parquet still belongs to the DuckDB path; Polars-lazy remote loading is not part of this
+  slice.

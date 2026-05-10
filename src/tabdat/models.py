@@ -407,6 +407,12 @@ class SaveResult:
   dataset: DatasetInfo
 
 
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ExportResult:
+  path: Path
+  dataset: DatasetInfo
+
+
 Result = (
   LoadResult
   | ActivateResult
@@ -422,4 +428,5 @@ Result = (
   | PlotResult
   | SetResult
   | SaveResult
+  | ExportResult
 )
