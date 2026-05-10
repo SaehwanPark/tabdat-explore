@@ -1,4 +1,4 @@
-# Phase 11 Completion QA Report
+# Phase 9-10 Future Items QA Report
 
 ## Status
 
@@ -6,31 +6,33 @@ pass
 
 ## Boundaries Checked
 
-- Contract to script helpers for condition syntax, branch selection, macro expansion, and
-  diagnostics.
-- Script helpers to CLI script execution for true branches, false branches, `else`, and missing
-  `end` errors.
-- Parser model to executor/backend for local `Path` targets versus remote URI string targets.
-- Backend source classification to the remote Parquet contract without depending on live internet.
-- Docs to implementation for Phase 11 completion and Phase 12 readiness.
+- Contract to parser for unchanged `export <path>[, replace]` grammar across `.parquet`, `.csv`,
+  and `.feather` suffixes.
+- Executor to backend for distinct `save` versus `export` behavior and result formatting.
+- Backend Polars lazy state to executor fallback behavior for supported lazy commands versus
+  explicit eager materialization.
+- CLI output to command contract for `Exported:` messaging and lazy row-count honesty.
+- Docs to implementation for completed Phase 9 export scope and bounded Phase 10 Polars scope.
 
 ## Blocking Issues
 
-- None found in focused validation.
+- None found in validation.
 
 ## Non-Blocking Follow-Ups
 
-- Nested conditionals, loops, richer boolean expressions, remote credentials, and DB connections
-  remain future work.
+- Broader Polars-native execution remains future work.
+- Remote Polars lazy loading remains out of scope.
+- Additional export ergonomics such as delimiter/compression options remain out of scope.
 
 ## Validation Evidence
 
-- Focused Phase 11 tests passed.
-- `uv run pytest` passed with 301 tests.
-- `uv run mypy` passed.
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed.
+- `uv run pytest` passed with 319 tests.
+- `uv run pyright` passed.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
 
 ## Recommended Next Action
 
-Commit the final documentation updates, push the branch, and open a ready-for-review PR.
+Push the branch, open the PR from `codex/tmp-phase9-phase10-future-items`, and mark it ready for
+review.

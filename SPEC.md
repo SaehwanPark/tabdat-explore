@@ -79,7 +79,8 @@ This file tracks feature state for spec-driven development. Product intent lives
   - runtime `set graph_format`, `set artifact_dir`, and `set graph_open`
   - config-aware plot artifact defaults with interactive-shell collision-avoiding suffixes
   - live row counting for `count` and unknown initial row counts for lazy loads
-  - `save` / `export` Parquet persistence for session-local transformations
+  - Parquet-only `save` plus `.parquet`, `.csv`, and `.feather` `export` for session-local
+    transformations
 - Completed the integrated public-dataset E2E checkpoint:
   - reusable harness for the Titanic, shell, NYC taxi lazy-scale, and Penguins script scenarios
   - captured deterministic stdout/stderr, exit-code, artifact, plot, and Parquet checks
@@ -92,6 +93,8 @@ This file tracks feature state for spec-driven development. Product intent lives
   - specific execution error subclasses for missing active data, missing variables, type
     mismatches, missing tables, reserved names, and backend failures
   - named table shell completions
+  - bounded real Polars lazy execution for projection, row filtering, describe/count/head/tail,
+    and explicit eager fallback for unsupported commands
 - Adopted `comp-builders` behind the local `tabdat.monads` boundary:
   - `Result`, `Option`, and `Validation` are now imported through `tabdat.monads`
   - parser recoverable failures compose with a `@result.block`
@@ -147,11 +150,9 @@ This file tracks feature state for spec-driven development. Product intent lives
 
 ## Future
 
-- Phase 9 configuration and persistence:
-  - add CSV and Feather export only after the Parquet persistence contract is stable
 - Phase 10 execution and state foundations:
-  - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
-    honest and test-covered
+  - extend Polars-native lazy lowering beyond projection/filter/count/preview only after the
+    bounded fallback contract is dogfooded
 - Phase 11 data workflow and reproducibility primitives:
   - extend join workflows with additional ergonomics only after the initial same-name equality join
     contract is dogfooded

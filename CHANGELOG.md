@@ -6,6 +6,11 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 9 export widening with suffix-driven local `.parquet`, `.csv`, and `.feather`
+  `export`, distinct `Exported:` CLI output, and focused parser, executor, and CLI coverage.
+- Added a bounded real Phase 10 Polars lazy execution slice for local Parquet projection,
+  row-filtering, count, and preview commands, plus explicit eager fallback for unsupported
+  commands.
 - Added Phase 9 startup config fallback through XDG user config at
   `$XDG_CONFIG_HOME/tabdat/config.toml` or `~/.config/tabdat/config.toml` when no explicit
   `--config` or project-local `.tabdat.toml` is present.
@@ -46,7 +51,7 @@ All notable project changes are tracked here.
   interactive shell, NYC taxi lazy-scale, and Penguins script reproducibility scenarios.
 - Added Phase 9 configuration and persistence with `.tabdat.toml`, `--config <path>`, runtime
   `set graph_format`, `set artifact_dir`, and `set graph_open`, config-aware plot defaults,
-  live `count` execution for lazy datasets, and Parquet `save` / `export`.
+  live `count` execution for lazy datasets, Parquet `save`, and multi-format `export`.
 - Added Phase 8 scripting and reproducibility with `tabdat -f <script>`, positional script
   execution, interactive and nested `run <script>`, deterministic script metadata, command
   transcripts, multiline SQL script blocks, line-numbered script errors, and script-mode plot

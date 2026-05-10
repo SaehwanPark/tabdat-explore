@@ -75,13 +75,17 @@ load-time projection, filtering, grouping, and terminal query operations can be 
 Local paths and `http://`, `https://`, or `s3://` Parquet URIs share this DuckDB loading boundary;
 remote credentials and non-Parquet remote formats are not part of the current contract.
 Session transformations replace the active relation for later commands. The optional `polars`
-engine selector is accepted and recorded for Phase 7 workflows, while command execution continues
-through the DuckDB relation boundary until deeper Polars-native lowering is designed. A
-session-local named table registry stores SQL `into` results under safe internal DuckDB relation
-names; `use <table>` reactivates a registered table, while the active relation remains the default
-target for non-SQL commands. `join <table> on <keylist>` joins the active relation to a registered
-named table using same-name equality keys, supports `inner` and `left` joins, suffixes right-side
-non-key column collisions, and materializes the result as the new eager active relation.
+engine selector now has a bounded real execution slice for local Parquet paths: projection,
+row-filtering, and preview/count commands can stay in a Polars `LazyFrame` boundary while later
+unsupported commands materialize once back into the eager DuckDB relation path. Remote Parquet
+URIs stay on the DuckDB boundary in the current contract. A session-local named table registry
+stores SQL `into` results under safe internal DuckDB relation names; `use <table>` reactivates a
+registered table, while the active relation remains the default target for non-SQL commands.
+`join <table> on <keylist>` joins the active relation to a registered named table using same-name
+equality keys, supports `inner` and `left` joins, suffixes right-side non-key column collisions,
+and materializes the result as the new eager active relation.
+`save` stays Parquet-only, while `export` persists the active dataset to local `.parquet`, `.csv`,
+or `.feather` paths without mutating session state.
 `append <table>` vertically stacks a registered named table under the active relation after strict
 same-column and compatible-type validation, preserving active-dataset column order and
 materializing the result as the new eager active relation. `reshape long <stublist>, i(...) j(...)`
@@ -156,7 +160,7 @@ display formatting.
 - Phase 9 config is executable through project-local `.tabdat.toml`, XDG user config,
   `--config <path>`, and runtime `set` commands.
 - Phase 9 persistence is executable through `save <path>[, replace]` and
-  `export <path>[, replace]` for local Parquet.
+  `export <path>[, replace]` for local `.parquet`, `.csv`, and `.feather` files.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -189,7 +193,7 @@ display formatting.
   options until panel metadata, aliases, or broader reshape ergonomics are designed.
 - Keep `panel` scoped to id/time metadata validation and reporting until balancedness diagnostics
   or estimation commands define additional panel semantics.
-- Treat `engine=polars` as experimental user-facing metadata until a Polars-native execution
-  contract exists.
+- Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
+  eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.
 - Run configured linting and formatting proactively before commits.
