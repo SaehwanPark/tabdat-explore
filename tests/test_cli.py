@@ -693,6 +693,104 @@ def test_cli_phase_9_loads_explicit_config(
   assert captured.err == ""
 
 
+def test_cli_phase_9_uses_xdg_default_config_when_project_config_is_missing(
+  sample_parquet: Path,
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+  capsys,
+) -> None:
+  project_dir = tmp_path / "project"
+  project_dir.mkdir()
+  xdg_home = tmp_path / "xdg"
+  artifact_dir = tmp_path / "configured"
+  config_path = xdg_home / "tabdat" / "config.toml"
+  config_path.parent.mkdir(parents=True)
+  config_path.write_text(
+    f'graph_format = "png"\nartifact_dir = "{artifact_dir}"\ngraph_open = false\n',
+    encoding="utf-8",
+  )
+  monkeypatch.chdir(project_dir)
+  monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
+
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "histogram age",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  plot_path = artifact_dir / "plots" / "histogram-age.png"
+
+  assert exit_code == 0
+  assert f"Saved plot: {plot_path}" in captured.out
+  assert plot_path.exists()
+  assert captured.err == ""
+
+
+def test_cli_phase_9_prefers_project_config_over_xdg_default(
+  sample_parquet: Path,
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+  capsys,
+) -> None:
+  project_dir = tmp_path / "project"
+  project_dir.mkdir()
+  project_artifact_dir = tmp_path / "project-artifacts"
+  project_config = project_dir / ".tabdat.toml"
+  project_config.write_text(
+    f'graph_format = "png"\nartifact_dir = "{project_artifact_dir}"\ngraph_open = false\n',
+    encoding="utf-8",
+  )
+  xdg_home = tmp_path / "xdg"
+  xdg_config = xdg_home / "tabdat" / "config.toml"
+  xdg_config.parent.mkdir(parents=True)
+  xdg_config.write_text('graph_format = "svg"\n', encoding="utf-8")
+  monkeypatch.chdir(project_dir)
+  monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
+
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "histogram age",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  plot_path = project_artifact_dir / "plots" / "histogram-age.png"
+
+  assert exit_code == 0
+  assert f"Saved plot: {plot_path}" in captured.out
+  assert plot_path.exists()
+  assert captured.err == ""
+
+
+def test_cli_phase_9_reports_invalid_xdg_config(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+  capsys,
+) -> None:
+  project_dir = tmp_path / "project"
+  project_dir.mkdir()
+  xdg_home = tmp_path / "xdg"
+  xdg_config = xdg_home / "tabdat" / "config.toml"
+  xdg_config.parent.mkdir(parents=True)
+  xdg_config.write_text('graph_format = "pdf"\n', encoding="utf-8")
+  monkeypatch.chdir(project_dir)
+  monkeypatch.setenv("XDG_CONFIG_HOME", str(xdg_home))
+
+  exit_code = main(["-c", "count"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "Error: graph_format must be svg or png" in captured.err
+
+
 def test_cli_phase_9_runtime_set_and_save(
   sample_parquet: Path,
   tmp_path: Path,
@@ -765,6 +863,47 @@ def test_cli_plot_auto_open_policy(tmp_path: Path) -> None:
     opener=lambda plot: opened.append(plot.path),
   )
   assert opened == [result.path]
+
+
+def test_shell_default_plot_paths_avoid_overwriting_existing_artifacts(
+  sample_parquet: Path,
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+  capsys,
+) -> None:
+  class FixedPromptSession:
+    def __init__(self) -> None:
+      self.commands = iter(
+        (
+          f"use {sample_parquet}",
+          "histogram age",
+          "histogram age",
+        )
+      )
+
+    def prompt(self, prompt_text: str) -> str:
+      try:
+        return next(self.commands)
+      except StopIteration as exc:
+        raise EOFError from exc
+
+  project_dir = tmp_path / "project"
+  project_dir.mkdir()
+  monkeypatch.chdir(project_dir)
+  monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: FixedPromptSession())
+
+  exit_code = main([])
+
+  captured = capsys.readouterr()
+  first_plot = project_dir / "artifacts" / "plots" / "histogram-age.svg"
+  second_plot = project_dir / "artifacts" / "plots" / "histogram-age-2.svg"
+
+  assert exit_code == 0
+  assert "Saved plot: artifacts/plots/histogram-age.svg" in captured.out
+  assert "Saved plot: artifacts/plots/histogram-age-2.svg" in captured.out
+  assert first_plot.exists()
+  assert second_plot.exists()
+  assert captured.err == ""
 
 
 def test_cli_uses_platform_plot_open_commands() -> None:

@@ -1,5 +1,6 @@
 """Runtime configuration for TabDat sessions."""
 
+import os
 import tomllib
 from pathlib import Path
 from typing import Literal, cast
@@ -37,10 +38,21 @@ def load_config(path: Path) -> TabDatConfig:
 
 
 def load_default_config() -> TabDatConfig:
-  default_path = Path.cwd() / ".tabdat.toml"
-  if default_path.exists():
+  default_path = find_default_config_path()
+  if default_path is not None:
     return load_config(default_path)
   return TabDatConfig()
+
+
+def find_default_config_path() -> Path | None:
+  project_path = Path.cwd() / ".tabdat.toml"
+  if project_path.exists():
+    return project_path
+
+  xdg_path = _xdg_config_path()
+  if xdg_path.exists():
+    return xdg_path
+  return None
 
 
 def config_from_mapping(data: dict[str, object]) -> TabDatConfig:
@@ -79,3 +91,10 @@ def set_config_value(config: TabDatConfig, name: str, value: object) -> TabDatCo
       raise TabDatError("graph_open must be on or off")
     return TabDatConfig(config.graph_format, config.artifact_dir, parsed)
   raise TabDatError(f"unknown config key: {name}")
+
+
+def _xdg_config_path() -> Path:
+  config_home = os.environ.get("XDG_CONFIG_HOME")
+  if config_home:
+    return Path(config_home).expanduser() / "tabdat" / "config.toml"
+  return Path.home() / ".config" / "tabdat" / "config.toml"

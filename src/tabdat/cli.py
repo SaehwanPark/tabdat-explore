@@ -5,6 +5,7 @@ import os
 import platform
 import subprocess
 import sys
+from dataclasses import replace
 from collections.abc import Callable, Sequence
 from enum import Enum, auto
 from pathlib import Path
@@ -14,7 +15,16 @@ from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_result
-from tabdat.models import ExitCommand, PlotResult, Result, RunCommand
+from tabdat.models import (
+  BarCommand,
+  Command,
+  ExitCommand,
+  HistogramCommand,
+  PlotResult,
+  Result,
+  RunCommand,
+  ScatterCommand,
+)
 from tabdat.parser import parse_command
 from tabdat.script import (
   ElseDirective,
@@ -31,6 +41,7 @@ from tabdat.script import (
   read_script,
 )
 from tabdat.shell import create_prompt_session
+from tabdat.visualization import next_available_plot_path
 
 
 class _RunStatus(Enum):
@@ -108,6 +119,7 @@ def _run_shell(executor: Executor) -> int:
       command_text,
       executor,
       open_plots=executor.state.config.graph_open,
+      command_rewriter=_prepare_interactive_command,
       run_script=lambda path: _run_script_status(
         path,
         executor,
@@ -125,6 +137,7 @@ def _run_one(
   executor: Executor,
   *,
   open_plots: bool,
+  command_rewriter: Callable[[Command, Executor], Command] | None = None,
   opener: Callable[[PlotResult], None] | None = None,
   run_script: Callable[[Path], _RunStatus] | None = None,
 ) -> _RunStatus:
@@ -132,6 +145,7 @@ def _run_one(
     status, result = _execute_one(
       command_text,
       executor,
+      command_rewriter=command_rewriter,
       run_script=run_script,
     )
   except TabDatError as exc:
@@ -150,9 +164,12 @@ def _execute_one(
   command_text: str,
   executor: Executor,
   *,
+  command_rewriter: Callable[[Command, Executor], Command] | None,
   run_script: Callable[[Path], _RunStatus] | None,
 ) -> tuple[_RunStatus, Result | None]:
   command = parse_command(command_text)
+  if command_rewriter is not None:
+    command = command_rewriter(command, executor)
   if isinstance(command, ExitCommand):
     return _RunStatus.STOP, None
   if isinstance(command, RunCommand):
@@ -160,6 +177,25 @@ def _execute_one(
       raise TabDatError("run is only available from the CLI")
     return run_script(command.path), None
   return _RunStatus.CONTINUE, executor.execute(command)
+
+
+def _prepare_interactive_command(command: Command, executor: Executor) -> Command:
+  if isinstance(command, HistogramCommand) and command.saving is None:
+    saving = next_available_plot_path(
+      executor._default_plot_path("histogram", (command.variable,))
+    )
+    return replace(command, saving=saving)
+  if isinstance(command, ScatterCommand) and command.saving is None:
+    saving = next_available_plot_path(
+      executor._default_plot_path("scatter", (command.y_variable, command.x_variable))
+    )
+    return replace(command, saving=saving)
+  if isinstance(command, BarCommand) and command.saving is None:
+    saving = next_available_plot_path(
+      executor._default_plot_path("bar", (command.variable,))
+    )
+    return replace(command, saving=saving)
+  return command
 
 
 def _run_script(
@@ -288,6 +324,7 @@ def _run_script_status(
       status, result = _execute_one(
         expanded_text,
         executor,
+        command_rewriter=None,
         run_script=run_nested,
       )
       if result is not None:
