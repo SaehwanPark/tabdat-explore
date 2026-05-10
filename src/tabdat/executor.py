@@ -23,6 +23,7 @@ from tabdat.models import (
   DropCommand,
   ExitCommand,
   ExportCommand,
+  ExportResult,
   GenerateCommand,
   HeadCommand,
   HistogramCommand,
@@ -81,6 +82,8 @@ class Executor:
   def execute(self, command: Command) -> Result | None:
     if isinstance(command, UseCommand):
       return self._execute_use(command)
+
+    self._materialize_polars_lazy_if_needed(command)
 
     if isinstance(command, DescribeCommand):
       dataset = self._require_active_dataset("describe")
@@ -208,7 +211,7 @@ class Executor:
       self.state.config = set_config_value(self.state.config, command.name, command.value)
       return SetResult(command.name, _setting_display_value(command.name, self.state.config))
 
-    if isinstance(command, SaveCommand | ExportCommand):
+    if isinstance(command, SaveCommand):
       dataset = self._require_active_dataset("save")
       self.backend.save_active_parquet(command.path, replace=command.replace)
       saved_dataset = DatasetInfo(
@@ -220,6 +223,19 @@ class Executor:
         panel_metadata=dataset.panel_metadata,
       )
       return SaveResult(command.path, saved_dataset)
+
+    if isinstance(command, ExportCommand):
+      dataset = self._require_active_dataset("export")
+      self.backend.export_active_dataset(command.path, replace=command.replace)
+      exported_dataset = DatasetInfo(
+        path=command.path,
+        row_count=self.backend.active_row_count(),
+        columns=dataset.columns,
+        execution_mode="eager",
+        lazy_engine=None,
+        panel_metadata=dataset.panel_metadata,
+      )
+      return ExportResult(command.path, exported_dataset)
 
     raise ExecutionError("unsupported command")
 
@@ -466,6 +482,29 @@ class Executor:
       count_headers: tuple[str, ...] = command.groups + ("Count",)
       return TableResult(headers=count_headers, rows=table_rows)
     raise ExecutionError("by only supports summarize and count in Phase 3")
+
+  def _materialize_polars_lazy_if_needed(self, command: Command) -> None:
+    if not self.backend.is_polars_lazy_active():
+      return
+    if isinstance(
+      command,
+      (
+        DescribeCommand,
+        CountCommand,
+        HeadCommand,
+        TailCommand,
+        KeepCommand,
+        DropCommand,
+        SelectCommand,
+        SaveCommand,
+        ExportCommand,
+      ),
+    ):
+      return
+    dataset = self._require_active_dataset("materialize")
+    materialized = self.backend.materialize_polars_lazy(dataset.path)
+    materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
+    self.state.active_dataset = materialized
 
 
 def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:

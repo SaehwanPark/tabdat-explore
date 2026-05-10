@@ -295,6 +295,8 @@ def test_parse_phase_9_configuration_and_persistence_commands() -> None:
     Path("output.parquet"),
     replace=True,
   )
+  assert parse_command("export output.csv") == ExportCommand(Path("output.csv"))
+  assert parse_command("export output.feather") == ExportCommand(Path("output.feather"))
 
 
 def test_parse_phase_6_visualization_commands() -> None:
