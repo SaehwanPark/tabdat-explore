@@ -23,6 +23,22 @@ def default_plot_path(
   return artifact_dir / "plots" / f"{slug}.{graph_format}"
 
 
+def next_available_plot_path(path: Path) -> Path:
+  normalized = path.expanduser()
+  if not normalized.exists():
+    return normalized
+
+  stem = normalized.stem
+  suffix = normalized.suffix
+  parent = normalized.parent
+  index = 2
+  while True:
+    candidate = parent / f"{stem}-{index}{suffix}"
+    if not candidate.exists():
+      return candidate
+    index += 1
+
+
 def save_histogram(
   rows: tuple[tuple[object, ...], ...],
   variable: str,

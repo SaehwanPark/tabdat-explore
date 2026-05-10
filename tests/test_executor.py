@@ -1183,6 +1183,24 @@ def test_phase_9_set_updates_plot_defaults(sample_parquet: Path, tmp_path: Path)
   assert plot.path.exists()
 
 
+def test_phase_9_executor_default_plot_path_remains_stable_on_repeated_saves(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  executor = Executor(config=TabDatConfig(artifact_dir=tmp_path / "artifacts"))
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    first_plot = executor.execute(HistogramCommand("age"))
+    second_plot = executor.execute(HistogramCommand("age"))
+  finally:
+    executor.close()
+
+  assert isinstance(first_plot, PlotResult)
+  assert isinstance(second_plot, PlotResult)
+  assert first_plot.path == tmp_path / "artifacts" / "plots" / "histogram-age.svg"
+  assert second_plot.path == first_plot.path
+
+
 def test_phase_9_save_writes_transformed_active_dataset(
   sample_parquet: Path,
   tmp_path: Path,

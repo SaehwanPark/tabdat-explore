@@ -175,10 +175,13 @@ tabdat> run analysis.td
   The active id/time pair must have no missing values and must uniquely identify rows.
 - Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
   `-c` and script runs only print the saved path.
-- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Generated names
-  are stable and may overwrite prior outputs; use `saving(...)` for explicit artifact paths.
-- Runtime settings apply for the current session only. `.tabdat.toml` and `--config <path>` support
-  `graph_format`, `artifact_dir`, and `graph_open`.
+- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Interactive shell
+  reruns avoid collisions with `-2`, `-3`, and later suffixes, while batch and script runs keep
+  the stable unsuffixed default path. Use `saving(...)` for explicit artifact paths.
+- Runtime settings apply for the current session only. Startup config precedence is
+  `--config <path>`, then project-local `.tabdat.toml`, then XDG user config at
+  `~/.config/tabdat/config.toml` or `$XDG_CONFIG_HOME/tabdat/config.toml`.
+  These config files support `graph_format`, `artifact_dir`, and `graph_open`.
 - `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
   Parquet. Existing files require `replace`.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast

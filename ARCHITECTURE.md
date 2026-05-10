@@ -29,7 +29,8 @@ Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for 
 history suggestions, syntax highlighting, and context-aware completions. Repeated `-c` commands
 bypass prompt-toolkit and remain the smoke-testable batch workflow. Script execution is available
 through `tabdat -f <script>`, `tabdat <script>`, and `run <script>`. Config loading happens at
-CLI startup from either `--config <path>` or project-local `.tabdat.toml`.
+CLI startup from `--config <path>`, otherwise project-local `.tabdat.toml`, otherwise XDG user
+config at `~/.config/tabdat/config.toml` or `$XDG_CONFIG_HOME/tabdat/config.toml`.
 
 ### Script Runner
 
@@ -101,7 +102,9 @@ table. It does not construct charts or write artifact files.
 
 Owns Altair chart construction and SVG/PNG artifact writes. Default plot artifacts are written
 under `<artifact_dir>/plots/` using `graph_format`, and explicit `saving(...)` paths create parent
-directories as needed. Interactive shell auto-open is a CLI-edge behavior controlled by
+directories as needed. Interactive shell default plot saves avoid overwriting existing artifacts by
+adding `-2`, `-3`, and later suffixes, while batch and script defaults keep the stable unsuffixed
+path for reproducibility. Interactive shell auto-open is a CLI-edge behavior controlled by
 `graph_open`; batch `-c` and script execution only print the artifact path.
 
 ### Formatter
@@ -150,8 +153,8 @@ display formatting.
 - Script-only non-nested `if` / `else` / `end` conditionals are available in script files.
 - `use` can load local Parquet paths or DuckDB-readable `http://`, `https://`, and `s3://` Parquet
   URIs.
-- Phase 9 config is executable through `.tabdat.toml`, `--config <path>`, and runtime `set`
-  commands.
+- Phase 9 config is executable through project-local `.tabdat.toml`, XDG user config,
+  `--config <path>`, and runtime `set` commands.
 - Phase 9 persistence is executable through `save <path>[, replace]` and
   `export <path>[, replace]` for local Parquet.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
