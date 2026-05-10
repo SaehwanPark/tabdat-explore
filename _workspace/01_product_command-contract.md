@@ -1,80 +1,88 @@
-# Phase 11 Completion Command Contract
+# Phase 9-10 Future Items Command Contract
 
 ## Request Summary
 
-Finish the remaining Phase 11 prerequisites before Phase 12 by adding minimal script control flow
-and narrow remote Parquet loading.
+Finish the remaining documented Phase 9 and Phase 10 future items by adding extension-driven
+multi-format export and a bounded real Polars lazy execution slice.
 
 ## Roadmap Phase
 
-Phase 11: Data Workflow & Reproducibility Primitives.
+- Phase 9: Configuration & Environment
+- Phase 10: Execution & State Foundations
 
-## Script Control Flow
-
-### Syntax
-
-```stata
-if <condition>
-  command
-else
-  command
-end
-```
-
-Rules:
-
-- `if`, `else`, and `end` are script-only directives.
-- A block may omit `else`.
-- Conditions are evaluated after macro expansion.
-- Supported conditions:
-  - `true`, `on`, and `1` evaluate true.
-  - `false`, `off`, and `0` evaluate false.
-  - `<left> == <right>` and `<left> != <right>` compare trimmed token text.
-- Commands inside an inactive branch are skipped and not echoed.
-- Nested `if` blocks are not supported in this slice.
-- Existing `seed`, `let`, `$macro`, and nested `run` behavior remains unchanged.
-
-### User-Facing Errors
-
-- Missing condition: `if expects a condition`
-- Unsupported condition: `if condition expects true/false, 1/0, on/off, ==, or !=`
-- Stray `else`: `else without matching if`
-- Stray `end`: `end without matching if`
-- Duplicate `else`: `if block already has an else branch`
-- Nested blocks: `nested if blocks are not supported`
-- Unterminated block: `if block is missing end`
-
-## Remote Parquet Loading
+## Export Contract
 
 ### Syntax
 
 ```stata
-use https://example.com/data.parquet
-use s3://bucket/path/data.parquet, lazy
+save filtered.parquet
+export filtered.parquet, replace
+export filtered.csv
+export filtered.feather, replace
 ```
 
 Rules:
 
-- `use` accepts local paths and remote URIs with `http://`, `https://`, or `s3://`.
-- All `use` targets must end in `.parquet`.
-- Remote targets are passed to DuckDB `read_parquet`.
-- `use <uri>, lazy` creates the same DuckDB scan-view boundary as local lazy loads.
-- Unsupported URI schemes fail before DuckDB execution.
-- Local path validation remains unchanged.
-- Remote credentials, config, and DB connections are out of scope.
+- `save` remains local Parquet only.
+- `export` chooses the output format from the path suffix.
+- Supported export suffixes are `.parquet`, `.csv`, and `.feather`.
+- `replace` keeps its current meaning for both `save` and `export`.
+- Parent directories are created automatically when needed.
+- Session state is not mutated by `save` or `export`.
 
 ### User-Facing Errors
 
-- Unsupported remote scheme: `use remote Parquet supports http, https, and s3 URLs`
-- Non-Parquet target: `use only supports .parquet files`
+- Unsupported export suffix: `export only supports .parquet, .csv, and .feather files`
+- Existing target without replace: `export target already exists: <path>`
+- Non-file existing target: `export target is not a file: <path>`
+- Writer failure: `export failed: <path>`
+
+### User-Facing Output
+
+- `save` keeps `Saved: <path> (<rows> rows, <columns> columns)`.
+- `export` reports `Exported: <path> (<rows> rows, <columns> columns)`.
+
+## Polars Lazy Contract
+
+### Syntax
+
+```stata
+use data.parquet, lazy engine=polars
+```
+
+Rules:
+
+- `use <local parquet path>, lazy engine=polars` creates a real Polars lazy active dataset.
+- The active dataset remains lazy for:
+  - `describe`
+  - `count`
+  - `head`
+  - `tail`
+  - `select`
+  - `keep <varlist>`
+  - `drop <varlist>`
+  - `keep if <expr>`
+  - `drop if <expr>`
+- Unsupported commands may materialize the active dataset once into the existing eager DuckDB
+  path before continuing.
+- After fallback materialization, the active dataset reports eager execution mode, a known row
+  count, and `lazy_engine=None`.
+- Existing eager DuckDB behavior remains unchanged.
+- Remote Parquet handling is not expanded in this slice.
+
+### User-Facing Errors
+
+- If Polars cannot create the lazy scan: `use could not read Parquet file: <path>`
+- If a Polars-only unsupported path needs a broader redesign, stop the implementation and report
+  the mismatch instead of changing command semantics.
 
 ## Acceptance Criteria
 
-- Script helper tests cover conditional parsing/evaluation, branch selection, macro-expanded
-  conditions, and diagnostics.
-- CLI tests cover script output for true/false/else branches and line-numbered control-flow
-  failures.
-- Parser/backend tests cover remote `use` syntax and backend remote URI classification without
-  depending on live internet.
-- Existing parser, executor, CLI, shell, and script behavior remains compatible.
-- Durable docs and `_workspace/` artifacts record Phase 11 completion and remaining future work.
+- Parser tests cover `export` paths with `.parquet`, `.csv`, and `.feather`.
+- Executor tests cover export success and error paths for all supported suffixes.
+- CLI tests cover `Exported:` output and artifact creation.
+- Executor tests prove that bounded Polars lazy commands preserve lazy state.
+- Executor tests prove that at least one unsupported command materializes once and then runs
+  successfully through the eager path.
+- `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and `_workspace/` artifacts all describe the same
+  supported export formats, the same bounded Polars subset, and the same remaining limits.
