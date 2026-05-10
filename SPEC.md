@@ -74,9 +74,10 @@ This file tracks feature state for spec-driven development. Product intent lives
   - script-mode plot auto-open suppression and golden mini-session coverage
   - lazy-mode documentation for materialization limits and experimental Polars selection
 - Implemented Phase 9 configuration and persistence:
-  - local `.tabdat.toml` and explicit `--config <path>` loading
+  - startup config precedence via explicit `--config <path>`, project-local `.tabdat.toml`, and
+    XDG user config
   - runtime `set graph_format`, `set artifact_dir`, and `set graph_open`
-  - config-aware plot artifact defaults
+  - config-aware plot artifact defaults with interactive-shell collision-avoiding suffixes
   - live row counting for `count` and unknown initial row counts for lazy loads
   - `save` / `export` Parquet persistence for session-local transformations
 - Completed the integrated public-dataset E2E checkpoint:
@@ -147,10 +148,7 @@ This file tracks feature state for spec-driven development. Product intent lives
 ## Future
 
 - Phase 9 configuration and persistence:
-  - consider user-level config locations after project-local config behavior settles
   - add CSV and Feather export only after the Parquet persistence contract is stable
-  - revisit timestamped or collision-avoiding plot names if stable overwrite behavior becomes
-    surprising in real interactive use
 - Phase 10 execution and state foundations:
   - continue deeper Polars-native lazy lowering only after the user-facing backend contract is
     honest and test-covered

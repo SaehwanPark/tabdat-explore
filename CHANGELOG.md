@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 9 startup config fallback through XDG user config at
+  `$XDG_CONFIG_HOME/tabdat/config.toml` or `~/.config/tabdat/config.toml` when no explicit
+  `--config` or project-local `.tabdat.toml` is present.
+- Added interactive-shell collision-safe default plot naming so repeated unsaved plot commands
+  create `-2`, `-3`, and later suffixes without changing batch or script default artifact paths.
+
 - Completed the remaining Phase 11 prerequisites with script-only non-nested `if` / `else` / `end`
   conditionals, macro-expanded condition evaluation, inactive branch skipping, and narrow
   DuckDB-backed remote Parquet loading for `http://`, `https://`, and `s3://` URIs.

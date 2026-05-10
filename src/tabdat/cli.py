@@ -5,8 +5,8 @@ import os
 import platform
 import subprocess
 import sys
-from dataclasses import replace
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from enum import Enum, auto
 from pathlib import Path
 
@@ -181,9 +181,7 @@ def _execute_one(
 
 def _prepare_interactive_command(command: Command, executor: Executor) -> Command:
   if isinstance(command, HistogramCommand) and command.saving is None:
-    saving = next_available_plot_path(
-      executor._default_plot_path("histogram", (command.variable,))
-    )
+    saving = next_available_plot_path(executor._default_plot_path("histogram", (command.variable,)))
     return replace(command, saving=saving)
   if isinstance(command, ScatterCommand) and command.saving is None:
     saving = next_available_plot_path(
@@ -191,9 +189,7 @@ def _prepare_interactive_command(command: Command, executor: Executor) -> Comman
     )
     return replace(command, saving=saving)
   if isinstance(command, BarCommand) and command.saving is None:
-    saving = next_available_plot_path(
-      executor._default_plot_path("bar", (command.variable,))
-    )
+    saving = next_available_plot_path(executor._default_plot_path("bar", (command.variable,)))
     return replace(command, saving=saving)
   return command
 
