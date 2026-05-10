@@ -86,11 +86,23 @@ class DuckDBBackend:
       if execution_mode == "lazy" and lazy_engine == "polars":
         if source.is_remote:
           raise ExecutionError("use lazy engine=polars only supports local Parquet paths")
+        next_lazy_frame = pl.scan_parquet(str(source.display_path))
+        schema = next_lazy_frame.collect_schema()
+        columns = tuple(
+          ColumnInfo(name=name, data_type=_polars_dtype_name(dtype))
+          for name, dtype in schema.items()
+        )
         self._drop_active_relation()
-        self._polars_lazy_frame = pl.scan_parquet(str(source.display_path))
+        self._polars_lazy_frame = next_lazy_frame
         self._lazy_engine = "polars"
         self._active_storage = "view"
-        return self.active_dataset_info(source.display_path)
+        return DatasetInfo(
+          path=source.display_path,
+          row_count=None,
+          columns=columns,
+          execution_mode="lazy",
+          lazy_engine="polars",
+        )
       if execution_mode == "lazy":
         read_sql = f"select * from read_parquet({_quote_literal(source.read_path)})"
         self._connection.execute(

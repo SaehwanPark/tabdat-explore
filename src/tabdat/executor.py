@@ -496,6 +496,8 @@ class Executor:
         KeepCommand,
         DropCommand,
         SelectCommand,
+        ExitCommand,
+        SetCommand,
         SaveCommand,
         ExportCommand,
       ),

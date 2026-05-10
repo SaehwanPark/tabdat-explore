@@ -144,6 +144,25 @@ def test_failing_lazy_use_preserves_existing_active_dataset(
   assert result.row_count == 3
 
 
+def test_failing_polars_lazy_use_preserves_existing_active_dataset(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  corrupt_parquet = tmp_path / "corrupt.parquet"
+  corrupt_parquet.write_text("not parquet")
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="use could not read Parquet file"):
+      executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="polars"))
+    result = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+
+
 @pytest.mark.parametrize("engine", ["duckdb", "polars"])
 def test_count_queries_lazy_active_dataset(sample_parquet: Path, engine: str) -> None:
   executor = Executor()
@@ -1358,6 +1377,22 @@ def test_phase_10_polars_lazy_unsupported_command_materializes_to_eager(
   assert active_dataset is not None
   assert active_dataset.execution_mode == "eager"
   assert active_dataset.lazy_engine is None
+
+
+def test_phase_10_polars_lazy_set_does_not_materialize(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    result = executor.execute(SetCommand("graph_open", "off"))
+    active_dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(result, SetResult)
+  assert result.value == "off"
+  assert active_dataset is not None
+  assert active_dataset.execution_mode == "lazy"
+  assert active_dataset.lazy_engine == "polars"
 
 
 def test_phase_6_visualizations_report_user_facing_errors(
