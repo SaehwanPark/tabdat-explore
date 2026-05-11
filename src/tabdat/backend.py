@@ -593,14 +593,14 @@ class DuckDBBackend:
   ) -> DatasetInfo:
     if self._polars_lazy_frame is not None:
       condition_expr = self._compile_polars_expression(dataset, condition)
-      predicate = condition_expr if keep else ~condition_expr
-      self._polars_lazy_frame = self._polars_lazy_frame.filter(predicate)
+      polars_predicate = condition_expr if keep else ~condition_expr
+      self._polars_lazy_frame = self._polars_lazy_frame.filter(polars_predicate)
       return self.active_dataset_info(dataset.path)
     condition_sql = self._compile_expression(dataset, condition)
-    predicate = condition_sql if keep else f"not ({condition_sql})"
+    sql_predicate: str = condition_sql if keep else f"not ({condition_sql})"
     command_name = "keep" if keep else "drop"
     self._replace_active(
-      f"select * from {ACTIVE_TABLE} where {predicate}",
+      f"select * from {ACTIVE_TABLE} where {sql_predicate}",
       command_name,
     )
     return self.active_dataset_info(dataset.path)

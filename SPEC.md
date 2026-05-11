@@ -138,15 +138,15 @@ This file tracks feature state for spec-driven development. Product intent lives
   - focused script helper, CLI, parser, backend classification, model, and validation coverage
 - Completed an SDD documentation compliance pass:
   - confirmed root `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` coverage
-  - clarified that Phase 12 estimation substrate remains planned future work until implementation
-    begins
+  - recorded that Phase 12 estimation substrate has been implemented as the internal
+    econometrics foundation
   - preserved the local `tabdat.monads` boundary as an active contributor invariant
 
 ## Present
 
-- No implementation feature is actively underway. Functional helper imports should continue to go
-  through `tabdat.monads`, which delegates to `comp-builders` while preserving a stable repo-local
-  boundary.
+- Phase 12 estimation substrate has been implemented.
+- Functional helper imports should continue to go through `tabdat.monads`, which delegates to
+  `comp-builders` while preserving a stable repo-local boundary.
 
 ## Future
 
@@ -163,11 +163,6 @@ This file tracks feature state for spec-driven development. Product intent lives
     dogfooded
   - add remote credentials, database connections, and broader object-store behavior only after the
     URI-based Parquet contract is dogfooded
-- Phase 12 estimation substrate:
-  - add reusable statistical primitives, simulation/resampling utilities, and shared least
-    squares, MLE, and GMM estimation interfaces
-  - define a stable internal result contract for coefficients, inference, diagnostics,
-    predictions, and model metadata
 - Phase 13 core linear econometrics:
   - add OLS/WLS, robust and cluster-robust inference, GLS, prediction/fitted-value workflows,
     and linear-model diagnostics

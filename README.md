@@ -187,8 +187,8 @@ tabdat> run analysis.td
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`
-  in later script entries and nested `run` scripts. Loops, inline comments, and script-level
-  conditionals are deferred.
+  in later script entries and nested `run` scripts. Loops and inline comments are deferred, while
+  script-level `if` / `else` / `end` conditionals are supported.
 - Named table registries are not persisted across CLI sessions; use `save` or `export` for durable
   Parquet output.
 - Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation

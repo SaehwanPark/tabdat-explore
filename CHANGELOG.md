@@ -14,8 +14,8 @@ All notable project changes are tracked here.
 - Added Phase 9 startup config fallback through XDG user config at
   `$XDG_CONFIG_HOME/tabdat/config.toml` or `~/.config/tabdat/config.toml` when no explicit
   `--config` or project-local `.tabdat.toml` is present.
-- Added interactive-shell collision-safe default plot naming so repeated unsaved plot commands
-  create `-2`, `-3`, and later suffixes without changing batch or script default artifact paths.
+- Added Phase 12 estimation substrate with reusable statistical primitives, bootstrap resampling,
+  least-squares contracts, and shared MLE/GMM estimation interfaces plus focused tests.
 
 - Completed the remaining Phase 11 prerequisites with script-only non-nested `if` / `else` / `end`
   conditionals, macro-expanded condition evaluation, inactive branch skipping, and narrow
@@ -92,8 +92,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
-- Clarified SDD state so `SPEC.md` separates completed Phase 11 work, no active implementation,
-  and future Phase 12 estimation substrate planning.
+- Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.
+
 - Changed structured parser failure composition from handwritten `Either` helpers to
   `comp-builders` `Result` values while preserving the public `ParseError` behavior.
 

@@ -1,7 +1,7 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed roadmap Phase 11 data workflow primitives and is ready for Phase 12
-estimation substrate work. This document records the implemented shell UX, script
+TabDat-Explore has completed roadmap Phase 12 estimation substrate work and is ready for Phase 13
+core linear econometrics work. This document records the implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
 join, append, reshape, panel metadata, and script primitive boundaries, and the boundaries future
