@@ -87,13 +87,16 @@ def test_fit_least_squares_returns_full_result_contract() -> None:
   assert result.degrees_of_freedom == 1
 
 
-def test_fit_least_squares_rejects_shape_mismatches() -> None:
-  with pytest.raises(ValueError, match="response length must match design matrix row count"):
+def test_fit_least_squares_rejects_saturated_models() -> None:
+  with pytest.raises(
+    ValueError,
+    match="least squares requires positive residual degrees of freedom",
+  ):
     fit_least_squares(
       LeastSquaresProblem(
         predictor_names=("x",),
         design_matrix=((0.0,), (1.0,)),
-        response=(1.0,),
+        response=(1.0, 2.0),
       )
     )
 

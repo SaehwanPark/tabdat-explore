@@ -229,7 +229,9 @@ def fit_least_squares(problem: LeastSquaresProblem) -> LeastSquaresResult:
   )
   observation_count = len(response)
   degrees_of_freedom = observation_count - len(parameters)
-  sigma_squared = residual_sum_of_squares / degrees_of_freedom if degrees_of_freedom > 0 else 0.0
+  if degrees_of_freedom <= 0:
+    raise ValueError("least squares requires positive residual degrees of freedom")
+  sigma_squared = residual_sum_of_squares / degrees_of_freedom
   covariance = scale_matrix(xtx_inverse, sigma_squared)
   standard_errors = tuple(
     sqrt(max(covariance[index][index], 0.0)) for index in range(len(parameters))
