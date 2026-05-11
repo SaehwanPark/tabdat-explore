@@ -171,6 +171,9 @@ display formatting.
 - Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
 - Do not add broad command grammar before a command contract needs it.
 - Keep public behavior documented before implementation.
+- For Phase 13+ statistical/econometric commands, use a library-first implementation order:
+  Python libraries first, R libraries via `rpy2` second, and lower-level `numpy`/`scipy`
+  implementations only as the last resort.
 - Import `Result`, `Option`, and `Validation` through `tabdat.monads`; do not import
   `comp-builders` directly from feature modules unless a future design records a reason to bypass
   the local boundary.

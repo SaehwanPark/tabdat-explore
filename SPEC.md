@@ -163,24 +163,76 @@ This file tracks feature state for spec-driven development. Product intent lives
     dogfooded
   - add remote credentials, database connections, and broader object-store behavior only after the
     URI-based Parquet contract is dogfooded
+- Phase 13+ statistical/econometric implementation policy:
+  - approach order:
+    1. use well-established Python libraries first when the method is directly supported or can be
+       orchestrated with limited glue
+    2. if Python coverage is missing or workaround-heavy, use well-established R packages through
+       `rpy2` adapters
+    3. only then add focused lower-level implementations on top of `numpy`/`scipy` and the Phase 12
+       estimation substrate
+  - keep commands as thin wrappers over library backends while normalizing outputs into the shared
+    Phase 12 estimation result contract
 - Phase 13 core linear econometrics:
   - add OLS/WLS, robust and cluster-robust inference, GLS, prediction/fitted-value workflows,
     and linear-model diagnostics
+  - library strategy:
+    - approach (1): `statsmodels` for OLS/WLS/GLS, robust/cluster covariance, prediction, and
+      standard diagnostics
+    - approach (2): `fixest` or `estimatr` via `rpy2` for gaps in inference variants
+    - approach (3): targeted `numpy`/`scipy` linear algebra and inference helpers only when needed
 - Phase 14 endogeneity and panel foundations:
   - add IV/2SLS, weak-instrument and overidentification diagnostics, panel indexing semantics,
     fixed effects, random effects, and Hausman-style comparisons
+  - library strategy:
+    - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
+      `statsmodels` diagnostics when needed
+    - approach (2): `AER` (`ivreg`), `plm`, and `fixest` via `rpy2` for panel/IV gaps
+    - approach (3): targeted `numpy`/`scipy` implementations over the shared GMM substrate
 - Phase 15 nonlinear estimation core:
   - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
     variable models such as Tobit, truncated regression, and sample selection
+  - library strategy:
+    - approach (1): `statsmodels` for logit/probit workflows, marginal effects, and core nonlinear
+      likelihood models
+    - approach (2): `sampleSelection`, `censReg`, and `truncreg` via `rpy2` for Heckman-style,
+      censored, and truncated models
+    - approach (3): targeted `scipy.optimize` + `numpy` MLE implementations only when necessary
 - Phase 16 specialized likelihood models:
   - add discrete-choice systems, count models, mixture/hurdle/zero-inflated models, and
     duration/survival models
+  - library strategy:
+    - approach (1): `statsmodels` for multinomial/count/zero-inflated families and `lifelines` for
+      duration/survival workflows
+    - approach (2): `mlogit`, `glmmTMB`, and `survival` via `rpy2` for model families not covered
+      cleanly in Python
+    - approach (3): targeted `scipy.optimize` + `numpy` likelihood implementations only when needed
 - Phase 17 advanced empirical methods:
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
+  - library strategy:
+    - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
+      semiparametric building blocks
+    - approach (2): `fixest`, `did`, `MatchIt`, `Synth`, and `quantreg` via `rpy2` for mature
+      causal and distributional workflows
+    - approach (3): targeted `numpy`/`scipy` implementations only when the first two layers are
+      insufficient
 - Phase 18 ecosystem and extension layer:
-  - add a plugin system, broader remote connectors, and R integration only after command and
-    analytical result interfaces are stable
+  - add a plugin system, broader remote connectors, and formalized R adapter governance once command
+    and analytical result interfaces are stable
+  - library strategy:
+    - approach (1): stabilize Python adapter layers for adopted libraries (`statsmodels`,
+      `linearmodels`, `lifelines`, and related dependencies)
+    - approach (2): harden `rpy2` adapter boundaries and package management for approved R
+      dependencies such as `fixest`, `plm`, and `lme4`
+    - approach (3): keep lower-level code limited to compatibility glue and performance-critical
+      kernels
 - Phase 19 modern extensions:
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
+  - library strategy:
+    - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
+      `pysal` (`spreg`) for spatial econometrics
+    - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger
+      coverage
+    - approach (3): narrow `numpy`/`scipy` custom implementations only when no mature backend fits

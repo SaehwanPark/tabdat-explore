@@ -93,6 +93,9 @@ All notable project changes are tracked here.
 ### Changed
 
 - Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.
+- Updated `SPEC.md`, `docs/dev_phase.md`, and `ARCHITECTURE.md` to define a Phase 13+ statistical
+  implementation priority order: Python libraries first, R via `rpy2` second, and lower-level
+  `numpy`/`scipy` implementations last.
 
 - Changed structured parser failure composition from handwritten `Either` helpers to
   `comp-builders` `Result` values while preserving the public `ParseError` behavior.

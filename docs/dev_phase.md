@@ -396,6 +396,27 @@ set graph_open off
 
 ---
 
+## Phase 13+ — Statistical/Econometric Library Policy
+
+**Goal:** Keep econometric command development pragmatic and reliable by defaulting to mature
+libraries instead of bespoke estimators.
+
+### Priority Order
+
+1. Well-established Python libraries when the method exists directly or can be composed with
+   limited orchestration.
+2. Well-established R libraries via `rpy2` adapters when Python coverage is missing or the Python
+   path is workaround-heavy.
+3. Focused lower-level implementations over `numpy`/`scipy` only when neither higher-level route
+   is acceptable.
+
+### Constraint
+
+* Command handlers should stay thin and map library results into the shared Phase 12 estimation
+  result contract.
+
+---
+
 ## Phase 13 — Core Linear Econometrics
 
 **Goal:** Deliver the standard cross-sectional linear analysis workflow.
@@ -413,6 +434,15 @@ set graph_open off
 ### Non-goals
 
 * No IV, panel, or nonlinear models yet
+
+### Library Strategy (Priority Order)
+
+1. Python first: `statsmodels` for OLS/WLS/GLS, robust and cluster-robust covariance,
+   prediction/fitted-value workflows, and standard linear diagnostics.
+2. R fallback via `rpy2`: `fixest` or `estimatr` for inference variants not covered cleanly by
+   Python.
+3. Lower-level fallback: targeted `numpy`/`scipy` linear algebra and inference helpers only when
+   the first two layers cannot meet the command contract.
 
 ### Exit Gate
 
@@ -436,6 +466,14 @@ set graph_open off
 
 * No nonlinear or limited dependent variable families yet
 
+### Library Strategy (Priority Order)
+
+1. Python first: `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE workflows; use
+   `statsmodels` diagnostics as needed.
+2. R fallback via `rpy2`: `AER` (`ivreg`), `plm`, and `fixest` for panel/IV coverage gaps.
+3. Lower-level fallback: targeted `numpy`/`scipy` implementations on top of the shared GMM
+   substrate for missing pieces only.
+
 ### Exit Gate
 
 * The tool supports the common cross-sectional and panel linear identification workflows
@@ -457,6 +495,15 @@ set graph_open off
 
 * No broad discrete-choice tree or mixture-model catalog yet
 
+### Library Strategy (Priority Order)
+
+1. Python first: `statsmodels` for logit/probit, marginal effects, and core nonlinear likelihood
+   workflows.
+2. R fallback via `rpy2`: `sampleSelection`, `censReg`, and `truncreg` for Heckman-style,
+   censored, and truncated model coverage.
+3. Lower-level fallback: targeted `scipy.optimize` + `numpy` MLE implementations only when needed
+   to satisfy command contracts.
+
 ### Exit Gate
 
 * Nonlinear cross-sectional estimation is a first-class workflow built on the shared MLE layer
@@ -477,6 +524,15 @@ set graph_open off
 ### Non-goals
 
 * No advanced panel GMM, causal, or semiparametric expansion yet
+
+### Library Strategy (Priority Order)
+
+1. Python first: `statsmodels` for multinomial/count/zero-inflated families and `lifelines` for
+   duration/survival workflows.
+2. R fallback via `rpy2`: `mlogit`, `glmmTMB`, and `survival` for model families not covered
+   cleanly in Python.
+3. Lower-level fallback: targeted `scipy.optimize` + `numpy` likelihood implementations only when
+   the first two layers are insufficient.
 
 ### Exit Gate
 
@@ -500,7 +556,16 @@ set graph_open off
 
 ### Non-goals
 
-* No plugin, R, ML, Bayesian, or spatial ecosystem expansion yet
+* No broad plugin, ML, Bayesian, or spatial ecosystem expansion yet
+
+### Library Strategy (Priority Order)
+
+1. Python first: `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
+   semiparametric building blocks.
+2. R fallback via `rpy2`: `fixest`, `did`, `MatchIt`, `Synth`, and `quantreg` for mature causal
+   and distributional workflows.
+3. Lower-level fallback: targeted `numpy`/`scipy` implementations only when the first two layers
+   cannot satisfy method requirements.
 
 ### Exit Gate
 
@@ -516,12 +581,22 @@ set graph_open off
 ### Coverage
 
 * Plugin system built on stable command and result interfaces
-* R integration (`rpy2`) only after the interoperability boundary is clear
+* Hardened `rpy2` interoperability boundary for targeted R-package adapters introduced in earlier
+  phases
 * Broader remote connectors beyond the first DuckDB-friendly sources
 
 ### Non-goals
 
 * No requirement to expand core estimators while extension interfaces are still settling
+
+### Library Strategy (Priority Order)
+
+1. Python first: stabilize adapter layers for adopted Python libraries (`statsmodels`,
+   `linearmodels`, `lifelines`, and related dependencies).
+2. R fallback via `rpy2`: standardize package curation and adapter contracts for approved R
+   dependencies (`fixest`, `plm`, `lme4`, and related phase-approved packages).
+3. Lower-level fallback: keep custom numerical code limited to compatibility glue and
+   performance-critical kernels.
 
 ### Exit Gate
 
@@ -542,6 +617,15 @@ set graph_open off
 ### Non-goals
 
 * No pressure to make these methods define the core product architecture
+
+### Library Strategy (Priority Order)
+
+1. Python first: `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
+   `pysal` (`spreg`) for spatial econometrics.
+2. R fallback via `rpy2`: `brms`/`rstanarm` and `spdep`/`spatialreg` where R has stronger mature
+   coverage.
+3. Lower-level fallback: narrow `numpy`/`scipy` custom implementations only when no mature backend
+   fits the required method.
 
 ### Exit Gate
 
@@ -603,14 +687,13 @@ They are part of the **value proposition**.
 
 ---
 
-## 5. Delay R Integration
+## 5. Use R Selectively, Not Broadly
 
-It’s tempting, but:
+R integration remains useful, but should stay scoped:
 
-* adds packaging complexity
-* introduces cross-language edge cases
-
-Add only after core is stable.
+* targeted `rpy2` adapters are allowed from Phase 13 onward when Python coverage is missing or
+  workaround-heavy
+* broad R-surface expansion should wait until interoperability and packaging boundaries are stable
 
 ---
 
