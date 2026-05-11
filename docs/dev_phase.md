@@ -373,6 +373,8 @@ set graph_open off
 
 ## Phase 12 — Estimation Substrate
 
+**Status:** Implemented.
+
 **Goal:** Build reusable estimation engines and statistical primitives.
 
 ### Coverage
