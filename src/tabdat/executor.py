@@ -597,6 +597,9 @@ class Executor:
       raise ExecutionError("ivregress failed") from exc
     parameter_names = _iv_parameter_names(command)
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
+    # ivregress establishes a new estimation step outside the regress/predict/estat pipeline.
+    # Clear stored linear-regression state so predict/estat cannot silently reuse stale models.
+    self.state.regression = None
     return IvRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,

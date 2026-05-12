@@ -649,6 +649,29 @@ def test_phase_14_ivregress_reports_prerequisite_errors(sample_parquet: Path) ->
     executor.close()
 
 
+def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("w",)))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+      executor.execute(PredictCommand(target_variable="y_hat"))
+    with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="ovtest"))
+  finally:
+    executor.close()
+
+
 def test_phase_11_inner_join_named_table(sample_parquet: Path) -> None:
   executor = Executor()
   try:
