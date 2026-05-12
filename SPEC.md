@@ -162,27 +162,39 @@ and describe the active work with concise verification criteria.
   - residual analysis summaries plus Ramsey RESET (`ovtest`) and VIF multicollinearity checks
   - best-effort diagnostics compatibility across OLS, WLS, and GLS regression states
   - focused parser, executor/backend, CLI, and shell coverage
+- Completed Phase 13 linear econometrics hardening:
+  - integrated public-dataset E2E coverage now includes a dedicated
+    `s5_titanic_phase13_dogfood` scenario for `regress`, `predict`, and `estat`
+  - script reproducibility harness assertions align with current `export` wording
+    (`Exported:`)
+  - full project validation and integrated E2E harness pass with the updated scenario set
+- Implemented the first Phase 14 endogeneity foundations slice:
+  - `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)`
+  - covariance options `robust` and `cluster(<var>)`, plus `noconstant`
+  - Python-first `linearmodels` IV2SLS execution with deterministic CLI formatting
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
-- Feature: Phase 13 linear econometrics hardening
+- Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: current working branch
+  Branch: codex/tmp-phase14-iv2sls-slice1
 
   Summary:
-  Finish the remaining dogfood and ergonomics work around the implemented `regress`, `predict`,
-  and `estat` workflows before marking Phase 13 complete.
+  Continue from the implemented `ivregress 2sls` slice to fill remaining Phase 14 prerequisites
+  before broader panel-model expansion.
 
   Verification:
-  - Existing Phase 13 regression and shell tests stay green
-  - A real-dataset dogfood run exercises `regress`, `predict`, and `estat`
-  - Batch, interactive, and script modes remain stable
+  - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
+  - Integrated E2E scenarios `s1` through `s5` pass
+  - `ivregress 2sls` works with nonrobust, robust, and clustered covariance modes
 
   Out of Scope:
-  - IV and panel model families
+  - Fixed effects, random effects, and Hausman-style comparisons
+  - Broad panel workflow redesign
   - Nonlinear estimators
-  - Broader command-surface expansion
+  - R fallback adapters while Python-first coverage is available
 
 ## Future
 
@@ -197,8 +209,9 @@ and describe the active work with concise verification criteria.
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
-  - add IV/2SLS, weak-instrument and overidentification diagnostics, panel indexing semantics,
-    fixed effects, random effects, and Hausman-style comparisons
+  - complete the remaining Phase 14 scope beyond the implemented first `ivregress 2sls` slice:
+    weak-instrument and overidentification diagnostics, panel indexing semantics, fixed effects,
+    random effects, and Hausman-style comparisons
   - library strategy:
     - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
       `statsmodels` diagnostics when needed

@@ -1,22 +1,21 @@
-# Phase 13 Slice 3 Delivery Summary
+# Phase 14 Slice 1 Delivery Summary
 
 ## Outcome
 
-Completed a bounded third Phase 13 vertical slice on branch
-`codex/tmp-phase13-estat-diagnostics`.
+Completed a bounded Phase 14 start on branch `codex/tmp-phase14-iv2sls-slice1` after closing
+remaining Phase 13 hardening prerequisites.
 
 ## Implemented
 
-- Added post-estimation diagnostics command:
-  - `estat residuals`
-  - `estat ovtest`
-  - `estat vif`
-- Preserved existing `regress` and `predict` behavior while extending session regression state to
-  support diagnostics against the latest fitted model.
-- Added deterministic diagnostic table outputs for residual summaries, RESET test statistics, and
-  VIF summaries.
-- Added focused parser/executor/CLI/shell coverage for success and failure flows, including
-  weighted-model compatibility checks.
+- Prerequisite closure before Phase 14:
+  - fixed integrated-E2E script export wording checks (`Exported:`)
+  - added `s5_titanic_phase13_dogfood` to enforce real-dataset `regress`/`predict`/`estat`
+    dogfooding
+- Phase 14 slice 1 command:
+  - `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
+  - Python-first IV2SLS execution via `linearmodels`
+  - deterministic formatter output and covariance labeling
+- Added focused parser/executor/CLI/shell coverage for the new command.
 - Updated SDD and user-facing docs:
   - `SPEC.md`
   - `ARCHITECTURE.md`
@@ -29,7 +28,8 @@ Completed a bounded third Phase 13 vertical slice on branch
 - `uv run ruff format --check .`
 - `uv run pyright`
 - `uv run mypy`
-- `uv run pytest`
+- `uv run pytest -q`
+- `uv run python integrated_testing/run_e2e.py`
 
 All commands passed.
 
@@ -40,4 +40,4 @@ All commands passed.
 
 ## Suggested Follow-up
 
-- Extend Phase 13 diagnostics breadth and prediction ergonomics in a later bounded slice.
+- Add weak-instrument and overidentification diagnostics as the next bounded Phase 14 slice.

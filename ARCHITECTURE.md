@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
-TabDat-Explore has completed roadmap Phase 12 estimation substrate work and has started Phase 13
-core linear econometrics with three `regress`/`predict`/`estat` slices. This document records the
-implemented shell UX, script
+TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
+linear econometrics with three `regress`/`predict`/`estat` slices, and started Phase 14 with a
+first `ivregress 2sls` slice. This document records the implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
 join, append, reshape, panel metadata, and script primitive boundaries, and the boundaries future
@@ -52,7 +52,8 @@ option parsing, `if` clauses, expression AST construction, and `run <script>` co
 <path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
 Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
-`residuals`, `residuals|ovtest|vif`).
+`residuals`, `residuals|ovtest|vif`). The first Phase 14 slice adds `ivregress 2sls` parsing with
+`endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -73,7 +74,9 @@ preserves or clears metadata across state-changing commands according to the com
 Phase 13 slices 1-3 add session-local regression state for the latest fitted linear model, extend
 `regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
 deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
-`estat residuals|ovtest|vif`.
+`estat residuals|ovtest|vif`. The first Phase 14 slice adds `ivregress 2sls` execution through
+`linearmodels` with nonrobust, robust, and clustered covariance options and deterministic result
+formatting.
 
 ### DuckDB Backend
 
@@ -174,6 +177,8 @@ display formatting.
 - Phase 13 slices 1-3 are executable through
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
+- The first Phase 14 slice is executable through
+  `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -201,6 +206,8 @@ display formatting.
 - Keep remote loading scoped to DuckDB-readable Parquet URIs until credentials, DB connections, or
   broader remote data access are explicitly designed.
 - Keep named tables session-local until a future persistence/catalog contract exists.
+- Keep `ivregress 2sls` scoped to one endogenous variable plus one-or-more instruments until
+  broader endogeneity diagnostics and panel-estimation contracts are implemented.
 - Keep `join` scoped to named-table inputs and same-name equality keys until a broader multi-table
   workflow contract is written.
 - Keep `append` scoped to named-table inputs with strict same-column schemas until a broader stack

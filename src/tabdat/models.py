@@ -264,6 +264,18 @@ class EstatCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class IvRegressCommand:
+  outcome: str
+  exogenous: tuple[str, ...]
+  endogenous: str
+  instruments: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+  estimator: Literal["2sls"] = "2sls"
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -305,6 +317,7 @@ Command = (
   | RegressCommand
   | PredictCommand
   | EstatCommand
+  | IvRegressCommand
   | ParsedCommand
 )
 
@@ -413,6 +426,20 @@ class RegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class IvRegressionResult:
+  estimator: Literal["2sls"]
+  covariance: str
+  outcome: str
+  exogenous: tuple[str, ...]
+  endogenous: str
+  instruments: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelResult:
   action: Literal["report", "set", "clear"]
   metadata: PanelMetadata | None = None
@@ -464,6 +491,7 @@ Result = (
   | PreviewResult
   | TransformResult
   | RegressionResult
+  | IvRegressionResult
   | PanelResult
   | SqlCreateResult
   | TableResult

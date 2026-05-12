@@ -1,54 +1,76 @@
-# Phase 13 Slice 3 Command Contract
+# Phase 14 Slice 1 Command Contract
 
 ## Request Summary
 
-Implement the next executable Phase 13 linear-econometrics slice by adding post-estimation
-linear diagnostics while preserving existing `regress` and `predict` behavior.
+Close prerequisite Phase 13 hardening gaps first, then implement the first executable Phase 14
+endogeneity slice with a Python-first IV command.
 
 ## Roadmap Phase
 
-- Phase 13 core linear econometrics (slice 3)
+- Phase 13 hardening closeout (prerequisite)
+- Phase 14 endogeneity and panel foundations (slice 1)
 
-## Command Contracts
+## Prerequisite Gate Contract
 
-### `estat`
+### Integrated E2E hardening
+
+- Integrated harness must pass all scenarios.
+- Existing `s4_penguins_script_repro` expectations must match current `export` wording
+  (`Exported:`).
+- Integrated harness must include one real-dataset Phase 13 dogfood flow that exercises
+  `regress`, `predict`, and `estat` together.
+
+## Command Contract
+
+### `ivregress`
 
 #### Syntax
 
 ```stata
-estat residuals
-estat ovtest
-estat vif
+ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)
+ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) robust
+ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) cluster(<var>)
+ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) noconstant
 ```
 
 #### Rules
 
 - Requires an active dataset.
-- Requires a prior successful `regress` model in session state.
-- Subcommands:
-  - `residuals`: display residual-analysis summary metrics.
-  - `ovtest`: run Ramsey RESET-style specification test and report statistic/p-value metadata.
-  - `vif`: report predictor-level variance inflation factors.
-- Diagnostics should use Python-first `statsmodels` APIs.
-- Diagnostics should run with best-effort compatibility for OLS, WLS, and GLS fitted models.
-- If a diagnostic cannot be produced for the current model shape, fail with a deterministic error.
+- Requires estimator token `2sls`.
+- Requires one endogenous variable via `endog(...)`.
+- Requires one-or-more instruments via `iv(...)`.
+- `robust` and `cluster(...)` are mutually exclusive.
+- `cluster(...)` requires one clustering variable.
+- Endogenous variable cannot also appear in exogenous variables.
+- Execution uses Python-first `linearmodels` IV2SLS.
+- Covariance labels in output:
+  - default: `nonrobust`
+  - robust: `robust`
+  - clustered: `cluster(<var>)`
 
-#### User-Facing Errors
+#### User-facing errors
 
-- Missing active dataset: existing `NoActiveDatasetError` shape.
-- Missing prior model: `estat requires a prior regress model`.
-- Invalid syntax: `estat expects syntax: estat <residuals|ovtest|vif>`.
-- Invalid subcommand: `estat subcommand must be residuals, ovtest, or vif`.
-- Unsupported diagnostic execution for current model:
-  - `estat residuals failed for current model`
-  - `estat ovtest failed for current model`
-  - `estat vif failed for current model`
+- Invalid command shape:
+  - `ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)`
+- Invalid estimator token:
+  - `ivregress estimator must be 2sls`
+- Invalid `endog`/`iv`/`cluster` option arity:
+  - `ivregress option endog expects one variable`
+  - `ivregress option iv expects at least one variable`
+  - `ivregress option cluster expects one variable`
+- Conflicting covariance options:
+  - `ivregress cannot combine robust and cluster`
+- Exogenous/endogenous overlap:
+  - `ivregress endog variable must not appear in exogenous variables`
+- Execution failure:
+  - `ivregress failed`
 
 ## Acceptance Criteria
 
-- Parser accepts supported `estat` subcommands and rejects malformed/unsupported forms.
-- Executor returns deterministic tabular outputs for `estat residuals`, `estat ovtest`, and `estat vif`.
-- `estat` fails without prior `regress` state.
-- `estat` works after OLS and best-effort weighted (`wls`/`gls`) regressions.
-- CLI/shell tests cover successful and failure flows.
-- SDD docs and changelog align with implemented Phase 13 slice scope.
+- Prerequisite integrated-harness gate passes (`s1`..`s5`).
+- Parser accepts valid `ivregress 2sls` forms and rejects malformed forms deterministically.
+- Executor returns deterministic IV results for default, robust, and clustered covariance modes.
+- CLI/shell tests cover `ivregress` command success and completion flows.
+- SDD docs and changelog reflect:
+  - completed Phase 13 hardening
+  - started Phase 14 with `ivregress 2sls` slice

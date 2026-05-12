@@ -22,6 +22,7 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  IvRegressCommand,
   JoinCommand,
   KeepCommand,
   NumberExpression,
@@ -367,6 +368,37 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat vif") == EstatCommand(subcommand="vif")
 
 
+def test_parse_phase_14_ivregress_command() -> None:
+  assert parse_command("ivregress 2sls cost age bmi, endog(hours) iv(distance policy)") == (
+    IvRegressCommand(
+      outcome="cost",
+      exogenous=("age", "bmi"),
+      endogenous="hours",
+      instruments=("distance", "policy"),
+      estimator="2sls",
+    )
+  )
+  assert parse_command("ivregress 2sls cost, endog(hours) iv(distance) robust") == IvRegressCommand(
+    outcome="cost",
+    exogenous=(),
+    endogenous="hours",
+    instruments=("distance",),
+    robust=True,
+    estimator="2sls",
+  )
+  assert parse_command(
+    "ivregress 2sls cost age, endog(hours) iv(distance) cluster(group_id) noconstant"
+  ) == IvRegressCommand(
+    outcome="cost",
+    exogenous=("age",),
+    endogenous="hours",
+    instruments=("distance",),
+    cluster_variable="group_id",
+    include_intercept=False,
+    estimator="2sls",
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -566,6 +598,16 @@ def test_parse_exit_aliases() -> None:
     "estat, vif",
     "estat detail",
     "estat residuals, detail",
+    "ivregress",
+    "ivregress liml y x, endog(z) iv(w)",
+    "ivregress 2sls y x",
+    "ivregress 2sls y x, endog(z)",
+    "ivregress 2sls y x, iv(w)",
+    "ivregress 2sls y x, endog(z w) iv(q)",
+    "ivregress 2sls y x, endog(z) iv()",
+    "ivregress 2sls y x, endog(z) iv(w) robust cluster(g)",
+    "ivregress 2sls y z, endog(z) iv(w)",
+    "ivregress 2sls y x, endog(z) iv(w) robust=true",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",
