@@ -708,7 +708,7 @@ def _estat_vif_table(
   vif_values: list[float] = []
   for column_index, predictor in enumerate(predictor_names, start=index_offset):
     try:
-      vif = _to_float(variance_inflation_factor(exog, column_index))
+      vif = _to_float_allow_inf(variance_inflation_factor(exog, column_index))
     except Exception as exc:
       raise ExecutionError("estat vif failed for current model") from exc
     rows.append((predictor, vif))
@@ -933,6 +933,20 @@ def _to_float(value: object) -> float | None:
   if numeric is None:
     return None
   if not math.isfinite(numeric):
+    return None
+  return numeric
+
+
+def _to_float_allow_inf(value: object) -> float | None:
+  if value is None or isinstance(value, bool):
+    return None
+  if not isinstance(value, SupportsFloat):
+    return None
+  try:
+    numeric = float(value)
+  except (TypeError, ValueError):
+    return None
+  if math.isnan(numeric):
     return None
   return numeric
 

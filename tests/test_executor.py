@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import duckdb
@@ -107,6 +108,23 @@ def _write_invalid_weight_regression_parquet(path: Path) -> None:
         (3.0, 16.5, 1.0, -1.0),
         (4.0, 19.0, 2.0, 1.0)
     ) as reg_data(x, y, weight, sigma)
+    """,
+  )
+
+
+def _write_collinear_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 2.0, 5.0),
+        (2.0, 4.0, 8.0),
+        (3.0, 6.0, 11.0),
+        (4.0, 8.0, 14.0),
+        (5.0, 10.0, 17.0),
+        (6.0, 12.0, 20.0)
+    ) as reg_data(x1, x2, y)
     """,
   )
 
@@ -486,6 +504,27 @@ def test_phase_13_estat_supports_weighted_regression_states(tmp_path: Path) -> N
   assert wls_ovtest.headers == ("Metric", "Value")
   assert isinstance(gls_residuals, TableResult)
   assert gls_residuals.headers == ("Metric", "Value")
+
+
+def test_phase_13_estat_vif_preserves_infinite_values(tmp_path: Path) -> None:
+  path = tmp_path / "collinear.parquet"
+  _write_collinear_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x1", "x2")))
+    result = executor.execute(EstatCommand(subcommand="vif"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("Variable", "VIF")
+  values_by_variable = {row[0]: row[1] for row in result.rows}
+  assert isinstance(values_by_variable["x1"], float) and math.isinf(values_by_variable["x1"])
+  assert isinstance(values_by_variable["x2"], float) and math.isinf(values_by_variable["x2"])
+  assert isinstance(values_by_variable["mean_vif"], float) and math.isinf(
+    values_by_variable["mean_vif"]
+  )
 
 
 def test_phase_13_estat_requires_prior_regression(sample_parquet: Path) -> None:
