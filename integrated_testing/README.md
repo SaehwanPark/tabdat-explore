@@ -9,6 +9,7 @@ This directory contains the reusable integrated testing harness for
 - `s2_interactive_shell_contract`: prompt-toolkit completion and history checks through a TTY.
 - `s3_taxi_lazy_scale`: lazy Parquet workflow on NYC taxi data, including SQL, plots, and save.
 - `s4_penguins_script_repro`: script/config/nested-run/multiline-SQL workflow on Penguins.
+- `s5_titanic_phase13_dogfood`: real-dataset `regress`/`predict`/`estat` flow on Titanic.
 
 The harness downloads public datasets into `artifacts/e2e/data/` and writes scenario outputs under
 `artifacts/e2e/`. These generated files are intentionally ignored by git.

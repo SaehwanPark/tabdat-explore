@@ -1,18 +1,19 @@
 # Public-Dataset Integrated E2E Test Plan
 
 This document defines integrated, public-dataset end-to-end scenarios for TabDat-Explore across
-Phases 1 through 9. The scenarios are written for AI agents and keep success criteria machine-
-observable: exit codes, stdout substrings or regexes, stderr expectations, and file existence at
-fixed paths.
+Phases 1 through 9 and the current Phase 13 linear-econometrics surface. The scenarios are written
+for AI agents and keep success criteria machine-observable: exit codes, stdout substrings or
+regexes, stderr expectations, and file existence at fixed paths.
 
 ## Coverage Matrix
 
-| Scenario | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6 | Phase 7 | Phase 8 | Phase 9 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `s1_titanic_batch_core` | yes | yes | yes | no | no | no | no | no | no |
-| `s2_interactive_shell_contract` | yes | no | yes | yes | yes | yes | no | no | no |
-| `s3_taxi_lazy_scale` | yes | no | yes | yes | no | yes | yes | no | yes |
-| `s4_penguins_script_repro` | yes | yes | yes | yes | no | yes | no | yes | yes |
+| Scenario | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6 | Phase 7 | Phase 8 | Phase 9 | Phase 13 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `s1_titanic_batch_core` | yes | yes | yes | no | no | no | no | no | no | no |
+| `s2_interactive_shell_contract` | yes | no | yes | yes | yes | yes | no | no | no | no |
+| `s3_taxi_lazy_scale` | yes | no | yes | yes | no | yes | yes | no | yes | no |
+| `s4_penguins_script_repro` | yes | yes | yes | yes | no | yes | no | yes | yes | no |
+| `s5_titanic_phase13_dogfood` | yes | no | yes | no | no | no | no | no | no | yes |
 
 ## Global Harness Rules
 
@@ -393,9 +394,9 @@ expected_stdout_contains:
   - "Row %"
   - "Col %"
   - "Created penguin_summary:"
-  - "Saved: artifacts/e2e/s4/penguin_summary.parquet"
+  - "Exported: artifacts/e2e/s4/penguin_summary.parquet"
 expected_stdout_regex:
-  - "Saved: artifacts/e2e/s4/penguin_summary.parquet \\([0-9]+ rows, 3 columns\\)"
+  - "Exported: artifacts/e2e/s4/penguin_summary.parquet \\([0-9]+ rows, 3 columns\\)"
 expected_stderr: ""
 expected_files:
   - artifacts/e2e/s4/config.tabdat.toml
@@ -409,6 +410,68 @@ red_flags:
   - plot auto-open occurs in script mode
   - multiline sql block parse fails
   - exported parquet is missing after a successful exit code
+```
+
+### `s5_titanic_phase13_dogfood`
+
+```yaml
+scenario_id: s5_titanic_phase13_dogfood
+goal: Cover real-dataset Phase 13 dogfooding for regress/predict/estat in batch mode.
+phases: [1, 3, 13]
+mode: batch_c
+dataset:
+  dataset_id: titanic
+  local_path: artifacts/e2e/data/titanic.parquet
+preflight:
+  - uv sync
+  - mkdir -p artifacts/e2e/data artifacts/e2e/s5
+  - dataset fetch and parquet conversion must succeed
+command:
+  argv:
+    - uv
+    - run
+    - tabdat
+    - -c
+    - use artifacts/e2e/data/titanic.parquet
+    - -c
+    - regress fare age
+    - -c
+    - predict fare_hat
+    - -c
+    - predict fare_resid, residuals
+    - -c
+    - estat residuals
+    - -c
+    - estat ovtest
+    - -c
+    - estat vif
+    - -c
+    - head 5
+expected_exit_code: 0
+expected_stdout_contains:
+  - "Loaded: artifacts/e2e/data/titanic.parquet"
+  - "Model: regress fare on age"
+  - "Estimator: ols"
+  - "Covariance: nonrobust"
+  - "Predicted fare_hat:"
+  - "Predicted fare_resid:"
+  - "Metric"
+  - "studentized_std_dev"
+  - "p_value"
+  - "Variable  VIF"
+  - "age"
+  - "fare_hat"
+  - "fare_resid"
+expected_stdout_regex:
+  - "Observations: [0-9]+"
+  - "Predicted fare_resid: [0-9]+ rows, [0-9]+ columns"
+expected_stderr: ""
+expected_files: []
+red_flags:
+  - regress output header missing or malformed
+  - predict commands do not add generated columns to subsequent preview
+  - estat residuals/ovtest/vif fail after successful regress
+  - diagnostics output changes shape without a matching command-contract update
 ```
 
 ## Global Red Flags

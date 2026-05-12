@@ -397,9 +397,11 @@ def s4_penguins_script_repro() -> ScenarioResult:
       "Row %",
       "Col %",
       "Created penguin_summary:",
-      "Saved: artifacts/e2e/s4/penguin_summary.parquet",
+      "Exported: artifacts/e2e/s4/penguin_summary.parquet",
     ),
-    stdout_regex=(r"Saved: artifacts/e2e/s4/penguin_summary.parquet \([0-9]+ rows, 3 columns\)",),
+    stdout_regex=(
+      r"Exported: artifacts/e2e/s4/penguin_summary.parquet \([0-9]+ rows, 3 columns\)",
+    ),
     expected_files=(
       Path("artifacts/e2e/s4/config.tabdat.toml"),
       Path("artifacts/e2e/s4/prep.td"),
@@ -409,6 +411,52 @@ def s4_penguins_script_repro() -> ScenarioResult:
     ),
   )
   return run_command_scenario("s4_penguins_script_repro", command)
+
+
+def s5_titanic_phase13_dogfood() -> ScenarioResult:
+  command = CommandSpec(
+    argv=(
+      "uv",
+      "run",
+      "tabdat",
+      "-c",
+      "use artifacts/e2e/data/titanic.parquet",
+      "-c",
+      "regress fare age",
+      "-c",
+      "predict fare_hat",
+      "-c",
+      "predict fare_resid, residuals",
+      "-c",
+      "estat residuals",
+      "-c",
+      "estat ovtest",
+      "-c",
+      "estat vif",
+      "-c",
+      "head 5",
+    ),
+    stdout_contains=(
+      "Loaded: artifacts/e2e/data/titanic.parquet",
+      "Model: regress fare on age",
+      "Estimator: ols",
+      "Covariance: nonrobust",
+      "Predicted fare_hat:",
+      "Predicted fare_resid:",
+      "Metric",
+      "studentized_std_dev",
+      "p_value",
+      "Variable  VIF",
+      "age",
+      "fare_hat",
+      "fare_resid",
+    ),
+    stdout_regex=(
+      r"Observations: [0-9]+",
+      r"Predicted fare_resid: [0-9]+ rows, [0-9]+ columns",
+    ),
+  )
+  return run_command_scenario("s5_titanic_phase13_dogfood", command)
 
 
 def run_command_scenario(scenario_id: str, command: CommandSpec) -> ScenarioResult:
@@ -609,6 +657,7 @@ SCENARIO_DATASETS = {
   "s2_interactive_shell_contract": ("titanic",),
   "s3_taxi_lazy_scale": ("nyc_taxi_jan_2023",),
   "s4_penguins_script_repro": ("penguins",),
+  "s5_titanic_phase13_dogfood": ("titanic",),
 }
 
 SCENARIOS = {
@@ -616,6 +665,7 @@ SCENARIOS = {
   "s2_interactive_shell_contract": s2_interactive_shell_contract,
   "s3_taxi_lazy_scale": s3_taxi_lazy_scale,
   "s4_penguins_script_repro": s4_penguins_script_repro,
+  "s5_titanic_phase13_dogfood": s5_titanic_phase13_dogfood,
 }
 
 
