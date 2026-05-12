@@ -1,34 +1,43 @@
-# Phase 13 Slice 2 Delivery Summary
+# Phase 13 Slice 3 Delivery Summary
 
-## Summary
+## Outcome
 
-Completed a bounded second Phase 13 vertical slice on branch
-`codex/tmp-phase13-slice2-wls-gls`.
+Completed a bounded third Phase 13 vertical slice on branch
+`codex/tmp-phase13-estat-diagnostics`.
 
-## Delivered Behavior
+## Implemented
 
-- Extended `regress` with weighted estimator modes:
-  - `wls(<weight_var>)`
-  - `gls(<sigma_var>)`
-- Preserved covariance controls (`nonrobust`, `robust`, `cluster(...)`) across OLS/WLS/GLS.
-- Added retained-row positive-value validation for weighted inputs.
-- Kept `predict <newvar>[, xb residuals]` compatible with weighted and unweighted regression state.
-- Added deterministic regression estimator metadata output.
-- Added focused parser/executor/CLI/shell coverage for weighted regress flows.
-- Synchronized `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`, and `_workspace`
-  contract/implementation/QA artifacts.
+- Added post-estimation diagnostics command:
+  - `estat residuals`
+  - `estat ovtest`
+  - `estat vif`
+- Preserved existing `regress` and `predict` behavior while extending session regression state to
+  support diagnostics against the latest fitted model.
+- Added deterministic diagnostic table outputs for residual summaries, RESET test statistics, and
+  VIF summaries.
+- Added focused parser/executor/CLI/shell coverage for success and failure flows, including
+  weighted-model compatibility checks.
+- Updated SDD and user-facing docs:
+  - `SPEC.md`
+  - `ARCHITECTURE.md`
+  - `README.md`
+  - `CHANGELOG.md`
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest`
 
-## Residual Risks
+All commands passed.
 
-- Broader linear diagnostics remain pending in a future Phase 13 slice.
-- `statsmodels` can emit runtime warnings on tiny saturated samples; tests currently treat these as
-  non-blocking.
+## Residual Risk
+
+- Existing tiny-sample `statsmodels` warnings in legacy regression/predict tests remain unchanged
+  and non-blocking.
+
+## Suggested Follow-up
+
+- Extend Phase 13 diagnostics breadth and prediction ergonomics in a later bounded slice.

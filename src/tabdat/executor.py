@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, SupportsFloat, cast
 
 import statsmodels.api as sm
+from statsmodels.stats.diagnostic import linear_reset
+from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
 from tabdat.backend import DuckDBBackend
 from tabdat.config import TabDatConfig, set_config_value
@@ -33,6 +35,7 @@ from tabdat.models import (
   DescribeCommand,
   DescribeResult,
   DropCommand,
+  EstatCommand,
   ExitCommand,
   ExportCommand,
   ExportResult,
@@ -79,6 +82,8 @@ class _RegressionState:
   predictor_names: tuple[str, ...]
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
+  include_intercept: bool
+  fitted_model: object
 
 
 @dataclass
@@ -266,6 +271,9 @@ class Executor:
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
+
+    if isinstance(command, EstatCommand):
+      return self._execute_estat(command)
 
     raise ExecutionError("unsupported command")
 
@@ -507,6 +515,8 @@ class Executor:
       predictor_names=command.predictors,
       predictor_coefficients=predictor_coefficients,
       intercept=intercept,
+      include_intercept=command.include_intercept,
+      fitted_model=fitted,
     )
     return RegressionResult(
       outcome=command.outcome,
@@ -540,6 +550,23 @@ class Executor:
       kind=command.kind,
     )
     return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+
+  def _execute_estat(self, command: EstatCommand) -> TableResult:
+    self._require_active_dataset("estat")
+    regression = self.state.regression
+    if regression is None:
+      raise ExecutionError("estat requires a prior regress model")
+    if command.subcommand == "residuals":
+      return _estat_residuals_table(regression.fitted_model)
+    if command.subcommand == "ovtest":
+      return _estat_ovtest_table(regression.fitted_model)
+    if command.subcommand == "vif":
+      return _estat_vif_table(
+        regression.fitted_model,
+        predictor_names=regression.predictor_names,
+        include_intercept=regression.include_intercept,
+      )
+    raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
@@ -622,6 +649,7 @@ class Executor:
         SetCommand,
         SaveCommand,
         ExportCommand,
+        EstatCommand,
       ),
     ):
       return
@@ -629,6 +657,107 @@ class Executor:
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
     self.state.active_dataset = materialized
+
+
+def _estat_residuals_table(fitted_model: object) -> TableResult:
+  residuals = _required_float_sequence(getattr(fitted_model, "resid", None))
+  if not residuals:
+    raise ExecutionError("estat residuals failed for current model")
+  rows: list[tuple[object, ...]] = [
+    ("count", len(residuals)),
+    ("mean", _mean(residuals)),
+    ("std_dev", _sample_standard_deviation(residuals)),
+    ("min", min(residuals)),
+    ("median", _median(residuals)),
+    ("max", max(residuals)),
+  ]
+  studentized = _studentized_residuals(fitted_model)
+  if studentized is not None:
+    rows.append(("studentized_std_dev", _sample_standard_deviation(studentized)))
+  return TableResult(headers=("Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_ovtest_table(fitted_model: object) -> TableResult:
+  try:
+    reset_result = linear_reset(cast(Any, fitted_model), use_f=True)
+  except Exception as exc:
+    raise ExecutionError("estat ovtest failed for current model") from exc
+  return TableResult(
+    headers=("Metric", "Value"),
+    rows=(
+      ("F", _to_float(getattr(reset_result, "fvalue", None))),
+      ("p_value", _to_float(getattr(reset_result, "pvalue", None))),
+      ("df_num", _to_float(getattr(reset_result, "df_num", None))),
+      ("df_denom", _to_float(getattr(reset_result, "df_denom", None))),
+    ),
+  )
+
+
+def _estat_vif_table(
+  fitted_model: object,
+  *,
+  predictor_names: tuple[str, ...],
+  include_intercept: bool,
+) -> TableResult:
+  exog = getattr(getattr(fitted_model, "model", None), "exog", None)
+  column_count = _matrix_column_count(exog)
+  index_offset = 1 if include_intercept else 0
+  if column_count is None or column_count < len(predictor_names) + index_offset:
+    raise ExecutionError("estat vif failed for current model")
+  rows: list[tuple[object, ...]] = []
+  vif_values: list[float] = []
+  for column_index, predictor in enumerate(predictor_names, start=index_offset):
+    try:
+      vif = _to_float_allow_inf(variance_inflation_factor(exog, column_index))
+    except Exception as exc:
+      raise ExecutionError("estat vif failed for current model") from exc
+    rows.append((predictor, vif))
+    if vif is not None:
+      vif_values.append(vif)
+  if not rows:
+    raise ExecutionError("estat vif failed for current model")
+  if vif_values:
+    rows.append(("mean_vif", _mean(tuple(vif_values))))
+  return TableResult(headers=("Variable", "VIF"), rows=tuple(rows))
+
+
+def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
+  try:
+    influence = OLSInfluence(cast(Any, fitted_model))
+    return _required_float_sequence(getattr(influence, "resid_studentized_internal", None))
+  except Exception:
+    return None
+
+
+def _matrix_column_count(matrix: object) -> int | None:
+  if matrix is None:
+    return None
+  shape = getattr(matrix, "shape", None)
+  if isinstance(shape, tuple) and len(shape) == 2 and isinstance(shape[1], int):
+    return shape[1]
+  return None
+
+
+def _mean(values: tuple[float, ...]) -> float:
+  return math.fsum(values) / len(values)
+
+
+def _sample_standard_deviation(values: tuple[float, ...]) -> float | None:
+  if len(values) < 2:
+    return None
+  mean_value = _mean(values)
+  variance = math.fsum((value - mean_value) * (value - mean_value) for value in values) / (
+    len(values) - 1
+  )
+  return math.sqrt(variance)
+
+
+def _median(values: tuple[float, ...]) -> float:
+  sorted_values = sorted(values)
+  midpoint = len(sorted_values) // 2
+  if len(sorted_values) % 2 == 1:
+    return sorted_values[midpoint]
+  return (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
 
 
 def _require_numeric_columns(
@@ -804,6 +933,20 @@ def _to_float(value: object) -> float | None:
   if numeric is None:
     return None
   if not math.isfinite(numeric):
+    return None
+  return numeric
+
+
+def _to_float_allow_inf(value: object) -> float | None:
+  if value is None or isinstance(value, bool):
+    return None
+  if not isinstance(value, SupportsFloat):
+    return None
+  try:
+    numeric = float(value)
+  except (TypeError, ValueError):
+    return None
+  if math.isnan(numeric):
     return None
   return numeric
 

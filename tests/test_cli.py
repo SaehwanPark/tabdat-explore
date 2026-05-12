@@ -407,6 +407,66 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert "Error: predict requires a prior regress model" in captured.err
 
 
+def test_cli_runs_phase_13_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "weighted.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 'a', 1.0, 1.0),
+        (2.0, 14.0, 'a', 1.5, 1.5),
+        (3.0, 16.5, 'b', 0.5, 0.5),
+        (4.0, 19.0, 'b', 2.0, 2.0),
+        (5.0, 21.0, 'c', 1.0, 1.0),
+        (6.0, 23.5, 'c', 3.0, 3.0)
+    ) as reg_data(x, y, cluster_id, weight, sigma)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "regress y x, wls(weight)",
+      "-c",
+      "estat residuals",
+      "-c",
+      "estat ovtest",
+      "-c",
+      "estat vif",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Metric" in captured.out
+  assert "count" in captured.out
+  assert "studentized_std_dev" in captured.out
+  assert "df_denom" in captured.out
+  assert "Variable  VIF" in captured.out
+  assert "x         1" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_estat_requires_prior_regress(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "estat ovtest",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "Loaded:" in captured.out
+  assert "Error: estat requires a prior regress model" in captured.err
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

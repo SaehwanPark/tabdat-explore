@@ -34,10 +34,11 @@ command line. The current CLI supports:
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - prediction workflows with `predict <newvar>[, xb residuals]`
+- post-estimation diagnostics with `estat <residuals|ovtest|vif>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the first two Phase 13 linear-econometrics slices on top of the
+The repository has completed the first three Phase 13 linear-econometrics slices on top of the
 Phase 12 estimation substrate.
 
 ## Quickstart
@@ -192,6 +193,8 @@ tabdat> run analysis.td
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`; `predict` writes
   fitted values (`xb`) or residuals into a new active-dataset column using the latest regression
   model in session state.
+- `estat` currently provides post-estimation residual summaries, RESET specification testing
+  (`ovtest`), and VIF multicollinearity checks (`vif`) over the latest regression state.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

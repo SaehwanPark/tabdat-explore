@@ -14,6 +14,7 @@ from tabdat.models import (
   CountCommand,
   DescribeCommand,
   DropCommand,
+  EstatCommand,
   ExitCommand,
   ExportCommand,
   FunctionCallExpression,
@@ -360,6 +361,12 @@ def test_parse_phase_13_predict_command() -> None:
   )
 
 
+def test_parse_phase_13_estat_command() -> None:
+  assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
+  assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
+  assert parse_command("estat vif") == EstatCommand(subcommand="vif")
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -554,6 +561,11 @@ def test_parse_exit_aliases() -> None:
     "predict cost_hat if age > 18",
     "predict cost_hat, xb residuals",
     "predict cost_hat, residuals=true",
+    "estat",
+    "estat vif extra",
+    "estat, vif",
+    "estat detail",
+    "estat residuals, detail",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",

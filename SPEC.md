@@ -155,12 +155,17 @@ This file tracks feature state for spec-driven development. Product intent lives
   - positive-value validation for retained WLS weights and GLS sigma values
   - deterministic estimator metadata output plus focused parser, executor/backend, CLI, and shell
     coverage
+- Implemented the third Phase 13 core linear econometrics slice:
+  - `estat <residuals|ovtest|vif>` post-estimation diagnostics over the latest regression state
+  - residual analysis summaries plus Ramsey RESET (`ovtest`) and VIF multicollinearity checks
+  - best-effort diagnostics compatibility across OLS, WLS, and GLS regression states
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
 - Phase 12 estimation substrate has been implemented.
-- Phase 13 slice 2 is implemented with weighted `regress` execution (`wls`/`gls`) plus existing
-  `predict` compatibility.
+- Phase 13 slice 3 is implemented with `estat` diagnostics over existing weighted and unweighted
+  `regress`/`predict` workflows.
 - Functional helper imports should continue to go through `tabdat.monads`, which delegates to
   `comp-builders` while preserving a stable repo-local boundary.
 
@@ -190,8 +195,8 @@ This file tracks feature state for spec-driven development. Product intent lives
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 13 core linear econometrics:
-  - extend beyond the implemented slices to complete broader diagnostics and additional
-    prediction/fitted-value ergonomics
+  - extend beyond the implemented slices to complete additional prediction/fitted-value ergonomics
+    and broader diagnostics breadth
   - library strategy:
     - approach (1): continue Python-first through `statsmodels` for WLS/GLS and remaining linear
       diagnostics

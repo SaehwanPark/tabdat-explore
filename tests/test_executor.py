@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 
 import duckdb
@@ -28,6 +29,7 @@ from tabdat.models import (
   DescribeCommand,
   DescribeResult,
   DropCommand,
+  EstatCommand,
   ExportCommand,
   ExportResult,
   FunctionCallExpression,
@@ -106,6 +108,23 @@ def _write_invalid_weight_regression_parquet(path: Path) -> None:
         (3.0, 16.5, 1.0, -1.0),
         (4.0, 19.0, 2.0, 1.0)
     ) as reg_data(x, y, weight, sigma)
+    """,
+  )
+
+
+def _write_collinear_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 2.0, 5.0),
+        (2.0, 4.0, 8.0),
+        (3.0, 6.0, 11.0),
+        (4.0, 8.0, 14.0),
+        (5.0, 10.0, 17.0),
+        (6.0, 12.0, 20.0)
+    ) as reg_data(x1, x2, y)
     """,
   )
 
@@ -426,6 +445,94 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
       executor.execute(PredictCommand(target_variable="cost_hat"))
+  finally:
+    executor.close()
+
+
+def test_phase_13_estat_residuals_ovtest_and_vif(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    residuals = executor.execute(EstatCommand(subcommand="residuals"))
+    ovtest = executor.execute(EstatCommand(subcommand="ovtest"))
+    vif = executor.execute(EstatCommand(subcommand="vif"))
+  finally:
+    executor.close()
+
+  assert isinstance(residuals, TableResult)
+  assert residuals.headers == ("Metric", "Value")
+  assert residuals.rows[0][0] == "count"
+  assert isinstance(ovtest, TableResult)
+  assert ovtest.headers == ("Metric", "Value")
+  assert ovtest.rows[0][0] == "F"
+  assert isinstance(vif, TableResult)
+  assert vif.headers == ("Variable", "VIF")
+  assert vif.rows[0][0] == "x"
+
+
+def test_phase_13_estat_supports_weighted_regression_states(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="wls",
+        weight_variable="weight",
+      )
+    )
+    wls_ovtest = executor.execute(EstatCommand(subcommand="ovtest"))
+    executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="gls",
+        weight_variable="sigma",
+      )
+    )
+    gls_residuals = executor.execute(EstatCommand(subcommand="residuals"))
+  finally:
+    executor.close()
+
+  assert isinstance(wls_ovtest, TableResult)
+  assert wls_ovtest.headers == ("Metric", "Value")
+  assert isinstance(gls_residuals, TableResult)
+  assert gls_residuals.headers == ("Metric", "Value")
+
+
+def test_phase_13_estat_vif_preserves_infinite_values(tmp_path: Path) -> None:
+  path = tmp_path / "collinear.parquet"
+  _write_collinear_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x1", "x2")))
+    result = executor.execute(EstatCommand(subcommand="vif"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("Variable", "VIF")
+  values_by_variable = {row[0]: row[1] for row in result.rows}
+  assert isinstance(values_by_variable["x1"], float) and math.isinf(values_by_variable["x1"])
+  assert isinstance(values_by_variable["x2"], float) and math.isinf(values_by_variable["x2"])
+  assert isinstance(values_by_variable["mean_vif"], float) and math.isinf(
+    values_by_variable["mean_vif"]
+  )
+
+
+def test_phase_13_estat_requires_prior_regression(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="ovtest"))
   finally:
     executor.close()
 

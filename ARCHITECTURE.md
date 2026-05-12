@@ -1,7 +1,7 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work and has started Phase 13
-core linear econometrics with two `regress`/`predict` slices. This document records the
+core linear econometrics with three `regress`/`predict`/`estat` slices. This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -50,8 +50,9 @@ and disables plot auto-open so runs are reproducible in batch contexts.
 Converts command text into internal command objects. The parser owns tokenization, varlist and
 option parsing, `if` clauses, expression AST construction, and `run <script>` commands. `use
 <path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
-Phase 13 slices 1-2 add parsed command forms for `regress` and `predict` with constrained option
-sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`, `residuals`).
+Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
+constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
+`residuals`, `residuals|ovtest|vif`).
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -69,9 +70,10 @@ materialize the next active relation. `reshape` validates active state at the ex
 delegates active-dataset wide/long materialization to the backend. `panel` stores session-local
 panel id/time metadata on active dataset snapshots, asks the backend to validate active rows, and
 preserves or clears metadata across state-changing commands according to the command contract.
-Phase 13 slices 1-2 add session-local regression state for the latest fitted linear model, extend
-`regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, and keep `predict`
-as a deterministic dataset-transform command over that state.
+Phase 13 slices 1-3 add session-local regression state for the latest fitted linear model, extend
+`regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
+deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
+`estat residuals|ovtest|vif`.
 
 ### DuckDB Backend
 
@@ -169,9 +171,9 @@ display formatting.
   `--config <path>`, and runtime `set` commands.
 - Phase 9 persistence is executable through `save <path>[, replace]` and
   `export <path>[, replace]` for local `.parquet`, `.csv`, and `.feather` files.
-- Phase 13 slices 1-2 are executable through
+- Phase 13 slices 1-3 are executable through
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
-  and `predict <newvar>[, xb residuals]`.
+  plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
