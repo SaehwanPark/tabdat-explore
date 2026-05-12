@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 13 linear econometrics slice with
+  `regress <y> <xvars>[, robust cluster(<var>) noconstant]` and
+  `predict <newvar>[, xb residuals]`, including Python-first `statsmodels` OLS fitting,
+  regression-result formatting, and focused parser/executor/backend/CLI/shell coverage.
 - Added Phase 9 export widening with suffix-driven local `.parquet`, `.csv`, and `.feather`
   `export`, distinct `Exported:` CLI output, and focused parser, executor, and CLI coverage.
 - Added a bounded real Phase 10 Polars lazy execution slice for local Parquet projection,

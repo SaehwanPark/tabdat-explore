@@ -1,88 +1,78 @@
-# Phase 9-10 Future Items Command Contract
+# Phase 13 Slice 1 Command Contract
 
 ## Request Summary
 
-Finish the remaining documented Phase 9 and Phase 10 future items by adding extension-driven
-multi-format export and a bounded real Polars lazy execution slice.
+Implement the first executable Phase 13 linear-econometrics command slice with strict bounded scope.
 
 ## Roadmap Phase
 
-- Phase 9: Configuration & Environment
-- Phase 10: Execution & State Foundations
+- Phase 13 core linear econometrics (slice 1)
 
-## Export Contract
+## Command Contracts
 
-### Syntax
+### `regress`
 
-```stata
-save filtered.parquet
-export filtered.parquet, replace
-export filtered.csv
-export filtered.feather, replace
-```
-
-Rules:
-
-- `save` remains local Parquet only.
-- `export` chooses the output format from the path suffix.
-- Supported export suffixes are `.parquet`, `.csv`, and `.feather`.
-- `replace` keeps its current meaning for both `save` and `export`.
-- Parent directories are created automatically when needed.
-- Session state is not mutated by `save` or `export`.
-
-### User-Facing Errors
-
-- Unsupported export suffix: `export only supports .parquet, .csv, and .feather files`
-- Existing target without replace: `export target already exists: <path>`
-- Non-file existing target: `export target is not a file: <path>`
-- Writer failure: `export failed: <path>`
-
-### User-Facing Output
-
-- `save` keeps `Saved: <path> (<rows> rows, <columns> columns)`.
-- `export` reports `Exported: <path> (<rows> rows, <columns> columns)`.
-
-## Polars Lazy Contract
-
-### Syntax
+#### Syntax
 
 ```stata
-use data.parquet, lazy engine=polars
+regress <y> <xvars>
+regress <y> <xvars>, robust
+regress <y> <xvars>, cluster(<var>)
+regress <y> <xvars>, noconstant
 ```
 
-Rules:
+#### Rules
 
-- `use <local parquet path>, lazy engine=polars` creates a real Polars lazy active dataset.
-- The active dataset remains lazy for:
-  - `describe`
-  - `count`
-  - `head`
-  - `tail`
-  - `select`
-  - `keep <varlist>`
-  - `drop <varlist>`
-  - `keep if <expr>`
-  - `drop if <expr>`
-- Unsupported commands may materialize the active dataset once into the existing eager DuckDB
-  path before continuing.
-- After fallback materialization, the active dataset reports eager execution mode, a known row
-  count, and `lazy_engine=None`.
-- Existing eager DuckDB behavior remains unchanged.
-- Remote Parquet handling is not expanded in this slice.
+- Requires an active dataset.
+- `<y>` and `<xvars>` must all be numeric columns.
+- Uses Python-first `statsmodels` OLS fitting.
+- Default covariance mode is non-robust.
+- `robust` applies HC1 covariance.
+- `cluster(<var>)` applies clustered covariance on `<var>`.
+- `robust` and `cluster(...)` are mutually exclusive.
+- `noconstant` removes the intercept term.
+- Rows with missing outcome/predictor values are excluded from fitting.
 
-### User-Facing Errors
+#### User-Facing Errors
 
-- If Polars cannot create the lazy scan: `use could not read Parquet file: <path>`
-- If a Polars-only unsupported path needs a broader redesign, stop the implementation and report
-  the mismatch instead of changing command semantics.
+- Missing active dataset: existing `NoActiveDatasetError` shape.
+- Unknown variable: `regress unknown variable: <vars>`.
+- Non-numeric variable: `regress requires numeric variables: <vars>`.
+- Invalid option combinations:
+  - `regress cannot combine robust and cluster`
+  - `regress option cluster expects one variable`
+
+### `predict`
+
+#### Syntax
+
+```stata
+predict <newvar>
+predict <newvar>, residuals
+predict <newvar>, xb
+```
+
+#### Rules
+
+- Requires an active dataset.
+- Requires a prior successful `regress` model in session state.
+- Default prediction mode is `xb`.
+- `residuals` computes `<y> - xb` using the model outcome variable.
+- Adds `<newvar>` as a new column to the active dataset.
+- Fails if `<newvar>` already exists.
+- `xb` and `residuals` are mutually exclusive options.
+
+#### User-Facing Errors
+
+- Missing prior model: `predict requires a prior regress model`.
+- Existing target column: `predict target already exists: <newvar>`.
+- Invalid option combinations:
+  - `predict options xb and residuals cannot be combined`
 
 ## Acceptance Criteria
 
-- Parser tests cover `export` paths with `.parquet`, `.csv`, and `.feather`.
-- Executor tests cover export success and error paths for all supported suffixes.
-- CLI tests cover `Exported:` output and artifact creation.
-- Executor tests prove that bounded Polars lazy commands preserve lazy state.
-- Executor tests prove that at least one unsupported command materializes once and then runs
-  successfully through the eager path.
-- `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and `_workspace/` artifacts all describe the same
-  supported export formats, the same bounded Polars subset, and the same remaining limits.
+- Parser supports valid `regress`/`predict` forms and rejects invalid option syntax.
+- Executor and backend run `regress` and produce deterministic regression output metadata.
+- `predict` mutates active dataset with either fitted values or residuals.
+- CLI and shell tests cover the new command flows.
+- SDD and changelog docs are synchronized with implemented scope and limits.

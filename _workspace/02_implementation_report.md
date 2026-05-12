@@ -1,45 +1,54 @@
-# Phase 12 Estimation Substrate Implementation Report
+# Phase 13 Slice 1 Implementation Report
 
 ## Contract Consumed
 
-`docs/dev_phase.md` Phase 12 and the current repo SDD docs (`SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`)
+`_workspace/01_product_command-contract.md` and Phase 13 policy in `SPEC.md`/`docs/dev_phase.md`.
 
 ## Files Changed
 
-- `src/tabdat/estimation.py`
-- `tests/test_estimation.py`
+- `pyproject.toml`, `uv.lock`
+- `src/tabdat/models.py`
+- `src/tabdat/parser.py`
+- `src/tabdat/shell.py`
+- `src/tabdat/executor.py`
 - `src/tabdat/backend.py`
-- `docs/dev_phase.md`
+- `src/tabdat/formatter.py`
+- `tests/test_parser.py`
+- `tests/test_executor.py`
+- `tests/test_cli.py`
+- `tests/test_shell.py`
 - `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`
+- `_workspace/00_input/request-summary.md`
+- `_workspace/01_product_command-contract.md`
 
 ## Implementation Notes
 
-- Added a pure, typed estimation substrate with shared contracts for coefficients, diagnostics,
-  least-squares results, MLE problems, GMM problems, and bootstrap output.
-- Implemented statistical primitives for mean, sample variance, sample covariance, covariance
-  matrices, matrix operations, inversion, and bootstrap index generation.
-- Implemented reusable estimation helpers for least squares, log-likelihood evaluation, moment
-  evaluation, and linear prediction.
-- Kept the new substrate internal and avoided expanding the user-facing command surface in this
-  phase.
-- Updated the executor/backend boundary only where required to keep the codebase type-safe; the
-  existing Phase 3+ command behavior remains intact.
-- Synchronized the roadmap/status docs so Phase 12 is recorded as implemented and Phase 13 remains
-  the next planned phase.
+- Added typed command/result models for `RegressCommand`, `PredictCommand`, and `RegressionResult`.
+- Added parser support for:
+  - `regress` with `robust`, `cluster(...)`, and `noconstant`
+  - `predict` with `xb` / `residuals`
+  - bounded validation for unsupported and conflicting options
+- Added shell command completion and option suggestions for `regress` and `predict`.
+- Added executor support for fitting OLS via `statsmodels`, storing session-local regression state,
+  and running prediction transforms against the active dataset.
+- Added backend helpers for regression sample extraction and SQL-based linear prediction column
+  materialization.
+- Added deterministic formatter output for regression model summaries and coefficient tables.
+- Added focused parser/executor/CLI/shell tests covering success and failure cases.
+- Added dependency `statsmodels` through `uv add statsmodels` (with resolved lockfile updates).
 
 ## Validation
 
-- `uv run pytest tests/test_estimation.py tests/test_models.py`
-- `uv run pytest`
-- `uv run pyright src/tabdat/estimation.py tests/test_estimation.py tests/test_models.py`
-- `uv run pyright`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
+- `uv run pyright`
 - `uv run mypy`
+- `uv run pytest`
 
 ## Known Gaps
 
-- The substrate currently provides reusable internal primitives and contracts, but no new end-user
-  model commands yet.
-- Later phase command layers should continue to build on these contracts rather than duplicating
-  solver or inference scaffolding.
+- WLS and GLS remain out of scope for this slice.
+- Regression `if` filtering and weighted fits remain out of scope for this slice.
+- Regression output can include statsmodels divide-by-zero runtime warnings for tiny saturated
+  test data (non-blocking for current contract).

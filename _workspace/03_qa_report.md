@@ -1,4 +1,4 @@
-# Phase 9-10 Future Items QA Report
+# Phase 13 Slice 1 QA Report
 
 ## Status
 
@@ -6,13 +6,13 @@ pass
 
 ## Boundaries Checked
 
-- Contract to parser for unchanged `export <path>[, replace]` grammar across `.parquet`, `.csv`,
-  and `.feather` suffixes.
-- Executor to backend for distinct `save` versus `export` behavior and result formatting.
-- Backend Polars lazy state to executor fallback behavior for supported lazy commands versus
-  explicit eager materialization.
-- CLI output to command contract for `Exported:` messaging and lazy row-count honesty.
-- Docs to implementation for completed Phase 9 export scope and bounded Phase 10 Polars scope.
+- Contract -> parser: `regress`/`predict` grammar and option validation.
+- Parser -> executor: typed command dispatch and scoped error behavior.
+- Executor -> backend: regression sample extraction and prediction materialization.
+- Backend -> formatter -> CLI: deterministic model and prediction output shape.
+- Shell UX -> parser boundary: completion suggestions only, no semantic validation leakage.
+- SDD/docs -> implementation: `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`
+  aligned with implemented slice scope.
 
 ## Blocking Issues
 
@@ -20,19 +20,18 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Broader Polars-native execution remains future work.
-- Remote Polars lazy loading remains out of scope.
-- Additional export ergonomics such as delimiter/compression options remain out of scope.
+- Add broader linear-model coverage (WLS/GLS) in later Phase 13 slices.
+- Add regression filtering/weights only after explicit command contract expansion.
+- Consider warning-normalized regression test fixtures to remove non-blocking statsmodels warnings.
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py` passed.
-- `uv run pytest` passed with 319 tests.
-- `uv run pyright` passed.
 - `uv run ruff check .` passed.
 - `uv run ruff format --check .` passed.
+- `uv run pyright` passed.
+- `uv run mypy` passed.
+- `uv run pytest` passed (`354 passed`).
 
 ## Recommended Next Action
 
-Push the branch, open the PR from `codex/tmp-phase9-phase10-future-items`, and mark it ready for
-review.
+Push `codex/tmp-phase13-slice1-regress-predict`, open one PR, and mark it ready for review.
