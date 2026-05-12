@@ -176,6 +176,8 @@ def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) 
     regress_options = _completion_texts(completer, "regress cost age, ")
     predict_command = _completion_texts(completer, "pred")
     predict_options = _completion_texts(completer, "predict cost_hat, ")
+    estat_command = _completion_texts(completer, "est")
+    estat_subcommands = _completion_texts(completer, "estat o")
   finally:
     executor.close()
 
@@ -184,6 +186,8 @@ def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) 
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
   assert predict_command == ["predict"]
   assert predict_options == ["xb", "residuals"]
+  assert estat_command == ["estat"]
+  assert estat_subcommands == ["ovtest"]
 
 
 def test_lexer_highlights_commands_keywords_and_literals() -> None:

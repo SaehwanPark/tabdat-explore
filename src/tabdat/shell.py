@@ -46,6 +46,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "export",
   "regress",
   "predict",
+  "estat",
   "by",
   "exit",
   "quit",
@@ -76,6 +77,7 @@ _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _PREDICT_OPTIONS = ("xb", "residuals")
+_ESTAT_SUBCOMMANDS = ("residuals", "ovtest", "vif")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
 _PREFIX_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$|by\($")
@@ -126,6 +128,10 @@ class TabdatCompleter(Completer):
 
     if command_name == "sql":
       yield from _matching_completions(_SQL_SUGGESTIONS, word)
+      return
+
+    if command_name == "estat":
+      yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
       return
 
     if command_name == "by":

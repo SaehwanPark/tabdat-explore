@@ -18,6 +18,7 @@ from tabdat.models import (
   CountCommand,
   DescribeCommand,
   DropCommand,
+  EstatCommand,
   ExitCommand,
   ExportCommand,
   Expression,
@@ -81,6 +82,7 @@ _EXECUTABLE_COMMANDS = {
   "export",
   "regress",
   "predict",
+  "estat",
   "exit",
   "quit",
 }
@@ -297,6 +299,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "predict":
     return _parse_predict(parts)
+
+  if parts.name == "estat":
+    return _parse_estat(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -791,6 +796,17 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
     target_variable=parts.arguments[0],
     kind="residuals" if "residuals" in option_names else "xb",
   )
+
+
+def _parse_estat(parts: _CommandParts) -> EstatCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif>")
+  if len(parts.arguments) != 1:
+    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif>")
+  subcommand = parts.arguments[0].lower()
+  if subcommand not in {"residuals", "ovtest", "vif"}:
+    raise ParseError("estat subcommand must be residuals, ovtest, or vif")
+  return EstatCommand(subcommand=cast(Literal["residuals", "ovtest", "vif"], subcommand))
 
 
 def _single_integer_option(

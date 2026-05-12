@@ -259,6 +259,11 @@ class PredictCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class EstatCommand:
+  subcommand: Literal["residuals", "ovtest", "vif"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -299,6 +304,7 @@ Command = (
   | ExportCommand
   | RegressCommand
   | PredictCommand
+  | EstatCommand
   | ParsedCommand
 )
 
