@@ -506,7 +506,11 @@ class Executor:
       include_intercept=command.include_intercept,
       r_squared=_to_float(getattr(fitted, "rsquared", None)),
       adjusted_r_squared=_to_float(getattr(fitted, "rsquared_adj", None)),
-      root_mse=_root_mse(getattr(fitted, "resid", None)),
+      root_mse=_root_mse(
+        mse_resid=getattr(fitted, "mse_resid", None),
+        residuals=getattr(fitted, "resid", None),
+        parameter_count=len(parameter_names),
+      ),
       coefficients=coefficients,
     )
 
@@ -751,7 +755,15 @@ def _to_float(value: object) -> float | None:
   return numeric
 
 
-def _root_mse(residuals: object) -> float | None:
+def _root_mse(
+  *,
+  mse_resid: object,
+  residuals: object,
+  parameter_count: int,
+) -> float | None:
+  mse = _to_float(mse_resid)
+  if mse is not None and mse >= 0.0:
+    return math.sqrt(mse)
   if residuals is None:
     return None
   if isinstance(residuals, (str, bytes)):
@@ -765,12 +777,13 @@ def _root_mse(residuals: object) -> float | None:
   if any(value is None for value in coerced):
     return None
   values = tuple(value for value in coerced if value is not None)
-  if not values:
+  if len(values) <= parameter_count:
     return None
-  squared = [value * value for value in values if math.isfinite(value)]
-  if len(squared) != len(values):
+  rss = sum(value * value for value in values)
+  df_resid = len(values) - parameter_count
+  if df_resid <= 0:
     return None
-  return math.sqrt(sum(squared) / len(squared))
+  return math.sqrt(rss / df_resid)
 
 
 def _coerce_float(value: object) -> float | None:
