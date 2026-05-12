@@ -339,10 +339,54 @@ def test_cli_runs_phase_13_regress_and_predict_flow(sample_parquet: Path, capsys
 
   assert exit_code == 0
   assert "Model: regress cost on age" in captured.out
+  assert "Estimator: ols" in captured.out
   assert "Covariance: nonrobust" in captured.out
   assert "Predicted cost_hat: 3 rows, 5 columns" in captured.out
   assert "Predicted cost_resid: 3 rows, 6 columns" in captured.out
   assert "age  bmi   sex  cost   cost_hat  cost_resid" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "weighted.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 'a', 1.0, 1.0),
+        (2.0, 14.0, 'a', 1.5, 1.5),
+        (3.0, 16.5, 'b', 0.5, 0.5),
+        (4.0, 19.0, 'b', 2.0, 2.0),
+        (5.0, 21.0, 'c', 1.0, 1.0),
+        (6.0, 23.5, 'c', 3.0, 3.0)
+    ) as reg_data(x, y, cluster_id, weight, sigma)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "regress y x, wls(weight) cluster(cluster_id)",
+      "-c",
+      "predict y_hat",
+      "-c",
+      "regress y x, gls(sigma) robust",
+      "-c",
+      "predict y_resid, residuals",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Estimator: wls" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Predicted y_hat: 6 rows, 6 columns" in captured.out
+  assert "Estimator: gls" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Predicted y_resid: 6 rows, 7 columns" in captured.out
   assert captured.err == ""
 
 

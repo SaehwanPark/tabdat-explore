@@ -1,4 +1,4 @@
-# Phase 13 Slice 1 Implementation Report
+# Phase 13 Slice 2 Implementation Report
 
 ## Contract Consumed
 
@@ -6,12 +6,10 @@
 
 ## Files Changed
 
-- `pyproject.toml`, `uv.lock`
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
 - `src/tabdat/shell.py`
 - `src/tabdat/executor.py`
-- `src/tabdat/backend.py`
 - `src/tabdat/formatter.py`
 - `tests/test_parser.py`
 - `tests/test_executor.py`
@@ -20,22 +18,26 @@
 - `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`
 - `_workspace/00_input/request-summary.md`
 - `_workspace/01_product_command-contract.md`
+- `_workspace/02_implementation_report.md`
+- `_workspace/03_qa_report.md`
+- `_workspace/final/tabdat-delivery-summary.md`
 
 ## Implementation Notes
 
-- Added typed command/result models for `RegressCommand`, `PredictCommand`, and `RegressionResult`.
-- Added parser support for:
-  - `regress` with `robust`, `cluster(...)`, and `noconstant`
-  - `predict` with `xb` / `residuals`
-  - bounded validation for unsupported and conflicting options
-- Added shell command completion and option suggestions for `regress` and `predict`.
-- Added executor support for fitting OLS via `statsmodels`, storing session-local regression state,
-  and running prediction transforms against the active dataset.
-- Added backend helpers for regression sample extraction and SQL-based linear prediction column
-  materialization.
-- Added deterministic formatter output for regression model summaries and coefficient tables.
-- Added focused parser/executor/CLI/shell tests covering success and failure cases.
-- Added dependency `statsmodels` through `uv add statsmodels` (with resolved lockfile updates).
+- Extended `RegressCommand`/`RegressionResult` typed models with estimator metadata and weighted
+  input variable support.
+- Added parser support for `wls(...)` and `gls(...)` regress options with bounded validation:
+  - unsupported options
+  - weighted option arity
+  - `wls`/`gls` mutual exclusion
+  - retained `robust` vs `cluster(...)` mutual exclusion
+- Extended shell completion suggestions for weighted regress options.
+- Extended executor regression path to select OLS/WLS/GLS models through `statsmodels` and preserve
+  existing session-local predict state behavior.
+- Added retained-row positive-value validation for weighted inputs with explicit execution errors.
+- Extended regression formatter output with deterministic estimator metadata.
+- Added focused parser/executor/CLI/shell tests for weighted regress flows and failures.
+- No new dependencies were required.
 
 ## Validation
 
@@ -48,7 +50,6 @@
 
 ## Known Gaps
 
-- WLS and GLS remain out of scope for this slice.
-- Regression `if` filtering and weighted fits remain out of scope for this slice.
+- Broader linear diagnostics remain out of scope for this slice.
 - Regression output can include statsmodels divide-by-zero runtime warnings for tiny saturated
   test data (non-blocking for current contract).

@@ -1,28 +1,31 @@
-# Phase 13 Slice 1 Request Summary
+# Phase 13 Slice 2 Request Summary
 
 ## Goal
 
-Move to the next planned phase per `SPEC.md` by implementing a bounded first Phase 13 linear-econometrics slice, then ship it through branch checkpoints, documentation, and a ready-for-review PR.
+Identify the next implementation target from `SPEC.md`, complete any prerequisite work before advancing
+phases, then implement the next bounded development slice with branch checkpoints, documentation,
+and a ready-for-review PR.
 
 ## Phase Fit
 
-- Gate interpretation: roadmap phases 0-12 are complete and Phase 13 is next.
-- In-scope phase: Phase 13 (slice 1), Python-first approach order.
+- Gate interpretation: prior phases are treated as complete by documented exit gates.
+- In-scope phase: Phase 13 core linear econometrics (slice 2).
+- Out-of-scope phase: Phase 14+ for this task.
 
 ## Scope
 
-- Add `regress <y> <xvars>[, robust cluster(<var>) noconstant]`.
-- Add `predict <newvar>[, xb residuals]` using the latest in-session regression model.
-- Use `statsmodels` first (per phase policy).
-- Add focused parser/executor/backend/CLI/shell coverage.
-- Keep FP-style explicit state boundaries and typed models.
-- Update `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md`.
-- Produce `_workspace` implementation and QA reports.
-- Open one ready-for-review PR from a temporary branch with meaningful checkpoint commits.
+- Extend `regress` with weighted estimator options:
+  - `wls(<weight_var>)`
+  - `gls(<sigma_var>)`
+- Keep `predict` compatible with the latest weighted or unweighted regression model state.
+- Allow covariance mode combinations (`robust` and `cluster(...)`) with OLS/WLS/GLS.
+- Enforce positive retained-row values for WLS weights and GLS sigma inputs.
+- Keep Python-first implementation order through `statsmodels`.
+- Add focused parser/executor/CLI/shell coverage and synchronize SDD docs.
 
 ## Non-Goals
 
-- No WLS/GLS in this slice.
-- No regression `if` filtering or weights in this slice.
-- No HTML report UI for regression diagnostics.
-- No Phase 14+ model work.
+- No Phase 14 work.
+- No broad linear diagnostics expansion in this slice.
+- No new top-level commands (`wls`/`gls`) outside `regress` options.
+- No regression `if` grammar expansion.

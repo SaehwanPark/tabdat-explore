@@ -103,6 +103,7 @@ def format_result(result: Result) -> str:
   if isinstance(result, RegressionResult):
     header = [
       f"Model: regress {result.outcome} on {' '.join(result.predictors)}",
+      f"Estimator: {result.estimator}",
       f"Covariance: {result.covariance}",
       f"Observations: {result.observation_count}",
       f"R-squared: {_format_number(result.r_squared)}",

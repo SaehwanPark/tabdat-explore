@@ -245,6 +245,8 @@ class ExportCommand:
 class RegressCommand:
   outcome: str
   predictors: tuple[str, ...]
+  estimator: Literal["ols", "wls", "gls"] = "ols"
+  weight_variable: str | None = None
   robust: bool = False
   cluster_variable: str | None = None
   include_intercept: bool = True
@@ -394,6 +396,7 @@ class TransformResult:
 class RegressionResult:
   outcome: str
   predictors: tuple[str, ...]
+  estimator: Literal["ols", "wls", "gls"]
   covariance: str
   observation_count: int
   include_intercept: bool

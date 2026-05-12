@@ -735,22 +735,40 @@ def _parse_regress(parts: _CommandParts) -> RegressCommand:
   if len(parts.arguments) < 2:
     raise ParseError("regress expects syntax: regress <y> <xvars>")
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"robust", "cluster", "noconstant"}
+  unsupported = option_names - {"robust", "cluster", "noconstant", "wls", "gls"}
   if unsupported:
     raise ParseError(f"regress unsupported option: {', '.join(sorted(unsupported))}")
   _require_flag_options(parts.options, "regress", {"robust", "noconstant"})
   cluster_values = _single_tuple_option(parts.options, "cluster", "regress")
   if cluster_values is not None and len(cluster_values) != 1:
     raise ParseError("regress option cluster expects one variable")
+  wls_values = _single_tuple_option(parts.options, "wls", "regress")
+  if wls_values is not None and len(wls_values) != 1:
+    raise ParseError("regress option wls expects one variable")
+  gls_values = _single_tuple_option(parts.options, "gls", "regress")
+  if gls_values is not None and len(gls_values) != 1:
+    raise ParseError("regress option gls expects one variable")
+  if wls_values is not None and gls_values is not None:
+    raise ParseError("regress cannot combine wls and gls")
   robust = "robust" in option_names
   cluster_variable = cluster_values[0] if cluster_values is not None else None
   if robust and cluster_variable is not None:
     raise ParseError("regress cannot combine robust and cluster")
+  estimator: Literal["ols", "wls", "gls"] = "ols"
+  weight_variable: str | None = None
+  if wls_values is not None:
+    estimator = "wls"
+    weight_variable = wls_values[0]
+  if gls_values is not None:
+    estimator = "gls"
+    weight_variable = gls_values[0]
   outcome = parts.arguments[0]
   predictors = parts.arguments[1:]
   return RegressCommand(
     outcome=outcome,
     predictors=predictors,
+    estimator=estimator,
+    weight_variable=weight_variable,
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,
