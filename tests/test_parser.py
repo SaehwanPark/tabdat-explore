@@ -26,6 +26,8 @@ from tabdat.models import (
   NumberExpression,
   PanelCommand,
   ParsedCommand,
+  PredictCommand,
+  RegressCommand,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
@@ -299,6 +301,39 @@ def test_parse_phase_9_configuration_and_persistence_commands() -> None:
   assert parse_command("export output.feather") == ExportCommand(Path("output.feather"))
 
 
+def test_parse_phase_13_regress_command() -> None:
+  assert parse_command("regress cost age bmi") == RegressCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("regress cost age, robust") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    robust=True,
+  )
+  assert parse_command("regress cost age, cluster(sex)") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    cluster_variable="sex",
+  )
+  assert parse_command("regress cost age, noconstant") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_13_predict_command() -> None:
+  assert parse_command("predict cost_hat") == PredictCommand(
+    target_variable="cost_hat",
+    kind="xb",
+  )
+  assert parse_command("predict resid, residuals") == PredictCommand(
+    target_variable="resid",
+    kind="residuals",
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -472,6 +507,20 @@ def test_parse_exit_aliases() -> None:
     "set",
     "set graph_format",
     "set unknown on",
+    "regress",
+    "regress cost",
+    "regress cost age if age > 18",
+    "regress cost age, robust cluster(sex)",
+    "regress cost age, cluster",
+    "regress cost age, cluster()",
+    "regress cost age, cluster(sex firm)",
+    "regress cost age, robust=true",
+    "regress cost age, noconstant=true",
+    "predict",
+    "predict a b",
+    "predict cost_hat if age > 18",
+    "predict cost_hat, xb residuals",
+    "predict cost_hat, residuals=true",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",

@@ -13,6 +13,7 @@ from tabdat.models import (
   PanelResult,
   PlotResult,
   PreviewResult,
+  RegressionResult,
   Result,
   SaveResult,
   SetResult,
@@ -98,6 +99,29 @@ def format_result(result: Result) -> str:
   if isinstance(result, PreviewResult):
     preview_rows = (tuple(_format_cell(value) for value in row) for row in result.rows)
     return "\n".join(_table(result.columns, preview_rows))
+
+  if isinstance(result, RegressionResult):
+    header = [
+      f"Model: regress {result.outcome} on {' '.join(result.predictors)}",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      f"Adj. R-squared: {_format_number(result.adjusted_r_squared)}",
+      f"Root MSE: {_format_number(result.root_mse)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
 
   if isinstance(result, TransformResult):
     dataset = result.dataset

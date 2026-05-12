@@ -31,6 +31,8 @@ from tabdat.models import (
   NumberExpression,
   PanelCommand,
   ParsedCommand,
+  PredictCommand,
+  RegressCommand,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
@@ -77,6 +79,8 @@ _EXECUTABLE_COMMANDS = {
   "set",
   "save",
   "export",
+  "regress",
+  "predict",
   "exit",
   "quit",
 }
@@ -287,6 +291,12 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "export":
     return _parse_save_or_export(parts, "export")
+
+  if parts.name == "regress":
+    return _parse_regress(parts)
+
+  if parts.name == "predict":
+    return _parse_predict(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -717,6 +727,52 @@ def _parse_save_or_export(parts: _CommandParts, command_name: str) -> SaveComman
   if command_name == "save":
     return SaveCommand(path=Path(parts.arguments[0]), replace="replace" in option_names)
   return ExportCommand(path=Path(parts.arguments[0]), replace="replace" in option_names)
+
+
+def _parse_regress(parts: _CommandParts) -> RegressCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("regress expects syntax: regress <y> <xvars>")
+  if len(parts.arguments) < 2:
+    raise ParseError("regress expects syntax: regress <y> <xvars>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"regress unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "regress", {"robust", "noconstant"})
+  cluster_values = _single_tuple_option(parts.options, "cluster", "regress")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("regress option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("regress cannot combine robust and cluster")
+  outcome = parts.arguments[0]
+  predictors = parts.arguments[1:]
+  return RegressCommand(
+    outcome=outcome,
+    predictors=predictors,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_predict(parts: _CommandParts) -> PredictCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("predict expects syntax: predict <newvar>")
+  if len(parts.arguments) != 1:
+    raise ParseError("predict expects syntax: predict <newvar>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"xb", "residuals"}
+  if unsupported:
+    raise ParseError(f"predict unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "predict", {"xb", "residuals"})
+  if "xb" in option_names and "residuals" in option_names:
+    raise ParseError("predict options xb and residuals cannot be combined")
+  return PredictCommand(
+    target_variable=parts.arguments[0],
+    kind="residuals" if "residuals" in option_names else "xb",
+  )
 
 
 def _single_integer_option(

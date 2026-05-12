@@ -44,7 +44,10 @@ from tabdat.models import (
   PanelResult,
   ParsedCommand,
   PlotResult,
+  PredictCommand,
   PreviewResult,
+  RegressCommand,
+  RegressionResult,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
@@ -73,6 +76,23 @@ def _write_sql_parquet(path: Path, query: str) -> None:
     connection.execute(f"copy ({query}) to ? (format parquet)", [str(path)])
   finally:
     connection.close()
+
+
+def _write_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 'a'),
+        (2.0, 14.0, 'a'),
+        (3.0, 16.5, 'b'),
+        (4.0, 19.0, 'b'),
+        (5.0, 21.0, 'c'),
+        (6.0, 23.5, 'c')
+    ) as reg_data(x, y, cluster_id)
+    """,
+  )
 
 
 def test_use_loads_active_dataset(sample_parquet: Path) -> None:
@@ -180,6 +200,87 @@ def test_count_queries_lazy_active_dataset(sample_parquet: Path, engine: str) ->
   assert active_dataset is not None
   assert active_dataset.execution_mode == "lazy"
   assert active_dataset.lazy_engine == engine
+
+
+def test_phase_13_regress_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+  finally:
+    executor.close()
+
+  assert isinstance(result, RegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+  assert result.r_squared is not None
+  assert 0.0 <= result.r_squared <= 1.0
+
+
+def test_phase_13_regress_supports_robust_and_cluster_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(RegressCommand(outcome="y", predictors=("x",), robust=True))
+    clustered = executor.execute(
+      RegressCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, RegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, RegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_13_predict_adds_linear_predictions_and_residuals(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(RegressCommand(outcome="cost", predictors=("age",)))
+    predicted = executor.execute(PredictCommand(target_variable="cost_hat"))
+    residuals = executor.execute(PredictCommand(target_variable="cost_resid", kind="residuals"))
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted cost_hat"
+  assert [column.name for column in predicted.dataset.columns] == [
+    "age",
+    "bmi",
+    "sex",
+    "cost",
+    "cost_hat",
+  ]
+  assert isinstance(residuals, TransformResult)
+  assert residuals.message == "Predicted cost_resid"
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("age", "bmi", "sex", "cost", "cost_hat", "cost_resid")
+  assert preview.rows[0][4] == pytest.approx(100.0)
+  assert preview.rows[1][4] == pytest.approx(150.0)
+  assert preview.rows[2][4] == pytest.approx(200.0)
+  assert preview.rows[0][5] == pytest.approx(0.0)
+  assert preview.rows[1][5] == pytest.approx(0.0)
+  assert preview.rows[2][5] is None
+
+
+def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+      executor.execute(PredictCommand(target_variable="cost_hat"))
+  finally:
+    executor.close()
 
 
 def test_phase_11_inner_join_named_table(sample_parquet: Path) -> None:

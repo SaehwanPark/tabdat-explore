@@ -31,10 +31,13 @@ command line. The current CLI supports:
 - project-local or explicit config for graph defaults
 - runtime settings with `set graph_format`, `set artifact_dir`, and `set graph_open`
 - Parquet persistence with `save` and `export`
+- linear regression with `regress <y> <xvars>[, robust cluster(<var>) noconstant]`
+- prediction workflows with `predict <newvar>[, xb residuals]`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the first execution and state foundations slice of the roadmap.
+The repository has completed the first Phase 13 linear-econometrics slice on top of the Phase 12
+estimation substrate.
 
 ## Quickstart
 
@@ -184,6 +187,9 @@ tabdat> run analysis.td
   These config files support `graph_format`, `artifact_dir`, and `graph_open`.
 - `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
   Parquet. Existing files require `replace`.
+- `regress` currently fits OLS through `statsmodels` and supports `robust`, `cluster(<var>)`, and
+  `noconstant`; `predict` writes fitted values (`xb`) or residuals into a new active-dataset
+  column using the latest regression model in session state.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

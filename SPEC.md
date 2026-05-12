@@ -141,10 +141,19 @@ This file tracks feature state for spec-driven development. Product intent lives
   - recorded that Phase 12 estimation substrate has been implemented as the internal
     econometrics foundation
   - preserved the local `tabdat.monads` boundary as an active contributor invariant
+- Implemented the first Phase 13 core linear econometrics slice:
+  - `regress <y> <xvars>[, robust cluster(<var>) noconstant]` with Python-first `statsmodels`
+    OLS fitting
+  - covariance selection for non-robust, HC1 robust, and clustered standard errors
+  - `predict <newvar>[, xb residuals]` active-dataset column generation using the latest
+    regression model state
+  - deterministic regression result formatting and focused parser, executor/backend, CLI, and
+    shell coverage
 
 ## Present
 
 - Phase 12 estimation substrate has been implemented.
+- Phase 13 slice 1 is implemented with `regress`/`predict` over OLS plus robust/cluster covariance.
 - Functional helper imports should continue to go through `tabdat.monads`, which delegates to
   `comp-builders` while preserving a stable repo-local boundary.
 
@@ -174,11 +183,11 @@ This file tracks feature state for spec-driven development. Product intent lives
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 13 core linear econometrics:
-  - add OLS/WLS, robust and cluster-robust inference, GLS, prediction/fitted-value workflows,
-    and linear-model diagnostics
+  - extend beyond the implemented slice to complete WLS, GLS, broader diagnostics, and additional
+    prediction/fitted-value ergonomics
   - library strategy:
-    - approach (1): `statsmodels` for OLS/WLS/GLS, robust/cluster covariance, prediction, and
-      standard diagnostics
+    - approach (1): continue Python-first through `statsmodels` for WLS/GLS and remaining linear
+      diagnostics
     - approach (2): `fixest` or `estimatr` via `rpy2` for gaps in inference variants
     - approach (3): targeted `numpy`/`scipy` linear algebra and inference helpers only when needed
 - Phase 14 endogeneity and panel foundations:

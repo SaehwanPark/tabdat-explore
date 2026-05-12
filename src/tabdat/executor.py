@@ -1,11 +1,23 @@
 """Command executor and session state."""
 
+import math
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
+from typing import SupportsFloat
+
+import statsmodels.api as sm
 
 from tabdat.backend import DuckDBBackend
 from tabdat.config import TabDatConfig, set_config_value
-from tabdat.errors import ExecutionError, NoActiveDatasetError, UnknownTableError
+from tabdat.errors import (
+  ExecutionError,
+  NoActiveDatasetError,
+  TypeMismatchExecutionError,
+  UnknownTableError,
+  UnknownVariableError,
+)
+from tabdat.estimation import CoefficientEstimate
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -34,7 +46,10 @@ from tabdat.models import (
   PanelMetadata,
   PanelResult,
   PlotResult,
+  PredictCommand,
   PreviewResult,
+  RegressCommand,
+  RegressionResult,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
@@ -58,12 +73,21 @@ from tabdat.models import (
 from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
 
 
+@dataclass(frozen=True)
+class _RegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+
+
 @dataclass
 class SessionState:
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
+  regression: _RegressionState | None = None
 
 
 class Executor:
@@ -236,6 +260,12 @@ class Executor:
         panel_metadata=dataset.panel_metadata,
       )
       return ExportResult(command.path, exported_dataset)
+
+    if isinstance(command, RegressCommand):
+      return self._execute_regress(command)
+
+    if isinstance(command, PredictCommand):
+      return self._execute_predict(command)
 
     raise ExecutionError("unsupported command")
 
@@ -419,6 +449,87 @@ class Executor:
     self.state.active_table_name = None
     return TransformResult(message, dataset)
 
+  def _execute_regress(self, command: RegressCommand) -> RegressionResult:
+    dataset = self._require_active_dataset("regress")
+    _require_numeric_columns(
+      "regress",
+      dataset,
+      (command.outcome, *command.predictors),
+    )
+    row_columns = (
+      (command.outcome, *command.predictors)
+      if command.cluster_variable is None
+      else (command.outcome, *command.predictors, command.cluster_variable)
+    )
+    rows = self.backend.regression_rows(dataset, row_columns)
+    outcome, predictors, groups = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcome:
+      raise ExecutionError("regress requires at least one complete observation")
+    design = _design_matrix(predictors, include_intercept=command.include_intercept)
+    model = sm.OLS(outcome, design)
+    fitted = model.fit()
+    covariance = "nonrobust"
+    if command.robust:
+      fitted = fitted.get_robustcov_results(cov_type="HC1")
+      covariance = "robust"
+    if command.cluster_variable is not None:
+      if groups is None:
+        raise ExecutionError("regress requires complete cluster values")
+      fitted = fitted.get_robustcov_results(cov_type="cluster", groups=groups)
+      covariance = f"cluster({command.cluster_variable})"
+
+    parameter_names = (
+      ("intercept", *command.predictors) if command.include_intercept else command.predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    intercept = coefficients[0].value if command.include_intercept else None
+    predictor_coefficients = (
+      tuple(estimate.value for estimate in coefficients[1:])
+      if command.include_intercept
+      else tuple(estimate.value for estimate in coefficients)
+    )
+    self.state.regression = _RegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+    )
+    return RegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      covariance=covariance,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(getattr(fitted, "rsquared", None)),
+      adjusted_r_squared=_to_float(getattr(fitted, "rsquared_adj", None)),
+      root_mse=_root_mse(
+        mse_resid=getattr(fitted, "mse_resid", None),
+        residuals=getattr(fitted, "resid", None),
+        parameter_count=len(parameter_names),
+      ),
+      coefficients=coefficients,
+    )
+
+  def _execute_predict(self, command: PredictCommand) -> TransformResult:
+    dataset = self._require_active_dataset("predict")
+    regression = self.state.regression
+    if regression is None:
+      raise ExecutionError("predict requires a prior regress model")
+    next_dataset = self.backend.add_linear_prediction_column(
+      dataset,
+      target_variable=command.target_variable,
+      predictor_names=regression.predictor_names,
+      predictor_coefficients=regression.predictor_coefficients,
+      intercept=regression.intercept,
+      outcome_variable=regression.outcome_variable,
+      kind=command.kind,
+    )
+    return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
       raise NoActiveDatasetError(f"{command_name} requires an active dataset; run use <path> first")
@@ -507,6 +618,186 @@ class Executor:
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
     self.state.active_dataset = materialized
+
+
+def _require_numeric_columns(
+  command_name: str,
+  dataset: DatasetInfo,
+  variables: tuple[str, ...],
+) -> None:
+  column_types = {column.name: column.data_type for column in dataset.columns}
+  missing = tuple(variable for variable in variables if variable not in column_types)
+  if missing:
+    raise UnknownVariableError(f"{command_name} unknown variable: {', '.join(missing)}")
+  non_numeric = tuple(
+    variable for variable in variables if not _is_numeric_type(column_types[variable])
+  )
+  if non_numeric:
+    raise TypeMismatchExecutionError(
+      f"{command_name} requires numeric variables: {', '.join(non_numeric)}"
+    )
+
+
+def _regression_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  has_cluster: bool,
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...], tuple[object, ...] | None]:
+  outcomes: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  groups: list[object] = []
+  row_width = predictor_count + 1 + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      raise ExecutionError("regress failed")
+    raw_outcome = row[0]
+    raw_predictors = row[1 : 1 + predictor_count]
+    raw_group = row[-1] if has_cluster else None
+    if raw_outcome is None or any(value is None for value in raw_predictors):
+      continue
+    if has_cluster and raw_group is None:
+      continue
+    outcome = _coerce_float(raw_outcome)
+    predictor_values = tuple(
+      value
+      for value in (_coerce_float(raw_value) for raw_value in raw_predictors)
+      if value is not None
+    )
+    if outcome is None or len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
+      continue
+    outcomes.append(outcome)
+    predictors.append(predictor_values)
+    if has_cluster:
+      groups.append(raw_group)
+  group_values = tuple(groups) if has_cluster else None
+  return tuple(outcomes), tuple(predictors), group_values
+
+
+def _design_matrix(
+  predictors: tuple[tuple[float, ...], ...],
+  *,
+  include_intercept: bool,
+) -> list[list[float]]:
+  if include_intercept:
+    return [[1.0, *row] for row in predictors]
+  return [list(row) for row in predictors]
+
+
+def _coefficient_estimates(
+  parameter_names: Sequence[str],
+  fitted: object,
+) -> tuple[CoefficientEstimate, ...]:
+  params = _required_float_sequence(getattr(fitted, "params", None))
+  standard_errors = _optional_float_sequence(getattr(fitted, "bse", None))
+  statistics = _optional_float_sequence(getattr(fitted, "tvalues", None))
+  p_values = _optional_float_sequence(getattr(fitted, "pvalues", None))
+  if len(params) != len(parameter_names):
+    raise ExecutionError("regress failed")
+  return tuple(
+    CoefficientEstimate(
+      name=name,
+      value=parameter,
+      standard_error=_optional_sequence_value(standard_errors, index),
+      statistic=_optional_sequence_value(statistics, index),
+      p_value=_optional_sequence_value(p_values, index),
+    )
+    for index, (name, parameter) in enumerate(zip(parameter_names, params, strict=True))
+  )
+
+
+def _required_float_sequence(values: object) -> tuple[float, ...]:
+  if values is None:
+    return ()
+  if isinstance(values, (str, bytes)):
+    raise ExecutionError("regress failed")
+  if not isinstance(values, Iterable):
+    raise ExecutionError("regress failed")
+  try:
+    coerced = tuple(_coerce_float(value) for value in values)
+  except (TypeError, ValueError) as exc:
+    raise ExecutionError("regress failed") from exc
+  if any(value is None for value in coerced):
+    raise ExecutionError("regress failed")
+  return tuple(value for value in coerced if value is not None)
+
+
+def _optional_float_sequence(values: object) -> tuple[float | None, ...]:
+  if values is None:
+    return ()
+  if isinstance(values, (str, bytes)):
+    return ()
+  if not isinstance(values, Iterable):
+    return ()
+  try:
+    return tuple(_coerce_float(value) for value in values)
+  except (TypeError, ValueError):
+    return ()
+
+
+def _optional_sequence_value(values: tuple[float | None, ...], index: int) -> float | None:
+  if index >= len(values):
+    return None
+  value = values[index]
+  if value is None or not math.isfinite(value):
+    return None
+  return value
+
+
+def _to_float(value: object) -> float | None:
+  numeric = _coerce_float(value)
+  if numeric is None:
+    return None
+  if not math.isfinite(numeric):
+    return None
+  return numeric
+
+
+def _root_mse(
+  *,
+  mse_resid: object,
+  residuals: object,
+  parameter_count: int,
+) -> float | None:
+  mse = _to_float(mse_resid)
+  if mse is not None and mse >= 0.0:
+    return math.sqrt(mse)
+  if residuals is None:
+    return None
+  if isinstance(residuals, (str, bytes)):
+    return None
+  if not isinstance(residuals, Iterable):
+    return None
+  try:
+    coerced = tuple(_coerce_float(value) for value in residuals)
+  except (TypeError, ValueError):
+    return None
+  if any(value is None for value in coerced):
+    return None
+  values = tuple(value for value in coerced if value is not None)
+  if len(values) <= parameter_count:
+    return None
+  rss = sum(value * value for value in values)
+  df_resid = len(values) - parameter_count
+  if df_resid <= 0:
+    return None
+  return math.sqrt(rss / df_resid)
+
+
+def _coerce_float(value: object) -> float | None:
+  if value is None or isinstance(value, bool):
+    return None
+  if not isinstance(value, SupportsFloat):
+    return None
+  try:
+    numeric = float(value)
+  except (TypeError, ValueError):
+    return None
+  if not math.isfinite(numeric):
+    return None
+  return numeric
 
 
 def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:

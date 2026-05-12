@@ -1,31 +1,29 @@
-# Phase 9-10 Future Items Delivery Summary
+# Phase 13 Slice 1 Delivery Summary
 
 ## Summary
 
-Finished the remaining documented Phase 9 and Phase 10 future items on branch
-`codex/tmp-phase9-phase10-future-items`.
+Completed a bounded first Phase 13 vertical slice on branch
+`codex/tmp-phase13-slice1-regress-predict`.
 
-## Changed Behavior
+## Delivered Behavior
 
-- `save` remains Parquet-only.
-- `export` now writes local `.parquet`, `.csv`, and `.feather` files based on output suffix.
-- Export success output is now `Exported: ...`.
-- `use <path>, lazy engine=polars` now creates a real bounded Polars lazy state for local Parquet
-  paths.
-- Polars-lazy `select`, `keep`, `drop`, `count`, `head`, and `tail` preserve lazy state and
-  unknown row counts.
-- Unsupported Polars-lazy commands materialize once into the eager DuckDB path before continuing.
+- Added `regress <y> <xvars>[, robust cluster(<var>) noconstant]`.
+- Added `predict <newvar>[, xb residuals]` driven by latest in-session regression state.
+- Added Python-first `statsmodels` OLS fitting and covariance mode selection.
+- Added deterministic regression formatter output and prediction transform messaging.
+- Added parser/executor/backend/CLI/shell coverage for new command flows.
+- Synchronized `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md`.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py`
-- `uv run pytest` passed with 319 tests.
-- `uv run pyright`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
+- `uv run pyright`
+- `uv run mypy`
+- `uv run pytest`
 
-## Known Limits
+## Residual Risks
 
-- Broader Polars-native execution remains future work.
-- Polars-lazy loading is currently scoped to local Parquet paths.
-- Export does not add delimiter, compression, or explicit format options.
+- Later Phase 13 slices still need WLS/GLS and broader diagnostics.
+- `statsmodels` can emit runtime warnings on tiny saturated samples; tests currently tolerate these
+  as non-blocking.
