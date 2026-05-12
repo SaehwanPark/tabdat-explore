@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the third Phase 13 linear econometrics slice with `estat <residuals|ovtest|vif>`
+  post-estimation diagnostics, residual-analysis summaries, Ramsey RESET specification testing,
+  VIF multicollinearity checks, best-effort OLS/WLS/GLS compatibility, and focused
+  parser/executor/backend/CLI/shell coverage.
 - Added the second Phase 13 linear econometrics slice with
   `regress <y> <xvars>, wls(<weight_var>)` and `regress <y> <xvars>, gls(<sigma_var>)`,
   weighted-estimator covariance combinations (`robust` and `cluster(<var>)`), positive

@@ -1,4 +1,4 @@
-# Phase 13 Slice 2 QA Report
+# Phase 13 Slice 3 QA Report
 
 ## Status
 
@@ -6,14 +6,14 @@ pass
 
 ## Boundaries Checked
 
-- Contract -> parser: weighted regress grammar and option validation.
-- Parser -> executor: typed estimator selection and scoped error behavior.
-- Executor -> backend: retained-row sampling, positive weighted-input checks, and prediction
-  compatibility.
-- Backend -> formatter -> CLI: deterministic estimator/covariance output shape and prediction flow.
-- Shell UX -> parser boundary: weighted option completions only, no semantic validation leakage.
-- SDD/docs -> implementation: `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`
-  aligned with implemented slice scope.
+- Contract -> parser: `estat` subcommand grammar and invalid-form rejection.
+- Parser -> executor: typed `EstatCommand` dispatch and prerequisite error behavior.
+- Executor -> diagnostics backend: Python-first `statsmodels` diagnostic execution and deterministic
+  failure surfaces.
+- Executor -> formatter -> CLI: deterministic tabular diagnostics output.
+- Shell UX -> parser boundary: `estat` command/subcommand completion without semantic leakage.
+- SDD/docs -> implementation: `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md`
+  aligned with Phase 13 slice 3 scope.
 
 ## Blocking Issues
 
@@ -21,9 +21,10 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Add broader Phase 13 linear diagnostics in the next bounded slice.
-- Consider warning-normalized regression fixtures to reduce non-blocking statsmodels runtime
-  warnings in tiny datasets.
+- Consider additional Phase 13 diagnostics breadth and prediction ergonomics in a later bounded
+  slice.
+- Consider warning-normalized regression fixtures to reduce non-blocking tiny-sample `statsmodels`
+  warnings.
 
 ## Validation Evidence
 
@@ -35,4 +36,4 @@ pass
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase13-slice2-wls-gls`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase13-estat-diagnostics`, open one PR, and mark it ready for review.

@@ -1,31 +1,30 @@
-# Phase 13 Slice 2 Request Summary
+# Phase 13 Slice 3 Request Summary
 
-## Goal
+## User Goal
 
-Identify the next implementation target from `SPEC.md`, complete any prerequisite work before advancing
-phases, then implement the next bounded development slice with branch checkpoints, documentation,
-and a ready-for-review PR.
-
-## Phase Fit
-
-- Gate interpretation: prior phases are treated as complete by documented exit gates.
-- In-scope phase: Phase 13 core linear econometrics (slice 2).
-- Out-of-scope phase: Phase 14+ for this task.
+Complete Phase 13 by implementing the remaining core linear diagnostics slice after prior `regress` and `predict` slices.
 
 ## Scope
 
-- Extend `regress` with weighted estimator options:
-  - `wls(<weight_var>)`
-  - `gls(<sigma_var>)`
-- Keep `predict` compatible with the latest weighted or unweighted regression model state.
-- Allow covariance mode combinations (`robust` and `cluster(...)`) with OLS/WLS/GLS.
-- Enforce positive retained-row values for WLS weights and GLS sigma inputs.
-- Keep Python-first implementation order through `statsmodels`.
-- Add focused parser/executor/CLI/shell coverage and synchronize SDD docs.
+- In-scope phase: Phase 13 core linear econometrics (slice 3).
+- Add post-estimation diagnostics command surface:
+  - `estat residuals`
+  - `estat ovtest`
+  - `estat vif`
+- Keep existing `regress` and `predict` behavior unchanged except for diagnostics integration.
+- Use the Phase 13 implementation order:
+  1. Python libraries first (`statsmodels`).
+  2. R via `rpy2` only when Python is insufficient.
+  3. Narrow lower-level fallback only when both prior approaches fail.
 
-## Non-Goals
+## Constraints
 
-- No Phase 14 work.
-- No broad linear diagnostics expansion in this slice.
-- No new top-level commands (`wls`/`gls`) outside `regress` options.
-- No regression `if` grammar expansion.
+- Preserve Stata-inspired command style.
+- Keep changes as a bounded vertical slice across parser, executor, CLI/shell UX, docs, and tests.
+- Keep deterministic terminal output and focused validation evidence.
+
+## Non-goals
+
+- No IV/panel/nonlinear model work (Phase 14+).
+- No broad parser redesign.
+- No interactive HTML diagnostics in this slice.
