@@ -105,6 +105,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Reworked `SPEC.md` to keep `Present` focused on the remaining Phase 13 hardening work and to
+  move completed roadmap phases out of `Future`.
 - Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.
 - Updated `SPEC.md`, `docs/dev_phase.md`, and `ARCHITECTURE.md` to define a Phase 13+ statistical
   implementation priority order: Python libraries first, R via `rpy2` second, and lower-level

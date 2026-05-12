@@ -1,6 +1,8 @@
 # TabDat-Explore Spec
 
-This file tracks feature state for spec-driven development. Product intent lives in `docs/project_proposal.md`; roadmap order lives in `docs/dev_phase.md`.
+This file tracks feature state for spec-driven development. Product intent lives in
+`docs/project_proposal.md`; roadmap order lives in `docs/dev_phase.md`. Present should stay small
+and describe the active work with concise verification criteria.
 
 ## Past
 
@@ -163,27 +165,27 @@ This file tracks feature state for spec-driven development. Product intent lives
 
 ## Present
 
-- Phase 12 estimation substrate has been implemented.
-- Phase 13 slice 3 is implemented with `estat` diagnostics over existing weighted and unweighted
-  `regress`/`predict` workflows.
-- Functional helper imports should continue to go through `tabdat.monads`, which delegates to
-  `comp-builders` while preserving a stable repo-local boundary.
+- Feature: Phase 13 linear econometrics hardening
+  Status: Active
+  Started: 2026-05-12
+  Branch: current working branch
+
+  Summary:
+  Finish the remaining dogfood and ergonomics work around the implemented `regress`, `predict`,
+  and `estat` workflows before marking Phase 13 complete.
+
+  Verification:
+  - Existing Phase 13 regression and shell tests stay green
+  - A real-dataset dogfood run exercises `regress`, `predict`, and `estat`
+  - Batch, interactive, and script modes remain stable
+
+  Out of Scope:
+  - IV and panel model families
+  - Nonlinear estimators
+  - Broader command-surface expansion
 
 ## Future
 
-- Phase 10 execution and state foundations:
-  - extend Polars-native lazy lowering beyond projection/filter/count/preview only after the
-    bounded fallback contract is dogfooded
-- Phase 11 data workflow and reproducibility primitives:
-  - extend join workflows with additional ergonomics only after the initial same-name equality join
-    contract is dogfooded
-  - extend append/stack workflows only after the initial strict named-table append contract is
-    dogfooded
-  - extend reshape workflows only after the initial wide/long contract is dogfooded
-  - extend script control flow beyond the initial non-nested conditional contract only after it is
-    dogfooded
-  - add remote credentials, database connections, and broader object-store behavior only after the
-    URI-based Parquet contract is dogfooded
 - Phase 13+ statistical/econometric implementation policy:
   - approach order:
     1. use well-established Python libraries first when the method is directly supported or can be
@@ -194,14 +196,6 @@ This file tracks feature state for spec-driven development. Product intent lives
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
-- Phase 13 core linear econometrics:
-  - extend beyond the implemented slices to complete additional prediction/fitted-value ergonomics
-    and broader diagnostics breadth
-  - library strategy:
-    - approach (1): continue Python-first through `statsmodels` for WLS/GLS and remaining linear
-      diagnostics
-    - approach (2): `fixest` or `estimatr` via `rpy2` for gaps in inference variants
-    - approach (3): targeted `numpy`/`scipy` linear algebra and inference helpers only when needed
 - Phase 14 endogeneity and panel foundations:
   - add IV/2SLS, weak-instrument and overidentification diagnostics, panel indexing semantics,
     fixed effects, random effects, and Hausman-style comparisons
