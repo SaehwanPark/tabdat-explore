@@ -84,13 +84,28 @@ def _write_regression_parquet(path: Path) -> None:
     """
     select * from (
       values
-        (1.0, 12.0, 'a'),
-        (2.0, 14.0, 'a'),
-        (3.0, 16.5, 'b'),
-        (4.0, 19.0, 'b'),
-        (5.0, 21.0, 'c'),
-        (6.0, 23.5, 'c')
-    ) as reg_data(x, y, cluster_id)
+        (1.0, 12.0, 'a', 1.0, 1.0),
+        (2.0, 14.0, 'a', 1.5, 1.5),
+        (3.0, 16.5, 'b', 0.5, 0.5),
+        (4.0, 19.0, 'b', 2.0, 2.0),
+        (5.0, 21.0, 'c', 1.0, 1.0),
+        (6.0, 23.5, 'c', 3.0, 3.0)
+    ) as reg_data(x, y, cluster_id, weight, sigma)
+    """,
+  )
+
+
+def _write_invalid_weight_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 1.0, 1.0),
+        (2.0, 14.0, 0.0, 1.0),
+        (3.0, 16.5, 1.0, -1.0),
+        (4.0, 19.0, 2.0, 1.0)
+    ) as reg_data(x, y, weight, sigma)
     """,
   )
 
@@ -213,6 +228,7 @@ def test_phase_13_regress_returns_typed_result(tmp_path: Path) -> None:
     executor.close()
 
   assert isinstance(result, RegressionResult)
+  assert result.estimator == "ols"
   assert result.covariance == "nonrobust"
   assert result.outcome == "y"
   assert result.predictors == ("x",)
@@ -236,9 +252,140 @@ def test_phase_13_regress_supports_robust_and_cluster_covariance(tmp_path: Path)
     executor.close()
 
   assert isinstance(robust, RegressionResult)
+  assert robust.estimator == "ols"
   assert robust.covariance == "robust"
   assert isinstance(clustered, RegressionResult)
+  assert clustered.estimator == "ols"
   assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_13_regress_supports_wls_and_gls_estimators(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    wls = executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="wls",
+        weight_variable="weight",
+      )
+    )
+    gls = executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="gls",
+        weight_variable="sigma",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(wls, RegressionResult)
+  assert wls.estimator == "wls"
+  assert wls.covariance == "nonrobust"
+  assert isinstance(gls, RegressionResult)
+  assert gls.estimator == "gls"
+  assert gls.covariance == "nonrobust"
+
+
+def test_phase_13_regress_supports_weighted_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    wls_cluster = executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="wls",
+        weight_variable="weight",
+        cluster_variable="cluster_id",
+      )
+    )
+    gls_robust = executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="gls",
+        weight_variable="sigma",
+        robust=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(wls_cluster, RegressionResult)
+  assert wls_cluster.covariance == "cluster(cluster_id)"
+  assert isinstance(gls_robust, RegressionResult)
+  assert gls_robust.covariance == "robust"
+
+
+def test_phase_13_regress_rejects_non_positive_weight_or_sigma(tmp_path: Path) -> None:
+  path = tmp_path / "invalid-weights.parquet"
+  _write_invalid_weight_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="regress requires positive weights values"):
+      executor.execute(
+        RegressCommand(
+          outcome="y",
+          predictors=("x",),
+          estimator="wls",
+          weight_variable="weight",
+        )
+      )
+    with pytest.raises(ExecutionError, match="regress requires positive sigma values"):
+      executor.execute(
+        RegressCommand(
+          outcome="y",
+          predictors=("x",),
+          estimator="gls",
+          weight_variable="sigma",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_13_predict_supports_weighted_regression_states(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="wls",
+        weight_variable="weight",
+      )
+    )
+    wls_predicted = executor.execute(PredictCommand(target_variable="y_hat_wls"))
+    executor.execute(
+      RegressCommand(
+        outcome="y",
+        predictors=("x",),
+        estimator="gls",
+        weight_variable="sigma",
+      )
+    )
+    gls_residuals = executor.execute(
+      PredictCommand(target_variable="y_resid_gls", kind="residuals")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(wls_predicted, TransformResult)
+  assert wls_predicted.message == "Predicted y_hat_wls"
+  assert isinstance(gls_residuals, TransformResult)
+  assert gls_residuals.message == "Predicted y_resid_gls"
 
 
 def test_phase_13_predict_adds_linear_predictions_and_residuals(sample_parquet: Path) -> None:

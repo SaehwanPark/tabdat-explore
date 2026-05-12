@@ -74,7 +74,7 @@ _COLLAPSE_OPTIONS = ("by(",)
 _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
-_REGRESS_OPTIONS = ("robust", "cluster(", "noconstant")
+_REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _PREDICT_OPTIONS = ("xb", "residuals")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}

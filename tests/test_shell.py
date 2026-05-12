@@ -181,7 +181,7 @@ def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) 
 
   assert regress_command == ["regress"]
   assert regress_columns == ["cost"]
-  assert regress_options == ["robust", "cluster(", "noconstant"]
+  assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
   assert predict_command == ["predict"]
   assert predict_options == ["xb", "residuals"]
 

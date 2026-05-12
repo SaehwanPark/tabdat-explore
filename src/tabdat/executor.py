@@ -4,7 +4,7 @@ import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import SupportsFloat
+from typing import Any, SupportsFloat, cast
 
 import statsmodels.api as sm
 
@@ -451,26 +451,36 @@ class Executor:
 
   def _execute_regress(self, command: RegressCommand) -> RegressionResult:
     dataset = self._require_active_dataset("regress")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    if command.weight_variable is not None:
+      numeric_variables = (*numeric_variables, command.weight_variable)
     _require_numeric_columns(
       "regress",
       dataset,
-      (command.outcome, *command.predictors),
+      numeric_variables,
     )
-    row_columns = (
-      (command.outcome, *command.predictors)
-      if command.cluster_variable is None
-      else (command.outcome, *command.predictors, command.cluster_variable)
-    )
-    rows = self.backend.regression_rows(dataset, row_columns)
-    outcome, predictors, groups = _regression_sample(
+    row_columns = [command.outcome, *command.predictors]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    if command.weight_variable is not None:
+      row_columns.append(command.weight_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    outcome, predictors, groups, weights = _regression_sample(
       rows=rows,
       predictor_count=len(command.predictors),
       has_cluster=command.cluster_variable is not None,
+      has_weight=command.weight_variable is not None,
+      weight_label="weights" if command.estimator == "wls" else "sigma",
     )
     if not outcome:
       raise ExecutionError("regress requires at least one complete observation")
     design = _design_matrix(predictors, include_intercept=command.include_intercept)
-    model = sm.OLS(outcome, design)
+    model = _regression_model(
+      estimator=command.estimator,
+      outcome=outcome,
+      design=design,
+      weights=weights,
+    )
     fitted = model.fit()
     covariance = "nonrobust"
     if command.robust:
@@ -501,6 +511,7 @@ class Executor:
     return RegressionResult(
       outcome=command.outcome,
       predictors=command.predictors,
+      estimator=command.estimator,
       covariance=covariance,
       observation_count=len(outcome),
       include_intercept=command.include_intercept,
@@ -643,20 +654,34 @@ def _regression_sample(
   rows: tuple[tuple[object, ...], ...],
   predictor_count: int,
   has_cluster: bool,
-) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...], tuple[object, ...] | None]:
+  has_weight: bool,
+  weight_label: str,
+) -> tuple[
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[object, ...] | None,
+  tuple[float, ...] | None,
+]:
   outcomes: list[float] = []
   predictors: list[tuple[float, ...]] = []
   groups: list[object] = []
-  row_width = predictor_count + 1 + (1 if has_cluster else 0)
+  weights: list[float] = []
+  row_width = predictor_count + 1 + (1 if has_cluster else 0) + (1 if has_weight else 0)
   for row in rows:
     if len(row) != row_width:
       raise ExecutionError("regress failed")
     raw_outcome = row[0]
     raw_predictors = row[1 : 1 + predictor_count]
-    raw_group = row[-1] if has_cluster else None
+    index = 1 + predictor_count
+    raw_group = row[index] if has_cluster else None
+    if has_cluster:
+      index += 1
+    raw_weight = row[index] if has_weight else None
     if raw_outcome is None or any(value is None for value in raw_predictors):
       continue
     if has_cluster and raw_group is None:
+      continue
+    if has_weight and raw_weight is None:
       continue
     outcome = _coerce_float(raw_outcome)
     predictor_values = tuple(
@@ -664,16 +689,44 @@ def _regression_sample(
       for value in (_coerce_float(raw_value) for raw_value in raw_predictors)
       if value is not None
     )
+    weight = _coerce_float(raw_weight) if has_weight else None
     if outcome is None or len(predictor_values) != predictor_count:
       continue
     if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
       continue
+    if has_weight:
+      if weight is None:
+        continue
+      if weight <= 0.0:
+        raise ExecutionError(f"regress requires positive {weight_label} values")
     outcomes.append(outcome)
     predictors.append(predictor_values)
     if has_cluster:
       groups.append(raw_group)
+    if has_weight:
+      assert weight is not None
+      weights.append(weight)
   group_values = tuple(groups) if has_cluster else None
-  return tuple(outcomes), tuple(predictors), group_values
+  weight_values = tuple(weights) if has_weight else None
+  return tuple(outcomes), tuple(predictors), group_values, weight_values
+
+
+def _regression_model(
+  *,
+  estimator: str,
+  outcome: tuple[float, ...],
+  design: list[list[float]],
+  weights: tuple[float, ...] | None,
+) -> Any:
+  if estimator == "wls":
+    if weights is None:
+      raise ExecutionError("regress failed")
+    return sm.WLS(outcome, design, weights=cast(Any, weights))
+  if estimator == "gls":
+    if weights is None:
+      raise ExecutionError("regress failed")
+    return sm.GLS(outcome, design, sigma=cast(Any, weights))
+  return sm.OLS(outcome, design)
 
 
 def _design_matrix(

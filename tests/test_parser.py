@@ -306,6 +306,18 @@ def test_parse_phase_13_regress_command() -> None:
     outcome="cost",
     predictors=("age", "bmi"),
   )
+  assert parse_command("regress cost age, wls(weight)") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    estimator="wls",
+    weight_variable="weight",
+  )
+  assert parse_command("regress cost age, gls(sigma)") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    estimator="gls",
+    weight_variable="sigma",
+  )
   assert parse_command("regress cost age, robust") == RegressCommand(
     outcome="cost",
     predictors=("age",),
@@ -320,6 +332,20 @@ def test_parse_phase_13_regress_command() -> None:
     outcome="cost",
     predictors=("age",),
     include_intercept=False,
+  )
+  assert parse_command("regress cost age, wls(weight) cluster(firm)") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    estimator="wls",
+    weight_variable="weight",
+    cluster_variable="firm",
+  )
+  assert parse_command("regress cost age, gls(sigma) robust") == RegressCommand(
+    outcome="cost",
+    predictors=("age",),
+    estimator="gls",
+    weight_variable="sigma",
+    robust=True,
   )
 
 
@@ -514,6 +540,13 @@ def test_parse_exit_aliases() -> None:
     "regress cost age, cluster",
     "regress cost age, cluster()",
     "regress cost age, cluster(sex firm)",
+    "regress cost age, wls",
+    "regress cost age, wls()",
+    "regress cost age, wls(age bmi)",
+    "regress cost age, gls",
+    "regress cost age, gls()",
+    "regress cost age, gls(age bmi)",
+    "regress cost age, wls(age) gls(sigma)",
     "regress cost age, robust=true",
     "regress cost age, noconstant=true",
     "predict",
