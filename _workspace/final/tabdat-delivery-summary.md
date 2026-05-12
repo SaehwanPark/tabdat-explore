@@ -1,21 +1,26 @@
-# Phase 13 Slice 1 Delivery Summary
+# Phase 13 Slice 2 Delivery Summary
 
 ## Summary
 
-Completed a bounded first Phase 13 vertical slice on branch
-`codex/tmp-phase13-slice1-regress-predict`.
+Completed a bounded second Phase 13 vertical slice on branch
+`codex/tmp-phase13-slice2-wls-gls`.
 
 ## Delivered Behavior
 
-- Added `regress <y> <xvars>[, robust cluster(<var>) noconstant]`.
-- Added `predict <newvar>[, xb residuals]` driven by latest in-session regression state.
-- Added Python-first `statsmodels` OLS fitting and covariance mode selection.
-- Added deterministic regression formatter output and prediction transform messaging.
-- Added parser/executor/backend/CLI/shell coverage for new command flows.
-- Synchronized `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md`.
+- Extended `regress` with weighted estimator modes:
+  - `wls(<weight_var>)`
+  - `gls(<sigma_var>)`
+- Preserved covariance controls (`nonrobust`, `robust`, `cluster(...)`) across OLS/WLS/GLS.
+- Added retained-row positive-value validation for weighted inputs.
+- Kept `predict <newvar>[, xb residuals]` compatible with weighted and unweighted regression state.
+- Added deterministic regression estimator metadata output.
+- Added focused parser/executor/CLI/shell coverage for weighted regress flows.
+- Synchronized `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`, and `_workspace`
+  contract/implementation/QA artifacts.
 
 ## Validation
 
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
@@ -24,6 +29,6 @@ Completed a bounded first Phase 13 vertical slice on branch
 
 ## Residual Risks
 
-- Later Phase 13 slices still need WLS/GLS and broader diagnostics.
-- `statsmodels` can emit runtime warnings on tiny saturated samples; tests currently tolerate these
-  as non-blocking.
+- Broader linear diagnostics remain pending in a future Phase 13 slice.
+- `statsmodels` can emit runtime warnings on tiny saturated samples; tests currently treat these as
+  non-blocking.

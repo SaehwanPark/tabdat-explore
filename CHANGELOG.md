@@ -6,6 +6,11 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the second Phase 13 linear econometrics slice with
+  `regress <y> <xvars>, wls(<weight_var>)` and `regress <y> <xvars>, gls(<sigma_var>)`,
+  weighted-estimator covariance combinations (`robust` and `cluster(<var>)`), positive
+  weight/sigma validation for retained rows, deterministic estimator metadata output, and focused
+  parser/executor/backend/CLI/shell coverage.
 - Added the first Phase 13 linear econometrics slice with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant]` and
   `predict <newvar>[, xb residuals]`, including Python-first `statsmodels` OLS fitting,

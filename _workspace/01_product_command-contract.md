@@ -1,12 +1,13 @@
-# Phase 13 Slice 1 Command Contract
+# Phase 13 Slice 2 Command Contract
 
 ## Request Summary
 
-Implement the first executable Phase 13 linear-econometrics command slice with strict bounded scope.
+Implement the next executable Phase 13 linear-econometrics slice by extending `regress` with
+weighted estimator modes while preserving existing `predict` behavior.
 
 ## Roadmap Phase
 
-- Phase 13 core linear econometrics (slice 1)
+- Phase 13 core linear econometrics (slice 2)
 
 ## Command Contracts
 
@@ -19,19 +20,26 @@ regress <y> <xvars>
 regress <y> <xvars>, robust
 regress <y> <xvars>, cluster(<var>)
 regress <y> <xvars>, noconstant
+regress <y> <xvars>, wls(<weight_var>)
+regress <y> <xvars>, gls(<sigma_var>)
 ```
 
 #### Rules
 
 - Requires an active dataset.
-- `<y>` and `<xvars>` must all be numeric columns.
-- Uses Python-first `statsmodels` OLS fitting.
-- Default covariance mode is non-robust.
+- `<y>` and `<xvars>` must be numeric columns.
+- `wls(<weight_var>)` and `gls(<sigma_var>)` variables must be numeric columns.
+- Estimator mode defaults to OLS when neither `wls(...)` nor `gls(...)` is provided.
+- `wls(...)` and `gls(...)` are mutually exclusive.
+- Covariance defaults to non-robust.
 - `robust` applies HC1 covariance.
 - `cluster(<var>)` applies clustered covariance on `<var>`.
-- `robust` and `cluster(...)` are mutually exclusive.
-- `noconstant` removes the intercept term.
+- `robust` and `cluster(...)` remain mutually exclusive.
+- Covariance options apply to OLS, WLS, and GLS estimator modes.
 - Rows with missing outcome/predictor values are excluded from fitting.
+- Rows with missing cluster values are excluded when clustered covariance is requested.
+- Rows with missing weight/sigma values are excluded for WLS/GLS.
+- Any retained WLS weight or GLS sigma value must be strictly positive.
 
 #### User-Facing Errors
 
@@ -40,7 +48,13 @@ regress <y> <xvars>, noconstant
 - Non-numeric variable: `regress requires numeric variables: <vars>`.
 - Invalid option combinations:
   - `regress cannot combine robust and cluster`
-  - `regress option cluster expects one variable`
+  - `regress cannot combine wls and gls`
+- Invalid weighted option arity:
+  - `regress option wls expects one variable`
+  - `regress option gls expects one variable`
+- Non-positive retained weighted inputs:
+  - `regress requires positive weights values`
+  - `regress requires positive sigma values`
 
 ### `predict`
 
@@ -55,24 +69,18 @@ predict <newvar>, xb
 #### Rules
 
 - Requires an active dataset.
-- Requires a prior successful `regress` model in session state.
+- Requires a prior successful `regress` model in session state (OLS, WLS, or GLS).
 - Default prediction mode is `xb`.
 - `residuals` computes `<y> - xb` using the model outcome variable.
 - Adds `<newvar>` as a new column to the active dataset.
 - Fails if `<newvar>` already exists.
 - `xb` and `residuals` are mutually exclusive options.
 
-#### User-Facing Errors
-
-- Missing prior model: `predict requires a prior regress model`.
-- Existing target column: `predict target already exists: <newvar>`.
-- Invalid option combinations:
-  - `predict options xb and residuals cannot be combined`
-
 ## Acceptance Criteria
 
-- Parser supports valid `regress`/`predict` forms and rejects invalid option syntax.
-- Executor and backend run `regress` and produce deterministic regression output metadata.
-- `predict` mutates active dataset with either fitted values or residuals.
-- CLI and shell tests cover the new command flows.
-- SDD and changelog docs are synchronized with implemented scope and limits.
+- Parser accepts valid weighted `regress` forms and rejects conflicting/malformed options.
+- Executor and backend run OLS/WLS/GLS through Python-first `statsmodels` path.
+- `predict` works after weighted and unweighted regressions.
+- CLI output includes deterministic estimator metadata and covariance mode.
+- CLI and shell tests cover weighted success/failure flows and option completion.
+- SDD/changelog docs are synchronized with implemented scope and limits.

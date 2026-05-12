@@ -149,11 +149,18 @@ This file tracks feature state for spec-driven development. Product intent lives
     regression model state
   - deterministic regression result formatting and focused parser, executor/backend, CLI, and
     shell coverage
+- Implemented the second Phase 13 core linear econometrics slice:
+  - `regress <y> <xvars>, wls(<weight_var>)` and `regress <y> <xvars>, gls(<sigma_var>)`
+  - covariance combinations for weighted estimators with `robust` and `cluster(<var>)`
+  - positive-value validation for retained WLS weights and GLS sigma values
+  - deterministic estimator metadata output plus focused parser, executor/backend, CLI, and shell
+    coverage
 
 ## Present
 
 - Phase 12 estimation substrate has been implemented.
-- Phase 13 slice 1 is implemented with `regress`/`predict` over OLS plus robust/cluster covariance.
+- Phase 13 slice 2 is implemented with weighted `regress` execution (`wls`/`gls`) plus existing
+  `predict` compatibility.
 - Functional helper imports should continue to go through `tabdat.monads`, which delegates to
   `comp-builders` while preserving a stable repo-local boundary.
 
@@ -183,7 +190,7 @@ This file tracks feature state for spec-driven development. Product intent lives
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 13 core linear econometrics:
-  - extend beyond the implemented slice to complete WLS, GLS, broader diagnostics, and additional
+  - extend beyond the implemented slices to complete broader diagnostics and additional
     prediction/fitted-value ergonomics
   - library strategy:
     - approach (1): continue Python-first through `statsmodels` for WLS/GLS and remaining linear
