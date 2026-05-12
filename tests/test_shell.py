@@ -166,7 +166,9 @@ def test_completer_suggests_visualization_columns_and_options(sample_parquet: Pa
   assert bar_options == ["missing"]
 
 
-def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) -> None:
+def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
+  sample_parquet: Path,
+) -> None:
   executor = Executor()
   try:
     executor.execute(UseCommand(sample_parquet))
@@ -174,6 +176,9 @@ def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) 
     regress_command = _completion_texts(completer, "regr")
     regress_columns = _completion_texts(completer, "regress c")
     regress_options = _completion_texts(completer, "regress cost age, ")
+    ivregress_command = _completion_texts(completer, "ivr")
+    ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
+    ivregress_options = _completion_texts(completer, "ivregress 2sls cost age, ")
     predict_command = _completion_texts(completer, "pred")
     predict_options = _completion_texts(completer, "predict cost_hat, ")
     estat_command = _completion_texts(completer, "est")
@@ -184,6 +189,9 @@ def test_completer_suggests_phase_13_commands_and_options(sample_parquet: Path) 
   assert regress_command == ["regress"]
   assert regress_columns == ["cost"]
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
+  assert ivregress_command == ["ivregress"]
+  assert ivregress_columns == ["cost"]
+  assert ivregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]
   assert predict_command == ["predict"]
   assert predict_options == ["xb", "residuals"]
   assert estat_command == ["estat"]

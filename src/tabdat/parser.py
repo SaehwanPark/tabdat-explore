@@ -27,6 +27,7 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  IvRegressCommand,
   JoinCommand,
   KeepCommand,
   NumberExpression,
@@ -83,6 +84,7 @@ _EXECUTABLE_COMMANDS = {
   "regress",
   "predict",
   "estat",
+  "ivregress",
   "exit",
   "quit",
 }
@@ -302,6 +304,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "estat":
     return _parse_estat(parts)
+
+  if parts.name == "ivregress":
+    return _parse_ivregress(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -807,6 +812,53 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
   if subcommand not in {"residuals", "ovtest", "vif"}:
     raise ParseError("estat subcommand must be residuals, ovtest, or vif")
   return EstatCommand(subcommand=cast(Literal["residuals", "ovtest", "vif"], subcommand))
+
+
+def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)"
+    )
+  if len(parts.arguments) < 2:
+    raise ParseError(
+      "ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)"
+    )
+  estimator = parts.arguments[0].lower()
+  if estimator != "2sls":
+    raise ParseError("ivregress estimator must be 2sls")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"endog", "iv", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"ivregress unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "ivregress", {"robust", "noconstant"})
+  endog_values = _single_tuple_option(parts.options, "endog", "ivregress")
+  if endog_values is None or len(endog_values) != 1:
+    raise ParseError("ivregress option endog expects one variable")
+  instrument_values = _single_tuple_option(parts.options, "iv", "ivregress")
+  if instrument_values is None:
+    raise ParseError("ivregress option iv expects at least one variable")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "ivregress")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("ivregress option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("ivregress cannot combine robust and cluster")
+  outcome = parts.arguments[1]
+  exogenous = parts.arguments[2:]
+  endogenous = endog_values[0]
+  if endogenous in exogenous:
+    raise ParseError("ivregress endog variable must not appear in exogenous variables")
+  return IvRegressCommand(
+    outcome=outcome,
+    exogenous=exogenous,
+    endogenous=endogenous,
+    instruments=instrument_values,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+    estimator="2sls",
+  )
 
 
 def _single_integer_option(

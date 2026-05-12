@@ -37,6 +37,8 @@ from tabdat.models import (
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
+  IvRegressCommand,
+  IvRegressionResult,
   JoinCommand,
   KeepCommand,
   LoadResult,
@@ -125,6 +127,25 @@ def _write_collinear_regression_parquet(path: Path) -> None:
         (5.0, 10.0, 17.0),
         (6.0, 12.0, 20.0)
     ) as reg_data(x1, x2, y)
+    """,
+  )
+
+
+def _write_iv_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 10.0, 1.0, 0.0, 'a'),
+        (1.0, 12.0, 2.0, 1.0, 'a'),
+        (2.0, 15.0, 2.0, 1.0, 'b'),
+        (3.0, 16.0, 4.0, 2.0, 'b'),
+        (4.0, 18.0, 4.0, 2.0, 'c'),
+        (5.0, 20.0, 6.0, 3.0, 'c'),
+        (6.0, 21.0, 6.0, 3.0, 'd'),
+        (7.0, 24.0, 8.0, 4.0, 'd')
+    ) as iv_data(w, y, x_endog, z_inst, cluster_id)
     """,
   )
 
@@ -533,6 +554,97 @@ def test_phase_13_estat_requires_prior_regression(sample_parquet: Path) -> None:
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
+  finally:
+    executor.close()
+
+
+def test_phase_14_ivregress_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, IvRegressionResult)
+  assert result.estimator == "2sls"
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.exogenous == ("w",)
+  assert result.endogenous == "x_endog"
+  assert result.instruments == ("z_inst",)
+  assert result.observation_count == 8
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "w", "x_endog"]
+  assert result.r_squared is not None
+
+
+def test_phase_14_ivregress_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+        robust=True,
+      )
+    )
+    clustered = executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, IvRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, IvRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_14_ivregress_reports_prerequisite_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="ivregress requires an active dataset"):
+      executor.execute(
+        IvRegressCommand(
+          outcome="y",
+          exogenous=("w",),
+          endogenous="x_endog",
+          instruments=("z_inst",),
+        )
+      )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(
+      UnknownVariableError,
+      match="ivregress unknown variable: w, x_endog, z_inst",
+    ):
+      executor.execute(
+        IvRegressCommand(
+          outcome="cost",
+          exogenous=("w",),
+          endogenous="x_endog",
+          instruments=("z_inst",),
+        )
+      )
   finally:
     executor.close()
 

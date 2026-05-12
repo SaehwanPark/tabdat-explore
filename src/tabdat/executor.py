@@ -6,7 +6,9 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, SupportsFloat, cast
 
+import numpy as np
 import statsmodels.api as sm
+from linearmodels.iv import IV2SLS
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
@@ -42,6 +44,8 @@ from tabdat.models import (
   GenerateCommand,
   HeadCommand,
   HistogramCommand,
+  IvRegressCommand,
+  IvRegressionResult,
   JoinCommand,
   KeepCommand,
   LoadResult,
@@ -268,6 +272,9 @@ class Executor:
 
     if isinstance(command, RegressCommand):
       return self._execute_regress(command)
+
+    if isinstance(command, IvRegressCommand):
+      return self._execute_ivregress(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -532,6 +539,74 @@ class Executor:
         residuals=getattr(fitted, "resid", None),
         parameter_count=len(parameter_names),
       ),
+      coefficients=coefficients,
+    )
+
+  def _execute_ivregress(self, command: IvRegressCommand) -> IvRegressionResult:
+    dataset = self._require_active_dataset("ivregress")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.exogenous,
+      command.endogenous,
+      *command.instruments,
+    )
+    _require_numeric_columns("ivregress", dataset, numeric_variables)
+    row_columns = [*numeric_variables]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    (
+      outcomes,
+      exogenous_values,
+      endogenous_values,
+      instrument_values,
+      cluster_values,
+    ) = _iv_regression_sample(
+      rows=rows,
+      exogenous_count=len(command.exogenous),
+      instrument_count=len(command.instruments),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("ivregress requires at least one complete observation")
+    exogenous_matrix = _design_matrix(exogenous_values, include_intercept=command.include_intercept)
+    exog_data: Any = np.array(exogenous_matrix, dtype=float) if exogenous_matrix[0] else None
+    dependent = np.array(outcomes, dtype=float)
+    endogenous = np.array(endogenous_values, dtype=float)
+    instruments = np.array(instrument_values, dtype=float)
+    cov_type = "unadjusted"
+    cov_label = "nonrobust"
+    cov_config: dict[str, Any] = {}
+    if command.robust:
+      cov_type = "robust"
+      cov_label = "robust"
+    if command.cluster_variable is not None:
+      cov_type = "clustered"
+      cov_label = f"cluster({command.cluster_variable})"
+      if cluster_values is None:
+        raise ExecutionError("ivregress requires complete cluster values")
+      cov_config["clusters"] = np.array(cluster_values)
+    try:
+      fitted = IV2SLS(
+        dependent=dependent,
+        exog=exog_data,
+        endog=endogenous,
+        instruments=instruments,
+      ).fit(cov_type=cov_type, **cov_config)
+    except Exception as exc:
+      raise ExecutionError("ivregress failed") from exc
+    parameter_names = _iv_parameter_names(command)
+    coefficients = _iv_coefficient_estimates(parameter_names, fitted)
+    return IvRegressionResult(
+      estimator=command.estimator,
+      covariance=cov_label,
+      outcome=command.outcome,
+      exogenous=command.exogenous,
+      endogenous=command.endogenous,
+      instruments=command.instruments,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(getattr(fitted, "rsquared", None)),
       coefficients=coefficients,
     )
 
@@ -840,6 +915,80 @@ def _regression_sample(
   return tuple(outcomes), tuple(predictors), group_values, weight_values
 
 
+def _iv_regression_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  exogenous_count: int,
+  instrument_count: int,
+  has_cluster: bool,
+) -> tuple[
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[object, ...] | None,
+]:
+  outcomes: list[float] = []
+  exogenous_values: list[tuple[float, ...]] = []
+  endogenous_values: list[float] = []
+  instrument_values: list[tuple[float, ...]] = []
+  clusters: list[object] = []
+  row_width = 1 + exogenous_count + 1 + instrument_count + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      raise ExecutionError("ivregress failed")
+    outcome_raw = row[0]
+    exog_start = 1
+    exog_end = exog_start + exogenous_count
+    endog_index = exog_end
+    iv_start = endog_index + 1
+    iv_end = iv_start + instrument_count
+    cluster_value = row[iv_end] if has_cluster else None
+
+    if (
+      outcome_raw is None
+      or row[endog_index] is None
+      or any(value is None for value in row[exog_start:exog_end])
+      or any(value is None for value in row[iv_start:iv_end])
+    ):
+      continue
+    if has_cluster and cluster_value is None:
+      continue
+
+    outcome = _coerce_float(outcome_raw)
+    endogenous = _coerce_float(row[endog_index])
+    exog = tuple(
+      value
+      for value in (_coerce_float(raw) for raw in row[exog_start:exog_end])
+      if value is not None
+    )
+    instruments = tuple(
+      value for value in (_coerce_float(raw) for raw in row[iv_start:iv_end]) if value is not None
+    )
+    if outcome is None or endogenous is None:
+      continue
+    if len(exog) != exogenous_count or len(instruments) != instrument_count:
+      continue
+    numeric_values = (outcome, endogenous, *exog, *instruments)
+    if any(not math.isfinite(value) for value in numeric_values):
+      continue
+
+    outcomes.append(outcome)
+    exogenous_values.append(exog)
+    endogenous_values.append(endogenous)
+    instrument_values.append(instruments)
+    if has_cluster:
+      clusters.append(cluster_value)
+
+  return (
+    tuple(outcomes),
+    tuple(exogenous_values),
+    tuple(endogenous_values),
+    tuple(instrument_values),
+    tuple(clusters) if has_cluster else None,
+  )
+
+
 def _regression_model(
   *,
   estimator: str,
@@ -878,6 +1027,39 @@ def _coefficient_estimates(
   p_values = _optional_float_sequence(getattr(fitted, "pvalues", None))
   if len(params) != len(parameter_names):
     raise ExecutionError("regress failed")
+  return tuple(
+    CoefficientEstimate(
+      name=name,
+      value=parameter,
+      standard_error=_optional_sequence_value(standard_errors, index),
+      statistic=_optional_sequence_value(statistics, index),
+      p_value=_optional_sequence_value(p_values, index),
+    )
+    for index, (name, parameter) in enumerate(zip(parameter_names, params, strict=True))
+  )
+
+
+def _iv_parameter_names(command: IvRegressCommand) -> tuple[str, ...]:
+  names: list[str] = []
+  if command.include_intercept:
+    names.append("intercept")
+  names.extend(command.exogenous)
+  names.append(command.endogenous)
+  return tuple(names)
+
+
+def _iv_coefficient_estimates(
+  parameter_names: Sequence[str],
+  fitted: object,
+) -> tuple[CoefficientEstimate, ...]:
+  params = _required_float_sequence(getattr(fitted, "params", None))
+  standard_errors = _optional_float_sequence(
+    getattr(fitted, "std_errors", getattr(fitted, "bse", None))
+  )
+  statistics = _optional_float_sequence(getattr(fitted, "tstats", getattr(fitted, "tvalues", None)))
+  p_values = _optional_float_sequence(getattr(fitted, "pvalues", None))
+  if len(params) != len(parameter_names):
+    raise ExecutionError("ivregress failed")
   return tuple(
     CoefficientEstimate(
       name=name,

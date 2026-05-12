@@ -6,6 +6,13 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 14 endogeneity foundations slice with
+  `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
+  Python-first `linearmodels` IV2SLS execution, deterministic formatter output, and focused
+  parser/executor/CLI/shell coverage.
+- Added `linearmodels` as the Phase 14 Python-first IV/2SLS backend dependency.
+- Added integrated E2E scenario `s5_titanic_phase13_dogfood` to exercise real-dataset
+  `regress`/`predict`/`estat` flows as a Phase 13 hardening gate.
 - Added the third Phase 13 linear econometrics slice with `estat <residuals|ovtest|vif>`
   post-estimation diagnostics, residual-analysis summaries, Ramsey RESET specification testing,
   VIF multicollinearity checks, best-effort OLS/WLS/GLS compatibility, and focused
@@ -105,6 +112,10 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Updated script reproducibility integrated-E2E expectations to match current `export` output
+  wording (`Exported:`).
+- Updated SDD state (`SPEC.md`, `ARCHITECTURE.md`, and `README.md`) to record completed Phase 13
+  hardening and the initial Phase 14 `ivregress 2sls` slice.
 - Reworked `SPEC.md` to keep `Present` focused on the remaining Phase 13 hardening work and to
   move completed roadmap phases out of `Future`.
 - Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.

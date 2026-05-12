@@ -1,4 +1,4 @@
-# Phase 13 Slice 3 QA Report
+# Phase 14 Slice 1 QA Report
 
 ## Status
 
@@ -6,14 +6,21 @@ pass
 
 ## Boundaries Checked
 
-- Contract -> parser: `estat` subcommand grammar and invalid-form rejection.
-- Parser -> executor: typed `EstatCommand` dispatch and prerequisite error behavior.
-- Executor -> diagnostics backend: Python-first `statsmodels` diagnostic execution and deterministic
-  failure surfaces.
-- Executor -> formatter -> CLI: deterministic tabular diagnostics output.
-- Shell UX -> parser boundary: `estat` command/subcommand completion without semantic leakage.
-- SDD/docs -> implementation: `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md`
-  aligned with Phase 13 slice 3 scope.
+- Contract -> parser:
+  - `ivregress 2sls` grammar, required options, and malformed-form rejection.
+- Parser -> executor:
+  - typed `IvRegressCommand` dispatch and deterministic execution failures.
+- Executor -> backend/library:
+  - Python-first `linearmodels` IV2SLS execution and covariance-mode mapping.
+- Executor -> formatter -> CLI:
+  - deterministic IV model output for nonrobust, robust, and clustered flows.
+- Shell UX -> parser boundary:
+  - `ivregress` command/option completions without semantic leakage.
+- Prerequisite gate:
+  - integrated harness passes with updated `s4` expectation and new `s5` Phase 13 dogfood flow.
+- SDD/docs -> implementation:
+  - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md` aligned with completed
+    prerequisites and Phase 14 slice entry.
 
 ## Blocking Issues
 
@@ -21,10 +28,8 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Consider additional Phase 13 diagnostics breadth and prediction ergonomics in a later bounded
-  slice.
-- Consider warning-normalized regression fixtures to reduce non-blocking tiny-sample `statsmodels`
-  warnings.
+- Add weak-instrument and overidentification diagnostics in a bounded follow-up Phase 14 slice.
+- Define panel-estimation command contracts before FE/RE/Hausman implementation.
 
 ## Validation Evidence
 
@@ -32,8 +37,9 @@ pass
 - `uv run ruff format --check .` passed.
 - `uv run pyright` passed.
 - `uv run mypy` passed.
-- `uv run pytest` passed.
+- `uv run pytest -q` passed.
+- `uv run python integrated_testing/run_e2e.py` passed.
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase13-estat-diagnostics`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-iv2sls-slice1`, open one PR, and mark it ready for review.

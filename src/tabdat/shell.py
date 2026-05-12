@@ -45,6 +45,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "save",
   "export",
   "regress",
+  "ivregress",
   "predict",
   "estat",
   "by",
@@ -69,6 +70,7 @@ _COLUMN_COMMANDS = {
   "reshape",
   "panel",
   "regress",
+  "ivregress",
 }
 _TABULATE_OPTIONS = ("row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
@@ -76,6 +78,7 @@ _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
+_IVREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _PREDICT_OPTIONS = ("xb", "residuals")
 _ESTAT_SUBCOMMANDS = ("residuals", "ovtest", "vif")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
@@ -145,6 +148,7 @@ class TabdatCompleter(Completer):
       "scatter",
       "bar",
       "regress",
+      "ivregress",
       "predict",
     } and _is_after_comma(text):
       yield from _option_completions(command_name, word)
@@ -233,6 +237,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_BAR_OPTIONS, word)
   if command_name == "regress":
     yield from _matching_completions(_REGRESS_OPTIONS, word)
+  if command_name == "ivregress":
+    yield from _matching_completions(_IVREGRESS_OPTIONS, word)
   if command_name == "predict":
     yield from _matching_completions(_PREDICT_OPTIONS, word)
 

@@ -467,6 +467,48 @@ def test_cli_estat_requires_prior_regress(sample_parquet: Path, capsys) -> None:
   assert "Error: estat requires a prior regress model" in captured.err
 
 
+def test_cli_runs_phase_14_ivregress_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "iv.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 10.0, 1.0, 0.0, 'a'),
+        (1.0, 12.0, 2.0, 1.0, 'a'),
+        (2.0, 15.0, 2.0, 1.0, 'b'),
+        (3.0, 16.0, 4.0, 2.0, 'b'),
+        (4.0, 18.0, 4.0, 2.0, 'c'),
+        (5.0, 20.0, 6.0, 3.0, 'c'),
+        (6.0, 21.0, 6.0, 3.0, 'd'),
+        (7.0, 24.0, 8.0, 4.0, 'd')
+    ) as iv_data(w, y, x_endog, z_inst, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "ivregress 2sls y w, endog(x_endog) iv(z_inst)",
+      "-c",
+      "ivregress 2sls y w, endog(x_endog) iv(z_inst) robust",
+      "-c",
+      "ivregress 2sls y w, endog(x_endog) iv(z_inst) cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: ivregress 2sls y on w (endog=x_endog; iv=z_inst)" in captured.out
+  assert "Estimator: 2sls" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

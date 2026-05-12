@@ -1,30 +1,32 @@
-# Phase 13 Slice 3 Request Summary
+# Phase 14 Slice 1 Request Summary
 
 ## User Goal
 
-Complete Phase 13 by implementing the remaining core linear diagnostics slice after prior `regress` and `predict` slices.
+Identify the correct next implementation target from `SPEC.md`, finish any prerequisite work that
+should be complete before entering the next phase, then implement the next planned phase slice with
+checkpoint commits, documentation updates, and a review-ready PR.
 
 ## Scope
 
-- In-scope phase: Phase 13 core linear econometrics (slice 3).
-- Add post-estimation diagnostics command surface:
-  - `estat residuals`
-  - `estat ovtest`
-  - `estat vif`
-- Keep existing `regress` and `predict` behavior unchanged except for diagnostics integration.
-- Use the Phase 13 implementation order:
-  1. Python libraries first (`statsmodels`).
-  2. R via `rpy2` only when Python is insufficient.
-  3. Narrow lower-level fallback only when both prior approaches fail.
+- Phase gate first:
+  - close remaining Phase 13 hardening work if any prerequisite gaps remain
+- Next phase execution:
+  - begin Phase 14 with one bounded slice only
+  - use `ivregress 2sls` as the initial command surface
+- Preserve phase policy order:
+  1. Python library first
+  2. R via `rpy2` fallback only if Python is insufficient
+  3. lower-level custom implementation only if both higher layers fail
 
 ## Constraints
 
-- Preserve Stata-inspired command style.
-- Keep changes as a bounded vertical slice across parser, executor, CLI/shell UX, docs, and tests.
-- Keep deterministic terminal output and focused validation evidence.
+- Keep a bounded vertical slice across parser, executor/backend, formatter, CLI/shell tests, and
+  SDD docs.
+- Keep existing `regress`/`predict`/`estat` behavior stable.
+- Keep output deterministic and validation evidence explicit.
 
 ## Non-goals
 
-- No IV/panel/nonlinear model work (Phase 14+).
-- No broad parser redesign.
-- No interactive HTML diagnostics in this slice.
+- No full Phase 14 rollout in one branch.
+- No FE/RE/Hausman or broad panel workflow redesign in this slice.
+- No R fallback adapter work while Python-first coverage is sufficient.

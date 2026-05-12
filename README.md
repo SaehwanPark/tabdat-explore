@@ -33,13 +33,16 @@ command line. The current CLI supports:
 - Parquet persistence with `save` and `export`
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
+- instrumental-variables regression with
+  `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - prediction workflows with `predict <newvar>[, xb residuals]`
 - post-estimation diagnostics with `estat <residuals|ovtest|vif>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate.
+Phase 12 estimation substrate and has started Phase 14 endogeneity foundations with an initial
+`ivregress 2sls` slice.
 
 ## Quickstart
 
@@ -195,6 +198,8 @@ tabdat> run analysis.td
   model in session state.
 - `estat` currently provides post-estimation residual summaries, RESET specification testing
   (`ovtest`), and VIF multicollinearity checks (`vif`) over the latest regression state.
+- `ivregress 2sls` currently provides a Python-first IV/2SLS path via `linearmodels` with
+  `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

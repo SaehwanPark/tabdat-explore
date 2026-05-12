@@ -1,60 +1,70 @@
-# Phase 13 Slice 3 Implementation Report
+# Phase 14 Slice 1 Implementation Report
 
 ## Scope
 
-Implemented Phase 13 core linear econometrics slice 3 from
-`_workspace/01_product_command-contract.md` and the Phase 13 library policy in `SPEC.md` and
-`docs/dev_phase.md`.
+Implemented the first Phase 14 endogeneity foundations slice (`ivregress 2sls`) after closing
+remaining Phase 13 hardening prerequisites.
 
 ## What Changed
 
-### Parser and command model
+### Prerequisite hardening (before Phase 14)
 
-- Added `EstatCommand` to typed command models.
+- Fixed integrated-harness expectation drift in `s4_penguins_script_repro`:
+  - `Saved:` -> `Exported:` for `export` output checks.
+- Added integrated E2E scenario `s5_titanic_phase13_dogfood`:
+  - runs real-dataset `regress`, `predict`, and `estat` flow.
+- Updated integrated test-plan and harness docs to include Phase 13 dogfood coverage.
+
+### Phase 14 command surface
+
+- Added `IvRegressCommand` and `IvRegressionResult` typed models.
 - Added parser support for:
-  - `estat residuals`
-  - `estat ovtest`
-  - `estat vif`
-- Added bounded parse diagnostics for malformed `estat` syntax and unsupported subcommands.
+  - `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)`
+  - covariance options: `robust` and `cluster(<var>)`
+  - intercept control: `noconstant`
+- Added bounded parse diagnostics for unsupported estimator tokens and malformed options.
 
-### Executor and diagnostics behavior
+### Executor and formatting behavior
 
-- Extended regression session state to retain the latest fitted model and intercept metadata for
-  post-estimation diagnostics.
-- Added executor support for `estat` with deterministic table outputs:
-  - `estat residuals`: residual summary metrics plus studentized residual dispersion when available.
-  - `estat ovtest`: RESET test statistics (F, p-value, df metadata).
-  - `estat vif`: predictor-level VIF and mean VIF.
-- Implemented Python-first diagnostics through `statsmodels` APIs (`linear_reset`,
-  `variance_inflation_factor`, `OLSInfluence`) with deterministic failure messages when not
-  available for current model state.
+- Added executor dispatch for `ivregress`.
+- Implemented IV2SLS execution via `linearmodels` (Python-first policy).
+- Added deterministic covariance labeling:
+  - `nonrobust`, `robust`, `cluster(<var>)`.
+- Added deterministic terminal formatting for IV output.
 
 ### Shell UX
 
-- Added `estat` to interactive command completions.
-- Added `estat` subcommand completions (`residuals`, `ovtest`, `vif`).
+- Added `ivregress` command completion.
+- Added option completions:
+  - `endog(`, `iv(`, `robust`, `cluster(`, `noconstant`.
 
 ### Tests
 
-- Added/updated focused tests across parser, shell, executor, and CLI for `estat` success and
-  failure flows, including weighted-model compatibility checks.
+- Added/updated focused parser, executor, CLI, and shell tests for the new command.
 
 ### Documentation and SDD state
 
-- Updated `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` for Phase 13 slice 3.
-- Updated `_workspace` artifacts for request summary, command contract, implementation, QA, and
-  final delivery synthesis.
+- Updated `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` for:
+  - completed Phase 13 hardening
+  - started Phase 14 with the `ivregress 2sls` slice.
 
 ## Files Changed
 
+- `integrated_testing/run_e2e.py`
+- `integrated_testing/README.md`
+- `integrated_testing/RUN_REPORT.md`
+- `docs/e2e_public_dataset_test_plan.md`
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
 - `src/tabdat/executor.py`
+- `src/tabdat/formatter.py`
 - `src/tabdat/shell.py`
 - `tests/test_parser.py`
-- `tests/test_shell.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
+- `tests/test_shell.py`
+- `pyproject.toml`
+- `uv.lock`
 - `SPEC.md`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -71,7 +81,8 @@ Implemented Phase 13 core linear econometrics slice 3 from
 - `uv run ruff format --check .`
 - `uv run pyright`
 - `uv run mypy`
-- `uv run pytest`
+- `uv run pytest -q`
+- `uv run python integrated_testing/run_e2e.py`
 
 ## Notes
 
