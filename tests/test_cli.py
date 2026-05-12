@@ -509,6 +509,94 @@ def test_cli_runs_phase_14_ivregress_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "iv-overid.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 10.0, 1.0, 0.0, 2.0),
+        (1.0, 12.0, 2.0, 1.0, 0.0),
+        (2.0, 15.0, 2.0, 1.0, 1.0),
+        (3.0, 16.0, 4.0, 2.0, 0.0),
+        (4.0, 18.0, 4.0, 2.0, 2.0),
+        (5.0, 20.0, 6.0, 3.0, 1.0),
+        (6.0, 21.0, 6.0, 3.0, 3.0),
+        (7.0, 24.0, 8.0, 4.0, 1.0)
+    ) as iv_data(w, y, x_endog, z_inst, z_inst2)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "ivregress 2sls y w, endog(x_endog) iv(z_inst z_inst2)",
+      "-c",
+      "estat firststage",
+      "-c",
+      "estat overid",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Variable  Metric" in captured.out
+  assert "partial_f" in captured.out
+  assert "Test               Metric" in captured.out
+  assert "sargan" in captured.out
+  assert "wooldridge_overid" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_14_xtreg_and_hausman_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0, 2.0),
+        (1, 2021, 11.0, 2.0, 1.0),
+        (1, 2022, 13.0, 3.0, 2.0),
+        (2, 2020, 14.0, 1.0, 3.0),
+        (2, 2021, 15.0, 2.0, 2.0),
+        (2, 2022, 16.0, 3.0, 3.0),
+        (3, 2020, 9.0, 1.0, 1.0),
+        (3, 2021, 10.0, 2.0, 2.0),
+        (3, 2022, 11.0, 3.0, 1.0)
+    ) as panel_data(firm_id, year, wage, exper, tenure)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "xtreg wage exper tenure, fe robust",
+      "-c",
+      "xtreg wage exper tenure, re robust",
+      "-c",
+      "estat hausman",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: xtreg fe wage on exper tenure" in captured.out
+  assert "Model: xtreg re wage on exper tenure" in captured.out
+  assert "R-squared (within):" in captured.out
+  assert "Metric   Value" in captured.out
+  assert "chi2" in captured.out
+  assert "p_value" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

@@ -22,6 +22,7 @@ from tabdat.models import (
   SummarizeResult,
   TableResult,
   TransformResult,
+  XtRegressionResult,
 )
 
 
@@ -137,6 +138,30 @@ def format_result(result: Result) -> str:
       f"Covariance: {result.covariance}",
       f"Observations: {result.observation_count}",
       f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, XtRegressionResult):
+    header = [
+      f"Model: xtreg {result.estimator} {result.outcome} on {' '.join(result.predictors)}",
+      f"Estimator: {result.estimator}",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"R-squared (within): {_format_number(result.r_squared_within)}",
+      f"R-squared (between): {_format_number(result.r_squared_between)}",
+      f"R-squared (overall): {_format_number(result.r_squared_overall)}",
       "",
     ]
     coefficient_rows = (

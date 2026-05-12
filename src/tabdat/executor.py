@@ -9,6 +9,8 @@ from typing import Any, SupportsFloat, cast
 import numpy as np
 import statsmodels.api as sm
 from linearmodels.iv import IV2SLS
+from linearmodels.panel import PanelOLS, RandomEffects
+from scipy.stats import chi2
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
@@ -76,6 +78,8 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
+  XtRegCommand,
+  XtRegressionResult,
 )
 from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
 
@@ -90,6 +94,28 @@ class _RegressionState:
   fitted_model: object
 
 
+@dataclass(frozen=True)
+class _IvRegressionState:
+  fitted_model: object
+
+
+@dataclass(frozen=True)
+class _XtRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  panel_metadata: PanelMetadata
+  estimator: str
+  covariance: str
+  cluster_variable: str | None
+  fitted_model: object
+
+
+@dataclass
+class _XtModelCache:
+  fe: _XtRegressionState | None = None
+  re: _XtRegressionState | None = None
+
+
 @dataclass
 class SessionState:
   active_dataset: DatasetInfo | None = None
@@ -97,6 +123,8 @@ class SessionState:
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
+  iv_regression: _IvRegressionState | None = None
+  xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
 
 
 class Executor:
@@ -275,6 +303,9 @@ class Executor:
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
+
+    if isinstance(command, XtRegCommand):
+      return self._execute_xtreg(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -525,6 +556,8 @@ class Executor:
       include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
+    self.state.iv_regression = None
+    self.state.xt_regressions = _XtModelCache()
     return RegressionResult(
       outcome=command.outcome,
       predictors=command.predictors,
@@ -597,9 +630,9 @@ class Executor:
       raise ExecutionError("ivregress failed") from exc
     parameter_names = _iv_parameter_names(command)
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
-    # ivregress establishes a new estimation step outside the regress/predict/estat pipeline.
-    # Clear stored linear-regression state so predict/estat cannot silently reuse stale models.
     self.state.regression = None
+    self.state.iv_regression = _IvRegressionState(fitted_model=fitted)
+    self.state.xt_regressions = _XtModelCache()
     return IvRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
@@ -630,21 +663,156 @@ class Executor:
     return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
 
   def _execute_estat(self, command: EstatCommand) -> TableResult:
-    self._require_active_dataset("estat")
-    regression = self.state.regression
-    if regression is None:
-      raise ExecutionError("estat requires a prior regress model")
+    dataset = self._require_active_dataset("estat")
     if command.subcommand == "residuals":
+      regression = self.state.regression
+      if regression is None:
+        raise ExecutionError("estat requires a prior regress model")
       return _estat_residuals_table(regression.fitted_model)
     if command.subcommand == "ovtest":
+      regression = self.state.regression
+      if regression is None:
+        raise ExecutionError("estat requires a prior regress model")
       return _estat_ovtest_table(regression.fitted_model)
     if command.subcommand == "vif":
+      regression = self.state.regression
+      if regression is None:
+        raise ExecutionError("estat requires a prior regress model")
       return _estat_vif_table(
         regression.fitted_model,
         predictor_names=regression.predictor_names,
         include_intercept=regression.include_intercept,
       )
+    if command.subcommand == "firststage":
+      iv_regression = self.state.iv_regression
+      if iv_regression is None:
+        raise ExecutionError("estat firststage requires a prior ivregress model")
+      return _estat_iv_firststage_table(iv_regression.fitted_model)
+    if command.subcommand == "overid":
+      iv_regression = self.state.iv_regression
+      if iv_regression is None:
+        raise ExecutionError("estat overid requires a prior ivregress model")
+      return _estat_iv_overid_table(iv_regression.fitted_model)
+    if command.subcommand == "hausman":
+      fe_state = self.state.xt_regressions.fe
+      re_state = self.state.xt_regressions.re
+      if fe_state is None or re_state is None:
+        raise ExecutionError("estat hausman requires prior xtreg fe and xtreg re models")
+      if fe_state.cluster_variable is not None or re_state.cluster_variable is not None:
+        raise ExecutionError("estat hausman does not support clustered covariance")
+      if fe_state.outcome_variable != re_state.outcome_variable:
+        raise ExecutionError("estat hausman requires matching xtreg specifications")
+      if fe_state.predictor_names != re_state.predictor_names:
+        raise ExecutionError("estat hausman requires matching xtreg specifications")
+      if fe_state.panel_metadata != re_state.panel_metadata:
+        raise ExecutionError("estat hausman requires matching xtreg specifications")
+      if fe_state.covariance != re_state.covariance:
+        raise ExecutionError("estat hausman requires matching xtreg covariance modes")
+      if dataset.panel_metadata != fe_state.panel_metadata:
+        raise ExecutionError("estat hausman requires matching panel metadata")
+      return _estat_hausman_table(fe_state.fitted_model, re_state.fitted_model)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
+
+  def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
+    dataset = self._require_active_dataset("xtreg")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("xtreg requires panel metadata; run panel <id_var> <time_var> first")
+    variables: tuple[str, ...] = (
+      panel_metadata.id_variable,
+      panel_metadata.time_variable,
+      command.outcome,
+      *command.predictors,
+    )
+    if command.cluster_variable is not None:
+      variables = (*variables, command.cluster_variable)
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    missing = tuple(variable for variable in variables if variable not in column_types)
+    if missing:
+      raise UnknownVariableError(f"xtreg unknown variable: {', '.join(missing)}")
+    _require_numeric_columns("xtreg", dataset, (command.outcome, *command.predictors))
+    rows = self.backend.regression_rows(dataset, variables)
+    panel = _xt_panel_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if panel is None:
+      raise ExecutionError("xtreg requires at least one complete observation")
+    outcome, exogenous, entity_ids, time_ids, cluster_values = panel
+    frame_data: dict[str, object] = {
+      panel_metadata.id_variable: entity_ids,
+      panel_metadata.time_variable: time_ids,
+      command.outcome: outcome,
+    }
+    for index, predictor in enumerate(command.predictors):
+      frame_data[predictor] = tuple(row[index] for row in exogenous)
+    model_frame = _data_frame(frame_data, panel_metadata.id_variable, panel_metadata.time_variable)
+    outcome_series = model_frame[command.outcome]
+    predictor_frame = model_frame[list(command.predictors)]
+    cov_type = "unadjusted"
+    cov_label = "nonrobust"
+    fit_kwargs: dict[str, Any] = {}
+    if command.robust:
+      cov_type = "robust"
+      cov_label = "robust"
+    if command.cluster_variable is not None:
+      cov_type = "clustered"
+      cov_label = f"cluster({command.cluster_variable})"
+      if cluster_values is None:
+        raise ExecutionError("xtreg requires complete cluster values")
+      cluster_frame_data: dict[str, object] = {
+        panel_metadata.id_variable: entity_ids,
+        panel_metadata.time_variable: time_ids,
+        command.cluster_variable: cluster_values,
+      }
+      cluster_frame = _data_frame(
+        cluster_frame_data,
+        panel_metadata.id_variable,
+        panel_metadata.time_variable,
+      )
+      fit_kwargs["clusters"] = cluster_frame[[command.cluster_variable]]
+    fitted: Any
+    try:
+      if command.estimator == "fe":
+        fitted = PanelOLS(outcome_series, predictor_frame, entity_effects=True).fit(
+          cov_type=cov_type,
+          **fit_kwargs,
+        )
+      else:
+        fitted = RandomEffects(outcome_series, predictor_frame).fit(
+          cov_type=cov_type,
+          **fit_kwargs,
+        )
+    except Exception as exc:
+      raise ExecutionError("xtreg failed") from exc
+    coefficients = _panel_coefficient_estimates(command.predictors, fitted)
+    state = _XtRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      panel_metadata=panel_metadata,
+      estimator=command.estimator,
+      covariance=cov_label,
+      cluster_variable=command.cluster_variable,
+      fitted_model=fitted,
+    )
+    if command.estimator == "fe":
+      self.state.xt_regressions.fe = state
+    else:
+      self.state.xt_regressions.re = state
+    self.state.regression = None
+    self.state.iv_regression = None
+    return XtRegressionResult(
+      estimator=command.estimator,
+      covariance=cov_label,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcome),
+      r_squared_within=_to_float(getattr(fitted, "rsquared_within", None)),
+      r_squared_between=_to_float(getattr(fitted, "rsquared_between", None)),
+      r_squared_overall=_to_float(getattr(fitted, "rsquared_overall", None)),
+      coefficients=coefficients,
+    )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
@@ -797,6 +965,89 @@ def _estat_vif_table(
   if vif_values:
     rows.append(("mean_vif", _mean(tuple(vif_values))))
   return TableResult(headers=("Variable", "VIF"), rows=tuple(rows))
+
+
+def _estat_iv_firststage_table(fitted_model: object) -> TableResult:
+  diagnostics = getattr(getattr(fitted_model, "first_stage", None), "diagnostics", None)
+  if diagnostics is None:
+    raise ExecutionError("estat firststage failed for current model")
+  try:
+    index_names = tuple(getattr(diagnostics, "index"))
+  except Exception as exc:
+    raise ExecutionError("estat firststage failed for current model") from exc
+  rows: list[tuple[object, ...]] = []
+  for variable in index_names:
+    values = {
+      "rsquared": _to_float(diagnostics.loc[variable, "rsquared"]),
+      "partial.rsquared": _to_float(diagnostics.loc[variable, "partial.rsquared"]),
+      "shea.rsquared": _to_float(diagnostics.loc[variable, "shea.rsquared"]),
+      "f.stat": _to_float(diagnostics.loc[variable, "f.stat"]),
+      "f.pval": _to_float(diagnostics.loc[variable, "f.pval"]),
+      "f.dist": str(diagnostics.loc[variable, "f.dist"]),
+    }
+    rows.extend(
+      (
+        (str(variable), "r_squared", values["rsquared"]),
+        (str(variable), "partial_r_squared", values["partial.rsquared"]),
+        (str(variable), "shea_r_squared", values["shea.rsquared"]),
+        (str(variable), "partial_f", values["f.stat"]),
+        (str(variable), "p_value", values["f.pval"]),
+        (str(variable), "distribution", values["f.dist"]),
+      )
+    )
+  if not rows:
+    raise ExecutionError("estat firststage failed for current model")
+  return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_iv_overid_table(fitted_model: object) -> TableResult:
+  tests = (
+    ("sargan", getattr(fitted_model, "sargan", None)),
+    ("wooldridge_overid", getattr(fitted_model, "wooldridge_overid", None)),
+  )
+  rows: list[tuple[object, ...]] = []
+  for name, test in tests:
+    if test is None:
+      raise ExecutionError("estat overid failed for current model")
+    dist_name = str(getattr(test, "dist_name", "")).strip()
+    rows.extend(
+      (
+        (name, "statistic", _to_float(getattr(test, "stat", None))),
+        (name, "p_value", _to_float(getattr(test, "pval", None))),
+        (name, "df", _to_float(getattr(test, "df", None))),
+        (name, "distribution", dist_name if dist_name and dist_name != "None" else "not_available"),
+      )
+    )
+  return TableResult(headers=("Test", "Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:
+  fe_params = _parameter_vector(getattr(fe_model, "params", None), "xtreg")
+  re_params = _parameter_vector(getattr(re_model, "params", None), "xtreg")
+  fe_covariance = _covariance_matrix(getattr(fe_model, "cov", None), "xtreg")
+  re_covariance = _covariance_matrix(getattr(re_model, "cov", None), "xtreg")
+  if fe_params.shape != re_params.shape or fe_covariance.shape != re_covariance.shape:
+    raise ExecutionError("estat hausman failed for current models")
+  delta = fe_params - re_params
+  cov_difference = fe_covariance - re_covariance
+  try:
+    inverse_cov = np.linalg.pinv(cov_difference)
+    statistic = float(delta.T @ inverse_cov @ delta)
+  except Exception as exc:
+    raise ExecutionError("estat hausman failed for current models") from exc
+  statistic = max(statistic, 0.0)
+  degrees_of_freedom = int(delta.shape[0])
+  if degrees_of_freedom <= 0:
+    raise ExecutionError("estat hausman failed for current models")
+  p_value = float(chi2.sf(statistic, degrees_of_freedom))
+  return TableResult(
+    headers=("Metric", "Value"),
+    rows=(
+      ("chi2", statistic),
+      ("p_value", p_value),
+      ("df", degrees_of_freedom),
+    ),
+  )
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
@@ -990,6 +1241,140 @@ def _iv_regression_sample(
     tuple(instrument_values),
     tuple(clusters) if has_cluster else None,
   )
+
+
+def _xt_panel_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  has_cluster: bool,
+) -> (
+  tuple[
+    tuple[float, ...],
+    tuple[tuple[float, ...], ...],
+    tuple[object, ...],
+    tuple[object, ...],
+    tuple[object, ...] | None,
+  ]
+  | None
+):
+  outcomes: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  entity_ids: list[object] = []
+  time_ids: list[object] = []
+  clusters: list[object] = []
+  row_width = 2 + 1 + predictor_count + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      raise ExecutionError("xtreg failed")
+    entity_id = row[0]
+    time_id = row[1]
+    outcome_raw = row[2]
+    predictor_start = 3
+    predictor_end = predictor_start + predictor_count
+    cluster_value = row[predictor_end] if has_cluster else None
+    if entity_id is None or time_id is None or outcome_raw is None:
+      continue
+    if any(value is None for value in row[predictor_start:predictor_end]):
+      continue
+    if has_cluster and cluster_value is None:
+      continue
+    outcome = _coerce_float(outcome_raw)
+    predictor_values = tuple(
+      value
+      for value in (_coerce_float(raw_value) for raw_value in row[predictor_start:predictor_end])
+      if value is not None
+    )
+    if outcome is None or len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
+      continue
+    outcomes.append(outcome)
+    predictors.append(predictor_values)
+    entity_ids.append(entity_id)
+    time_ids.append(time_id)
+    if has_cluster:
+      clusters.append(cluster_value)
+  if not outcomes:
+    return None
+  return (
+    tuple(outcomes),
+    tuple(predictors),
+    tuple(entity_ids),
+    tuple(time_ids),
+    tuple(clusters) if has_cluster else None,
+  )
+
+
+def _panel_coefficient_estimates(
+  predictor_names: tuple[str, ...],
+  fitted: object,
+) -> tuple[CoefficientEstimate, ...]:
+  names = tuple(str(name) for name in getattr(getattr(fitted, "params", None), "index", ()))
+  params = _parameter_vector(getattr(fitted, "params", None), "xtreg")
+  standard_errors = _optional_float_sequence(getattr(fitted, "std_errors", None))
+  statistics = _optional_float_sequence(getattr(fitted, "tstats", None))
+  p_values = _optional_float_sequence(getattr(fitted, "pvalues", None))
+  if len(params) != len(names):
+    raise ExecutionError("xtreg failed")
+  coefficients_by_name = {
+    name: CoefficientEstimate(
+      name=name,
+      value=value,
+      standard_error=_optional_sequence_value(standard_errors, index),
+      statistic=_optional_sequence_value(statistics, index),
+      p_value=_optional_sequence_value(p_values, index),
+    )
+    for index, (name, value) in enumerate(zip(names, params, strict=True))
+  }
+  coefficients = tuple(
+    coefficients_by_name[predictor]
+    for predictor in predictor_names
+    if predictor in coefficients_by_name
+  )
+  if len(coefficients) != len(predictor_names):
+    raise ExecutionError("xtreg failed")
+  return coefficients
+
+
+def _parameter_vector(values: object, command_name: str) -> np.ndarray:
+  if values is None:
+    raise ExecutionError(f"{command_name} failed")
+  if isinstance(values, (str, bytes)) or not isinstance(values, Iterable):
+    raise ExecutionError(f"{command_name} failed")
+  try:
+    numbers = np.array([float(value) for value in values], dtype=float)
+  except Exception as exc:
+    raise ExecutionError(f"{command_name} failed") from exc
+  if numbers.ndim != 1 or numbers.size == 0:
+    raise ExecutionError(f"{command_name} failed")
+  if np.isnan(numbers).any():
+    raise ExecutionError(f"{command_name} failed")
+  return numbers
+
+
+def _covariance_matrix(values: object, command_name: str) -> np.ndarray:
+  if values is None:
+    raise ExecutionError(f"{command_name} failed")
+  to_numpy = getattr(values, "to_numpy", None)
+  if not callable(to_numpy):
+    raise ExecutionError(f"{command_name} failed")
+  try:
+    matrix = np.array(to_numpy(), dtype=float)
+  except Exception as exc:
+    raise ExecutionError(f"{command_name} failed") from exc
+  if matrix.ndim != 2 or matrix.shape[0] != matrix.shape[1] or matrix.shape[0] == 0:
+    raise ExecutionError(f"{command_name} failed")
+  if np.isnan(matrix).any():
+    raise ExecutionError(f"{command_name} failed")
+  return matrix
+
+
+def _data_frame(data: dict[str, object], id_name: str, time_name: str) -> Any:
+  import pandas as pd
+
+  frame = pd.DataFrame(data)
+  return frame.set_index([id_name, time_name])
 
 
 def _regression_model(

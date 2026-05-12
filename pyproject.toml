@@ -51,7 +51,17 @@ strict_equality = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["duckdb", "linearmodels", "linearmodels.*", "statsmodels", "statsmodels.*"]
+module = [
+    "duckdb",
+    "linearmodels",
+    "linearmodels.*",
+    "pandas",
+    "pandas.*",
+    "scipy",
+    "scipy.*",
+    "statsmodels",
+    "statsmodels.*",
+]
 ignore_missing_imports = true
 
 [tool.hatch.build.targets.wheel]

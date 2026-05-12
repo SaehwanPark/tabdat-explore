@@ -71,6 +71,8 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
+  XtRegCommand,
+  XtRegressionResult,
 )
 
 
@@ -146,6 +148,45 @@ def _write_iv_regression_parquet(path: Path) -> None:
         (6.0, 21.0, 6.0, 3.0, 'd'),
         (7.0, 24.0, 8.0, 4.0, 'd')
     ) as iv_data(w, y, x_endog, z_inst, cluster_id)
+    """,
+  )
+
+
+def _write_iv_overid_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 10.0, 1.0, 0.0, 2.0, 'a'),
+        (1.0, 12.0, 2.0, 1.0, 0.0, 'a'),
+        (2.0, 15.0, 2.0, 1.0, 1.0, 'b'),
+        (3.0, 16.0, 4.0, 2.0, 0.0, 'b'),
+        (4.0, 18.0, 4.0, 2.0, 2.0, 'c'),
+        (5.0, 20.0, 6.0, 3.0, 1.0, 'c'),
+        (6.0, 21.0, 6.0, 3.0, 3.0, 'd'),
+        (7.0, 24.0, 8.0, 4.0, 1.0, 'd')
+    ) as iv_data(w, y, x_endog, z_inst, z_inst2, cluster_id)
+    """,
+  )
+
+
+def _write_panel_regression_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0, 2.0, 'a'),
+        (1, 2021, 11.0, 2.0, 1.0, 'a'),
+        (1, 2022, 13.0, 3.0, 2.0, 'a'),
+        (2, 2020, 14.0, 1.0, 3.0, 'b'),
+        (2, 2021, 15.0, 2.0, 2.0, 'b'),
+        (2, 2022, 16.0, 3.0, 3.0, 'b'),
+        (3, 2020, 9.0, 1.0, 1.0, 'c'),
+        (3, 2021, 10.0, 2.0, 2.0, 'c'),
+        (3, 2022, 11.0, 3.0, 1.0, 'c')
+    ) as panel_data(firm_id, year, wage, exper, tenure, cluster_id)
     """,
   )
 
@@ -668,6 +709,245 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
+  finally:
+    executor.close()
+
+
+def test_phase_14_estat_iv_diagnostics(tmp_path: Path) -> None:
+  path = tmp_path / "iv-overid.parquet"
+  _write_iv_overid_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst", "z_inst2"),
+      )
+    )
+    first_stage = executor.execute(EstatCommand(subcommand="firststage"))
+    overid = executor.execute(EstatCommand(subcommand="overid"))
+  finally:
+    executor.close()
+
+  assert isinstance(first_stage, TableResult)
+  assert first_stage.headers == ("Variable", "Metric", "Value")
+  assert any(row[1] == "partial_f" for row in first_stage.rows)
+
+  assert isinstance(overid, TableResult)
+  assert overid.headers == ("Test", "Metric", "Value")
+  assert any(row[0] == "sargan" for row in overid.rows)
+  assert any(row[0] == "wooldridge_overid" for row in overid.rows)
+
+
+def test_phase_14_estat_overid_handles_exact_identification(tmp_path: Path) -> None:
+  path = tmp_path / "iv-just-identified.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    overid = executor.execute(EstatCommand(subcommand="overid"))
+  finally:
+    executor.close()
+
+  assert isinstance(overid, TableResult)
+  distributions = {row[0]: row[2] for row in overid.rows if row[1] == "distribution"}
+  assert distributions["sargan"] == "not_available"
+  assert distributions["wooldridge_overid"] == "not_available"
+
+
+def test_phase_14_estat_iv_requires_prior_ivregress(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="estat firststage requires a prior ivregress model"):
+      executor.execute(EstatCommand(subcommand="firststage"))
+    with pytest.raises(ExecutionError, match="estat overid requires a prior ivregress model"):
+      executor.execute(EstatCommand(subcommand="overid"))
+  finally:
+    executor.close()
+
+
+def test_phase_14_xtreg_returns_typed_result_and_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    fe_result = executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="fe",
+        robust=True,
+      )
+    )
+    re_result = executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="re",
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(fe_result, XtRegressionResult)
+  assert fe_result.estimator == "fe"
+  assert fe_result.covariance == "robust"
+  assert [estimate.name for estimate in fe_result.coefficients] == ["exper", "tenure"]
+  assert isinstance(re_result, XtRegressionResult)
+  assert re_result.estimator == "re"
+  assert re_result.covariance == "cluster(cluster_id)"
+
+
+def test_phase_14_xtreg_requires_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="xtreg requires panel metadata; run panel <id_var> <time_var> first",
+    ):
+      executor.execute(
+        XtRegCommand(
+          outcome="wage",
+          predictors=("exper",),
+          estimator="fe",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_14_estat_hausman_flow_and_guards(tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="fe",
+        robust=True,
+      )
+    )
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="re",
+        robust=True,
+      )
+    )
+    hausman = executor.execute(EstatCommand(subcommand="hausman"))
+  finally:
+    executor.close()
+
+  assert isinstance(hausman, TableResult)
+  assert hausman.headers == ("Metric", "Value")
+  metrics = {row[0]: row[1] for row in hausman.rows}
+  assert isinstance(metrics["chi2"], float)
+  assert isinstance(metrics["p_value"], float)
+  assert metrics["df"] == 2
+
+
+def test_phase_14_estat_hausman_requires_matching_specs_and_non_cluster(tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="fe",
+        robust=True,
+      )
+    )
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper",),
+        estimator="re",
+        robust=True,
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="estat hausman requires matching xtreg specifications",
+    ):
+      executor.execute(EstatCommand(subcommand="hausman"))
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="re",
+        cluster_variable="cluster_id",
+      )
+    )
+    with pytest.raises(ExecutionError, match="estat hausman does not support clustered covariance"):
+      executor.execute(EstatCommand(subcommand="hausman"))
+  finally:
+    executor.close()
+
+
+def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) -> None:
+  iv_path = tmp_path / "iv-regression.parquet"
+  panel_path = tmp_path / "panel-regression.parquet"
+  _write_iv_regression_parquet(iv_path)
+  _write_panel_regression_parquet(panel_path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(iv_path))
+    executor.execute(RegressCommand(outcome="y", predictors=("w",)))
+    executor.execute(UseCommand(panel_path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper",),
+        estimator="fe",
+      )
+    )
+    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+      executor.execute(PredictCommand(target_variable="y_hat"))
+    with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="ovtest"))
+
+    executor.execute(UseCommand(iv_path))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="estat hausman requires prior xtreg fe and xtreg re models",
+    ):
+      executor.execute(EstatCommand(subcommand="hausman"))
   finally:
     executor.close()
 
