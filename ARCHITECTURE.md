@@ -1,8 +1,9 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and started Phase 14 with a
-first `ivregress 2sls` slice. This document records the implemented shell UX, script
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented three Phase 14
+slices (`ivregress`, IV diagnostics, and panel FE/RE starter). This document records the
+implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
 join, append, reshape, panel metadata, and script primitive boundaries, and the boundaries future
@@ -52,8 +53,9 @@ option parsing, `if` clauses, expression AST construction, and `run <script>` co
 <path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
 Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
-`residuals`, `residuals|ovtest|vif`). The first Phase 14 slice adds `ivregress 2sls` parsing with
-`endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
+`residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
+`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman`, and
+`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -74,9 +76,10 @@ preserves or clears metadata across state-changing commands according to the com
 Phase 13 slices 1-3 add session-local regression state for the latest fitted linear model, extend
 `regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
 deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
-`estat residuals|ovtest|vif`. The first Phase 14 slice adds `ivregress 2sls` execution through
-`linearmodels` with nonrobust, robust, and clustered covariance options and deterministic result
-formatting.
+`estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls` execution through `linearmodels`,
+IV-focused `estat firststage|overid`, and panel `xtreg` FE/RE plus `estat hausman` with bounded
+covariance constraints. Estimation-family state is explicit: running one family clears stale state
+from the others to prevent cross-family `estat` reuse.
 
 ### DuckDB Backend
 
@@ -177,8 +180,13 @@ display formatting.
 - Phase 13 slices 1-3 are executable through
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
-- The first Phase 14 slice is executable through
+- Phase 14 IV slices are executable through
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
+- Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after
+  successful `ivregress`.
+- Phase 14 panel starter commands are executable through
+  `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` and `estat hausman` after matching FE/RE
+  fits with non-cluster covariance.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -216,6 +224,8 @@ display formatting.
   options until panel metadata, aliases, or broader reshape ergonomics are designed.
 - Keep `panel` scoped to id/time metadata validation and reporting until balancedness diagnostics
   or estimation commands define additional panel semantics.
+- Keep `xtreg` scoped to panel-metadata-backed FE/RE estimators and `estat hausman` for matching
+  non-cluster model pairs until broader panel-indexing/transformation contracts are written.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.

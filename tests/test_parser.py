@@ -44,6 +44,7 @@ from tabdat.models import (
   TabulateCommand,
   TailCommand,
   UseCommand,
+  XtRegCommand,
 )
 from tabdat.parser import parse_command, parse_expression
 
@@ -366,6 +367,9 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
   assert parse_command("estat vif") == EstatCommand(subcommand="vif")
+  assert parse_command("estat firststage") == EstatCommand(subcommand="firststage")
+  assert parse_command("estat overid") == EstatCommand(subcommand="overid")
+  assert parse_command("estat hausman") == EstatCommand(subcommand="hausman")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -396,6 +400,26 @@ def test_parse_phase_14_ivregress_command() -> None:
     cluster_variable="group_id",
     include_intercept=False,
     estimator="2sls",
+  )
+
+
+def test_parse_phase_14_xtreg_command() -> None:
+  assert parse_command("xtreg wage exper tenure, fe") == XtRegCommand(
+    outcome="wage",
+    predictors=("exper", "tenure"),
+    estimator="fe",
+  )
+  assert parse_command("xtreg wage exper, re robust") == XtRegCommand(
+    outcome="wage",
+    predictors=("exper",),
+    estimator="re",
+    robust=True,
+  )
+  assert parse_command("xtreg wage exper, fe cluster(firm_id)") == XtRegCommand(
+    outcome="wage",
+    predictors=("exper",),
+    estimator="fe",
+    cluster_variable="firm_id",
   )
 
 
@@ -598,6 +622,7 @@ def test_parse_exit_aliases() -> None:
     "estat, vif",
     "estat detail",
     "estat residuals, detail",
+    "estat first",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",
@@ -608,6 +633,15 @@ def test_parse_exit_aliases() -> None:
     "ivregress 2sls y x, endog(z) iv(w) robust cluster(g)",
     "ivregress 2sls y z, endog(z) iv(w)",
     "ivregress 2sls y x, endog(z) iv(w) robust=true",
+    "xtreg",
+    "xtreg y, fe",
+    "xtreg y x",
+    "xtreg y x, fe re",
+    "xtreg y x, robust",
+    "xtreg y x, cluster(firm)",
+    "xtreg y x, fe cluster(firm) robust",
+    "xtreg y x, fe cluster(firm year)",
+    "xtreg y x, fe=true",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",

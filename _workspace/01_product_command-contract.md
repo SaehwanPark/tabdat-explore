@@ -1,76 +1,136 @@
-# Phase 14 Slice 1 Command Contract
-
-## Request Summary
-
-Close prerequisite Phase 13 hardening gaps first, then implement the first executable Phase 14
-endogeneity slice with a Python-first IV command.
+# Phase 14 Slice 2+3 Command Contract
 
 ## Roadmap Phase
 
-- Phase 13 hardening closeout (prerequisite)
-- Phase 14 endogeneity and panel foundations (slice 1)
+- Phase 14 endogeneity and panel foundations
+  - Slice 2: IV diagnostics
+  - Slice 3: panel FE/RE starter + Hausman comparison
 
-## Prerequisite Gate Contract
+## Slice 2 Contract
 
-### Integrated E2E hardening
-
-- Integrated harness must pass all scenarios.
-- Existing `s4_penguins_script_repro` expectations must match current `export` wording
-  (`Exported:`).
-- Integrated harness must include one real-dataset Phase 13 dogfood flow that exercises
-  `regress`, `predict`, and `estat` together.
-
-## Command Contract
-
-### `ivregress`
+### `estat firststage`
 
 #### Syntax
 
 ```stata
-ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)
-ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) robust
-ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) cluster(<var>)
-ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>) noconstant
+estat firststage
 ```
 
 #### Rules
 
 - Requires an active dataset.
-- Requires estimator token `2sls`.
-- Requires one endogenous variable via `endog(...)`.
-- Requires one-or-more instruments via `iv(...)`.
-- `robust` and `cluster(...)` are mutually exclusive.
-- `cluster(...)` requires one clustering variable.
-- Endogenous variable cannot also appear in exogenous variables.
-- Execution uses Python-first `linearmodels` IV2SLS.
-- Covariance labels in output:
-  - default: `nonrobust`
-  - robust: `robust`
-  - clustered: `cluster(<var>)`
+- Requires a prior successful `ivregress` model state.
+- Reports first-stage diagnostics for endogenous regressors.
 
 #### User-facing errors
 
-- Invalid command shape:
-  - `ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)`
-- Invalid estimator token:
-  - `ivregress estimator must be 2sls`
-- Invalid `endog`/`iv`/`cluster` option arity:
-  - `ivregress option endog expects one variable`
-  - `ivregress option iv expects at least one variable`
-  - `ivregress option cluster expects one variable`
-- Conflicting covariance options:
-  - `ivregress cannot combine robust and cluster`
-- Exogenous/endogenous overlap:
-  - `ivregress endog variable must not appear in exogenous variables`
+- Missing prior IV state:
+  - `estat firststage requires a prior ivregress model`
 - Execution failure:
-  - `ivregress failed`
+  - `estat firststage failed for current model`
+
+### `estat overid`
+
+#### Syntax
+
+```stata
+estat overid
+```
+
+#### Rules
+
+- Requires an active dataset.
+- Requires a prior successful `ivregress` model state.
+- Reports deterministic overidentification diagnostics using:
+  - `sargan`
+  - `wooldridge_overid`
+- Exactly identified models must report deterministic not-available output, not crash.
+
+#### User-facing errors
+
+- Missing prior IV state:
+  - `estat overid requires a prior ivregress model`
+- Execution failure:
+  - `estat overid failed for current model`
+
+## Slice 3 Contract
+
+### `xtreg`
+
+#### Syntax
+
+```stata
+xtreg <y> <xvars>, fe
+xtreg <y> <xvars>, re
+xtreg <y> <xvars>, fe robust
+xtreg <y> <xvars>, re robust
+xtreg <y> <xvars>, fe cluster(<var>)
+xtreg <y> <xvars>, re cluster(<var>)
+```
+
+#### Rules
+
+- Requires an active dataset.
+- Requires prior panel metadata from `panel <id_var> <time_var>`.
+- Requires exactly one estimator flag: `fe` or `re`.
+- `robust` and `cluster(<var>)` are mutually exclusive.
+- `cluster(<var>)` requires exactly one variable.
+- Execution uses Python-first `linearmodels` panel estimators.
+
+#### User-facing errors
+
+- Missing panel metadata:
+  - `xtreg requires panel metadata; run panel <id_var> <time_var> first`
+- Invalid command shape:
+  - `xtreg expects syntax: xtreg <y> <xvars>, fe|re`
+- Invalid estimator selection:
+  - `xtreg requires exactly one of fe or re`
+- Invalid cluster option arity:
+  - `xtreg option cluster expects one variable`
+- Conflicting covariance options:
+  - `xtreg cannot combine robust and cluster`
+- Execution failure:
+  - `xtreg failed`
+
+### `estat hausman`
+
+#### Syntax
+
+```stata
+estat hausman
+```
+
+#### Rules
+
+- Requires an active dataset.
+- Requires prior `xtreg ..., fe` and `xtreg ..., re` model states.
+- Requires matching FE/RE model specs (outcome, predictors, panel metadata, covariance mode).
+- Supports non-cluster and robust model pairs in this slice.
+- Clustered FE/RE fits are rejected for Hausman in this slice.
+
+#### User-facing errors
+
+- Missing prior panel-model states:
+  - `estat hausman requires prior xtreg fe and xtreg re models`
+- Non-matching FE/RE specs:
+  - `estat hausman requires matching xtreg specifications`
+- Non-matching covariance mode:
+  - `estat hausman requires matching xtreg covariance modes`
+- Clustered Hausman unsupported:
+  - `estat hausman does not support clustered covariance`
+- Execution failure:
+  - `estat hausman failed for current models`
+
+## Cross-family State Rules
+
+- Running `regress` invalidates stored IV and panel-model states.
+- Running `ivregress` invalidates stored linear-regression and panel-model states.
+- Running `xtreg` invalidates stored linear-regression and IV states.
 
 ## Acceptance Criteria
 
-- Prerequisite integrated-harness gate passes (`s1`..`s5`).
-- Parser accepts valid `ivregress 2sls` forms and rejects malformed forms deterministically.
-- Executor returns deterministic IV results for default, robust, and clustered covariance modes.
-- CLI/shell tests cover `ivregress` command success and completion flows.
-- SDD docs and changelog reflect:
-  - completed Phase 13 hardening
-  - started Phase 14 with `ivregress 2sls` slice
+- Parser accepts valid forms and rejects malformed forms deterministically.
+- Executor returns deterministic result shapes for all added commands.
+- CLI/shell tests cover command success and completion paths.
+- Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`).
+- SDD/docs and `_workspace` artifacts reflect delivered behavior.

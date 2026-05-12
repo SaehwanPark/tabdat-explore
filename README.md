@@ -35,14 +35,17 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - instrumental-variables regression with
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
+- panel regression with
+  `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals]`
-- post-estimation diagnostics with `estat <residuals|ovtest|vif>`
+- post-estimation diagnostics with
+  `estat <residuals|ovtest|vif|firststage|overid|hausman>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and has started Phase 14 endogeneity foundations with an initial
-`ivregress 2sls` slice.
+Phase 12 estimation substrate and now includes three Phase 14 slices: `ivregress`, IV diagnostics,
+and an initial panel FE/RE + Hausman starter.
 
 ## Quickstart
 
@@ -196,10 +199,14 @@ tabdat> run analysis.td
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`; `predict` writes
   fitted values (`xb`) or residuals into a new active-dataset column using the latest regression
   model in session state.
-- `estat` currently provides post-estimation residual summaries, RESET specification testing
-  (`ovtest`), and VIF multicollinearity checks (`vif`) over the latest regression state.
+- `estat` currently provides:
+  - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
+  - IV diagnostics (`firststage`, `overid`) over the latest `ivregress` state
+  - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
 - `ivregress 2sls` currently provides a Python-first IV/2SLS path via `linearmodels` with
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
+- `xtreg` currently provides Python-first `linearmodels` FE/RE estimation with `robust` and
+  `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`
