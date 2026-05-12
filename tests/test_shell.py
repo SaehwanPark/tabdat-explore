@@ -179,6 +179,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_options = _completion_texts(completer, "ivregress 2sls cost age, ")
+    xtreg_command = _completion_texts(completer, "xtr")
+    xtreg_columns = _completion_texts(completer, "xtreg c")
+    xtreg_options = _completion_texts(completer, "xtreg cost age, ")
     predict_command = _completion_texts(completer, "pred")
     predict_options = _completion_texts(completer, "predict cost_hat, ")
     estat_command = _completion_texts(completer, "est")
@@ -192,10 +195,13 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]
+  assert xtreg_command == ["xtreg"]
+  assert xtreg_columns == ["cost"]
+  assert xtreg_options == ["fe", "re", "robust", "cluster("]
   assert predict_command == ["predict"]
   assert predict_options == ["xb", "residuals"]
   assert estat_command == ["estat"]
-  assert estat_subcommands == ["ovtest"]
+  assert estat_subcommands == ["ovtest", "overid"]
 
 
 def test_lexer_highlights_commands_keywords_and_literals() -> None:

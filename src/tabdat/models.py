@@ -260,7 +260,7 @@ class PredictCommand:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
-  subcommand: Literal["residuals", "ovtest", "vif"]
+  subcommand: Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman"]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -273,6 +273,15 @@ class IvRegressCommand:
   cluster_variable: str | None = None
   include_intercept: bool = True
   estimator: Literal["2sls"] = "2sls"
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtRegCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  estimator: Literal["fe", "re"]
+  robust: bool = False
+  cluster_variable: str | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -318,6 +327,7 @@ Command = (
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
+  | XtRegCommand
   | ParsedCommand
 )
 
@@ -440,6 +450,19 @@ class IvRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtRegressionResult:
+  estimator: Literal["fe", "re"]
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  r_squared_within: float | None
+  r_squared_between: float | None
+  r_squared_overall: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelResult:
   action: Literal["report", "set", "clear"]
   metadata: PanelMetadata | None = None
@@ -492,6 +515,7 @@ Result = (
   | TransformResult
   | RegressionResult
   | IvRegressionResult
+  | XtRegressionResult
   | PanelResult
   | SqlCreateResult
   | TableResult

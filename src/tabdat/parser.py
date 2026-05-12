@@ -50,6 +50,7 @@ from tabdat.models import (
   TailCommand,
   UnaryExpression,
   UseCommand,
+  XtRegCommand,
 )
 from tabdat.monads import Err, Ok, Result, result, result_either
 
@@ -85,6 +86,7 @@ _EXECUTABLE_COMMANDS = {
   "predict",
   "estat",
   "ivregress",
+  "xtreg",
   "exit",
   "quit",
 }
@@ -307,6 +309,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "ivregress":
     return _parse_ivregress(parts)
+
+  if parts.name == "xtreg":
+    return _parse_xtreg(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -805,13 +810,20 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
 
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   if parts.condition is not None or parts.options or parts.expression is not None:
-    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif>")
+    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman>")
   if len(parts.arguments) != 1:
-    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif>")
+    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman>")
   subcommand = parts.arguments[0].lower()
-  if subcommand not in {"residuals", "ovtest", "vif"}:
-    raise ParseError("estat subcommand must be residuals, ovtest, or vif")
-  return EstatCommand(subcommand=cast(Literal["residuals", "ovtest", "vif"], subcommand))
+  if subcommand not in {"residuals", "ovtest", "vif", "firststage", "overid", "hausman"}:
+    raise ParseError(
+      "estat subcommand must be residuals, ovtest, vif, firststage, overid, or hausman"
+    )
+  return EstatCommand(
+    subcommand=cast(
+      Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman"],
+      subcommand,
+    )
+  )
 
 
 def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
@@ -858,6 +870,37 @@ def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,
     estimator="2sls",
+  )
+
+
+def _parse_xtreg(parts: _CommandParts) -> XtRegCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("xtreg expects syntax: xtreg <y> <xvars>, fe|re")
+  if len(parts.arguments) < 2:
+    raise ParseError("xtreg expects syntax: xtreg <y> <xvars>, fe|re")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"fe", "re", "robust", "cluster"}
+  if unsupported:
+    raise ParseError(f"xtreg unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "xtreg", {"fe", "re", "robust"})
+  cluster_values = _single_tuple_option(parts.options, "cluster", "xtreg")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("xtreg option cluster expects one variable")
+  has_fe = "fe" in option_names
+  has_re = "re" in option_names
+  if has_fe == has_re:
+    raise ParseError("xtreg requires exactly one of fe or re")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("xtreg cannot combine robust and cluster")
+  estimator: Literal["fe", "re"] = "fe" if has_fe else "re"
+  return XtRegCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    estimator=estimator,
+    robust=robust,
+    cluster_variable=cluster_variable,
   )
 
 
