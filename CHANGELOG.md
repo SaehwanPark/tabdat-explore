@@ -6,6 +6,13 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the second Phase 14 diagnostics slice with `estat firststage` and `estat overid` over
+  `ivregress` model state, deterministic Sargan/Wooldridge overidentification output, and focused
+  parser/executor/CLI/shell coverage.
+- Added the third Phase 14 panel-model starter slice with
+  `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`, required `panel` metadata preconditions,
+  `estat hausman` for matching FE/RE fits, deterministic formatter output, and focused
+  parser/executor/CLI/shell coverage.
 - Added the first Phase 14 endogeneity foundations slice with
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
   Python-first `linearmodels` IV2SLS execution, deterministic formatter output, and focused
@@ -112,6 +119,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed estimation-state handling so `regress`, `ivregress`, and `xtreg` clear incompatible
+  prior model-family state before later `predict`/`estat` usage.
 - Updated script reproducibility integrated-E2E expectations to match current `export` output
   wording (`Exported:`).
 - Updated SDD state (`SPEC.md`, `ARCHITECTURE.md`, and `README.md`) to record completed Phase 13

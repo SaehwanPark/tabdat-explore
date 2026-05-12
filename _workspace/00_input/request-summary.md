@@ -1,32 +1,30 @@
-# Phase 14 Slice 1 Request Summary
+# Phase 14 Slice 2+3 Request Summary
 
 ## User Goal
 
-Identify the correct next implementation target from `SPEC.md`, finish any prerequisite work that
-should be complete before entering the next phase, then implement the next planned phase slice with
-checkpoint commits, documentation updates, and a review-ready PR.
+Implement Phase 14 Slice 2 and, if feasible in the same bounded branch, one additional Phase 14
+slice while following `SPEC.md` approach-order policy, creating checkpoint commits, updating SDD
+artifacts, and opening a review-ready PR.
 
 ## Scope
 
-- Phase gate first:
-  - close remaining Phase 13 hardening work if any prerequisite gaps remain
-- Next phase execution:
-  - begin Phase 14 with one bounded slice only
-  - use `ivregress 2sls` as the initial command surface
-- Preserve phase policy order:
-  1. Python library first
-  2. R via `rpy2` fallback only if Python is insufficient
-  3. lower-level custom implementation only if both higher layers fail
+- Phase 14 Slice 2:
+  - add IV diagnostics through `estat firststage` and `estat overid` after `ivregress`
+- Phase 14 Slice 3 (conditional on Slice 2 success):
+  - add panel starter commands via `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`
+  - add `estat hausman` for matching FE/RE fits
 
 ## Constraints
 
-- Keep a bounded vertical slice across parser, executor/backend, formatter, CLI/shell tests, and
-  SDD docs.
-- Keep existing `regress`/`predict`/`estat` behavior stable.
-- Keep output deterministic and validation evidence explicit.
+- Preserve approach order from `SPEC.md`:
+  1. Python libraries first
+  2. R via `rpy2` only if Python-first is insufficient
+  3. lower-level custom numerical implementation only as a last resort
+- Keep behavior deterministic and bounded to vertical-slice surfaces.
+- Keep existing `regress`/`predict`/`estat residuals|ovtest|vif` behavior stable.
 
 ## Non-goals
 
-- No full Phase 14 rollout in one branch.
-- No FE/RE/Hausman or broad panel workflow redesign in this slice.
+- No broad panel-workflow redesign.
+- No nonlinear models.
 - No R fallback adapter work while Python-first coverage is sufficient.

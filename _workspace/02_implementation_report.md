@@ -1,59 +1,59 @@
-# Phase 14 Slice 1 Implementation Report
+# Phase 14 Slice 2+3 Implementation Report
 
 ## Scope
 
-Implemented the first Phase 14 endogeneity foundations slice (`ivregress 2sls`) after closing
-remaining Phase 13 hardening prerequisites.
+Implemented Phase 14 Slice 2 (IV diagnostics) and Slice 3 (panel FE/RE starter with Hausman)
+on one bounded branch using Python-first libraries.
 
 ## What Changed
 
-### Prerequisite hardening (before Phase 14)
+### Slice 2: IV diagnostics
 
-- Fixed integrated-harness expectation drift in `s4_penguins_script_repro`:
-  - `Saved:` -> `Exported:` for `export` output checks.
-- Added integrated E2E scenario `s5_titanic_phase13_dogfood`:
-  - runs real-dataset `regress`, `predict`, and `estat` flow.
-- Updated integrated test-plan and harness docs to include Phase 13 dogfood coverage.
+- Extended `estat` parser surface with:
+  - `estat firststage`
+  - `estat overid`
+- Added IV estimation-state tracking from `ivregress` execution.
+- Added deterministic executor outputs for:
+  - first-stage diagnostics
+  - overidentification diagnostics (`sargan`, `wooldridge_overid`)
+- Added deterministic handling for exactly identified models where overid tests are unavailable.
 
-### Phase 14 command surface
+### Slice 3: panel FE/RE starter and Hausman
 
-- Added `IvRegressCommand` and `IvRegressionResult` typed models.
 - Added parser support for:
-  - `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)`
-  - covariance options: `robust` and `cluster(<var>)`
-  - intercept control: `noconstant`
-- Added bounded parse diagnostics for unsupported estimator tokens and malformed options.
+  - `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`
+- Added executor support for FE/RE estimation through `linearmodels` panel estimators.
+- Required panel metadata precondition (`panel <id_var> <time_var>`) for `xtreg`.
+- Added `estat hausman` over matching FE/RE model states.
+- Implemented bounded Hausman constraints for this slice:
+  - supports non-cluster and robust mode pairs
+  - rejects clustered covariance pairs for Hausman
 
-### Executor and formatting behavior
+### State safety
 
-- Added executor dispatch for `ivregress`.
-- Implemented IV2SLS execution via `linearmodels` (Python-first policy).
-- Added deterministic covariance labeling:
-  - `nonrobust`, `robust`, `cluster(<var>)`.
-- Added deterministic terminal formatting for IV output.
+- Added explicit cross-family invalidation so stale model states cannot leak across:
+  - `regress`
+  - `ivregress`
+  - `xtreg`
 
-### Shell UX
+### Formatting and UX
 
-- Added `ivregress` command completion.
-- Added option completions:
-  - `endog(`, `iv(`, `robust`, `cluster(`, `noconstant`.
+- Added deterministic terminal formatting for `xtreg` results.
+- Extended shell completions for:
+  - `xtreg`
+  - expanded `estat` subcommands
 
 ### Tests
 
-- Added/updated focused parser, executor, CLI, and shell tests for the new command.
+- Added/updated focused parser, executor, CLI, and shell tests for all new surfaces.
 
 ### Documentation and SDD state
 
-- Updated `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` for:
-  - completed Phase 13 hardening
-  - started Phase 14 with the `ivregress 2sls` slice.
+- Updated `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md`.
+- Updated `_workspace` handoff artifacts for this delivery.
 
 ## Files Changed
 
-- `integrated_testing/run_e2e.py`
-- `integrated_testing/README.md`
-- `integrated_testing/RUN_REPORT.md`
-- `docs/e2e_public_dataset_test_plan.md`
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
 - `src/tabdat/executor.py`
@@ -64,7 +64,6 @@ remaining Phase 13 hardening prerequisites.
 - `tests/test_cli.py`
 - `tests/test_shell.py`
 - `pyproject.toml`
-- `uv.lock`
 - `SPEC.md`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -82,9 +81,8 @@ remaining Phase 13 hardening prerequisites.
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest -q`
-- `uv run python integrated_testing/run_e2e.py`
 
 ## Notes
 
-- Existing tiny-sample `statsmodels` warnings in pre-existing regression/predict tests remain
-  non-blocking and unchanged in scope.
+- Existing tiny-sample `statsmodels` warnings in legacy regression/predict tests remain unchanged
+  and non-blocking.

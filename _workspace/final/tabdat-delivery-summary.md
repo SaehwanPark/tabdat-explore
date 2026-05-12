@@ -1,26 +1,25 @@
-# Phase 14 Slice 1 Delivery Summary
+# Phase 14 Slice 2+3 Delivery Summary
 
 ## Outcome
 
-Completed a bounded Phase 14 start on branch `codex/tmp-phase14-iv2sls-slice1` after closing
-remaining Phase 13 hardening prerequisites.
+Completed Phase 14 Slice 2 and Slice 3 in one bounded delivery branch:
+
+- Slice 2: IV diagnostics (`estat firststage`, `estat overid`)
+- Slice 3: panel FE/RE starter (`xtreg`) plus `estat hausman`
 
 ## Implemented
 
-- Prerequisite closure before Phase 14:
-  - fixed integrated-E2E script export wording checks (`Exported:`)
-  - added `s5_titanic_phase13_dogfood` to enforce real-dataset `regress`/`predict`/`estat`
-    dogfooding
-- Phase 14 slice 1 command:
-  - `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
-  - Python-first IV2SLS execution via `linearmodels`
-  - deterministic formatter output and covariance labeling
-- Added focused parser/executor/CLI/shell coverage for the new command.
-- Updated SDD and user-facing docs:
-  - `SPEC.md`
-  - `ARCHITECTURE.md`
-  - `README.md`
-  - `CHANGELOG.md`
+- Extended `estat` with strict family-routed subcommands:
+  - regress-state: `residuals`, `ovtest`, `vif`
+  - iv-state: `firststage`, `overid`
+  - panel-state: `hausman`
+- Added Python-first `xtreg` FE/RE execution with required prior panel metadata.
+- Added deterministic Hausman comparison with bounded scope:
+  - supports matching FE/RE non-cluster and robust mode pairs
+  - rejects clustered covariance pairs
+- Added cross-family estimation-state invalidation to prevent stale diagnostics/predictions.
+- Added focused parser/executor/CLI/shell coverage for all new behavior.
+- Updated SDD/docs and `_workspace` artifacts.
 
 ## Validation
 
@@ -29,7 +28,6 @@ remaining Phase 13 hardening prerequisites.
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest -q`
-- `uv run python integrated_testing/run_e2e.py`
 
 All commands passed.
 
@@ -40,4 +38,5 @@ All commands passed.
 
 ## Suggested Follow-up
 
-- Add weak-instrument and overidentification diagnostics as the next bounded Phase 14 slice.
+- Continue remaining Phase 14 work on broader panel indexing semantics/transforms and control
+  function entry points.

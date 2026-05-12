@@ -173,25 +173,38 @@ and describe the active work with concise verification criteria.
   - covariance options `robust` and `cluster(<var>)`, plus `noconstant`
   - Python-first `linearmodels` IV2SLS execution with deterministic CLI formatting
   - focused parser, executor/backend, CLI, and shell coverage
+- Implemented the second Phase 14 endogeneity diagnostics slice:
+  - `estat firststage` and `estat overid` after `ivregress`
+  - weak-instrument first-stage diagnostics plus deterministic overidentification output
+    (`sargan` and `wooldridge_overid`)
+  - strict `estat` family routing so IV diagnostics require prior `ivregress`
+  - focused parser, executor/backend, CLI, and shell coverage
+- Implemented the third Phase 14 panel-model starter slice:
+  - `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`
+  - `estat hausman` for matching FE/RE fits with non-cluster covariance
+  - required panel metadata precondition via `panel <id_var> <time_var>`
+  - strict estimation-state invalidation across `regress`, `ivregress`, and `xtreg`
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-iv2sls-slice1
+  Branch: codex/tmp-phase14-slice2-3
 
   Summary:
-  Continue from the implemented `ivregress 2sls` slice to fill remaining Phase 14 prerequisites
-  before broader panel-model expansion.
+  Continue from implemented `ivregress`, IV diagnostics, and initial panel FE/RE/Hausman support
+  to fill the remaining Phase 14 panel-indexing and control-function prerequisites.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
   - `ivregress 2sls` works with nonrobust, robust, and clustered covariance modes
+  - `estat firststage|overid` works after `ivregress`
+  - `xtreg` FE/RE and `estat hausman` work with required panel metadata
 
   Out of Scope:
-  - Fixed effects, random effects, and Hausman-style comparisons
   - Broad panel workflow redesign
   - Nonlinear estimators
   - R fallback adapters while Python-first coverage is available
@@ -209,9 +222,9 @@ and describe the active work with concise verification criteria.
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
-  - complete the remaining Phase 14 scope beyond the implemented first `ivregress 2sls` slice:
-    weak-instrument and overidentification diagnostics, panel indexing semantics, fixed effects,
-    random effects, and Hausman-style comparisons
+  - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics, and
+    initial FE/RE/Hausman:
+    control-function entry points and broader panel indexing semantics/transforms
   - library strategy:
     - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
       `statsmodels` diagnostics when needed
