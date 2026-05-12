@@ -6,6 +6,8 @@ from typing import Literal
 from pydantic import ConfigDict
 from pydantic.dataclasses import dataclass
 
+from tabdat.estimation import CoefficientEstimate
+
 _MODEL_CONFIG = ConfigDict(strict=True)
 
 
@@ -240,6 +242,21 @@ class ExportCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class RegressCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class PredictCommand:
+  target_variable: str
+  kind: Literal["xb", "residuals"] = "xb"
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -278,6 +295,8 @@ Command = (
   | SetCommand
   | SaveCommand
   | ExportCommand
+  | RegressCommand
+  | PredictCommand
   | ParsedCommand
 )
 
@@ -372,6 +391,19 @@ class TransformResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class RegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  covariance: str
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  adjusted_r_squared: float | None
+  root_mse: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelResult:
   action: Literal["report", "set", "clear"]
   metadata: PanelMetadata | None = None
@@ -422,6 +454,7 @@ Result = (
   | CountResult
   | PreviewResult
   | TransformResult
+  | RegressionResult
   | PanelResult
   | SqlCreateResult
   | TableResult

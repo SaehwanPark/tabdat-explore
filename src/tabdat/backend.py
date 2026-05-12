@@ -1,5 +1,6 @@
 """DuckDB-backed dataset operations."""
 
+import math
 import tempfile
 from pathlib import Path
 from typing import Literal, cast
@@ -784,6 +785,49 @@ class DuckDBBackend:
       "bar",
     )
 
+  def regression_rows(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+  ) -> tuple[tuple[object, ...], ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("regress", column_types, variables)
+    select_sql = _select_list(variables)
+    return self._fetch_table(f"select {select_sql} from {ACTIVE_TABLE}", "regress")
+
+  def add_linear_prediction_column(
+    self,
+    dataset: DatasetInfo,
+    *,
+    target_variable: str,
+    predictor_names: tuple[str, ...],
+    predictor_coefficients: tuple[float, ...],
+    intercept: float | None,
+    outcome_variable: str,
+    kind: Literal["xb", "residuals"],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if target_variable in column_types:
+      raise ExecutionError(f"predict target already exists: {target_variable}")
+    _require_columns("predict", column_types, predictor_names)
+    if kind == "residuals":
+      _require_columns("predict", column_types, (outcome_variable,))
+    prediction_sql = _linear_prediction_sql(
+      predictor_names=predictor_names,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+    )
+    expression_sql = (
+      prediction_sql
+      if kind == "xb"
+      else f"{_quote_identifier(outcome_variable)} - ({prediction_sql})"
+    )
+    self._replace_active(
+      f"select *, {expression_sql} as {_quote_identifier(target_variable)} from {ACTIVE_TABLE}",
+      "predict",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def _summarize_variable(self, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""
@@ -1164,6 +1208,31 @@ class DuckDBBackend:
 def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper()
   return normalized.startswith(NUMERIC_TYPES)
+
+
+def _linear_prediction_sql(
+  *,
+  predictor_names: tuple[str, ...],
+  predictor_coefficients: tuple[float, ...],
+  intercept: float | None,
+) -> str:
+  terms: list[str] = []
+  if intercept is not None:
+    terms.append(f"cast({_float_sql_literal(intercept)} as double)")
+  for predictor, coefficient in zip(predictor_names, predictor_coefficients, strict=True):
+    terms.append(
+      f"cast({_float_sql_literal(coefficient)} as double) * "
+      f"cast({_quote_identifier(predictor)} as double)"
+    )
+  if not terms:
+    return "0.0"
+  return " + ".join(terms)
+
+
+def _float_sql_literal(value: float) -> str:
+  if not math.isfinite(value):
+    raise ExecutionError("predict failed: regression coefficient is not finite")
+  return format(float(value), ".17g")
 
 
 def _require_columns(

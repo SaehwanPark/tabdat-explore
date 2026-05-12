@@ -319,6 +319,50 @@ def test_cli_runs_phase_11_panel_metadata_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_13_regress_and_predict_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "regress cost age",
+      "-c",
+      "predict cost_hat",
+      "-c",
+      "predict cost_resid, residuals",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: regress cost on age" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Predicted cost_hat: 3 rows, 5 columns" in captured.out
+  assert "Predicted cost_resid: 3 rows, 6 columns" in captured.out
+  assert "age  bmi   sex  cost   cost_hat  cost_resid" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "predict cost_hat",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "Loaded:" in captured.out
+  assert "Error: predict requires a prior regress model" in captured.err
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(
