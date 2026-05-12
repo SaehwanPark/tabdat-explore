@@ -901,6 +901,37 @@ def test_phase_14_estat_hausman_requires_matching_specs_and_non_cluster(tmp_path
       XtRegCommand(
         outcome="wage",
         predictors=("exper", "tenure"),
+        estimator="fe",
+        robust=True,
+      )
+    )
+    executor.execute(
+      ReplaceCommand(
+        variable="wage",
+        expression=BinaryExpression(
+          left=IdentifierExpression("wage"),
+          operator="*",
+          right=NumberExpression(2),
+        ),
+      )
+    )
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
+        estimator="re",
+        robust=True,
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="estat hausman requires matching xtreg estimation sample",
+    ):
+      executor.execute(EstatCommand(subcommand="hausman"))
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exper", "tenure"),
         estimator="re",
         cluster_variable="cluster_id",
       )

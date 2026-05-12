@@ -1,5 +1,6 @@
 """Command executor and session state."""
 
+import hashlib
 import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
@@ -107,6 +108,7 @@ class _XtRegressionState:
   estimator: str
   covariance: str
   cluster_variable: str | None
+  sample_fingerprint: str
   fitted_model: object
 
 
@@ -708,6 +710,8 @@ class Executor:
         raise ExecutionError("estat hausman requires matching xtreg specifications")
       if fe_state.covariance != re_state.covariance:
         raise ExecutionError("estat hausman requires matching xtreg covariance modes")
+      if fe_state.sample_fingerprint != re_state.sample_fingerprint:
+        raise ExecutionError("estat hausman requires matching xtreg estimation sample")
       if dataset.panel_metadata != fe_state.panel_metadata:
         raise ExecutionError("estat hausman requires matching panel metadata")
       return _estat_hausman_table(fe_state.fitted_model, re_state.fitted_model)
@@ -740,6 +744,12 @@ class Executor:
     if panel is None:
       raise ExecutionError("xtreg requires at least one complete observation")
     outcome, exogenous, entity_ids, time_ids, cluster_values = panel
+    sample_fingerprint = _xt_sample_fingerprint(
+      outcomes=outcome,
+      predictors=exogenous,
+      entity_ids=entity_ids,
+      time_ids=time_ids,
+    )
     frame_data: dict[str, object] = {
       panel_metadata.id_variable: entity_ids,
       panel_metadata.time_variable: time_ids,
@@ -794,6 +804,7 @@ class Executor:
       estimator=command.estimator,
       covariance=cov_label,
       cluster_variable=command.cluster_variable,
+      sample_fingerprint=sample_fingerprint,
       fitted_model=fitted,
     )
     if command.estimator == "fe":
@@ -1304,6 +1315,33 @@ def _xt_panel_sample(
     tuple(time_ids),
     tuple(clusters) if has_cluster else None,
   )
+
+
+def _xt_sample_fingerprint(
+  *,
+  outcomes: tuple[float, ...],
+  predictors: tuple[tuple[float, ...], ...],
+  entity_ids: tuple[object, ...],
+  time_ids: tuple[object, ...],
+) -> str:
+  digest = hashlib.sha256()
+  for outcome, predictor_row, entity_id, time_id in zip(
+    outcomes,
+    predictors,
+    entity_ids,
+    time_ids,
+    strict=True,
+  ):
+    digest.update(repr(entity_id).encode("utf-8"))
+    digest.update(b"\x1f")
+    digest.update(repr(time_id).encode("utf-8"))
+    digest.update(b"\x1f")
+    digest.update(f"{outcome:.17g}".encode())
+    for predictor in predictor_row:
+      digest.update(b"\x1f")
+      digest.update(f"{predictor:.17g}".encode())
+    digest.update(b"\x1e")
+  return digest.hexdigest()
 
 
 def _panel_coefficient_estimates(
