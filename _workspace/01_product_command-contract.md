@@ -1,58 +1,40 @@
-# Phase 14 Slice 5 Command Contract
+# Phase 14 Slice 6 Command Contract
 
 ## Roadmap Phase
 
 - Phase 14 endogeneity and panel foundations
-  - Slice 5: control-function core (`cfregress`)
+  - Slice 6: control-function prediction routing (`predict` after `cfregress`)
 
-## `cfregress`
+## `predict` after `cfregress`
 
 ### Syntax
 
 ```stata
-cfregress <y> [exog_vars], endog(<var>) iv(<vars>)
-cfregress <y> [exog_vars], endog(<var>) iv(<vars>) robust
-cfregress <y> [exog_vars], endog(<var>) iv(<vars>) cluster(<var>)
-cfregress <y> [exog_vars], endog(<var>) iv(<vars>) noconstant
+predict <newvar>
+predict <newvar>, residuals
 ```
 
 ### Rules
 
 - Requires an active dataset.
-- Requires one outcome variable.
-- Requires exactly one endogenous variable via `endog(<var>)`.
-- Requires one or more instruments via `iv(<vars>)`.
-- `robust` and `cluster(<var>)` are mutually exclusive.
-- `cluster(<var>)` requires exactly one variable.
-- Endogenous variable cannot appear in exogenous varlist.
-- Variables in outcome/exogenous/endogenous/instruments must be numeric.
-- Execution performs bounded two-step control-function estimation:
-  - first stage: endogenous on exogenous + instruments
-  - second stage: outcome on exogenous + endogenous + first-stage residual
+- Requires a prior fitted model from either:
+  - `regress` (existing behavior), or
+  - `cfregress` (new in this slice).
+- `predict <newvar>` returns fitted values (`xb`).
+- `predict <newvar>, residuals` returns outcome minus fitted values.
+- Prediction target variable must not already exist.
+- No new `predict` options are introduced.
 
 ### User-facing errors
 
-- Invalid command shape:
-  - `cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)`
-- Unsupported options:
-  - `cfregress unsupported option: <options>`
-- Invalid option arity:
-  - `cfregress option endog expects one variable`
-  - `cfregress option iv expects at least one variable`
-  - `cfregress option cluster expects one variable`
-- Conflicting covariance options:
-  - `cfregress cannot combine robust and cluster`
-- Endogenous duplicated in exogenous:
-  - `cfregress endog variable must not appear in exogenous variables`
-- Missing/unknown/nonnumeric prerequisites:
-  - standard active-dataset and unknown/numeric errors scoped to `cfregress`
-- No usable sample rows:
-  - `cfregress requires at least one complete observation`
+- Missing prerequisite model state:
+  - `predict requires a prior regress or cfregress model`
+- Existing output-column and unknown-variable errors remain under `predict` scope.
 
 ## Acceptance Criteria
 
-- Parser accepts valid forms and rejects malformed forms deterministically.
-- Executor returns deterministic control-function result shape for nonrobust/robust/clustered modes.
-- CLI/shell tests cover command success and completion paths.
+- `predict` succeeds after `cfregress` for both `xb` and `residuals`.
+- Existing `predict` behavior after `regress` remains unchanged.
+- CLI coverage demonstrates `use -> cfregress -> predict -> predict, residuals` flow.
 - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`).
 - SDD/docs and `_workspace` artifacts reflect delivered behavior.

@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the sixth Phase 14 control-function prediction slice with `predict <newvar>[, xb residuals]`
+  support after `cfregress`, deterministic `predict` model-family routing, and focused
+  executor/backend/CLI coverage.
 - Added the fifth Phase 14 control-function core slice with
   `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
   bounded two-step residual-inclusion execution, deterministic formatter output, and focused

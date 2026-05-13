@@ -404,7 +404,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
 
   assert exit_code == 1
   assert "Loaded:" in captured.out
-  assert "Error: predict requires a prior regress model" in captured.err
+  assert "Error: predict requires a prior regress or cfregress model" in captured.err
 
 
 def test_cli_runs_phase_13_estat_flow(tmp_path: Path, capsys) -> None:
@@ -537,6 +537,10 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
       "cfregress y w, endog(x_endog) iv(z_inst) robust",
       "-c",
       "cfregress y w, endog(x_endog) iv(z_inst) cluster(cluster_id)",
+      "-c",
+      "predict y_hat_cf",
+      "-c",
+      "predict y_resid_cf, residuals",
     ],
   )
 
@@ -548,6 +552,8 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
   assert "Covariance: nonrobust" in captured.out
   assert "Covariance: robust" in captured.out
   assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Predicted y_hat_cf: 8 rows, 6 columns" in captured.out
+  assert "Predicted y_resid_cf: 8 rows, 7 columns" in captured.out
   assert captured.err == ""
 
 

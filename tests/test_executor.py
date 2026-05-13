@@ -156,6 +156,23 @@ def _write_iv_regression_parquet(path: Path) -> None:
   )
 
 
+def _write_cfresidual_name_collision_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0, 1.0, 8.0),
+        (1.0, 1.0, 1.0, 10.0),
+        (2.0, 2.0, 2.0, 15.0),
+        (3.0, 2.0, 2.0, 17.0),
+        (4.0, 3.0, 3.0, 22.0),
+        (5.0, 3.0, 3.0, 24.0)
+    ) as collision_data(cf_residual, x_endog, z_inst, y)
+    """,
+  )
+
+
 def _write_iv_overid_parquet(path: Path) -> None:
   _write_sql_parquet(
     path,
@@ -509,7 +526,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
   executor = Executor()
   try:
     executor.execute(UseCommand(sample_parquet))
-    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
     executor.close()
@@ -738,6 +755,62 @@ def test_phase_14_cfregress_reports_prerequisite_errors(sample_parquet: Path) ->
     executor.close()
 
 
+def test_phase_14_predict_works_after_cfregress(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    predicted = executor.execute(PredictCommand(target_variable="y_hat_cf"))
+    residuals = executor.execute(PredictCommand(target_variable="y_resid_cf", kind="residuals"))
+    preview = executor.execute(HeadCommand(1))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted y_hat_cf"
+  assert isinstance(residuals, TransformResult)
+  assert residuals.message == "Predicted y_resid_cf"
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("w", "y", "x_endog", "z_inst", "cluster_id", "y_hat_cf", "y_resid_cf")
+
+
+def test_phase_14_predict_after_cfregress_handles_cf_residual_name_collision(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "cf-name-collision.parquet"
+  _write_cfresidual_name_collision_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("cf_residual",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    executor.execute(PredictCommand(target_variable="y_hat_cf"))
+    preview = executor.execute(HeadCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("cf_residual", "x_endog", "z_inst", "y", "y_hat_cf")
+  assert preview.rows[0][4] != pytest.approx(preview.rows[1][4])
+  assert preview.rows[0][4] == pytest.approx(8.0, rel=1e-5, abs=1e-5)
+  assert preview.rows[1][4] == pytest.approx(10.0, rel=1e-5, abs=1e-5)
+
+
 def test_phase_14_ivregress_reports_prerequisite_errors(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -782,7 +855,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
         instruments=("z_inst",),
       )
     )
-    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
@@ -1110,7 +1183,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
         estimator="fe",
       )
     )
-    with pytest.raises(ExecutionError, match="predict requires a prior regress model"):
+    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))

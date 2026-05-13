@@ -1,36 +1,33 @@
-# Phase 14 Slice 5 Implementation Report
+# Phase 14 Slice 6 Implementation Report
 
 ## Scope
 
-Implemented Phase 14 Slice 5 (`cfregress` control-function core) on one bounded branch using
-Python-first execution and existing estimation boundaries.
+Implemented Phase 14 Slice 6 (`predict` support after `cfregress`) on one bounded branch using
+existing `predict` command surface and Python-first execution.
 
 ## What Changed
 
-### Parser/model/shell surface
+### Executor/model-state behavior
 
-- Added typed `CfRegressCommand` and `CfRegressionResult`.
-- Added parser support for:
-  - `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)`
-  - optional `robust`, `cluster(<var>)`, and `noconstant`
-- Added shell completions for `cfregress` and its options.
+- Added dedicated control-function prediction state in executor session state.
+- Extended `cfregress` execution to persist first-stage and second-stage coefficients needed for
+  deterministic post-estimation prediction.
+- Extended `predict` routing to accept prior `regress` (existing) or prior `cfregress` (new).
+- Updated missing-prior-model `predict` error to:
+  - `predict requires a prior regress or cfregress model`
 
-### Executor/formatter behavior
+### Backend behavior
 
-- Added `cfregress` executor dispatch with deterministic guards:
-  - active dataset required
-  - numeric variable requirements
-  - option and command-shape constraints from command contract
-- Added bounded two-step residual-inclusion execution:
-  - first stage: endogenous on exogenous + instruments
-  - second stage: outcome on exogenous + endogenous + first-stage residual
-- Added covariance handling for nonrobust, robust, and clustered modes.
-- Added deterministic terminal formatting for `cfregress` results.
-- Added cross-family estimation-state invalidation so stale model-state reuse is blocked.
+- Added bounded backend path for control-function prediction column generation.
+- Implemented deterministic SQL expression construction for:
+  - fitted values (`xb`)
+  - residuals (`outcome - xb`)
 
 ### Tests
 
-- Added/updated focused parser, executor, CLI, and shell tests for the new surface and guardrails.
+- Updated `predict` prerequisite error expectations.
+- Added focused executor coverage for `cfregress` + `predict xb` + `predict residuals`.
+- Extended CLI flow coverage to include post-`cfregress` predictions.
 
 ### Documentation and SDD state
 
@@ -39,15 +36,10 @@ Python-first execution and existing estimation boundaries.
 
 ## Files Changed
 
-- `src/tabdat/models.py`
-- `src/tabdat/parser.py`
-- `src/tabdat/shell.py`
 - `src/tabdat/executor.py`
-- `src/tabdat/formatter.py`
-- `tests/test_parser.py`
+- `src/tabdat/backend.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
-- `tests/test_shell.py`
 - `SPEC.md`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -60,6 +52,8 @@ Python-first execution and existing estimation boundaries.
 
 ## Validation Commands
 
+- `uv run pytest -q tests/test_executor.py -k "predict or cfregress"`
+- `uv run pytest -q tests/test_cli.py -k "cfregress_flow or predict_requires_prior_regress"`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`

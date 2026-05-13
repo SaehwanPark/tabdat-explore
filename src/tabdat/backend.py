@@ -849,6 +849,55 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def add_cf_prediction_column(
+    self,
+    dataset: DatasetInfo,
+    *,
+    target_variable: str,
+    first_stage_predictor_names: tuple[str, ...],
+    first_stage_predictor_coefficients: tuple[float, ...],
+    first_stage_intercept: float | None,
+    second_stage_predictor_names: tuple[str, ...],
+    second_stage_predictor_coefficients: tuple[float, ...],
+    second_stage_intercept: float | None,
+    second_stage_residual_index: int,
+    endogenous_variable: str,
+    outcome_variable: str,
+    kind: Literal["xb", "residuals"],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if target_variable in column_types:
+      raise ExecutionError(f"predict target already exists: {target_variable}")
+    _require_columns("predict", column_types, first_stage_predictor_names)
+    cf_required = tuple(
+      name
+      for index, name in enumerate(second_stage_predictor_names)
+      if index != second_stage_residual_index
+    )
+    _require_columns("predict", column_types, cf_required)
+    if kind == "residuals":
+      _require_columns("predict", column_types, (outcome_variable,))
+    prediction_sql = _cf_prediction_sql(
+      first_stage_predictor_names=first_stage_predictor_names,
+      first_stage_predictor_coefficients=first_stage_predictor_coefficients,
+      first_stage_intercept=first_stage_intercept,
+      second_stage_predictor_names=second_stage_predictor_names,
+      second_stage_predictor_coefficients=second_stage_predictor_coefficients,
+      second_stage_intercept=second_stage_intercept,
+      second_stage_residual_index=second_stage_residual_index,
+      endogenous_variable=endogenous_variable,
+    )
+    expression_sql = (
+      prediction_sql
+      if kind == "xb"
+      else f"{_quote_identifier(outcome_variable)} - ({prediction_sql})"
+    )
+    self._replace_active(
+      f"select *, {expression_sql} as {_quote_identifier(target_variable)} from {ACTIVE_TABLE}",
+      "predict",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def _summarize_variable(self, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""
@@ -1245,6 +1294,43 @@ def _linear_prediction_sql(
       f"cast({_float_sql_literal(coefficient)} as double) * "
       f"cast({_quote_identifier(predictor)} as double)"
     )
+  if not terms:
+    return "0.0"
+  return " + ".join(terms)
+
+
+def _cf_prediction_sql(
+  *,
+  first_stage_predictor_names: tuple[str, ...],
+  first_stage_predictor_coefficients: tuple[float, ...],
+  first_stage_intercept: float | None,
+  second_stage_predictor_names: tuple[str, ...],
+  second_stage_predictor_coefficients: tuple[float, ...],
+  second_stage_intercept: float | None,
+  second_stage_residual_index: int,
+  endogenous_variable: str,
+) -> str:
+  first_stage_sql = _linear_prediction_sql(
+    predictor_names=first_stage_predictor_names,
+    predictor_coefficients=first_stage_predictor_coefficients,
+    intercept=first_stage_intercept,
+  )
+  terms: list[str] = []
+  if second_stage_intercept is not None:
+    terms.append(f"cast({_float_sql_literal(second_stage_intercept)} as double)")
+  for index, (predictor, coefficient) in enumerate(
+    zip(
+      second_stage_predictor_names,
+      second_stage_predictor_coefficients,
+      strict=True,
+    )
+  ):
+    predictor_sql = (
+      f"(cast({_quote_identifier(endogenous_variable)} as double) - ({first_stage_sql}))"
+      if index == second_stage_residual_index
+      else f"cast({_quote_identifier(predictor)} as double)"
+    )
+    terms.append(f"cast({_float_sql_literal(coefficient)} as double) * {predictor_sql}")
   if not terms:
     return "0.0"
   return " + ".join(terms)

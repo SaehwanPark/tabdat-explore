@@ -104,6 +104,19 @@ class _IvRegressionState:
 
 
 @dataclass(frozen=True)
+class _CfRegressionState:
+  outcome_variable: str
+  endogenous_variable: str
+  first_stage_predictor_names: tuple[str, ...]
+  first_stage_predictor_coefficients: tuple[float, ...]
+  first_stage_intercept: float | None
+  second_stage_predictor_names: tuple[str, ...]
+  second_stage_predictor_coefficients: tuple[float, ...]
+  second_stage_intercept: float | None
+  second_stage_residual_index: int
+
+
+@dataclass(frozen=True)
 class _XtRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
@@ -129,6 +142,7 @@ class SessionState:
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
   iv_regression: _IvRegressionState | None = None
+  cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
 
 
@@ -568,6 +582,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.iv_regression = None
+    self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return RegressionResult(
       outcome=command.outcome,
@@ -643,6 +658,7 @@ class Executor:
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
     self.state.iv_regression = _IvRegressionState(fitted_model=fitted)
+    self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return IvRegressionResult(
       estimator=command.estimator,
@@ -740,8 +756,37 @@ class Executor:
       else (*command.exogenous, command.endogenous, "cf_residual")
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
+    first_stage_parameter_names = (
+      ("intercept", *command.exogenous, *command.instruments)
+      if command.include_intercept
+      else (*command.exogenous, *command.instruments)
+    )
+    first_stage_coefficients = _coefficient_estimates(first_stage_parameter_names, first_stage)
+    first_stage_intercept = first_stage_coefficients[0].value if command.include_intercept else None
+    first_stage_predictor_coefficients = (
+      tuple(estimate.value for estimate in first_stage_coefficients[1:])
+      if command.include_intercept
+      else tuple(estimate.value for estimate in first_stage_coefficients)
+    )
+    second_stage_intercept = coefficients[0].value if command.include_intercept else None
+    second_stage_predictor_coefficients = (
+      tuple(estimate.value for estimate in coefficients[1:])
+      if command.include_intercept
+      else tuple(estimate.value for estimate in coefficients)
+    )
     self.state.regression = None
     self.state.iv_regression = None
+    self.state.cf_regression = _CfRegressionState(
+      outcome_variable=command.outcome,
+      endogenous_variable=command.endogenous,
+      first_stage_predictor_names=(*command.exogenous, *command.instruments),
+      first_stage_predictor_coefficients=first_stage_predictor_coefficients,
+      first_stage_intercept=first_stage_intercept,
+      second_stage_predictor_names=(*command.exogenous, command.endogenous, "cf_residual"),
+      second_stage_predictor_coefficients=second_stage_predictor_coefficients,
+      second_stage_intercept=second_stage_intercept,
+      second_stage_residual_index=len(command.exogenous) + 1,
+    )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
       covariance=covariance,
@@ -758,18 +803,35 @@ class Executor:
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
     regression = self.state.regression
-    if regression is None:
-      raise ExecutionError("predict requires a prior regress model")
-    next_dataset = self.backend.add_linear_prediction_column(
-      dataset,
-      target_variable=command.target_variable,
-      predictor_names=regression.predictor_names,
-      predictor_coefficients=regression.predictor_coefficients,
-      intercept=regression.intercept,
-      outcome_variable=regression.outcome_variable,
-      kind=command.kind,
-    )
-    return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=regression.predictor_names,
+        predictor_coefficients=regression.predictor_coefficients,
+        intercept=regression.intercept,
+        outcome_variable=regression.outcome_variable,
+        kind=command.kind,
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    cf_regression = self.state.cf_regression
+    if cf_regression is not None:
+      next_dataset = self.backend.add_cf_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        first_stage_predictor_names=cf_regression.first_stage_predictor_names,
+        first_stage_predictor_coefficients=cf_regression.first_stage_predictor_coefficients,
+        first_stage_intercept=cf_regression.first_stage_intercept,
+        second_stage_predictor_names=cf_regression.second_stage_predictor_names,
+        second_stage_predictor_coefficients=cf_regression.second_stage_predictor_coefficients,
+        second_stage_intercept=cf_regression.second_stage_intercept,
+        second_stage_residual_index=cf_regression.second_stage_residual_index,
+        endogenous_variable=cf_regression.endogenous_variable,
+        outcome_variable=cf_regression.outcome_variable,
+        kind=command.kind,
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    raise ExecutionError("predict requires a prior regress or cfregress model")
 
   def _execute_estat(self, command: EstatCommand) -> TableResult:
     dataset = self._require_active_dataset("estat")
@@ -920,6 +982,7 @@ class Executor:
       self.state.xt_regressions.re = state
     self.state.regression = None
     self.state.iv_regression = None
+    self.state.cf_regression = None
     return XtRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,

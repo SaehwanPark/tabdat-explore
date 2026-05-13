@@ -195,17 +195,22 @@ and describe the active work with concise verification criteria.
   - bounded two-step residual-inclusion execution with deterministic result formatting
   - strict parser and executor preconditions aligned with existing IV command boundaries
   - focused parser, executor, CLI, and shell coverage
+- Implemented the sixth Phase 14 control-function prediction slice:
+  - `predict <newvar>[, xb residuals]` after successful `cfregress`
+  - deterministic model-family routing across regress/cfregress prediction state
+  - focused executor/backend and CLI coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice5-cfregress-core
+  Branch: codex/tmp-phase14-slice6-cfpredict-core
 
   Summary:
   Continue from implemented `ivregress`, IV diagnostics, panel FE/RE/Hausman starter,
-  `xtdata` within/between transforms, and `cfregress` control-function core to fill remaining
+  `xtdata` within/between transforms, `cfregress` control-function core, and control-function
+  prediction routing to fill remaining
   Phase 14 control-function and panel-semantic extensions.
 
   Verification:
@@ -216,6 +221,7 @@ and describe the active work with concise verification criteria.
   - `xtreg` FE/RE and `estat hausman` work with required panel metadata
   - `xtdata ... , within|between` works with required panel metadata
   - `cfregress` works with nonrobust, robust, and clustered covariance modes
+  - `predict <newvar>[, xb residuals]` works after `cfregress`
 
   Out of Scope:
   - Broad panel workflow redesign
@@ -236,7 +242,7 @@ and describe the active work with concise verification criteria.
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
   - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics,
-    FE/RE/Hausman, `xtdata` within/between transforms, and `cfregress` core:
+    FE/RE/Hausman, `xtdata` within/between transforms, `cfregress` core, and cf prediction:
     control-function diagnostics/prediction surfaces and any additional panel-indexing semantics
   - library strategy:
     - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
