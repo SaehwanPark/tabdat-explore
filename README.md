@@ -43,14 +43,15 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes six Phase 14 slices: `ivregress`, IV diagnostics,
+Phase 12 estimation substrate and now includes seven Phase 14 slices: `ivregress`, IV diagnostics,
 panel FE/RE + Hausman starter, `xtdata` within/between transforms, `cfregress` control-function
-core, and `predict` support after `cfregress` for `xb` and `residuals`.
+core, `predict` support after `cfregress` for `xb` and `residuals`, and
+`estat endogenous` support after `cfregress`.
 
 ## Quickstart
 
@@ -208,6 +209,7 @@ tabdat> run analysis.td
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
   - IV diagnostics (`firststage`, `overid`) over the latest `ivregress` state
   - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
+  - control-function endogenous diagnostics (`endogenous`) over the latest `cfregress` state
 - `ivregress 2sls` currently provides a Python-first IV/2SLS path via `linearmodels` with
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
 - `cfregress` currently provides a bounded two-step control-function path (first-stage endogenous

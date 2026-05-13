@@ -199,13 +199,17 @@ and describe the active work with concise verification criteria.
   - `predict <newvar>[, xb residuals]` after successful `cfregress`
   - deterministic model-family routing across regress/cfregress prediction state
   - focused executor/backend and CLI coverage
+- Implemented the seventh Phase 14 control-function diagnostics slice:
+  - `estat endogenous` after successful `cfregress`
+  - deterministic residual-inclusion diagnostic table output (`cf_residual` statistic and p-value)
+  - focused parser, shell, executor/backend, and CLI coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice6-cfpredict-core
+  Branch: codex/tmp-phase14-slice7-cf-endogenous
 
   Summary:
   Continue from implemented `ivregress`, IV diagnostics, panel FE/RE/Hausman starter,
@@ -222,6 +226,7 @@ and describe the active work with concise verification criteria.
   - `xtdata ... , within|between` works with required panel metadata
   - `cfregress` works with nonrobust, robust, and clustered covariance modes
   - `predict <newvar>[, xb residuals]` works after `cfregress`
+  - `estat endogenous` works after `cfregress`
 
   Out of Scope:
   - Broad panel workflow redesign
@@ -242,7 +247,8 @@ and describe the active work with concise verification criteria.
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
   - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics,
-    FE/RE/Hausman, `xtdata` within/between transforms, `cfregress` core, and cf prediction:
+    FE/RE/Hausman, `xtdata` within/between transforms, `cfregress` core,
+    cf prediction, and bounded cf endogenous diagnostics:
     control-function diagnostics/prediction surfaces and any additional panel-indexing semantics
   - library strategy:
     - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with

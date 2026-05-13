@@ -1,9 +1,9 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented six Phase 14
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented seven Phase 14
 slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, `cfregress` core, and
-`predict` support after `cfregress`). This document records the
+`predict` plus `estat endogenous` support after `cfregress`). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -55,7 +55,7 @@ option parsing, `if` clauses, expression AST construction, and `run <script>` co
 Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
 `residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
-`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman`,
+`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman|endogenous`,
 `xtreg <y> <xvars>, fe|re[, robust cluster(...)]`,
 `xtdata <varlist>, within|between`, and
 `cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
@@ -82,7 +82,8 @@ deterministic dataset-transform command over that state, and expose post-estimat
 `estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls` execution through `linearmodels`,
 IV-focused `estat firststage|overid`, panel `xtreg` FE/RE plus `estat hausman` with bounded
 covariance constraints, and bounded `cfregress` control-function execution through Python-first
-two-stage OLS residual inclusion. Estimation-family state is explicit: running one family clears
+two-stage OLS residual inclusion plus `estat endogenous` over residual-inclusion statistics.
+Estimation-family state is explicit: running one family clears
 stale state from the others to prevent cross-family `estat` reuse.
 
 ### DuckDB Backend
@@ -197,6 +198,8 @@ display formatting.
   `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Phase 14 control-function prediction is executable through
   `predict <newvar>[, xb residuals]` after successful `cfregress`.
+- Phase 14 control-function endogenous diagnostics are executable through
+  `estat endogenous` after successful `cfregress`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -238,8 +241,8 @@ display formatting.
   non-cluster model pairs until broader panel-indexing/transformation contracts are written.
 - Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
   until broader panel-indexing/transformation contracts are written.
-- Keep `cfregress` diagnostics scoped to a future dedicated contract; current prediction support is
-  limited to existing `predict <newvar>[, xb residuals]` routing after `cfregress`.
+- Keep `cfregress` diagnostics scoped to bounded `estat endogenous` residual-inclusion output
+  until broader control-function diagnostics contracts are written.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.
