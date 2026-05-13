@@ -30,6 +30,8 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   ByCommand,
+  CfRegressCommand,
+  CfRegressionResult,
   CodebookCommand,
   CodebookResult,
   CollapseCommand,
@@ -306,6 +308,9 @@ class Executor:
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
+
+    if isinstance(command, CfRegressCommand):
+      return self._execute_cfregress(command)
 
     if isinstance(command, XtRegCommand):
       return self._execute_xtreg(command)
@@ -642,6 +647,104 @@ class Executor:
     return IvRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
+      outcome=command.outcome,
+      exogenous=command.exogenous,
+      endogenous=command.endogenous,
+      instruments=command.instruments,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(getattr(fitted, "rsquared", None)),
+      coefficients=coefficients,
+    )
+
+  def _execute_cfregress(self, command: CfRegressCommand) -> CfRegressionResult:
+    dataset = self._require_active_dataset("cfregress")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.exogenous,
+      command.endogenous,
+      *command.instruments,
+    )
+    _require_numeric_columns("cfregress", dataset, numeric_variables)
+    row_columns = [*numeric_variables]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    (
+      outcomes,
+      exogenous_values,
+      endogenous_values,
+      instrument_values,
+      cluster_values,
+    ) = _iv_regression_sample(
+      rows=rows,
+      exogenous_count=len(command.exogenous),
+      instrument_count=len(command.instruments),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("cfregress requires at least one complete observation")
+    if command.cluster_variable is not None and cluster_values is None:
+      raise ExecutionError("cfregress requires complete cluster values")
+
+    first_stage_predictors = tuple(
+      (*exogenous, *instruments)
+      for exogenous, instruments in zip(exogenous_values, instrument_values, strict=True)
+    )
+    first_stage_design = _design_matrix(
+      first_stage_predictors,
+      include_intercept=command.include_intercept,
+    )
+    first_stage = sm.OLS(
+      np.array(endogenous_values, dtype=float),
+      np.array(first_stage_design, dtype=float),
+    ).fit()
+    first_stage_residuals = tuple(
+      endog - fitted
+      for endog, fitted in zip(
+        endogenous_values,
+        tuple(float(value) for value in first_stage.fittedvalues),
+        strict=True,
+      )
+    )
+
+    second_stage_predictors = tuple(
+      (*exogenous, endogenous, residual)
+      for exogenous, endogenous, residual in zip(
+        exogenous_values,
+        endogenous_values,
+        first_stage_residuals,
+        strict=True,
+      )
+    )
+    second_stage_design = _design_matrix(
+      second_stage_predictors,
+      include_intercept=command.include_intercept,
+    )
+    fitted = sm.OLS(
+      np.array(outcomes, dtype=float),
+      np.array(second_stage_design, dtype=float),
+    ).fit()
+    covariance = "nonrobust"
+    if command.robust:
+      fitted = fitted.get_robustcov_results(cov_type="HC1")
+      covariance = "robust"
+    if command.cluster_variable is not None:
+      assert cluster_values is not None
+      fitted = fitted.get_robustcov_results(cov_type="cluster", groups=cluster_values)
+      covariance = f"cluster({command.cluster_variable})"
+
+    parameter_names = (
+      ("intercept", *command.exogenous, command.endogenous, "cf_residual")
+      if command.include_intercept
+      else (*command.exogenous, command.endogenous, "cf_residual")
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    self.state.regression = None
+    self.state.iv_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return CfRegressionResult(
+      covariance=covariance,
       outcome=command.outcome,
       exogenous=command.exogenous,
       endogenous=command.endogenous,

@@ -509,6 +509,48 @@ def test_cli_runs_phase_14_ivregress_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "iv.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 10.0, 1.0, 0.0, 'a'),
+        (1.0, 12.0, 2.0, 1.0, 'a'),
+        (2.0, 15.0, 2.0, 1.0, 'b'),
+        (3.0, 16.0, 4.0, 2.0, 'b'),
+        (4.0, 18.0, 4.0, 2.0, 'c'),
+        (5.0, 20.0, 6.0, 3.0, 'c'),
+        (6.0, 21.0, 6.0, 3.0, 'd'),
+        (7.0, 24.0, 8.0, 4.0, 'd')
+    ) as iv_data(w, y, x_endog, z_inst, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "cfregress y w, endog(x_endog) iv(z_inst)",
+      "-c",
+      "cfregress y w, endog(x_endog) iv(z_inst) robust",
+      "-c",
+      "cfregress y w, endog(x_endog) iv(z_inst) cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: cfregress y on w (endog=x_endog; iv=z_inst)" in captured.out
+  assert "Estimator: control-function" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "iv-overid.parquet"
   _write_sql_parquet(
