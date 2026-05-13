@@ -820,17 +820,29 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
 
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   if parts.condition is not None or parts.options or parts.expression is not None:
-    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman>")
-  if len(parts.arguments) != 1:
-    raise ParseError("estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman>")
-  subcommand = parts.arguments[0].lower()
-  if subcommand not in {"residuals", "ovtest", "vif", "firststage", "overid", "hausman"}:
     raise ParseError(
-      "estat subcommand must be residuals, ovtest, vif, firststage, overid, or hausman"
+      "estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>"
+    )
+  if len(parts.arguments) != 1:
+    raise ParseError(
+      "estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>"
+    )
+  subcommand = parts.arguments[0].lower()
+  if subcommand not in {
+    "residuals",
+    "ovtest",
+    "vif",
+    "firststage",
+    "overid",
+    "hausman",
+    "endogenous",
+  }:
+    raise ParseError(
+      "estat subcommand must be residuals, ovtest, vif, firststage, overid, hausman, or endogenous"
     )
   return EstatCommand(
     subcommand=cast(
-      Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman"],
+      Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous"],
       subcommand,
     )
   )
