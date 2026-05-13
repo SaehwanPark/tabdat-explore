@@ -597,6 +597,47 @@ def test_cli_runs_phase_14_xtreg_and_hausman_flow(tmp_path: Path, capsys) -> Non
   assert captured.err == ""
 
 
+def test_cli_runs_phase_14_xtdata_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 11.0, 2.0),
+        (1, 2022, 13.0, 3.0),
+        (2, 2020, 14.0, 1.0),
+        (2, 2021, 15.0, 2.0),
+        (2, 2022, 16.0, 3.0)
+    ) as panel_data(firm_id, year, wage, exper)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "xtdata wage exper, within",
+      "-c",
+      "xtdata wage exper, between",
+      "-c",
+      "head 2",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Applied xtdata within transform: 6 rows, 6 columns" in captured.out
+  assert "Applied xtdata between transform: 6 rows, 8 columns" in captured.out
+  assert "wage_within" in captured.out
+  assert "wage_between" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(
