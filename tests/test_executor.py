@@ -1086,6 +1086,36 @@ def test_phase_14_estat_endogenous_after_cfregress(tmp_path: Path) -> None:
   assert isinstance(endogenous.rows[2][2], float)
 
 
+def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collision(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "cf-name-collision.parquet"
+  _write_cfresidual_name_collision_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    fit = executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("cf_residual",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    endogenous = executor.execute(EstatCommand(subcommand="endogenous"))
+  finally:
+    executor.close()
+
+  assert isinstance(fit, CfRegressionResult)
+  assert isinstance(endogenous, TableResult)
+  expected_residual = fit.coefficients[-1]
+  assert expected_residual.name == "cf_residual"
+  observed = {row[1]: row[2] for row in endogenous.rows}
+  assert observed["test"] == "cf_residual"
+  assert observed["statistic"] == pytest.approx(expected_residual.statistic)
+  assert observed["p_value"] == pytest.approx(expected_residual.p_value)
+
+
 def test_phase_14_estat_endogenous_requires_prior_cfregress(sample_parquet: Path) -> None:
   executor = Executor()
   try:

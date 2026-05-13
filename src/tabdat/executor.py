@@ -113,6 +113,7 @@ class _CfRegressionState:
   second_stage_predictor_names: tuple[str, ...]
   second_stage_predictor_coefficients: tuple[float, ...]
   second_stage_intercept: float | None
+  include_intercept: bool
   second_stage_residual_index: int
   residual_statistic: float | None
   residual_p_value: float | None
@@ -778,6 +779,11 @@ class Executor:
     )
     self.state.regression = None
     self.state.iv_regression = None
+    residual_statistic, residual_p_value = _cf_residual_diagnostic(
+      coefficients=coefficients,
+      include_intercept=command.include_intercept,
+      residual_index=len(command.exogenous) + 1,
+    )
     self.state.cf_regression = _CfRegressionState(
       outcome_variable=command.outcome,
       endogenous_variable=command.endogenous,
@@ -787,15 +793,10 @@ class Executor:
       second_stage_predictor_names=(*command.exogenous, command.endogenous, "cf_residual"),
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
+      include_intercept=command.include_intercept,
       second_stage_residual_index=len(command.exogenous) + 1,
-      residual_statistic=next(
-        (estimate.statistic for estimate in coefficients if estimate.name == "cf_residual"),
-        None,
-      ),
-      residual_p_value=next(
-        (estimate.p_value for estimate in coefficients if estimate.name == "cf_residual"),
-        None,
-      ),
+      residual_statistic=residual_statistic,
+      residual_p_value=residual_p_value,
     )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
@@ -1279,6 +1280,19 @@ def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult
     ("control_function_residual", "p_value", cf_regression.residual_p_value),
   )
   return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
+
+
+def _cf_residual_diagnostic(
+  *,
+  coefficients: tuple[CoefficientEstimate, ...],
+  include_intercept: bool,
+  residual_index: int,
+) -> tuple[float | None, float | None]:
+  coefficient_index = residual_index + (1 if include_intercept else 0)
+  if coefficient_index < 0 or coefficient_index >= len(coefficients):
+    return (None, None)
+  residual_coefficient = coefficients[coefficient_index]
+  return (residual_coefficient.statistic, residual_coefficient.p_value)
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
