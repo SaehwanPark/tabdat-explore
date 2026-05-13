@@ -1,4 +1,4 @@
-# Phase 14 Slice 4 QA Report
+# Phase 14 Slice 5 QA Report
 
 ## Status
 
@@ -7,15 +7,15 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser:
-  - `xtdata` grammar and malformed-form rejection.
+  - `cfregress` grammar and malformed-form rejection.
 - Parser -> executor:
-  - typed `XtDataCommand` dispatch and deterministic guard failures.
-- Executor -> backend:
-  - within/between transformed columns with preserved row count and panel metadata.
+  - typed `CfRegressCommand` dispatch and deterministic guard failures.
+- Executor -> model backend:
+  - bounded two-step residual-inclusion execution with deterministic covariance modes.
 - Executor -> formatter -> CLI:
-  - deterministic transform output messaging and previewed transformed columns.
+  - deterministic result output and covariance labels for nonrobust/robust/clustered runs.
 - Shell UX -> parser boundary:
-  - `xtdata` and `within|between` completion behavior.
+  - `cfregress` command and option completion behavior.
 - SDD/docs -> implementation:
   - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` aligned.
 
@@ -25,8 +25,8 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Continue remaining Phase 14 control-function entry-point design and implementation.
-- Add broader panel-indexing semantics only if a new command contract requires them.
+- Add control-function diagnostics and/or prediction surface only with a dedicated next contract.
+- Revisit broader panel-control-function combinations in a separate slice.
 
 ## Validation Evidence
 
@@ -38,4 +38,4 @@ pass
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice4-xtdata`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice5-cfregress-core`, open one PR, and mark it ready for review.

@@ -11,9 +11,9 @@ from tabdat.models import (
   BarCommand,
   BinaryExpression,
   ByCommand,
+  CfRegressCommand,
   CodebookCommand,
   CollapseCommand,
-  CfRegressCommand,
   Command,
   CommandOption,
   CountCommand,
@@ -934,13 +934,9 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
 
 def _parse_cfregress(parts: _CommandParts) -> CfRegressCommand:
   if parts.condition is not None or parts.expression is not None:
-    raise ParseError(
-      "cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)"
-    )
+    raise ParseError("cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)")
   if len(parts.arguments) < 1:
-    raise ParseError(
-      "cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)"
-    )
+    raise ParseError("cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)")
   option_names = {option.name for option in parts.options}
   unsupported = option_names - {"endog", "iv", "robust", "cluster", "noconstant"}
   if unsupported:

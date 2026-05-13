@@ -1,30 +1,32 @@
-# Phase 14 Slice 4 Implementation Report
+# Phase 14 Slice 5 Implementation Report
 
 ## Scope
 
-Implemented Phase 14 Slice 4 (`xtdata` panel-indexing transforms) on one bounded branch using
-Python-first execution and existing DuckDB backend boundaries.
+Implemented Phase 14 Slice 5 (`cfregress` control-function core) on one bounded branch using
+Python-first execution and existing estimation boundaries.
 
 ## What Changed
 
 ### Parser/model/shell surface
 
-- Added typed `XtDataCommand`.
+- Added typed `CfRegressCommand` and `CfRegressionResult`.
 - Added parser support for:
-  - `xtdata <varlist>, within`
-  - `xtdata <varlist>, between`
-- Added shell completions for `xtdata` and `within|between`.
+  - `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)`
+  - optional `robust`, `cluster(<var>)`, and `noconstant`
+- Added shell completions for `cfregress` and its options.
 
-### Executor/backend behavior
+### Executor/formatter behavior
 
-- Added `xtdata` executor dispatch with deterministic guards:
-  - panel metadata required
-  - numeric variables required
-  - transformed-column collision checks
-- Added backend `xtdata` transform execution that appends:
-  - `<var>_within`
-  - `<var>_between`
-- Preserved panel metadata and active-row shape after transforms.
+- Added `cfregress` executor dispatch with deterministic guards:
+  - active dataset required
+  - numeric variable requirements
+  - option and command-shape constraints from command contract
+- Added bounded two-step residual-inclusion execution:
+  - first stage: endogenous on exogenous + instruments
+  - second stage: outcome on exogenous + endogenous + first-stage residual
+- Added covariance handling for nonrobust, robust, and clustered modes.
+- Added deterministic terminal formatting for `cfregress` results.
+- Added cross-family estimation-state invalidation so stale model-state reuse is blocked.
 
 ### Tests
 
@@ -40,8 +42,8 @@ Python-first execution and existing DuckDB backend boundaries.
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
 - `src/tabdat/shell.py`
-- `src/tabdat/backend.py`
 - `src/tabdat/executor.py`
+- `src/tabdat/formatter.py`
 - `tests/test_parser.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`

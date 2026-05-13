@@ -1,20 +1,20 @@
-# Phase 14 Slice 4 Delivery Summary
+# Phase 14 Slice 5 Delivery Summary
 
 ## Outcome
 
-Completed Phase 14 Slice 4 in one bounded delivery branch:
+Completed Phase 14 Slice 5 in one bounded delivery branch:
 
-- Slice 4: panel-indexing transforms via `xtdata <varlist>, within|between`
+- Slice 5: control-function core via
+  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 
 ## Implemented
 
-- Added typed parser/executor command surface for `xtdata`.
-- Added deterministic shell completions for `xtdata` and `within|between`.
-- Added panel-metadata-aware backend transforms that append:
-  - `<var>_within`
-  - `<var>_between`
-- Added deterministic guardrails for missing panel metadata, non-numeric variables, and target
-  column collisions.
+- Added typed parser/executor/formatter command-result surface for `cfregress`.
+- Added deterministic shell completions for `cfregress` and option set.
+- Added bounded two-step residual-inclusion execution with:
+  - first-stage endogenous fit on exogenous + instruments
+  - second-stage outcome fit with residual inclusion
+- Added deterministic covariance handling for nonrobust, robust, and clustered modes.
 - Added focused parser/executor/CLI/shell coverage for all new behavior.
 - Updated SDD/docs and `_workspace` artifacts.
 
@@ -30,8 +30,8 @@ All commands passed.
 
 ## Residual Risk
 
-- Remaining Phase 14 control-function entry points are still pending.
+- Control-function diagnostics and prediction surfaces are intentionally deferred.
 
 ## Suggested Follow-up
 
-- Continue Phase 14 with control-function entry-point command contract and bounded first slice.
+- Continue Phase 14 with a dedicated control-function diagnostics/prediction contract.

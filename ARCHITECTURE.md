@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented four Phase 14
-slices (`ivregress`, IV diagnostics, panel FE/RE starter, and `xtdata` transforms). This document records the
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented five Phase 14
+slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, and `cfregress` core). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -55,8 +55,9 @@ Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `esta
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
 `residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
 `ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman`,
-`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`, and
-`xtdata <varlist>, within|between`.
+`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`,
+`xtdata <varlist>, within|between`, and
+`cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -78,9 +79,10 @@ Phase 13 slices 1-3 add session-local regression state for the latest fitted lin
 `regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
 deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
 `estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls` execution through `linearmodels`,
-IV-focused `estat firststage|overid`, and panel `xtreg` FE/RE plus `estat hausman` with bounded
-covariance constraints. Estimation-family state is explicit: running one family clears stale state
-from the others to prevent cross-family `estat` reuse.
+IV-focused `estat firststage|overid`, panel `xtreg` FE/RE plus `estat hausman` with bounded
+covariance constraints, and bounded `cfregress` control-function execution through Python-first
+two-stage OLS residual inclusion. Estimation-family state is explicit: running one family clears
+stale state from the others to prevent cross-family `estat` reuse.
 
 ### DuckDB Backend
 
@@ -190,6 +192,8 @@ display formatting.
   fits with non-cluster covariance.
 - Phase 14 panel-index transforms are executable through
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`.
+- Phase 14 control-function core is executable through
+  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -231,6 +235,8 @@ display formatting.
   non-cluster model pairs until broader panel-indexing/transformation contracts are written.
 - Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
   until broader panel-indexing/transformation contracts are written.
+- Keep `cfregress` scoped to executable core estimation only (no new `estat`/`predict` surfaces)
+  until a later control-function diagnostics/prediction contract is written.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.
