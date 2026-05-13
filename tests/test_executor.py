@@ -1057,6 +1057,45 @@ def test_phase_14_xtdata_guards(sample_parquet: Path, tmp_path: Path) -> None:
     executor.close()
 
 
+def test_phase_14_estat_endogenous_after_cfregress(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    endogenous = executor.execute(EstatCommand(subcommand="endogenous"))
+  finally:
+    executor.close()
+
+  assert isinstance(endogenous, TableResult)
+  assert endogenous.headers == ("Test", "Metric", "Value")
+  assert endogenous.rows[0] == ("control_function_residual", "test", "cf_residual")
+  assert endogenous.rows[1][0] == "control_function_residual"
+  assert endogenous.rows[1][1] == "statistic"
+  assert isinstance(endogenous.rows[1][2], float)
+  assert endogenous.rows[2][0] == "control_function_residual"
+  assert endogenous.rows[2][1] == "p_value"
+  assert isinstance(endogenous.rows[2][2], float)
+
+
+def test_phase_14_estat_endogenous_requires_prior_cfregress(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="estat endogenous requires a prior cfregress model"):
+      executor.execute(EstatCommand(subcommand="endogenous"))
+  finally:
+    executor.close()
+
+
 def test_phase_14_estat_hausman_flow_and_guards(tmp_path: Path) -> None:
   path = tmp_path / "panel-regression.parquet"
   _write_panel_regression_parquet(path)

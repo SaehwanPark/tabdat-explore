@@ -114,6 +114,8 @@ class _CfRegressionState:
   second_stage_predictor_coefficients: tuple[float, ...]
   second_stage_intercept: float | None
   second_stage_residual_index: int
+  residual_statistic: float | None
+  residual_p_value: float | None
 
 
 @dataclass(frozen=True)
@@ -786,6 +788,14 @@ class Executor:
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
       second_stage_residual_index=len(command.exogenous) + 1,
+      residual_statistic=next(
+        (estimate.statistic for estimate in coefficients if estimate.name == "cf_residual"),
+        None,
+      ),
+      residual_p_value=next(
+        (estimate.p_value for estimate in coefficients if estimate.name == "cf_residual"),
+        None,
+      ),
     )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
@@ -884,6 +894,11 @@ class Executor:
       if dataset.panel_metadata != fe_state.panel_metadata:
         raise ExecutionError("estat hausman requires matching panel metadata")
       return _estat_hausman_table(fe_state.fitted_model, re_state.fitted_model)
+    if command.subcommand == "endogenous":
+      cf_regression = self.state.cf_regression
+      if cf_regression is None:
+        raise ExecutionError("estat endogenous requires a prior cfregress model")
+      return _estat_cf_endogenous_table(cf_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1253,6 +1268,17 @@ def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:
       ("df", degrees_of_freedom),
     ),
   )
+
+
+def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult:
+  if cf_regression.residual_statistic is None or cf_regression.residual_p_value is None:
+    raise ExecutionError("estat endogenous failed for current model")
+  rows = (
+    ("control_function_residual", "test", "cf_residual"),
+    ("control_function_residual", "statistic", cf_regression.residual_statistic),
+    ("control_function_residual", "p_value", cf_regression.residual_p_value),
+  )
+  return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
