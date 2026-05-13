@@ -35,6 +35,8 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - instrumental-variables regression with
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
+- control-function regression with
+  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - panel regression with
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - panel-data transforms with
@@ -46,8 +48,9 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes four Phase 14 slices: `ivregress`, IV diagnostics,
-panel FE/RE + Hausman starter, and `xtdata` within/between panel transforms.
+Phase 12 estimation substrate and now includes five Phase 14 slices: `ivregress`, IV diagnostics,
+panel FE/RE + Hausman starter, `xtdata` within/between transforms, and `cfregress` control-function
+core.
 
 ## Quickstart
 
@@ -207,6 +210,8 @@ tabdat> run analysis.td
   - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
 - `ivregress 2sls` currently provides a Python-first IV/2SLS path via `linearmodels` with
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
+- `cfregress` currently provides a bounded two-step control-function path (first-stage endogenous
+  fit plus second-stage outcome fit with residual inclusion) for one endogenous variable.
 - `xtreg` currently provides Python-first `linearmodels` FE/RE estimation with `robust` and
   `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
 - `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and

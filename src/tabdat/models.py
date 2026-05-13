@@ -291,6 +291,17 @@ class XtDataCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class CfRegressCommand:
+  outcome: str
+  exogenous: tuple[str, ...]
+  endogenous: str
+  instruments: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -335,6 +346,7 @@ Command = (
   | IvRegressCommand
   | XtRegCommand
   | XtDataCommand
+  | CfRegressCommand
   | ParsedCommand
 )
 
@@ -470,6 +482,19 @@ class XtRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class CfRegressionResult:
+  covariance: str
+  outcome: str
+  exogenous: tuple[str, ...]
+  endogenous: str
+  instruments: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelResult:
   action: Literal["report", "set", "clear"]
   metadata: PanelMetadata | None = None
@@ -523,6 +548,7 @@ Result = (
   | RegressionResult
   | IvRegressionResult
   | XtRegressionResult
+  | CfRegressionResult
   | PanelResult
   | SqlCreateResult
   | TableResult

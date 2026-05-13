@@ -22,6 +22,8 @@ from tabdat.models import (
   BarCommand,
   BinaryExpression,
   ByCommand,
+  CfRegressCommand,
+  CfRegressionResult,
   CodebookCommand,
   CodebookResult,
   CollapseCommand,
@@ -661,6 +663,79 @@ def test_phase_14_ivregress_supports_covariance_modes(tmp_path: Path) -> None:
   assert robust.covariance == "robust"
   assert isinstance(clustered, IvRegressionResult)
   assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_14_cfregress_returns_typed_result_and_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+        robust=True,
+      )
+    )
+    clustered = executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, CfRegressionResult)
+  assert robust.covariance == "robust"
+  assert robust.outcome == "y"
+  assert robust.exogenous == ("w",)
+  assert robust.endogenous == "x_endog"
+  assert robust.instruments == ("z_inst",)
+  assert robust.observation_count == 8
+  assert [estimate.name for estimate in robust.coefficients] == [
+    "intercept",
+    "w",
+    "x_endog",
+    "cf_residual",
+  ]
+  assert isinstance(clustered, CfRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_14_cfregress_reports_prerequisite_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="cfregress requires an active dataset"):
+      executor.execute(
+        CfRegressCommand(
+          outcome="y",
+          exogenous=("w",),
+          endogenous="x_endog",
+          instruments=("z_inst",),
+        )
+      )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(
+      UnknownVariableError,
+      match="cfregress unknown variable: w, x_endog, z_inst",
+    ):
+      executor.execute(
+        CfRegressCommand(
+          outcome="cost",
+          exogenous=("w",),
+          endogenous="x_endog",
+          instruments=("z_inst",),
+        )
+      )
+  finally:
+    executor.close()
 
 
 def test_phase_14_ivregress_reports_prerequisite_errors(sample_parquet: Path) -> None:

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tabdat.models import (
   ActivateResult,
+  CfRegressionResult,
   CodebookResult,
   CountResult,
   DescribeResult,
@@ -162,6 +163,33 @@ def format_result(result: Result) -> str:
       f"R-squared (within): {_format_number(result.r_squared_within)}",
       f"R-squared (between): {_format_number(result.r_squared_between)}",
       f"R-squared (overall): {_format_number(result.r_squared_overall)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, CfRegressionResult):
+    exogenous = " ".join(result.exogenous) if result.exogenous else "(none)"
+    instruments = " ".join(result.instruments)
+    header = [
+      (
+        f"Model: cfregress {result.outcome} on {exogenous} "
+        f"(endog={result.endogenous}; iv={instruments})"
+      ),
+      "Estimator: control-function",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
       "",
     ]
     coefficient_rows = (

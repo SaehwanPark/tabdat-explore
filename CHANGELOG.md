@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fifth Phase 14 control-function core slice with
+  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
+  bounded two-step residual-inclusion execution, deterministic formatter output, and focused
+  parser/executor/CLI/shell coverage.
 - Added the fourth Phase 14 panel-indexing slice with
   `xtdata <varlist>, within|between`, panel-metadata preconditions, deterministic
   `_within`/`_between` transformed columns, and focused parser/executor/CLI/shell coverage.
