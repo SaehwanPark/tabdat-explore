@@ -1,4 +1,4 @@
-# Phase 14 Slice 6 Request Summary
+# Phase 14 Slice 7 Request Summary
 
 ## User Goal
 
@@ -7,11 +7,10 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 14 Slice 6:
-  - add control-function prediction support through existing command surface:
-    - `predict <newvar>`
-    - `predict <newvar>, residuals`
-  - route prediction state from prior `cfregress` without changing `predict` syntax/options
+- Phase 14 Slice 7:
+  - add control-function endogenous diagnostics through a dedicated post-estimation surface:
+    - `estat endogenous`
+  - route diagnostics from prior `cfregress` state without changing `cfregress` syntax/options
 
 ## Constraints
 
@@ -24,8 +23,8 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Non-goals
 
-- No new `estat` diagnostics in this slice.
 - No new `predict` syntax or option surface.
+- No changes to IV diagnostics command behavior (`estat firststage`, `estat overid`).
 - No broad panel-workflow redesign.
 - No nonlinear estimators.
 - No R fallback adapter work while Python-first coverage is sufficient.

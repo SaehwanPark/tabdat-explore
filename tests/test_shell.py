@@ -192,6 +192,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     predict_options = _completion_texts(completer, "predict cost_hat, ")
     estat_command = _completion_texts(completer, "est")
     estat_subcommands = _completion_texts(completer, "estat o")
+    estat_endogenous = _completion_texts(completer, "estat e")
   finally:
     executor.close()
 
@@ -214,6 +215,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert predict_options == ["xb", "residuals"]
   assert estat_command == ["estat"]
   assert estat_subcommands == ["ovtest", "overid"]
+  assert estat_endogenous == ["endogenous"]
 
 
 def test_lexer_highlights_commands_keywords_and_literals() -> None:

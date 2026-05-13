@@ -113,7 +113,10 @@ class _CfRegressionState:
   second_stage_predictor_names: tuple[str, ...]
   second_stage_predictor_coefficients: tuple[float, ...]
   second_stage_intercept: float | None
+  include_intercept: bool
   second_stage_residual_index: int
+  residual_statistic: float | None
+  residual_p_value: float | None
 
 
 @dataclass(frozen=True)
@@ -776,6 +779,11 @@ class Executor:
     )
     self.state.regression = None
     self.state.iv_regression = None
+    residual_statistic, residual_p_value = _cf_residual_diagnostic(
+      coefficients=coefficients,
+      include_intercept=command.include_intercept,
+      residual_index=len(command.exogenous) + 1,
+    )
     self.state.cf_regression = _CfRegressionState(
       outcome_variable=command.outcome,
       endogenous_variable=command.endogenous,
@@ -785,7 +793,10 @@ class Executor:
       second_stage_predictor_names=(*command.exogenous, command.endogenous, "cf_residual"),
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
+      include_intercept=command.include_intercept,
       second_stage_residual_index=len(command.exogenous) + 1,
+      residual_statistic=residual_statistic,
+      residual_p_value=residual_p_value,
     )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
@@ -884,6 +895,11 @@ class Executor:
       if dataset.panel_metadata != fe_state.panel_metadata:
         raise ExecutionError("estat hausman requires matching panel metadata")
       return _estat_hausman_table(fe_state.fitted_model, re_state.fitted_model)
+    if command.subcommand == "endogenous":
+      cf_regression = self.state.cf_regression
+      if cf_regression is None:
+        raise ExecutionError("estat endogenous requires a prior cfregress model")
+      return _estat_cf_endogenous_table(cf_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1253,6 +1269,30 @@ def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:
       ("df", degrees_of_freedom),
     ),
   )
+
+
+def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult:
+  if cf_regression.residual_statistic is None or cf_regression.residual_p_value is None:
+    raise ExecutionError("estat endogenous failed for current model")
+  rows = (
+    ("control_function_residual", "test", "cf_residual"),
+    ("control_function_residual", "statistic", cf_regression.residual_statistic),
+    ("control_function_residual", "p_value", cf_regression.residual_p_value),
+  )
+  return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
+
+
+def _cf_residual_diagnostic(
+  *,
+  coefficients: tuple[CoefficientEstimate, ...],
+  include_intercept: bool,
+  residual_index: int,
+) -> tuple[float | None, float | None]:
+  coefficient_index = residual_index + (1 if include_intercept else 0)
+  if coefficient_index < 0 or coefficient_index >= len(coefficients):
+    return (None, None)
+  residual_coefficient = coefficients[coefficient_index]
+  return (residual_coefficient.statistic, residual_coefficient.p_value)
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:

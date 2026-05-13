@@ -372,6 +372,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat firststage") == EstatCommand(subcommand="firststage")
   assert parse_command("estat overid") == EstatCommand(subcommand="overid")
   assert parse_command("estat hausman") == EstatCommand(subcommand="hausman")
+  assert parse_command("estat endogenous") == EstatCommand(subcommand="endogenous")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -664,6 +665,7 @@ def test_parse_exit_aliases() -> None:
     "estat detail",
     "estat residuals, detail",
     "estat first",
+    "estat endog",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",

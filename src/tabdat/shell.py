@@ -89,7 +89,15 @@ _XTREG_OPTIONS = ("fe", "re", "robust", "cluster(")
 _XTDATA_OPTIONS = ("within", "between")
 _CFREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _PREDICT_OPTIONS = ("xb", "residuals")
-_ESTAT_SUBCOMMANDS = ("residuals", "ovtest", "vif", "firststage", "overid", "hausman")
+_ESTAT_SUBCOMMANDS = (
+  "residuals",
+  "ovtest",
+  "vif",
+  "firststage",
+  "overid",
+  "hausman",
+  "endogenous",
+)
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
 _PREFIX_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$|by\($")

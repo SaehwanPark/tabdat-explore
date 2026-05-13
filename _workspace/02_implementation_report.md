@@ -1,33 +1,33 @@
-# Phase 14 Slice 6 Implementation Report
+# Phase 14 Slice 7 Implementation Report
 
 ## Scope
 
-Implemented Phase 14 Slice 6 (`predict` support after `cfregress`) on one bounded branch using
-existing `predict` command surface and Python-first execution.
+Implemented Phase 14 Slice 7 (`estat endogenous` after `cfregress`) on one bounded branch using
+existing `estat` command surface and Python-first execution.
 
 ## What Changed
 
 ### Executor/model-state behavior
 
-- Added dedicated control-function prediction state in executor session state.
-- Extended `cfregress` execution to persist first-stage and second-stage coefficients needed for
-  deterministic post-estimation prediction.
-- Extended `predict` routing to accept prior `regress` (existing) or prior `cfregress` (new).
-- Updated missing-prior-model `predict` error to:
-  - `predict requires a prior regress or cfregress model`
+- Extended control-function session state to persist deterministic residual-inclusion diagnostic
+  statistics (`cf_residual` t-statistic and p-value).
+- Added `estat endogenous` routing over prior `cfregress` state.
+- Added dedicated missing-prior-model error:
+  - `estat endogenous requires a prior cfregress model`
+- Added bounded failure guard when residual-inclusion statistics are unavailable:
+  - `estat endogenous failed for current model`
 
-### Backend behavior
+### Parser/shell command surface
 
-- Added bounded backend path for control-function prediction column generation.
-- Implemented deterministic SQL expression construction for:
-  - fitted values (`xb`)
-  - residuals (`outcome - xb`)
+- Extended `estat` parser and typed command model to include `endogenous`.
+- Extended shell completion suggestions to include `endogenous` under `estat`.
 
 ### Tests
 
-- Updated `predict` prerequisite error expectations.
-- Added focused executor coverage for `cfregress` + `predict xb` + `predict residuals`.
-- Extended CLI flow coverage to include post-`cfregress` predictions.
+- Added focused parser coverage for `estat endogenous`.
+- Added focused shell completion coverage for `estat e` -> `endogenous`.
+- Added focused executor coverage for `cfregress` + `estat endogenous` and missing-prior guard.
+- Extended CLI Phase 14 flow coverage to include `estat endogenous` output.
 
 ### Documentation and SDD state
 
@@ -36,8 +36,12 @@ existing `predict` command surface and Python-first execution.
 
 ## Files Changed
 
+- `src/tabdat/models.py`
+- `src/tabdat/parser.py`
+- `src/tabdat/shell.py`
 - `src/tabdat/executor.py`
-- `src/tabdat/backend.py`
+- `tests/test_parser.py`
+- `tests/test_shell.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
 - `SPEC.md`
@@ -52,10 +56,13 @@ existing `predict` command surface and Python-first execution.
 
 ## Validation Commands
 
-- `uv run pytest -q tests/test_executor.py -k "predict or cfregress"`
-- `uv run pytest -q tests/test_cli.py -k "cfregress_flow or predict_requires_prior_regress"`
+- `uv run pytest -q tests/test_parser.py -k "estat"`
+- `uv run pytest -q tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options`
+- `uv run pytest -q tests/test_executor.py -k "cfregress or estat"`
+- `uv run pytest -q tests/test_cli.py -k "cfregress_flow or estat"`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest -q`
+- `uv run python integrated_testing/run_e2e.py`

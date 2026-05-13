@@ -260,7 +260,7 @@ class PredictCommand:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
-  subcommand: Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman"]
+  subcommand: Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous"]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

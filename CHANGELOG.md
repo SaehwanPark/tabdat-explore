@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the seventh Phase 14 control-function diagnostics slice with `estat endogenous` support
+  after `cfregress`, deterministic residual-inclusion diagnostic output, and focused
+  parser/shell/executor/CLI coverage.
 - Added the sixth Phase 14 control-function prediction slice with `predict <newvar>[, xb residuals]`
   support after `cfregress`, deterministic `predict` model-family routing, and focused
   executor/backend/CLI coverage.
