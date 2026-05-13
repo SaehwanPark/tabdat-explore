@@ -13,6 +13,7 @@ from tabdat.models import (
   ByCommand,
   CodebookCommand,
   CollapseCommand,
+  CfRegressCommand,
   Command,
   CommandOption,
   CountCommand,
@@ -89,6 +90,7 @@ _EXECUTABLE_COMMANDS = {
   "ivregress",
   "xtreg",
   "xtdata",
+  "cfregress",
   "exit",
   "quit",
 }
@@ -317,6 +319,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "xtdata":
     return _parse_xtdata(parts)
+
+  if parts.name == "cfregress":
+    return _parse_cfregress(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -925,6 +930,49 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
     raise ParseError("xtdata requires exactly one of within or between")
   transform: Literal["within", "between"] = "within" if has_within else "between"
   return XtDataCommand(variables=parts.arguments, transform=transform)
+
+
+def _parse_cfregress(parts: _CommandParts) -> CfRegressCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)"
+    )
+  if len(parts.arguments) < 1:
+    raise ParseError(
+      "cfregress expects syntax: cfregress <y> [exog_vars], endog(<var>) iv(<vars>)"
+    )
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"endog", "iv", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"cfregress unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "cfregress", {"robust", "noconstant"})
+  endog_values = _single_tuple_option(parts.options, "endog", "cfregress")
+  if endog_values is None or len(endog_values) != 1:
+    raise ParseError("cfregress option endog expects one variable")
+  instrument_values = _single_tuple_option(parts.options, "iv", "cfregress")
+  if instrument_values is None:
+    raise ParseError("cfregress option iv expects at least one variable")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "cfregress")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("cfregress option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("cfregress cannot combine robust and cluster")
+  outcome = parts.arguments[0]
+  exogenous = parts.arguments[1:]
+  endogenous = endog_values[0]
+  if endogenous in exogenous:
+    raise ParseError("cfregress endog variable must not appear in exogenous variables")
+  return CfRegressCommand(
+    outcome=outcome,
+    exogenous=exogenous,
+    endogenous=endogenous,
+    instruments=instrument_values,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
 
 
 def _single_integer_option(

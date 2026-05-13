@@ -8,6 +8,7 @@ from tabdat.models import (
   BarCommand,
   BinaryExpression,
   ByCommand,
+  CfRegressCommand,
   CodebookCommand,
   CollapseCommand,
   CommandOption,
@@ -435,6 +436,34 @@ def test_parse_phase_14_xtdata_command() -> None:
   )
 
 
+def test_parse_phase_14_cfregress_command() -> None:
+  assert parse_command("cfregress cost age bmi, endog(hours) iv(distance policy)") == (
+    CfRegressCommand(
+      outcome="cost",
+      exogenous=("age", "bmi"),
+      endogenous="hours",
+      instruments=("distance", "policy"),
+    )
+  )
+  assert parse_command("cfregress cost, endog(hours) iv(distance) robust") == CfRegressCommand(
+    outcome="cost",
+    exogenous=(),
+    endogenous="hours",
+    instruments=("distance",),
+    robust=True,
+  )
+  assert parse_command(
+    "cfregress cost age, endog(hours) iv(distance) cluster(group_id) noconstant"
+  ) == CfRegressCommand(
+    outcome="cost",
+    exogenous=("age",),
+    endogenous="hours",
+    instruments=("distance",),
+    cluster_variable="group_id",
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -660,6 +689,15 @@ def test_parse_exit_aliases() -> None:
     "xtdata wage, detail",
     "xtdata wage, within=true",
     "xtdata wage if year > 2020, within",
+    "cfregress",
+    "cfregress y x",
+    "cfregress y x, endog(z)",
+    "cfregress y x, iv(w)",
+    "cfregress y x, endog(z w) iv(q)",
+    "cfregress y x, endog(z) iv()",
+    "cfregress y x, endog(z) iv(w) robust cluster(g)",
+    "cfregress y z, endog(z) iv(w)",
+    "cfregress y x, endog(z) iv(w) robust=true",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",
