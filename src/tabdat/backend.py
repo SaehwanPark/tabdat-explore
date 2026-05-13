@@ -860,6 +860,7 @@ class DuckDBBackend:
     second_stage_predictor_names: tuple[str, ...],
     second_stage_predictor_coefficients: tuple[float, ...],
     second_stage_intercept: float | None,
+    second_stage_residual_index: int,
     endogenous_variable: str,
     outcome_variable: str,
     kind: Literal["xb", "residuals"],
@@ -868,7 +869,11 @@ class DuckDBBackend:
     if target_variable in column_types:
       raise ExecutionError(f"predict target already exists: {target_variable}")
     _require_columns("predict", column_types, first_stage_predictor_names)
-    cf_required = tuple(name for name in second_stage_predictor_names if name != "cf_residual")
+    cf_required = tuple(
+      name
+      for index, name in enumerate(second_stage_predictor_names)
+      if index != second_stage_residual_index
+    )
     _require_columns("predict", column_types, cf_required)
     if kind == "residuals":
       _require_columns("predict", column_types, (outcome_variable,))
@@ -879,6 +884,7 @@ class DuckDBBackend:
       second_stage_predictor_names=second_stage_predictor_names,
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
+      second_stage_residual_index=second_stage_residual_index,
       endogenous_variable=endogenous_variable,
     )
     expression_sql = (
@@ -1301,6 +1307,7 @@ def _cf_prediction_sql(
   second_stage_predictor_names: tuple[str, ...],
   second_stage_predictor_coefficients: tuple[float, ...],
   second_stage_intercept: float | None,
+  second_stage_residual_index: int,
   endogenous_variable: str,
 ) -> str:
   first_stage_sql = _linear_prediction_sql(
@@ -1311,14 +1318,16 @@ def _cf_prediction_sql(
   terms: list[str] = []
   if second_stage_intercept is not None:
     terms.append(f"cast({_float_sql_literal(second_stage_intercept)} as double)")
-  for predictor, coefficient in zip(
-    second_stage_predictor_names,
-    second_stage_predictor_coefficients,
-    strict=True,
+  for index, (predictor, coefficient) in enumerate(
+    zip(
+      second_stage_predictor_names,
+      second_stage_predictor_coefficients,
+      strict=True,
+    )
   ):
     predictor_sql = (
       f"(cast({_quote_identifier(endogenous_variable)} as double) - ({first_stage_sql}))"
-      if predictor == "cf_residual"
+      if index == second_stage_residual_index
       else f"cast({_quote_identifier(predictor)} as double)"
     )
     terms.append(f"cast({_float_sql_literal(coefficient)} as double) * {predictor_sql}")

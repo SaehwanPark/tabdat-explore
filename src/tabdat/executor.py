@@ -113,6 +113,7 @@ class _CfRegressionState:
   second_stage_predictor_names: tuple[str, ...]
   second_stage_predictor_coefficients: tuple[float, ...]
   second_stage_intercept: float | None
+  second_stage_residual_index: int
 
 
 @dataclass(frozen=True)
@@ -784,6 +785,7 @@ class Executor:
       second_stage_predictor_names=(*command.exogenous, command.endogenous, "cf_residual"),
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
+      second_stage_residual_index=len(command.exogenous) + 1,
     )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
@@ -823,6 +825,7 @@ class Executor:
         second_stage_predictor_names=cf_regression.second_stage_predictor_names,
         second_stage_predictor_coefficients=cf_regression.second_stage_predictor_coefficients,
         second_stage_intercept=cf_regression.second_stage_intercept,
+        second_stage_residual_index=cf_regression.second_stage_residual_index,
         endogenous_variable=cf_regression.endogenous_variable,
         outcome_variable=cf_regression.outcome_variable,
         kind=command.kind,

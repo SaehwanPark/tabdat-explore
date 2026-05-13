@@ -156,6 +156,23 @@ def _write_iv_regression_parquet(path: Path) -> None:
   )
 
 
+def _write_cfresidual_name_collision_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0, 1.0, 8.0),
+        (1.0, 1.0, 1.0, 10.0),
+        (2.0, 2.0, 2.0, 15.0),
+        (3.0, 2.0, 2.0, 17.0),
+        (4.0, 3.0, 3.0, 22.0),
+        (5.0, 3.0, 3.0, 24.0)
+    ) as collision_data(cf_residual, x_endog, z_inst, y)
+    """,
+  )
+
+
 def _write_iv_overid_parquet(path: Path) -> None:
   _write_sql_parquet(
     path,
@@ -764,6 +781,34 @@ def test_phase_14_predict_works_after_cfregress(tmp_path: Path) -> None:
   assert residuals.message == "Predicted y_resid_cf"
   assert isinstance(preview, PreviewResult)
   assert preview.columns == ("w", "y", "x_endog", "z_inst", "cluster_id", "y_hat_cf", "y_resid_cf")
+
+
+def test_phase_14_predict_after_cfregress_handles_cf_residual_name_collision(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "cf-name-collision.parquet"
+  _write_cfresidual_name_collision_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("cf_residual",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    executor.execute(PredictCommand(target_variable="y_hat_cf"))
+    preview = executor.execute(HeadCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("cf_residual", "x_endog", "z_inst", "y", "y_hat_cf")
+  assert preview.rows[0][4] != pytest.approx(preview.rows[1][4])
+  assert preview.rows[0][4] == pytest.approx(8.0, rel=1e-5, abs=1e-5)
+  assert preview.rows[1][4] == pytest.approx(10.0, rel=1e-5, abs=1e-5)
 
 
 def test_phase_14_ivregress_reports_prerequisite_errors(sample_parquet: Path) -> None:
