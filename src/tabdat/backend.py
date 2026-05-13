@@ -699,8 +699,7 @@ class DuckDBBackend:
     partition_sql = _quote_identifier(panel_id_variable)
     select_columns = ", ".join(_quote_identifier(column.name) for column in dataset.columns)
     derived_columns = ", ".join(
-      _xtdata_expression(variable, partition_sql, transform=transform)
-      for variable in variables
+      _xtdata_expression(variable, partition_sql, transform=transform) for variable in variables
     )
     self._replace_active(
       f"select {select_columns}, {derived_columns} from {ACTIVE_TABLE}",

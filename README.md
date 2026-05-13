@@ -37,6 +37,8 @@ command line. The current CLI supports:
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - panel regression with
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
+- panel-data transforms with
+  `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals]`
 - post-estimation diagnostics with
   `estat <residuals|ovtest|vif|firststage|overid|hausman>`
@@ -44,8 +46,8 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes three Phase 14 slices: `ivregress`, IV diagnostics,
-and an initial panel FE/RE + Hausman starter.
+Phase 12 estimation substrate and now includes four Phase 14 slices: `ivregress`, IV diagnostics,
+panel FE/RE + Hausman starter, and `xtdata` within/between panel transforms.
 
 ## Quickstart
 
@@ -207,6 +209,8 @@ tabdat> run analysis.td
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
 - `xtreg` currently provides Python-first `linearmodels` FE/RE estimation with `robust` and
   `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
+- `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and
+  appends deterministic `<var>_within` or `<var>_between` columns.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

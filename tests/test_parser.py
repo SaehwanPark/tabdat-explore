@@ -44,8 +44,8 @@ from tabdat.models import (
   TabulateCommand,
   TailCommand,
   UseCommand,
-  XtRegCommand,
   XtDataCommand,
+  XtRegCommand,
 )
 from tabdat.parser import parse_command, parse_expression
 

@@ -1,23 +1,20 @@
-# Phase 14 Slice 2+3 Delivery Summary
+# Phase 14 Slice 4 Delivery Summary
 
 ## Outcome
 
-Completed Phase 14 Slice 2 and Slice 3 in one bounded delivery branch:
+Completed Phase 14 Slice 4 in one bounded delivery branch:
 
-- Slice 2: IV diagnostics (`estat firststage`, `estat overid`)
-- Slice 3: panel FE/RE starter (`xtreg`) plus `estat hausman`
+- Slice 4: panel-indexing transforms via `xtdata <varlist>, within|between`
 
 ## Implemented
 
-- Extended `estat` with strict family-routed subcommands:
-  - regress-state: `residuals`, `ovtest`, `vif`
-  - iv-state: `firststage`, `overid`
-  - panel-state: `hausman`
-- Added Python-first `xtreg` FE/RE execution with required prior panel metadata.
-- Added deterministic Hausman comparison with bounded scope:
-  - supports matching FE/RE non-cluster and robust mode pairs
-  - rejects clustered covariance pairs
-- Added cross-family estimation-state invalidation to prevent stale diagnostics/predictions.
+- Added typed parser/executor command surface for `xtdata`.
+- Added deterministic shell completions for `xtdata` and `within|between`.
+- Added panel-metadata-aware backend transforms that append:
+  - `<var>_within`
+  - `<var>_between`
+- Added deterministic guardrails for missing panel metadata, non-numeric variables, and target
+  column collisions.
 - Added focused parser/executor/CLI/shell coverage for all new behavior.
 - Updated SDD/docs and `_workspace` artifacts.
 
@@ -33,10 +30,8 @@ All commands passed.
 
 ## Residual Risk
 
-- Existing tiny-sample `statsmodels` warnings in legacy regression/predict tests remain unchanged
-  and non-blocking.
+- Remaining Phase 14 control-function entry points are still pending.
 
 ## Suggested Follow-up
 
-- Continue remaining Phase 14 work on broader panel indexing semantics/transforms and control
-  function entry points.
+- Continue Phase 14 with control-function entry-point command contract and bounded first slice.

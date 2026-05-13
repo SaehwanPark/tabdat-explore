@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -71,8 +72,8 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
-  XtRegCommand,
   XtDataCommand,
+  XtRegCommand,
   XtRegressionResult,
 )
 
@@ -870,9 +871,15 @@ def test_phase_14_xtdata_within_between_transforms(tmp_path: Path) -> None:
   wage_index = preview.columns.index("wage")
   within_index = preview.columns.index("wage_within")
   between_index = preview.columns.index("wage_between")
-  first_wage = float(preview.rows[0][wage_index])
-  first_within = float(preview.rows[0][within_index])
-  first_between = float(preview.rows[0][between_index])
+  first_wage_raw = preview.rows[0][wage_index]
+  first_within_raw = preview.rows[0][within_index]
+  first_between_raw = preview.rows[0][between_index]
+  assert isinstance(first_wage_raw, int | float | Decimal)
+  assert isinstance(first_within_raw, int | float | Decimal)
+  assert isinstance(first_between_raw, int | float | Decimal)
+  first_wage = float(first_wage_raw)
+  first_within = float(first_within_raw)
+  first_between = float(first_between_raw)
   assert first_wage == pytest.approx(10.0)
   assert first_within == pytest.approx(-4.0 / 3.0)
   assert first_between == pytest.approx(34.0 / 3.0)

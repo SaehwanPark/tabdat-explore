@@ -185,17 +185,22 @@ and describe the active work with concise verification criteria.
   - required panel metadata precondition via `panel <id_var> <time_var>`
   - strict estimation-state invalidation across `regress`, `ivregress`, and `xtreg`
   - focused parser, executor/backend, CLI, and shell coverage
+- Implemented the fourth Phase 14 panel-indexing slice:
+  - `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
+  - deterministic `<var>_within` and `<var>_between` transformed numeric columns
+  - strict panel-metadata and numeric-variable preconditions with deterministic errors
+  - focused parser, executor/backend, CLI, and shell coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice2-3
+  Branch: codex/tmp-phase14-slice4-xtdata
 
   Summary:
-  Continue from implemented `ivregress`, IV diagnostics, and initial panel FE/RE/Hausman support
-  to fill the remaining Phase 14 panel-indexing and control-function prerequisites.
+  Continue from implemented `ivregress`, IV diagnostics, panel FE/RE/Hausman starter, and
+  `xtdata` within/between transforms to fill the remaining Phase 14 control-function prerequisites.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
@@ -203,6 +208,7 @@ and describe the active work with concise verification criteria.
   - `ivregress 2sls` works with nonrobust, robust, and clustered covariance modes
   - `estat firststage|overid` works after `ivregress`
   - `xtreg` FE/RE and `estat hausman` work with required panel metadata
+  - `xtdata ... , within|between` works with required panel metadata
 
   Out of Scope:
   - Broad panel workflow redesign
@@ -222,9 +228,9 @@ and describe the active work with concise verification criteria.
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
-  - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics, and
-    initial FE/RE/Hausman:
-    control-function entry points and broader panel indexing semantics/transforms
+  - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics,
+    FE/RE/Hausman, and `xtdata` within/between transforms:
+    control-function entry points and any additional panel-indexing semantics beyond current slice
   - library strategy:
     - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
       `statsmodels` diagnostics when needed

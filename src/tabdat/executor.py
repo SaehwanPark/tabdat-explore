@@ -79,8 +79,8 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
-  XtRegCommand,
   XtDataCommand,
+  XtRegCommand,
   XtRegressionResult,
 )
 from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
@@ -838,7 +838,9 @@ class Executor:
     column_names = {column.name for column in dataset.columns}
     suffix = f"_{command.transform}"
     collisions = tuple(
-      target for target in (f"{variable}{suffix}" for variable in command.variables) if target in column_names
+      target
+      for target in (f"{variable}{suffix}" for variable in command.variables)
+      if target in column_names
     )
     if collisions:
       raise ExecutionError(f"xtdata target already exists: {', '.join(collisions)}")
