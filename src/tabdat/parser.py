@@ -50,6 +50,7 @@ from tabdat.models import (
   TailCommand,
   UnaryExpression,
   UseCommand,
+  XtDataCommand,
   XtRegCommand,
 )
 from tabdat.monads import Err, Ok, Result, result, result_either
@@ -87,6 +88,7 @@ _EXECUTABLE_COMMANDS = {
   "estat",
   "ivregress",
   "xtreg",
+  "xtdata",
   "exit",
   "quit",
 }
@@ -312,6 +314,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "xtreg":
     return _parse_xtreg(parts)
+
+  if parts.name == "xtdata":
+    return _parse_xtdata(parts)
 
   if parts.name in {"exit", "quit"}:
     if parts.arguments or parts.condition is not None or parts.options:
@@ -902,6 +907,24 @@ def _parse_xtreg(parts: _CommandParts) -> XtRegCommand:
     robust=robust,
     cluster_variable=cluster_variable,
   )
+
+
+def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("xtdata expects syntax: xtdata <varlist>, within|between")
+  if not parts.arguments:
+    raise ParseError("xtdata expects syntax: xtdata <varlist>, within|between")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"within", "between"}
+  if unsupported:
+    raise ParseError(f"xtdata unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "xtdata", {"within", "between"})
+  has_within = "within" in option_names
+  has_between = "between" in option_names
+  if has_within == has_between:
+    raise ParseError("xtdata requires exactly one of within or between")
+  transform: Literal["within", "between"] = "within" if has_within else "between"
+  return XtDataCommand(variables=parts.arguments, transform=transform)
 
 
 def _single_integer_option(

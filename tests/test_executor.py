@@ -1,4 +1,5 @@
 import math
+from decimal import Decimal
 from pathlib import Path
 
 import duckdb
@@ -71,6 +72,7 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
+  XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
 )
@@ -830,6 +832,79 @@ def test_phase_14_xtreg_requires_panel_metadata(tmp_path: Path) -> None:
           estimator="fe",
         )
       )
+  finally:
+    executor.close()
+
+
+def test_phase_14_xtdata_within_between_transforms(tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    within_result = executor.execute(
+      XtDataCommand(
+        variables=("wage",),
+        transform="within",
+      )
+    )
+    between_result = executor.execute(
+      XtDataCommand(
+        variables=("wage",),
+        transform="between",
+      )
+    )
+    preview = executor.execute(HeadCommand(limit=3))
+  finally:
+    executor.close()
+
+  assert isinstance(within_result, TransformResult)
+  assert within_result.message == "Applied xtdata within transform"
+  assert isinstance(between_result, TransformResult)
+  assert between_result.message == "Applied xtdata between transform"
+  assert within_result.dataset.panel_metadata == PanelMetadata("firm_id", "year")
+  assert between_result.dataset.panel_metadata == PanelMetadata("firm_id", "year")
+  assert isinstance(preview, PreviewResult)
+  assert "wage_within" in preview.columns
+  assert "wage_between" in preview.columns
+  wage_index = preview.columns.index("wage")
+  within_index = preview.columns.index("wage_within")
+  between_index = preview.columns.index("wage_between")
+  first_wage_raw = preview.rows[0][wage_index]
+  first_within_raw = preview.rows[0][within_index]
+  first_between_raw = preview.rows[0][between_index]
+  assert isinstance(first_wage_raw, int | float | Decimal)
+  assert isinstance(first_within_raw, int | float | Decimal)
+  assert isinstance(first_between_raw, int | float | Decimal)
+  first_wage = float(first_wage_raw)
+  first_within = float(first_within_raw)
+  first_between = float(first_between_raw)
+  assert first_wage == pytest.approx(10.0)
+  assert first_within == pytest.approx(-4.0 / 3.0)
+  assert first_between == pytest.approx(34.0 / 3.0)
+
+
+def test_phase_14_xtdata_guards(sample_parquet: Path, tmp_path: Path) -> None:
+  path = tmp_path / "panel-regression.parquet"
+  _write_panel_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(
+      ExecutionError,
+      match="xtdata requires panel metadata; run panel <id_var> <time_var> first",
+    ):
+      executor.execute(XtDataCommand(variables=("age",), transform="within"))
+    executor.execute(PanelCommand("set", "sex", "age"))
+    with pytest.raises(TypeMismatchExecutionError, match="xtdata requires numeric variables: sex"):
+      executor.execute(XtDataCommand(variables=("sex",), transform="within"))
+
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand("set", "firm_id", "year"))
+    executor.execute(XtDataCommand(variables=("wage",), transform="within"))
+    with pytest.raises(ExecutionError, match="xtdata target already exists: wage_within"):
+      executor.execute(XtDataCommand(variables=("wage",), transform="within"))
   finally:
     executor.close()
 

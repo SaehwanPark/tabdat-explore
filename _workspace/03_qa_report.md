@@ -1,4 +1,4 @@
-# Phase 14 Slice 2+3 QA Report
+# Phase 14 Slice 4 QA Report
 
 ## Status
 
@@ -7,19 +7,15 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser:
-  - `estat firststage|overid|hausman` grammar and malformed-form rejection.
-  - `xtreg` grammar, estimator-option constraints, and covariance-option constraints.
+  - `xtdata` grammar and malformed-form rejection.
 - Parser -> executor:
-  - typed `EstatCommand` and `XtRegCommand` dispatch and deterministic failures.
-- Executor -> library backend:
-  - Python-first `linearmodels` IV diagnostics and panel FE/RE execution.
-  - bounded Hausman calculation with deterministic guardrails.
+  - typed `XtDataCommand` dispatch and deterministic guard failures.
+- Executor -> backend:
+  - within/between transformed columns with preserved row count and panel metadata.
 - Executor -> formatter -> CLI:
-  - deterministic `xtreg` and `estat` outputs.
+  - deterministic transform output messaging and previewed transformed columns.
 - Shell UX -> parser boundary:
-  - `xtreg` and expanded `estat` completion behavior.
-- State safety boundary:
-  - estimation-family invalidation prevents stale cross-family `estat`/`predict` usage.
+  - `xtdata` and `within|between` completion behavior.
 - SDD/docs -> implementation:
   - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` aligned.
 
@@ -29,8 +25,8 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Add broader panel-indexing transforms/semantics beyond current FE/RE starter.
-- Revisit clustered-Hausman support if a stronger panel-comparison contract is required.
+- Continue remaining Phase 14 control-function entry-point design and implementation.
+- Add broader panel-indexing semantics only if a new command contract requires them.
 
 ## Validation Evidence
 
@@ -42,4 +38,4 @@ pass
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice2-3`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice4-xtdata`, open one PR, and mark it ready for review.

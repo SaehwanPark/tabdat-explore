@@ -285,6 +285,12 @@ class XtRegCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtDataCommand:
+  variables: tuple[str, ...]
+  transform: Literal["within", "between"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -328,6 +334,7 @@ Command = (
   | EstatCommand
   | IvRegressCommand
   | XtRegCommand
+  | XtDataCommand
   | ParsedCommand
 )
 

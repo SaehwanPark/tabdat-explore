@@ -79,6 +79,7 @@ from tabdat.models import (
   TailCommand,
   TransformResult,
   UseCommand,
+  XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
 )
@@ -308,6 +309,9 @@ class Executor:
 
     if isinstance(command, XtRegCommand):
       return self._execute_xtreg(command)
+
+    if isinstance(command, XtDataCommand):
+      return self._execute_xtdata(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -824,6 +828,30 @@ class Executor:
       r_squared_overall=_to_float(getattr(fitted, "rsquared_overall", None)),
       coefficients=coefficients,
     )
+
+  def _execute_xtdata(self, command: XtDataCommand) -> TransformResult:
+    dataset = self._require_active_dataset("xtdata")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("xtdata requires panel metadata; run panel <id_var> <time_var> first")
+    _require_numeric_columns("xtdata", dataset, command.variables)
+    column_names = {column.name for column in dataset.columns}
+    suffix = f"_{command.transform}"
+    collisions = tuple(
+      target
+      for target in (f"{variable}{suffix}" for variable in command.variables)
+      if target in column_names
+    )
+    if collisions:
+      raise ExecutionError(f"xtdata target already exists: {', '.join(collisions)}")
+    next_dataset = self.backend.xtdata_transform(
+      dataset,
+      command.variables,
+      panel_id_variable=panel_metadata.id_variable,
+      transform=command.transform,
+    )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    return self._record_transform(f"Applied xtdata {command.transform} transform", next_dataset)
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:

@@ -1,8 +1,8 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented three Phase 14
-slices (`ivregress`, IV diagnostics, and panel FE/RE starter). This document records the
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented four Phase 14
+slices (`ivregress`, IV diagnostics, panel FE/RE starter, and `xtdata` transforms). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -54,8 +54,9 @@ option parsing, `if` clauses, expression AST construction, and `run <script>` co
 Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
 `residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
-`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman`, and
-`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`.
+`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman`,
+`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`, and
+`xtdata <varlist>, within|between`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -187,6 +188,8 @@ display formatting.
 - Phase 14 panel starter commands are executable through
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` and `estat hausman` after matching FE/RE
   fits with non-cluster covariance.
+- Phase 14 panel-index transforms are executable through
+  `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -226,6 +229,8 @@ display formatting.
   or estimation commands define additional panel semantics.
 - Keep `xtreg` scoped to panel-metadata-backed FE/RE estimators and `estat hausman` for matching
   non-cluster model pairs until broader panel-indexing/transformation contracts are written.
+- Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
+  until broader panel-indexing/transformation contracts are written.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.

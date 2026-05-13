@@ -1,51 +1,34 @@
-# Phase 14 Slice 2+3 Implementation Report
+# Phase 14 Slice 4 Implementation Report
 
 ## Scope
 
-Implemented Phase 14 Slice 2 (IV diagnostics) and Slice 3 (panel FE/RE starter with Hausman)
-on one bounded branch using Python-first libraries.
+Implemented Phase 14 Slice 4 (`xtdata` panel-indexing transforms) on one bounded branch using
+Python-first execution and existing DuckDB backend boundaries.
 
 ## What Changed
 
-### Slice 2: IV diagnostics
+### Parser/model/shell surface
 
-- Extended `estat` parser surface with:
-  - `estat firststage`
-  - `estat overid`
-- Added IV estimation-state tracking from `ivregress` execution.
-- Added deterministic executor outputs for:
-  - first-stage diagnostics
-  - overidentification diagnostics (`sargan`, `wooldridge_overid`)
-- Added deterministic handling for exactly identified models where overid tests are unavailable.
-
-### Slice 3: panel FE/RE starter and Hausman
-
+- Added typed `XtDataCommand`.
 - Added parser support for:
-  - `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`
-- Added executor support for FE/RE estimation through `linearmodels` panel estimators.
-- Required panel metadata precondition (`panel <id_var> <time_var>`) for `xtreg`.
-- Added `estat hausman` over matching FE/RE model states.
-- Implemented bounded Hausman constraints for this slice:
-  - supports non-cluster and robust mode pairs
-  - rejects clustered covariance pairs for Hausman
+  - `xtdata <varlist>, within`
+  - `xtdata <varlist>, between`
+- Added shell completions for `xtdata` and `within|between`.
 
-### State safety
+### Executor/backend behavior
 
-- Added explicit cross-family invalidation so stale model states cannot leak across:
-  - `regress`
-  - `ivregress`
-  - `xtreg`
-
-### Formatting and UX
-
-- Added deterministic terminal formatting for `xtreg` results.
-- Extended shell completions for:
-  - `xtreg`
-  - expanded `estat` subcommands
+- Added `xtdata` executor dispatch with deterministic guards:
+  - panel metadata required
+  - numeric variables required
+  - transformed-column collision checks
+- Added backend `xtdata` transform execution that appends:
+  - `<var>_within`
+  - `<var>_between`
+- Preserved panel metadata and active-row shape after transforms.
 
 ### Tests
 
-- Added/updated focused parser, executor, CLI, and shell tests for all new surfaces.
+- Added/updated focused parser, executor, CLI, and shell tests for the new surface and guardrails.
 
 ### Documentation and SDD state
 
@@ -56,14 +39,13 @@ on one bounded branch using Python-first libraries.
 
 - `src/tabdat/models.py`
 - `src/tabdat/parser.py`
-- `src/tabdat/executor.py`
-- `src/tabdat/formatter.py`
 - `src/tabdat/shell.py`
+- `src/tabdat/backend.py`
+- `src/tabdat/executor.py`
 - `tests/test_parser.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
 - `tests/test_shell.py`
-- `pyproject.toml`
 - `SPEC.md`
 - `ARCHITECTURE.md`
 - `README.md`
@@ -81,8 +63,3 @@ on one bounded branch using Python-first libraries.
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest -q`
-
-## Notes
-
-- Existing tiny-sample `statsmodels` warnings in legacy regression/predict tests remain unchanged
-  and non-blocking.

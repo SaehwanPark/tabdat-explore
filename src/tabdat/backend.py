@@ -686,6 +686,27 @@ class DuckDBBackend:
       raise
     return next_dataset
 
+  def xtdata_transform(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    *,
+    panel_id_variable: str,
+    transform: Literal["within", "between"],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("xtdata", column_types, (panel_id_variable, *variables))
+    partition_sql = _quote_identifier(panel_id_variable)
+    select_columns = ", ".join(_quote_identifier(column.name) for column in dataset.columns)
+    derived_columns = ", ".join(
+      _xtdata_expression(variable, partition_sql, transform=transform) for variable in variables
+    )
+    self._replace_active(
+      f"select {select_columns}, {derived_columns} from {ACTIVE_TABLE}",
+      "xtdata",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def tabulate(
     self,
     dataset: DatasetInfo,
@@ -1227,6 +1248,20 @@ def _linear_prediction_sql(
   if not terms:
     return "0.0"
   return " + ".join(terms)
+
+
+def _xtdata_expression(
+  variable: str,
+  partition_sql: str,
+  *,
+  transform: Literal["within", "between"],
+) -> str:
+  quoted_variable = _quote_identifier(variable)
+  mean_sql = f"avg(cast({quoted_variable} as double)) over (partition by {partition_sql})"
+  target_name = f"{variable}_{transform}"
+  if transform == "between":
+    return f"{mean_sql} as {_quote_identifier(target_name)}"
+  return f"(cast({quoted_variable} as double) - {mean_sql}) as {_quote_identifier(target_name)}"
 
 
 def _float_sql_literal(value: float) -> str:

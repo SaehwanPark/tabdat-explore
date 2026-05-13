@@ -44,6 +44,7 @@ from tabdat.models import (
   TabulateCommand,
   TailCommand,
   UseCommand,
+  XtDataCommand,
   XtRegCommand,
 )
 from tabdat.parser import parse_command, parse_expression
@@ -423,6 +424,17 @@ def test_parse_phase_14_xtreg_command() -> None:
   )
 
 
+def test_parse_phase_14_xtdata_command() -> None:
+  assert parse_command("xtdata wage exper, within") == XtDataCommand(
+    variables=("wage", "exper"),
+    transform="within",
+  )
+  assert parse_command("xtdata wage, between") == XtDataCommand(
+    variables=("wage",),
+    transform="between",
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -642,6 +654,12 @@ def test_parse_exit_aliases() -> None:
     "xtreg y x, fe cluster(firm) robust",
     "xtreg y x, fe cluster(firm year)",
     "xtreg y x, fe=true",
+    "xtdata",
+    "xtdata wage",
+    "xtdata wage, within between",
+    "xtdata wage, detail",
+    "xtdata wage, within=true",
+    "xtdata wage if year > 2020, within",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",

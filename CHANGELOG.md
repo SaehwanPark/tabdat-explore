@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 14 panel-indexing slice with
+  `xtdata <varlist>, within|between`, panel-metadata preconditions, deterministic
+  `_within`/`_between` transformed columns, and focused parser/executor/CLI/shell coverage.
 - Added the second Phase 14 diagnostics slice with `estat firststage` and `estat overid` over
   `ivregress` model state, deterministic Sargan/Wooldridge overidentification output, and focused
   parser/executor/CLI/shell coverage.
