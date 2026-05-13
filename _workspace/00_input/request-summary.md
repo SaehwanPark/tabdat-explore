@@ -1,4 +1,4 @@
-# Phase 14 Slice 5 Request Summary
+# Phase 14 Slice 6 Request Summary
 
 ## User Goal
 
@@ -7,10 +7,11 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 14 Slice 5:
-  - add control-function core through
-    `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
-  - keep deterministic, bounded two-step residual-inclusion execution
+- Phase 14 Slice 6:
+  - add control-function prediction support through existing command surface:
+    - `predict <newvar>`
+    - `predict <newvar>, residuals`
+  - route prediction state from prior `cfregress` without changing `predict` syntax/options
 
 ## Constraints
 
@@ -19,12 +20,12 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
   2. R via `rpy2` only if Python-first is insufficient
   3. lower-level custom numerical implementation only as a last resort
 - Keep behavior deterministic and bounded to one vertical-slice surface.
-- Keep existing `ivregress`/`xtreg`/`xtdata`/`estat` Phase 14 behavior stable.
+- Keep existing `regress`/`ivregress`/`xtreg`/`xtdata`/`estat` Phase 14 behavior stable.
 
 ## Non-goals
 
 - No new `estat` diagnostics in this slice.
-- No new `predict` support for control-function outputs.
+- No new `predict` syntax or option surface.
 - No broad panel-workflow redesign.
 - No nonlinear estimators.
 - No R fallback adapter work while Python-first coverage is sufficient.

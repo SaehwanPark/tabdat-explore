@@ -1,8 +1,9 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented five Phase 14
-slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, and `cfregress` core). This document records the
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented six Phase 14
+slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, `cfregress` core, and
+`predict` support after `cfregress`). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -194,6 +195,8 @@ display formatting.
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`.
 - Phase 14 control-function core is executable through
   `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
+- Phase 14 control-function prediction is executable through
+  `predict <newvar>[, xb residuals]` after successful `cfregress`.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -235,8 +238,8 @@ display formatting.
   non-cluster model pairs until broader panel-indexing/transformation contracts are written.
 - Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
   until broader panel-indexing/transformation contracts are written.
-- Keep `cfregress` scoped to executable core estimation only (no new `estat`/`predict` surfaces)
-  until a later control-function diagnostics/prediction contract is written.
+- Keep `cfregress` diagnostics scoped to a future dedicated contract; current prediction support is
+  limited to existing `predict <newvar>[, xb residuals]` routing after `cfregress`.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.
