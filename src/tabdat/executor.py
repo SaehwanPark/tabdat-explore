@@ -5,11 +5,11 @@ import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, SupportsFloat, cast
+from typing import Any, Literal, SupportsFloat, cast
 
 import numpy as np
 import statsmodels.api as sm
-from linearmodels.iv import IV2SLS
+from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.stats import chi2
 from statsmodels.stats.diagnostic import linear_reset
@@ -100,6 +100,7 @@ class _RegressionState:
 
 @dataclass(frozen=True)
 class _IvRegressionState:
+  estimator: Literal["2sls", "gmm"]
   fitted_model: object
 
 
@@ -655,19 +656,32 @@ class Executor:
       if cluster_values is None:
         raise ExecutionError("ivregress requires complete cluster values")
       cov_config["clusters"] = np.array(cluster_values)
-    try:
-      fitted = IV2SLS(
+    model: Any
+    if command.estimator == "gmm":
+      model = IVGMM(
         dependent=dependent,
         exog=exog_data,
         endog=endogenous,
         instruments=instruments,
-      ).fit(cov_type=cov_type, **cov_config)
+      )
+    else:
+      model = IV2SLS(
+        dependent=dependent,
+        exog=exog_data,
+        endog=endogenous,
+        instruments=instruments,
+      )
+    try:
+      fitted = model.fit(cov_type=cov_type, **cov_config)
     except Exception as exc:
       raise ExecutionError("ivregress failed") from exc
     parameter_names = _iv_parameter_names(command)
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
-    self.state.iv_regression = _IvRegressionState(fitted_model=fitted)
+    self.state.iv_regression = _IvRegressionState(
+      estimator=command.estimator,
+      fitted_model=fitted,
+    )
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return IvRegressionResult(
@@ -926,9 +940,14 @@ class Executor:
       return _estat_hausman_table(fe_state.fitted_model, re_state.fitted_model)
     if command.subcommand == "endogenous":
       cf_regression = self.state.cf_regression
-      if cf_regression is None:
+      if cf_regression is not None:
+        return _estat_cf_endogenous_table(cf_regression)
+      iv_regression = self.state.iv_regression
+      if iv_regression is None:
         raise ExecutionError("estat endogenous requires a prior cfregress model")
-      return _estat_cf_endogenous_table(cf_regression)
+      if iv_regression.estimator != "2sls":
+        raise ExecutionError("estat endogenous requires a prior ivregress 2sls model")
+      return _estat_iv_endogenous_table(iv_regression.fitted_model)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1251,14 +1270,55 @@ def _estat_iv_firststage_table(fitted_model: object) -> TableResult:
 
 
 def _estat_iv_overid_table(fitted_model: object) -> TableResult:
+  gmm_j_test = getattr(fitted_model, "j_stat", None)
+  if gmm_j_test is not None:
+    return _iv_test_table_rows((("gmm_j", gmm_j_test),))
+
   tests = (
     ("sargan", getattr(fitted_model, "sargan", None)),
     ("wooldridge_overid", getattr(fitted_model, "wooldridge_overid", None)),
   )
+  return _iv_test_table_rows(tests)
+
+
+def _iv_test_table_rows(
+  tests: tuple[tuple[str, object | None], ...],
+) -> TableResult:
   rows: list[tuple[object, ...]] = []
   for name, test in tests:
     if test is None:
-      raise ExecutionError("estat overid failed for current model")
+      rows.extend(
+        (
+          (name, "statistic", None),
+          (name, "p_value", None),
+          (name, "df", None),
+          (name, "distribution", "not_available"),
+        )
+      )
+      continue
+    dist_name = str(getattr(test, "dist_name", "")).strip()
+    rows.extend(
+      (
+        (name, "statistic", _to_float(getattr(test, "stat", None))),
+        (name, "p_value", _to_float(getattr(test, "pval", None))),
+        (name, "df", _to_float(getattr(test, "df", None))),
+        (name, "distribution", dist_name if dist_name and dist_name != "None" else "not_available"),
+      )
+    )
+  if not rows:
+    raise ExecutionError("estat overid failed for current model")
+  return TableResult(headers=("Test", "Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_iv_endogenous_table(fitted_model: object) -> TableResult:
+  tests = (
+    ("durbin", _invoke_iv_test_stat(fitted_model, "durbin")),
+    ("wu_hausman", _invoke_iv_test_stat(fitted_model, "wu_hausman")),
+  )
+  rows: list[tuple[object, ...]] = []
+  for name, test in tests:
+    if test is None:
+      raise ExecutionError("estat endogenous failed for current model")
     dist_name = str(getattr(test, "dist_name", "")).strip()
     rows.extend(
       (
@@ -1269,6 +1329,16 @@ def _estat_iv_overid_table(fitted_model: object) -> TableResult:
       )
     )
   return TableResult(headers=("Test", "Metric", "Value"), rows=tuple(rows))
+
+
+def _invoke_iv_test_stat(fitted_model: object, attribute_name: str) -> object | None:
+  test_method = getattr(fitted_model, attribute_name, None)
+  if not callable(test_method):
+    return None
+  try:
+    return cast(object, test_method())
+  except Exception:
+    return None
 
 
 def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:

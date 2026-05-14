@@ -6,6 +6,15 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the eleventh Phase 14 IV endogenous diagnostics slice with `estat endogenous` support after
+  `ivregress 2sls`, deterministic Durbin/Wu-Hausman output rows, and focused executor/CLI
+  coverage while preserving existing `cfregress` endogenous diagnostics behavior.
+- Added the tenth Phase 14 IV estimator expansion slice with
+  `ivregress gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
+  deterministic estimator output across `2sls` and `gmm`, and focused parser/executor/CLI/shell
+  coverage.
+- Added deterministic `estat overid` compatibility across IV estimators: `sargan` and
+  `wooldridge_overid` rows after `2sls` plus `gmm_j` rows after `gmm`.
 - Added the ninth Phase 14 control-function diagnostics expansion slice with `estat endogenous`
   output rows for `ci_level`, `ci_lower`, `ci_upper`, `distribution`, and `df` (in addition to
   `test`, `estimate`, `std_error`, `statistic`, and `p_value`) after `cfregress`, with focused

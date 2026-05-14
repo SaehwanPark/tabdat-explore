@@ -404,6 +404,15 @@ def test_parse_phase_14_ivregress_command() -> None:
     include_intercept=False,
     estimator="2sls",
   )
+  assert parse_command("ivregress gmm cost age, endog(hours) iv(distance policy)") == (
+    IvRegressCommand(
+      outcome="cost",
+      exogenous=("age",),
+      endogenous="hours",
+      instruments=("distance", "policy"),
+      estimator="gmm",
+    )
+  )
 
 
 def test_parse_phase_14_xtreg_command() -> None:

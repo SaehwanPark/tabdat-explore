@@ -178,6 +178,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     regress_options = _completion_texts(completer, "regress cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
+    ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
     ivregress_options = _completion_texts(completer, "ivregress 2sls cost age, ")
     xtreg_command = _completion_texts(completer, "xtr")
     xtreg_columns = _completion_texts(completer, "xtreg c")
@@ -201,6 +202,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
+  assert ivregress_gmm_columns == ["cost"]
   assert ivregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]
   assert xtreg_command == ["xtreg"]
   assert xtreg_columns == ["cost"]

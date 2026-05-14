@@ -272,7 +272,7 @@ class IvRegressCommand:
   robust: bool = False
   cluster_variable: str | None = None
   include_intercept: bool = True
-  estimator: Literal["2sls"] = "2sls"
+  estimator: Literal["2sls", "gmm"] = "2sls"
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -456,7 +456,7 @@ class RegressionResult:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
-  estimator: Literal["2sls"]
+  estimator: Literal["2sls", "gmm"]
   covariance: str
   outcome: str
   exogenous: tuple[str, ...]

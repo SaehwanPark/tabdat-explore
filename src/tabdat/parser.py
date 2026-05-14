@@ -851,15 +851,15 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
 def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
   if parts.condition is not None or parts.expression is not None:
     raise ParseError(
-      "ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)"
+      "ivregress expects syntax: ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)"
     )
   if len(parts.arguments) < 2:
     raise ParseError(
-      "ivregress expects syntax: ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)"
+      "ivregress expects syntax: ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)"
     )
   estimator = parts.arguments[0].lower()
-  if estimator != "2sls":
-    raise ParseError("ivregress estimator must be 2sls")
+  if estimator not in {"2sls", "gmm"}:
+    raise ParseError("ivregress estimator must be 2sls or gmm")
   option_names = {option.name for option in parts.options}
   unsupported = option_names - {"endog", "iv", "robust", "cluster", "noconstant"}
   if unsupported:
@@ -891,7 +891,7 @@ def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,
-    estimator="2sls",
+    estimator=cast(Literal["2sls", "gmm"], estimator),
   )
 
 

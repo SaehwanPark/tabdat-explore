@@ -212,25 +212,40 @@ and describe the active work with concise verification criteria.
     `ci_level`, `ci_lower`, `ci_upper`, `distribution`, and `df`
   - preserved existing `estat endogenous` command surface and precondition behavior
   - focused executor/backend and CLI coverage
+- Implemented the tenth Phase 14 IV estimator expansion slice:
+  - `ivregress gmm <y> [exog_vars], endog(<var>) iv(<vars>)`
+  - preserved covariance options (`robust`, `cluster(<var>)`, `noconstant`) and deterministic
+    formatter output across `2sls` and `gmm`
+  - deterministic `estat overid` support for both IV estimators:
+    `sargan`/`wooldridge_overid` rows for `2sls` and `gmm_j` rows for `gmm`
+  - focused parser, executor/backend, CLI, and shell coverage
+- Implemented the eleventh Phase 14 IV endogenous diagnostics slice:
+  - `estat endogenous` after `ivregress 2sls`
+  - deterministic Durbin and Wu-Hausman output rows (`statistic`, `p_value`, `df`, `distribution`)
+  - preserved existing control-function `estat endogenous` behavior after `cfregress`
+  - explicit guard that IV endogenous diagnostics are not available after `ivregress gmm`
+  - focused executor/backend and CLI coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice9-cf-endogenous-ci
+  Branch: codex/tmp-phase14-slice10-11-ivgmm-endogenous
 
   Summary:
-  Continue from implemented `ivregress`, IV diagnostics, panel FE/RE/Hausman starter,
-  `xtdata` within/between transforms, `cfregress` control-function core, and control-function
-  prediction routing to fill remaining
+  Continue from implemented `ivregress` (`2sls` + `gmm`), IV diagnostics (`firststage`,
+  `overid`, and `endogenous` after `2sls`), panel FE/RE/Hausman starter, `xtdata`
+  within/between transforms, `cfregress` control-function core, and control-function
+  prediction/diagnostics routing to fill remaining
   Phase 14 control-function and panel-semantic extensions.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
-  - `ivregress 2sls` works with nonrobust, robust, and clustered covariance modes
+  - `ivregress 2sls|gmm` works with nonrobust, robust, and clustered covariance modes
   - `estat firststage|overid` works after `ivregress`
+  - `estat endogenous` works after `ivregress 2sls`
   - `xtreg` FE/RE and `estat hausman` work with required panel metadata
   - `xtdata ... , within|between` works with required panel metadata
   - `cfregress` works with nonrobust, robust, and clustered covariance modes
@@ -257,7 +272,8 @@ and describe the active work with concise verification criteria.
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
 - Phase 14 endogeneity and panel foundations:
-  - complete the remaining Phase 14 scope beyond implemented `ivregress`, IV diagnostics,
+  - complete the remaining Phase 14 scope beyond implemented `ivregress` (`2sls` + `gmm`),
+    IV diagnostics (`firststage`, `overid`, and `endogenous` after `2sls`),
     FE/RE/Hausman, `xtdata` within/between transforms, `cfregress` core,
     cf prediction, and bounded cf endogenous diagnostics:
     control-function diagnostics/prediction surfaces and any additional panel-indexing semantics

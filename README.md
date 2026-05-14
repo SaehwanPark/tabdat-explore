@@ -34,7 +34,7 @@ command line. The current CLI supports:
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - instrumental-variables regression with
-  `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
+  `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
   `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - panel regression with
@@ -48,10 +48,11 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes nine Phase 14 slices: `ivregress`, IV diagnostics,
-panel FE/RE + Hausman starter, `xtdata` within/between transforms, `cfregress` control-function
-core, `predict` support after `cfregress` for `xb` and `residuals`, and
-`estat endogenous` support after `cfregress` with expanded residual-inclusion diagnostics.
+Phase 12 estimation substrate and now includes eleven Phase 14 slices: `ivregress` (`2sls` +
+`gmm`), IV diagnostics (`firststage`, `overid`, and `endogenous` after `2sls`), panel FE/RE +
+Hausman starter, `xtdata` within/between transforms, `cfregress` control-function core, `predict`
+support after `cfregress` for `xb` and `residuals`, and `estat endogenous` support after
+`cfregress` with expanded residual-inclusion diagnostics.
 
 ## Quickstart
 
@@ -207,14 +208,16 @@ tabdat> run analysis.td
   model in session state.
 - `estat` currently provides:
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
-  - IV diagnostics (`firststage`, `overid`) over the latest `ivregress` state
+  - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state
   - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
   - control-function endogenous diagnostics (`endogenous`) over the latest `cfregress` state
     with deterministic residual-inclusion metrics:
     `test`, `estimate`, `std_error`, `statistic`, `p_value`, `ci_level`, `ci_lower`, `ci_upper`,
     `distribution`, and `df`
-- `ivregress 2sls` currently provides a Python-first IV/2SLS path via `linearmodels` with
+- `ivregress` currently provides Python-first IV/2SLS and IV-GMM paths via `linearmodels` with
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
+- `estat endogenous` after `ivregress` is currently scoped to prior `ivregress 2sls` fits and
+  reports Durbin/Wu-Hausman diagnostics.
 - `cfregress` currently provides a bounded two-step control-function path (first-stage endogenous
   fit plus second-stage outcome fit with residual inclusion) for one endogenous variable.
 - `xtreg` currently provides Python-first `linearmodels` FE/RE estimation with `robust` and

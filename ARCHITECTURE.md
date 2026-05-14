@@ -1,9 +1,10 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented nine Phase 14
-slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, `cfregress` core, and
-`predict` plus `estat endogenous` support after `cfregress`). This document records the
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented eleven Phase 14
+slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
+FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
+support after `cfregress`). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -55,7 +56,7 @@ option parsing, `if` clauses, expression AST construction, and `run <script>` co
 Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
 constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
 `residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
-`ivregress 2sls ... endog(...) iv(...)`, `estat firststage|overid|hausman|endogenous`,
+`ivregress 2sls|gmm ... endog(...) iv(...)`, `estat firststage|overid|hausman|endogenous`,
 `xtreg <y> <xvars>, fe|re[, robust cluster(...)]`,
 `xtdata <varlist>, within|between`, and
 `cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
@@ -79,10 +80,11 @@ preserves or clears metadata across state-changing commands according to the com
 Phase 13 slices 1-3 add session-local regression state for the latest fitted linear model, extend
 `regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
 deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
-`estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls` execution through `linearmodels`,
-IV-focused `estat firststage|overid`, panel `xtreg` FE/RE plus `estat hausman` with bounded
-covariance constraints, and bounded `cfregress` control-function execution through Python-first
-two-stage OLS residual inclusion plus `estat endogenous` over residual-inclusion statistics.
+`estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls|gmm` execution through `linearmodels`,
+IV-focused `estat firststage|overid` plus `estat endogenous` after `2sls`, panel `xtreg` FE/RE plus
+`estat hausman` with bounded covariance constraints, and bounded `cfregress` control-function
+execution through Python-first two-stage OLS residual inclusion plus `estat endogenous` over
+residual-inclusion statistics.
 Estimation-family state is explicit: running one family clears
 stale state from the others to prevent cross-family `estat` reuse.
 
@@ -186,9 +188,9 @@ display formatting.
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
 - Phase 14 IV slices are executable through
-  `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
+  `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after
-  successful `ivregress`.
+  successful `ivregress`, plus `estat endogenous` after successful `ivregress 2sls`.
 - Phase 14 panel starter commands are executable through
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` and `estat hausman` after matching FE/RE
   fits with non-cluster covariance.
@@ -227,8 +229,8 @@ display formatting.
 - Keep remote loading scoped to DuckDB-readable Parquet URIs until credentials, DB connections, or
   broader remote data access are explicitly designed.
 - Keep named tables session-local until a future persistence/catalog contract exists.
-- Keep `ivregress 2sls` scoped to one endogenous variable plus one-or-more instruments until
-  broader endogeneity diagnostics and panel-estimation contracts are implemented.
+- Keep `ivregress` (`2sls|gmm`) scoped to one endogenous variable plus one-or-more instruments
+  until broader endogeneity diagnostics and panel-estimation contracts are implemented.
 - Keep `join` scoped to named-table inputs and same-name equality keys until a broader multi-table
   workflow contract is written.
 - Keep `append` scoped to named-table inputs with strict same-column schemas until a broader stack

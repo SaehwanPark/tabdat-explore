@@ -495,6 +495,8 @@ def test_cli_runs_phase_14_ivregress_flow(tmp_path: Path, capsys) -> None:
       "ivregress 2sls y w, endog(x_endog) iv(z_inst) robust",
       "-c",
       "ivregress 2sls y w, endog(x_endog) iv(z_inst) cluster(cluster_id)",
+      "-c",
+      "ivregress gmm y w, endog(x_endog) iv(z_inst)",
     ],
   )
 
@@ -506,6 +508,8 @@ def test_cli_runs_phase_14_ivregress_flow(tmp_path: Path, capsys) -> None:
   assert "Covariance: nonrobust" in captured.out
   assert "Covariance: robust" in captured.out
   assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Model: ivregress gmm y on w (endog=x_endog; iv=z_inst)" in captured.out
+  assert "Estimator: gmm" in captured.out
   assert captured.err == ""
 
 
@@ -596,6 +600,12 @@ def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
       "estat firststage",
       "-c",
       "estat overid",
+      "-c",
+      "estat endogenous",
+      "-c",
+      "ivregress gmm y w, endog(x_endog) iv(z_inst z_inst2)",
+      "-c",
+      "estat overid",
     ],
   )
 
@@ -607,6 +617,9 @@ def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
   assert "Test               Metric" in captured.out
   assert "sargan" in captured.out
   assert "wooldridge_overid" in captured.out
+  assert "durbin" in captured.out
+  assert "wu_hausman" in captured.out
+  assert "gmm_j" in captured.out
   assert captured.err == ""
 
 
