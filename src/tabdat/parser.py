@@ -36,6 +36,7 @@ from tabdat.models import (
   PanelCommand,
   ParsedCommand,
   PredictCommand,
+  ProbitCommand,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -87,6 +88,7 @@ _EXECUTABLE_COMMANDS = {
   "export",
   "regress",
   "logit",
+  "probit",
   "predict",
   "estat",
   "ivregress",
@@ -309,6 +311,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "logit":
     return _parse_logit(parts)
+
+  if parts.name == "probit":
+    return _parse_probit(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -849,15 +854,41 @@ def _parse_logit(parts: _CommandParts) -> LogitCommand:
   )
 
 
+def _parse_probit(parts: _CommandParts) -> ProbitCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("probit expects syntax: probit <y> <xvars>")
+  if len(parts.arguments) < 2:
+    raise ParseError("probit expects syntax: probit <y> <xvars>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"probit unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "probit", {"robust", "noconstant"})
+  cluster_values = _single_tuple_option(parts.options, "cluster", "probit")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("probit option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("probit cannot combine robust and cluster")
+  return ProbitCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
+  expected_estat_syntax = (
+    "estat expects syntax: "
+    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins>"
+  )
   if parts.condition is not None or parts.options or parts.expression is not None:
-    raise ParseError(
-      "estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>"
-    )
+    raise ParseError(expected_estat_syntax)
   if len(parts.arguments) != 1:
-    raise ParseError(
-      "estat expects syntax: estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>"
-    )
+    raise ParseError(expected_estat_syntax)
   subcommand = parts.arguments[0].lower()
   if subcommand not in {
     "residuals",
@@ -867,13 +898,17 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "overid",
     "hausman",
     "endogenous",
+    "margins",
   }:
     raise ParseError(
-      "estat subcommand must be residuals, ovtest, vif, firststage, overid, hausman, or endogenous"
+      "estat subcommand must be residuals, ovtest, vif, firststage, "
+      "overid, hausman, endogenous, or margins"
     )
   return EstatCommand(
     subcommand=cast(
-      Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous"],
+      Literal[
+        "residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous", "margins"
+      ],
       subcommand,
     )
   )

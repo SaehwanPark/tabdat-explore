@@ -35,6 +35,8 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
+- binary-choice probit regression with
+  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -45,13 +47,13 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate, completed thirteen Phase 14 slices, and started Phase 15 with a
-bounded `logit` core slice.
+Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered three bounded
+Phase 15 slices (`logit`, `probit`, and `estat margins`).
 
 ## Quickstart
 

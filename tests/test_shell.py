@@ -179,6 +179,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     logit_command = _completion_texts(completer, "log")
     logit_columns = _completion_texts(completer, "logit c")
     logit_options = _completion_texts(completer, "logit cost age, ")
+    probit_command = _completion_texts(completer, "prob")
+    probit_columns = _completion_texts(completer, "probit c")
+    probit_options = _completion_texts(completer, "probit cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -197,6 +200,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     estat_command = _completion_texts(completer, "est")
     estat_subcommands = _completion_texts(completer, "estat o")
     estat_endogenous = _completion_texts(completer, "estat e")
+    estat_margins = _completion_texts(completer, "estat m")
   finally:
     executor.close()
 
@@ -206,6 +210,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert logit_command == ["logit"]
   assert logit_columns == ["cost"]
   assert logit_options == ["robust", "cluster(", "noconstant"]
+  assert probit_command == ["probit"]
+  assert probit_columns == ["cost"]
+  assert probit_options == ["robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]
@@ -224,6 +231,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert estat_command == ["estat"]
   assert estat_subcommands == ["ovtest", "overid"]
   assert estat_endogenous == ["endogenous"]
+  assert estat_margins == ["margins"]
 
 
 def test_lexer_highlights_commands_keywords_and_literals() -> None:

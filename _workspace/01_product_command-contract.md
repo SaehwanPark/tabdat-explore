@@ -1,16 +1,17 @@
-# Phase 15 Slice 1 Command Contract
+# Phase 15 Slice 2-3 Command Contract
 
 ## Roadmap Phase
 
 - Phase 15 nonlinear estimation core
-  - Slice 1: bounded binary-choice `logit` estimator foundation
+  - Slice 2: bounded binary-choice `probit` estimator foundation
+  - Slice 3: bounded binary-choice `estat margins` diagnostics
 
-## `logit`
+## `probit`
 
 ### Syntax
 
 ```stata
-logit <y> <xvars>[, robust cluster(<var>) noconstant]
+probit <y> <xvars>[, robust cluster(<var>) noconstant]
 ```
 
 ### Rules
@@ -26,36 +27,59 @@ logit <y> <xvars>[, robust cluster(<var>) noconstant]
 - `robust` and `cluster(<var>)` are mutually exclusive.
 - `noconstant` disables intercept inclusion.
 - On successful fit, returns deterministic model output with:
-  - model identification (`logit`, outcome, predictors)
+  - model identification (`probit`, outcome, predictors)
   - covariance label
   - observation count
   - pseudo R-squared
   - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
 
+## `estat margins`
+
+### Syntax
+
+```stata
+estat margins
+```
+
+### Rules
+
+- Requires one active dataset.
+- Requires successful prior binary-choice model state from `logit` or `probit`.
+- Returns deterministic predictor-level rows with columns:
+  - `Variable`, `Metric`, `Value`
+- Supported metrics per predictor:
+  - `dy_dx`, `std_error`, `statistic`, `p_value`, `ci_lower`, `ci_upper`
+
 ## Error/guard behavior
 
 - No active dataset:
-  - `logit requires an active dataset; run use <path> first`
+  - `probit requires an active dataset; run use <path> first`
+  - `estat requires an active dataset; run use <path> first`
 - Invalid syntax/options:
   - parser errors consistent with existing command-family style
 - Non-binary outcome on complete-case sample:
-  - `logit outcome must be binary with values 0 and 1`
+  - `probit outcome must be binary with values 0 and 1`
 - No complete-case observations:
-  - `logit requires at least one complete observation`
+  - `probit requires at least one complete observation`
 - Cluster option with incomplete cluster values on retained sample:
-  - `logit requires complete cluster values`
+  - `probit requires complete cluster values`
 - Backend fit failures:
-  - `logit failed`
+  - `probit failed`
+- Missing binary-model prerequisite for margins:
+  - `estat margins requires a prior logit or probit model`
+- Marginal effects extraction failures:
+  - `estat margins failed for current model`
 
 ## State behavior
 
-- Running `logit` clears incompatible prior estimation family state to prevent stale post-estimation
+- Running `probit` clears incompatible prior estimation family state to prevent stale post-estimation
   use from other model families.
-- This slice does not add new `predict` or `estat` behaviors for `logit`.
+- Running `logit` or `probit` registers binary-model state for `estat margins`.
+- This slice pair does not add new nonlinear `predict` behavior.
 
 ## Acceptance Criteria
 
-- `logit` parses and executes with nonrobust, robust, and clustered covariance modes.
-- Deterministic CLI formatting is available for `logit` results.
+- `probit` parses and executes with nonrobust, robust, and clustered covariance modes.
+- `estat margins` parses and executes after `logit` and `probit` with deterministic output.
 - Focused parser/executor/CLI/shell coverage passes.
-- Existing `regress`/`ivregress`/`cfregress`/`xtreg`/`predict`/`estat` behavior remains stable.
+- Existing `regress`/`ivregress`/`cfregress`/`xtreg`/`predict`/other `estat` behavior remains stable.

@@ -56,6 +56,8 @@ from tabdat.models import (
   PlotResult,
   PredictCommand,
   PreviewResult,
+  ProbitCommand,
+  ProbitRegressionResult,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -554,6 +556,105 @@ def test_phase_15_logit_clears_prior_regress_state(tmp_path: Path) -> None:
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
+  finally:
+    executor.close()
+
+
+def test_phase_15_probit_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "probit.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(ProbitCommand(outcome="y", predictors=("x", "z")))
+  finally:
+    executor.close()
+
+  assert isinstance(result, ProbitRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x", "z")
+  assert result.observation_count == 8
+  assert result.pseudo_r_squared is not None
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x", "z"]
+
+
+def test_phase_15_probit_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "probit.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(ProbitCommand(outcome="y", predictors=("x",), robust=True))
+    clustered = executor.execute(
+      ProbitCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, ProbitRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, ProbitRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_15_probit_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  nonbinary_path = tmp_path / "nonbinary.parquet"
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  _write_nonbinary_logit_parquet(nonbinary_path)
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="probit requires an active dataset"):
+      executor.execute(ProbitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="probit unknown variable: y, x"):
+      executor.execute(ProbitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(nonbinary_path))
+    with pytest.raises(
+      ExecutionError,
+      match="probit outcome must be binary with values 0 and 1",
+    ):
+      executor.execute(ProbitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="probit requires complete cluster values"):
+      executor.execute(ProbitCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id"))
+  finally:
+    executor.close()
+
+
+def test_phase_15_estat_margins_after_logit_and_probit(tmp_path: Path) -> None:
+  path = tmp_path / "binary.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(LogitCommand(outcome="y", predictors=("x", "z")))
+    logit_margins = executor.execute(EstatCommand(subcommand="margins"))
+    executor.execute(ProbitCommand(outcome="y", predictors=("x", "z")))
+    probit_margins = executor.execute(EstatCommand(subcommand="margins"))
+  finally:
+    executor.close()
+
+  assert isinstance(logit_margins, TableResult)
+  assert logit_margins.headers == ("Variable", "Metric", "Value")
+  assert any(row[0] == "x" and row[1] == "dy_dx" for row in logit_margins.rows)
+  assert any(row[0] == "z" and row[1] == "ci_upper" for row in logit_margins.rows)
+  assert isinstance(probit_margins, TableResult)
+  assert probit_margins.headers == ("Variable", "Metric", "Value")
+  assert any(row[0] == "x" and row[1] == "dy_dx" for row in probit_margins.rows)
+  assert any(row[0] == "z" and row[1] == "ci_upper" for row in probit_margins.rows)
+
+
+def test_phase_15_estat_margins_requires_prior_binary_model(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(
+      ExecutionError,
+      match="estat margins requires a prior logit or probit model",
+    ):
+      executor.execute(EstatCommand(subcommand="margins"))
   finally:
     executor.close()
 

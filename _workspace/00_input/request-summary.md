@@ -1,17 +1,19 @@
-# Phase 15 Slice 1 Request Summary
+# Phase 15 Slice 2-3 Request Summary
 
 ## User Goal
 
-Resume development from the latest checkpoint by starting the next meaningful phase in `SPEC.md`
-with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
+Resume development from the latest checkpoint by implementing remaining meaningful Phase 15 slices
+in one bounded PR with checkpoint commits, updated SDD artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 15 Slice 1:
-  - add bounded nonlinear binary-choice estimation via `logit`
+- Phase 15 Slice 2:
+  - add bounded nonlinear binary-choice estimation via `probit`
   - command surface:
-    - `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
-  - preserve current estimation family boundaries for `regress`, `ivregress`, `cfregress`, `xtreg`
+    - `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
+- Phase 15 Slice 3:
+  - add bounded post-estimation marginal effects via `estat margins`
+  - available after successful `logit` or `probit`
 
 ## Constraints
 
@@ -24,7 +26,6 @@ with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review P
 
 ## Non-goals
 
-- No `probit` in this slice.
-- No marginal effects or nonlinear `predict` workflows in this slice.
-- No new command families outside the `logit` estimator surface.
+- No nonlinear `predict` expansion in this slice pair.
+- No limited-dependent command families (`tobit`, `truncated`, `sample selection`) in this PR.
 - No R adapter work while Python-first coverage is sufficient.

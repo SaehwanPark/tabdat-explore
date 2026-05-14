@@ -46,6 +46,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "export",
   "regress",
   "logit",
+  "probit",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -75,6 +76,7 @@ _COLUMN_COMMANDS = {
   "panel",
   "regress",
   "logit",
+  "probit",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -87,6 +89,7 @@ _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _LOGIT_OPTIONS = ("robust", "cluster(", "noconstant")
+_PROBIT_OPTIONS = ("robust", "cluster(", "noconstant")
 _IVREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _XTREG_OPTIONS = ("fe", "re", "robust", "cluster(")
 _XTDATA_OPTIONS = ("within", "between")
@@ -100,6 +103,7 @@ _ESTAT_SUBCOMMANDS = (
   "overid",
   "hausman",
   "endogenous",
+  "margins",
 )
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
@@ -169,6 +173,7 @@ class TabdatCompleter(Completer):
       "bar",
       "regress",
       "logit",
+      "probit",
       "ivregress",
       "xtreg",
       "xtdata",
@@ -263,6 +268,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_REGRESS_OPTIONS, word)
   if command_name == "logit":
     yield from _matching_completions(_LOGIT_OPTIONS, word)
+  if command_name == "probit":
+    yield from _matching_completions(_PROBIT_OPTIONS, word)
   if command_name == "ivregress":
     yield from _matching_completions(_IVREGRESS_OPTIONS, word)
   if command_name == "xtreg":

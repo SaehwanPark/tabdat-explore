@@ -262,6 +262,15 @@ class LogitCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ProbitCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PredictCommand:
   target_variable: str
   kind: Literal["xb", "residuals"] = "xb"
@@ -269,7 +278,9 @@ class PredictCommand:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
-  subcommand: Literal["residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous"]
+  subcommand: Literal[
+    "residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous", "margins"
+  ]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -351,6 +362,7 @@ Command = (
   | ExportCommand
   | RegressCommand
   | LogitCommand
+  | ProbitCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -489,6 +501,17 @@ class LogitRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ProbitRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  pseudo_r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -582,6 +605,7 @@ Result = (
   | TransformResult
   | RegressionResult
   | LogitRegressionResult
+  | ProbitRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

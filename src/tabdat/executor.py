@@ -62,6 +62,8 @@ from tabdat.models import (
   PlotResult,
   PredictCommand,
   PreviewResult,
+  ProbitCommand,
+  ProbitRegressionResult,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -144,6 +146,13 @@ class _XtRegressionState:
   fitted_model: object
 
 
+@dataclass(frozen=True)
+class _BinaryRegressionState:
+  family: Literal["logit", "probit"]
+  predictor_names: tuple[str, ...]
+  fitted_model: object
+
+
 @dataclass
 class _XtModelCache:
   fe: _XtRegressionState | None = None
@@ -157,6 +166,7 @@ class SessionState:
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
+  binary_regression: _BinaryRegressionState | None = None
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
@@ -338,6 +348,9 @@ class Executor:
 
     if isinstance(command, LogitCommand):
       return self._execute_logit(command)
+
+    if isinstance(command, ProbitCommand):
+      return self._execute_probit(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -604,6 +617,7 @@ class Executor:
       include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
+    self.state.binary_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -671,10 +685,80 @@ class Executor:
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.binary_regression = _BinaryRegressionState(
+      family="logit",
+      predictor_names=command.predictors,
+      fitted_model=fitted,
+    )
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return LogitRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      pseudo_r_squared=_to_float(getattr(fitted, "prsquared", None)),
+      coefficients=coefficients,
+    )
+
+  def _execute_probit(self, command: ProbitCommand) -> ProbitRegressionResult:
+    dataset = self._require_active_dataset("probit")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("probit", dataset, numeric_variables)
+    row_columns = [command.outcome, *command.predictors]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    outcomes, predictors, groups, missing_cluster_detected = _logit_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("probit requires at least one complete observation")
+    observed_outcomes = set(outcomes)
+    if (
+      observed_outcomes != {0.0, 1.0} and observed_outcomes != {0.0} and observed_outcomes != {1.0}
+    ):
+      raise ExecutionError("probit outcome must be binary with values 0 and 1")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcomes, dtype=float)
+    covariance = "nonrobust"
+    model = sm.Probit(outcome_array, design)
+    try:
+      if command.robust:
+        fitted = model.fit(disp=0, cov_type="HC1")
+        covariance = "robust"
+      elif command.cluster_variable is not None:
+        if groups is None or missing_cluster_detected:
+          raise ExecutionError("probit requires complete cluster values")
+        fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
+        covariance = f"cluster({command.cluster_variable})"
+      else:
+        fitted = model.fit(disp=0)
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("probit failed") from exc
+    parameter_names = (
+      ("intercept", *command.predictors) if command.include_intercept else command.predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    self.state.regression = None
+    self.state.binary_regression = _BinaryRegressionState(
+      family="probit",
+      predictor_names=command.predictors,
+      fitted_model=fitted,
+    )
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return ProbitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
       predictors=command.predictors,
@@ -750,6 +834,7 @@ class Executor:
     parameter_names = _iv_parameter_names(command)
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.binary_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
       fitted_model=fitted,
@@ -871,6 +956,7 @@ class Executor:
       else tuple(estimate.value for estimate in coefficients)
     )
     self.state.regression = None
+    self.state.binary_regression = None
     self.state.iv_regression = None
     (
       residual_estimate,
@@ -1026,6 +1112,14 @@ class Executor:
       if iv_regression.estimator != "2sls":
         raise ExecutionError("estat endogenous requires a prior ivregress 2sls model")
       return _estat_iv_endogenous_table(iv_regression.fitted_model)
+    if command.subcommand == "margins":
+      binary_regression = self.state.binary_regression
+      if binary_regression is None:
+        raise ExecutionError("estat margins requires a prior logit or probit model")
+      return _estat_binary_margins_table(
+        binary_regression.fitted_model,
+        predictor_names=binary_regression.predictor_names,
+      )
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1123,6 +1217,7 @@ class Executor:
     else:
       self.state.xt_regressions.re = state
     self.state.regression = None
+    self.state.binary_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     return XtRegressionResult(
@@ -1407,6 +1502,47 @@ def _estat_iv_endogenous_table(fitted_model: object) -> TableResult:
       )
     )
   return TableResult(headers=("Test", "Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_binary_margins_table(
+  fitted_model: object,
+  *,
+  predictor_names: tuple[str, ...],
+) -> TableResult:
+  try:
+    margins = cast(Any, fitted_model).get_margeff(at="overall")
+    summary = margins.summary_frame()
+    raw_index = getattr(summary, "index", ())
+    index: tuple[object, ...] = tuple(raw_index)
+  except Exception as exc:
+    raise ExecutionError("estat margins failed for current model") from exc
+  if not index:
+    raise ExecutionError("estat margins failed for current model")
+  margin_variables = (
+    predictor_names if len(predictor_names) == len(index) else tuple(str(name) for name in index)
+  )
+  rows: list[tuple[object, ...]] = []
+  for variable, summary_name in zip(margin_variables, index, strict=True):
+    try:
+      effect = _to_float(summary.loc[summary_name, "dy/dx"])
+      std_error = _to_float(summary.loc[summary_name, "Std. Err."])
+      statistic = _to_float(summary.loc[summary_name, "z"])
+      p_value = _to_float(summary.loc[summary_name, "Pr(>|z|)"])
+      ci_lower = _to_float(summary.loc[summary_name, "Conf. Int. Low"])
+      ci_upper = _to_float(summary.loc[summary_name, "Cont. Int. Hi."])
+    except Exception as exc:
+      raise ExecutionError("estat margins failed for current model") from exc
+    rows.extend(
+      (
+        (str(variable), "dy_dx", effect),
+        (str(variable), "std_error", std_error),
+        (str(variable), "statistic", statistic),
+        (str(variable), "p_value", p_value),
+        (str(variable), "ci_lower", ci_lower),
+        (str(variable), "ci_upper", ci_upper),
+      )
+    )
+  return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))
 
 
 def _invoke_iv_test_stat(fitted_model: object, attribute_name: str) -> object | None:
