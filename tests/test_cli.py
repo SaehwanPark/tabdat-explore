@@ -315,6 +315,11 @@ def test_cli_runs_phase_11_panel_metadata_flow(tmp_path: Path, capsys) -> None:
   assert "Panel: none" in captured.out
   assert "Panel set: id=firm_id, time=year" in captured.out
   assert "Panel: id=firm_id, time=year" in captured.out
+  assert "Observations: 3" in captured.out
+  assert "Entities: 2" in captured.out
+  assert "Time periods: 2" in captured.out
+  assert "Obs per entity: min=1, max=2" in captured.out
+  assert "Balanced: no" in captured.out
   assert "Panel cleared" in captured.out
   assert captured.err == ""
 
@@ -546,6 +551,8 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
       "-c",
       "predict y_resid_cf, residuals",
       "-c",
+      "estat firststage",
+      "-c",
       "estat endogenous",
     ],
   )
@@ -560,6 +567,8 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
   assert "Covariance: cluster(cluster_id)" in captured.out
   assert "Predicted y_hat_cf: 8 rows, 6 columns" in captured.out
   assert "Predicted y_resid_cf: 8 rows, 7 columns" in captured.out
+  assert "first_stage  observation_count" in captured.out
+  assert "first_stage  r_squared" in captured.out
   assert "control_function_residual  estimate" in captured.out
   assert "control_function_residual  std_error" in captured.out
   assert "control_function_residual  statistic" in captured.out

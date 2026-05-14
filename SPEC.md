@@ -225,26 +225,39 @@ and describe the active work with concise verification criteria.
   - preserved existing control-function `estat endogenous` behavior after `cfregress`
   - explicit guard that IV endogenous diagnostics are not available after `ivregress gmm`
   - focused executor/backend and CLI coverage
+- Implemented the twelfth Phase 14 control-function diagnostics extension slice:
+  - `estat firststage` after successful `cfregress`
+  - deterministic first-stage coefficient and fit-summary output (`coefficient`, `std_error`,
+    `statistic`, `p_value`, `observation_count`, `r_squared`)
+  - preserved existing IV `estat firststage` behavior and prerequisite errors
+  - focused executor and CLI coverage
+- Implemented the thirteenth Phase 14 panel semantics extension slice:
+  - expanded `panel` report output with deterministic structure metrics
+  - panel report now includes `observation_count`, `entity_count`, `time_count`,
+    per-entity min/max observation counts, and balancedness (`yes`/`no`)
+  - preserved existing `panel set`, `panel clear`, and metadata-validation behavior
+  - focused backend, executor, formatter, and CLI coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice10-11-ivgmm-endogenous
+  Branch: codex/tmp-phase14-slice12-13-cf-firststage-panel-report
 
   Summary:
   Continue from implemented `ivregress` (`2sls` + `gmm`), IV diagnostics (`firststage`,
   `overid`, and `endogenous` after `2sls`), panel FE/RE/Hausman starter, `xtdata`
   within/between transforms, `cfregress` control-function core, and control-function
-  prediction/diagnostics routing to fill remaining
-  Phase 14 control-function and panel-semantic extensions.
+  prediction/diagnostics routing with the new `estat firststage` CF extension and expanded
+  panel structure reporting.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
   - `ivregress 2sls|gmm` works with nonrobust, robust, and clustered covariance modes
   - `estat firststage|overid` works after `ivregress`
+  - `estat firststage` works after `cfregress`
   - `estat endogenous` works after `ivregress 2sls`
   - `xtreg` FE/RE and `estat hausman` work with required panel metadata
   - `xtdata ... , within|between` works with required panel metadata
@@ -253,6 +266,7 @@ and describe the active work with concise verification criteria.
   - `estat endogenous` works after `cfregress`
   - `estat endogenous` reports `test`, `estimate`, `std_error`, `statistic`, `p_value`,
     `ci_level`, `ci_lower`, `ci_upper`, `distribution`, and `df`
+  - `panel` report includes deterministic structure and balancedness metrics after `panel set`
 
   Out of Scope:
   - Broad panel workflow redesign

@@ -49,6 +49,7 @@ from tabdat.models import (
   PanelCommand,
   PanelMetadata,
   PanelResult,
+  PanelStructureSummary,
   ParsedCommand,
   PlotResult,
   PredictCommand,
@@ -1218,6 +1219,36 @@ def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collis
   assert isinstance(observed["df"], (float, str))
 
 
+def test_phase_14_estat_firststage_after_cfregress(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    firststage = executor.execute(EstatCommand(subcommand="firststage"))
+  finally:
+    executor.close()
+
+  assert isinstance(firststage, TableResult)
+  assert firststage.headers == ("Variable", "Metric", "Value")
+  observed = {(str(row[0]), str(row[1])): row[2] for row in firststage.rows}
+  assert ("intercept", "coefficient") in observed
+  assert ("w", "coefficient") in observed
+  assert ("z_inst", "coefficient") in observed
+  assert ("first_stage", "observation_count") in observed
+  assert observed[("first_stage", "observation_count")] == 8
+  assert ("first_stage", "r_squared") in observed
+  assert isinstance(observed[("first_stage", "r_squared")], float)
+
+
 def test_phase_14_estat_endogenous_requires_prior_cfregress(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -1784,9 +1815,29 @@ def test_phase_11_panel_set_report_clear_and_named_table_restore(tmp_path: Path)
 
   assert report_before == PanelResult(action="report")
   assert set_result == PanelResult("set", PanelMetadata("firm_id", "year"))
-  assert report_after == PanelResult("report", PanelMetadata("firm_id", "year"))
+  assert report_after == PanelResult(
+    "report",
+    PanelMetadata("firm_id", "year"),
+    summary=PanelStructureSummary(
+      observation_count=3,
+      entity_count=2,
+      time_count=2,
+      min_observations_per_entity=1,
+      max_observations_per_entity=2,
+    ),
+  )
   assert cleared == PanelResult(action="report")
-  assert restored == PanelResult("report", PanelMetadata("firm_id", "year"))
+  assert restored == PanelResult(
+    "report",
+    PanelMetadata("firm_id", "year"),
+    summary=PanelStructureSummary(
+      observation_count=3,
+      entity_count=2,
+      time_count=2,
+      min_observations_per_entity=1,
+      max_observations_per_entity=2,
+    ),
+  )
 
 
 def test_phase_11_panel_reports_validation_errors(sample_parquet: Path, tmp_path: Path) -> None:

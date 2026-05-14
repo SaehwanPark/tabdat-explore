@@ -108,9 +108,12 @@ class _IvRegressionState:
 class _CfRegressionState:
   outcome_variable: str
   endogenous_variable: str
+  first_stage_coefficients: tuple[CoefficientEstimate, ...]
   first_stage_predictor_names: tuple[str, ...]
   first_stage_predictor_coefficients: tuple[float, ...]
   first_stage_intercept: float | None
+  first_stage_observation_count: int
+  first_stage_r_squared: float | None
   second_stage_predictor_names: tuple[str, ...]
   second_stage_predictor_coefficients: tuple[float, ...]
   second_stage_intercept: float | None
@@ -509,7 +512,11 @@ class Executor:
   def _execute_panel(self, command: PanelCommand) -> PanelResult:
     dataset = self._require_active_dataset("panel")
     if command.action == "report":
-      return PanelResult(action="report", metadata=dataset.panel_metadata)
+      metadata = dataset.panel_metadata
+      if metadata is None:
+        return PanelResult(action="report")
+      summary = self.backend.panel_structure_summary(metadata)
+      return PanelResult(action="report", metadata=metadata, summary=summary)
     if command.action == "clear":
       cleared = replace(dataset, panel_metadata=None)
       self._set_active_dataset(cleared)
@@ -823,9 +830,12 @@ class Executor:
     self.state.cf_regression = _CfRegressionState(
       outcome_variable=command.outcome,
       endogenous_variable=command.endogenous,
+      first_stage_coefficients=first_stage_coefficients,
       first_stage_predictor_names=(*command.exogenous, *command.instruments),
       first_stage_predictor_coefficients=first_stage_predictor_coefficients,
       first_stage_intercept=first_stage_intercept,
+      first_stage_observation_count=len(endogenous_values),
+      first_stage_r_squared=_to_float(getattr(first_stage, "rsquared", None)),
       second_stage_predictor_names=(*command.exogenous, command.endogenous, "cf_residual"),
       second_stage_predictor_coefficients=second_stage_predictor_coefficients,
       second_stage_intercept=second_stage_intercept,
@@ -910,9 +920,12 @@ class Executor:
       )
     if command.subcommand == "firststage":
       iv_regression = self.state.iv_regression
-      if iv_regression is None:
-        raise ExecutionError("estat firststage requires a prior ivregress model")
-      return _estat_iv_firststage_table(iv_regression.fitted_model)
+      if iv_regression is not None:
+        return _estat_iv_firststage_table(iv_regression.fitted_model)
+      cf_regression = self.state.cf_regression
+      if cf_regression is not None:
+        return _estat_cf_firststage_table(cf_regression)
+      raise ExecutionError("estat firststage requires a prior ivregress model")
     if command.subcommand == "overid":
       iv_regression = self.state.iv_regression
       if iv_regression is None:
@@ -1398,6 +1411,26 @@ def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult
     ("control_function_residual", "df", distribution_df),
   )
   return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
+
+
+def _estat_cf_firststage_table(cf_regression: _CfRegressionState) -> TableResult:
+  rows: list[tuple[object, ...]] = []
+  for estimate in cf_regression.first_stage_coefficients:
+    rows.extend(
+      (
+        (estimate.name, "coefficient", estimate.value),
+        (estimate.name, "std_error", estimate.standard_error),
+        (estimate.name, "statistic", estimate.statistic),
+        (estimate.name, "p_value", estimate.p_value),
+      )
+    )
+  rows.extend(
+    (
+      ("first_stage", "observation_count", cf_regression.first_stage_observation_count),
+      ("first_stage", "r_squared", cf_regression.first_stage_r_squared),
+    )
+  )
+  return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))
 
 
 def _cf_residual_diagnostic(

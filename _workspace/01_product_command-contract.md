@@ -1,64 +1,58 @@
-# Phase 14 Slices 10-11 Command Contract
+# Phase 14 Slices 12-13 Command Contract
 
 ## Roadmap Phase
 
 - Phase 14 endogeneity and panel foundations
-  - Slice 10: IV estimator expansion (`ivregress gmm`)
-  - Slice 11: IV endogenous diagnostics (`estat endogenous` after `ivregress 2sls`)
+  - Slice 12: control-function first-stage diagnostics (`estat firststage` after `cfregress`)
+  - Slice 13: panel report semantic expansion
 
-## `ivregress` estimator expansion
-
-### Syntax
-
-```stata
-ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]
-```
-
-### Rules
-
-- Keeps one endogenous variable and one-or-more instruments.
-- Supports `2sls` and `gmm` estimators through Python-first `linearmodels`.
-- Preserves covariance modes:
-  - nonrobust (default)
-  - robust
-  - cluster(`<var>`)
-
-## `estat overid` after `ivregress`
+## `estat firststage` after `cfregress`
 
 ### Syntax
 
 ```stata
-estat overid
+estat firststage
 ```
 
 ### Rules
 
-- Requires prior `ivregress` model state.
-- After `ivregress 2sls`: returns deterministic `sargan` and `wooldridge_overid` rows.
-- After `ivregress gmm`: returns deterministic `gmm_j` rows.
+- Existing behavior remains unchanged after prior `ivregress`.
+- New behavior: after prior `cfregress`, return deterministic first-stage diagnostic rows with
+  headers `Variable`, `Metric`, and `Value`.
+- Include coefficient-level metrics for first-stage terms:
+  - `coefficient`
+  - `std_error`
+  - `statistic`
+  - `p_value`
+- Include first-stage fit summary rows:
+  - `observation_count`
+  - `r_squared`
+- Preserve existing error when no compatible prior model state exists:
+  - `estat firststage requires a prior ivregress model`
 
-## `estat endogenous`
+## `panel` report semantic expansion
 
 ### Syntax
 
 ```stata
-estat endogenous
+panel
 ```
 
 ### Rules
 
-- Existing behavior remains unchanged after prior `cfregress`.
-- New behavior: after prior `ivregress 2sls`, returns deterministic rows for:
-  - `durbin`
-  - `wu_hausman`
-  with metrics `statistic`, `p_value`, `df`, and `distribution`.
-- Guard: after prior `ivregress gmm`, returns
-  - `estat endogenous requires a prior ivregress 2sls model`
+- Existing `panel set <id_var> <time_var>` and `panel clear` behavior remains unchanged.
+- Existing `panel` with no active metadata remains unchanged (`Panel: none`).
+- After panel metadata is set, `panel` report output includes deterministic structure metrics:
+  - total observations
+  - distinct entity count
+  - distinct time count
+  - per-entity minimum and maximum observation counts
+  - balancedness indicator (`yes` when min==max, else `no`)
 
 ## Acceptance Criteria
 
-- `ivregress gmm` parses and executes with existing IV option/covariance surface.
-- `estat overid` works deterministically after both `ivregress 2sls` and `ivregress gmm`.
-- `estat endogenous` works after `ivregress 2sls` and preserves current `cfregress` path.
-- Existing `regress`/`cfregress`/`xtreg`/`xtdata` behavior remains stable.
-- Focused parser/executor/CLI/shell tests pass.
+- `estat firststage` works after both `ivregress` and `cfregress`.
+- Existing `ivregress` diagnostics and `cfregress` `predict`/`estat endogenous` behavior remain stable.
+- `panel` report includes deterministic structure metrics when metadata is set.
+- Existing `panel set`, `panel clear`, and `panel`-without-metadata behavior remain stable.
+- Focused executor/backend/formatter/CLI tests pass.
