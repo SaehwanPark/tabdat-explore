@@ -546,6 +546,8 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
       "-c",
       "predict y_resid_cf, residuals",
       "-c",
+      "estat firststage",
+      "-c",
       "estat endogenous",
     ],
   )
@@ -560,6 +562,8 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
   assert "Covariance: cluster(cluster_id)" in captured.out
   assert "Predicted y_hat_cf: 8 rows, 6 columns" in captured.out
   assert "Predicted y_resid_cf: 8 rows, 7 columns" in captured.out
+  assert "first_stage  observation_count" in captured.out
+  assert "first_stage  r_squared" in captured.out
   assert "control_function_residual  estimate" in captured.out
   assert "control_function_residual  std_error" in captured.out
   assert "control_function_residual  statistic" in captured.out

@@ -1218,6 +1218,36 @@ def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collis
   assert isinstance(observed["df"], (float, str))
 
 
+def test_phase_14_estat_firststage_after_cfregress(tmp_path: Path) -> None:
+  path = tmp_path / "iv-regression.parquet"
+  _write_iv_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      CfRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst",),
+      )
+    )
+    firststage = executor.execute(EstatCommand(subcommand="firststage"))
+  finally:
+    executor.close()
+
+  assert isinstance(firststage, TableResult)
+  assert firststage.headers == ("Variable", "Metric", "Value")
+  observed = {(str(row[0]), str(row[1])): row[2] for row in firststage.rows}
+  assert ("intercept", "coefficient") in observed
+  assert ("w", "coefficient") in observed
+  assert ("z_inst", "coefficient") in observed
+  assert ("first_stage", "observation_count") in observed
+  assert observed[("first_stage", "observation_count")] == 8
+  assert ("first_stage", "r_squared") in observed
+  assert isinstance(observed[("first_stage", "r_squared")], float)
+
+
 def test_phase_14_estat_endogenous_requires_prior_cfregress(sample_parquet: Path) -> None:
   executor = Executor()
   try:
