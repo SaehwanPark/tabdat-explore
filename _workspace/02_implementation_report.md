@@ -1,20 +1,23 @@
-# Phase 14 Slice 8 Implementation Report
+# Phase 14 Slice 9 Implementation Report
 
 ## Scope
 
-Implemented Phase 14 Slice 8 (expanded `estat endogenous` diagnostics after `cfregress`) on one
+Implemented Phase 14 Slice 9 (expanded `estat endogenous` diagnostics after `cfregress`) on one
 bounded branch using the existing `estat` command surface and Python-first execution.
 
 ## What Changed
 
 ### Executor/model-state behavior
 
-- Extended control-function session state to persist deterministic residual-inclusion coefficient
-  value and standard error for `cf_residual`.
+- Extended control-function session state to persist deterministic residual-inclusion confidence
+  interval and distribution metadata for `cf_residual`.
 - Expanded `estat endogenous` table output rows to include:
-  - `estimate`
-  - `std_error`
-  while preserving existing `test`, `statistic`, and `p_value` rows.
+  - `ci_level`
+  - `ci_lower`
+  - `ci_upper`
+  - `distribution`
+  - `df`
+  while preserving existing `test`, `estimate`, `std_error`, `statistic`, and `p_value` rows.
 - Preserved existing missing-prior-model error:
   - `estat endogenous requires a prior cfregress model`
 - Preserved bounded failure guard when residual-inclusion diagnostics are unavailable:
@@ -27,9 +30,8 @@ bounded branch using the existing `estat` command surface and Python-first execu
 
 ### Tests
 
-- Expanded focused executor coverage for `estat endogenous` row shape and value/SE consistency with
-  residual-inclusion coefficient slots.
-- Expanded CLI Phase 14 flow coverage to assert `estimate` and `std_error` output rows.
+- Expanded focused executor coverage for `estat endogenous` row shape and CI/distribution fields.
+- Expanded CLI Phase 14 flow coverage to assert CI/distribution output rows.
 
 ### Documentation and SDD state
 

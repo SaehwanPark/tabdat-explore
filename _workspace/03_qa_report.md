@@ -1,4 +1,4 @@
-# Phase 14 Slice 8 QA Report
+# Phase 14 Slice 9 QA Report
 
 ## Status
 
@@ -11,7 +11,7 @@ pass
 - Contract -> executor routing:
   - `estat endogenous` still requires prior `cfregress` model state.
 - Executor -> CLI:
-  - deterministic terminal output now includes `estimate` and `std_error` rows after `cfregress`.
+  - deterministic terminal output now includes CI/distribution rows after `cfregress`.
 - Regression-family isolation:
   - existing `estat` and prediction behavior remain unchanged.
 - SDD/docs -> implementation:
@@ -23,8 +23,8 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Consider a future dedicated contract for confidence intervals or distribution metadata in
-  `estat endogenous` if broader diagnostic parity is required.
+- Consider a future dedicated contract for alternate CI levels or additional post-estimation
+  distribution metadata if broader diagnostic parity is required.
 
 ## Validation Evidence
 
@@ -38,4 +38,4 @@ pass
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice8-cf-endogenous-expanded`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice9-cf-endogenous-ci`, open one PR, and mark it ready for review.
