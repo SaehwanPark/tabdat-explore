@@ -1,4 +1,4 @@
-# Phase 14 Slice 8 Request Summary
+# Phase 14 Slice 9 Request Summary
 
 ## User Goal
 
@@ -7,10 +7,11 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 14 Slice 8:
+- Phase 14 Slice 9:
   - expand control-function endogenous diagnostics through the existing post-estimation surface:
     - `estat endogenous`
-  - preserve the existing command syntax/options while broadening diagnostic output detail
+  - preserve the existing command syntax/options while broadening diagnostic output detail with
+    confidence-interval and distribution metadata rows
 
 ## Constraints
 
