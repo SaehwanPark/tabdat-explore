@@ -1,4 +1,4 @@
-# Phase 14 Slice 7 Request Summary
+# Phase 14 Slice 8 Request Summary
 
 ## User Goal
 
@@ -7,10 +7,10 @@ checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 14 Slice 7:
-  - add control-function endogenous diagnostics through a dedicated post-estimation surface:
+- Phase 14 Slice 8:
+  - expand control-function endogenous diagnostics through the existing post-estimation surface:
     - `estat endogenous`
-  - route diagnostics from prior `cfregress` state without changing `cfregress` syntax/options
+  - preserve the existing command syntax/options while broadening diagnostic output detail
 
 ## Constraints
 
