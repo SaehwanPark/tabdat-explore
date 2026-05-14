@@ -920,6 +920,54 @@ def test_phase_14_estat_iv_diagnostics(tmp_path: Path) -> None:
   assert any(row[0] == "wooldridge_overid" for row in overid.rows)
 
 
+def test_phase_14_estat_endogenous_after_ivregress_2sls(tmp_path: Path) -> None:
+  path = tmp_path / "iv-overid.parquet"
+  _write_iv_overid_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst", "z_inst2"),
+      )
+    )
+    endogenous = executor.execute(EstatCommand(subcommand="endogenous"))
+  finally:
+    executor.close()
+
+  assert isinstance(endogenous, TableResult)
+  assert endogenous.headers == ("Test", "Metric", "Value")
+  assert any(row[0] == "durbin" for row in endogenous.rows)
+  assert any(row[0] == "wu_hausman" for row in endogenous.rows)
+
+
+def test_phase_14_estat_endogenous_rejects_non_2sls_ivregress(tmp_path: Path) -> None:
+  path = tmp_path / "iv-overid.parquet"
+  _write_iv_overid_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst", "z_inst2"),
+        estimator="gmm",
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="estat endogenous requires a prior ivregress 2sls model",
+    ):
+      executor.execute(EstatCommand(subcommand="endogenous"))
+  finally:
+    executor.close()
+
+
 def test_phase_14_estat_overid_handles_exact_identification(tmp_path: Path) -> None:
   path = tmp_path / "iv-just-identified.parquet"
   _write_iv_regression_parquet(path)

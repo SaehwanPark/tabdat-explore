@@ -601,6 +601,8 @@ def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
       "-c",
       "estat overid",
       "-c",
+      "estat endogenous",
+      "-c",
       "ivregress gmm y w, endog(x_endog) iv(z_inst z_inst2)",
       "-c",
       "estat overid",
@@ -615,6 +617,8 @@ def test_cli_runs_phase_14_iv_estat_flow(tmp_path: Path, capsys) -> None:
   assert "Test               Metric" in captured.out
   assert "sargan" in captured.out
   assert "wooldridge_overid" in captured.out
+  assert "durbin" in captured.out
+  assert "wu_hausman" in captured.out
   assert "gmm_j" in captured.out
   assert captured.err == ""
 
