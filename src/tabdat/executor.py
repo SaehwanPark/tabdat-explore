@@ -54,6 +54,8 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LoadResult,
+  LogitCommand,
+  LogitRegressionResult,
   PanelCommand,
   PanelMetadata,
   PanelResult,
@@ -333,6 +335,9 @@ class Executor:
 
     if isinstance(command, RegressCommand):
       return self._execute_regress(command)
+
+    if isinstance(command, LogitCommand):
+      return self._execute_logit(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -616,6 +621,63 @@ class Executor:
         residuals=getattr(fitted, "resid", None),
         parameter_count=len(parameter_names),
       ),
+      coefficients=coefficients,
+    )
+
+  def _execute_logit(self, command: LogitCommand) -> LogitRegressionResult:
+    dataset = self._require_active_dataset("logit")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("logit", dataset, numeric_variables)
+    row_columns = [command.outcome, *command.predictors]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    outcomes, predictors, groups = _logit_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("logit requires at least one complete observation")
+    observed_outcomes = set(outcomes)
+    if observed_outcomes != {0.0, 1.0} and observed_outcomes != {0.0} and observed_outcomes != {1.0}:
+      raise ExecutionError("logit outcome must be binary with values 0 and 1")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcomes, dtype=float)
+    fit_kwargs: dict[str, object] = {"disp": 0}
+    covariance = "nonrobust"
+    if command.robust:
+      fit_kwargs["cov_type"] = "HC1"
+      covariance = "robust"
+    if command.cluster_variable is not None:
+      if groups is None:
+        raise ExecutionError("logit requires complete cluster values")
+      fit_kwargs["cov_type"] = "cluster"
+      fit_kwargs["cov_kwds"] = {"groups": np.array(groups)}
+      covariance = f"cluster({command.cluster_variable})"
+    model = sm.Logit(outcome_array, design)
+    try:
+      fitted = model.fit(**fit_kwargs)
+    except Exception as exc:
+      raise ExecutionError("logit failed") from exc
+    parameter_names = (
+      ("intercept", *command.predictors) if command.include_intercept else command.predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    self.state.regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return LogitRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      pseudo_r_squared=_to_float(getattr(fitted, "prsquared", None)),
       coefficients=coefficients,
     )
 
@@ -1593,6 +1655,42 @@ def _regression_sample(
   group_values = tuple(groups) if has_cluster else None
   weight_values = tuple(weights) if has_weight else None
   return tuple(outcomes), tuple(predictors), group_values, weight_values
+
+
+def _logit_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  has_cluster: bool,
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...], tuple[object, ...] | None]:
+  outcomes: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  groups: list[object] = []
+  row_width = predictor_count + 1 + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      continue
+    raw_outcome = row[0]
+    raw_predictors = row[1 : 1 + predictor_count]
+    raw_group = row[-1] if has_cluster else None
+    if raw_outcome is None or any(value is None for value in raw_predictors):
+      continue
+    outcome = _coerce_float(raw_outcome)
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw_value) for raw_value in raw_predictors) if value is not None
+    )
+    if outcome is None or len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
+      continue
+    if has_cluster and raw_group is None:
+      continue
+    outcomes.append(outcome)
+    predictors.append(predictor_values)
+    if has_cluster:
+      groups.append(raw_group)
+  group_values: tuple[object, ...] | None = tuple(groups) if has_cluster else None
+  return tuple(outcomes), tuple(predictors), group_values
 
 
 def _iv_regression_sample(
