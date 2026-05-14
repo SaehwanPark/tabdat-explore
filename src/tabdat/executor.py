@@ -119,6 +119,11 @@ class _CfRegressionState:
   residual_standard_error: float | None
   residual_statistic: float | None
   residual_p_value: float | None
+  residual_ci_level: float | None
+  residual_ci_lower: float | None
+  residual_ci_upper: float | None
+  residual_distribution: str | None
+  residual_df: float | None
 
 
 @dataclass(frozen=True)
@@ -791,6 +796,16 @@ class Executor:
       include_intercept=command.include_intercept,
       residual_index=len(command.exogenous) + 1,
     )
+    (
+      residual_ci_lower,
+      residual_ci_upper,
+      residual_distribution,
+      residual_df,
+    ) = _cf_residual_confidence_interval(
+      fitted_model=fitted,
+      include_intercept=command.include_intercept,
+      residual_index=len(command.exogenous) + 1,
+    )
     self.state.cf_regression = _CfRegressionState(
       outcome_variable=command.outcome,
       endogenous_variable=command.endogenous,
@@ -806,6 +821,11 @@ class Executor:
       residual_standard_error=residual_standard_error,
       residual_statistic=residual_statistic,
       residual_p_value=residual_p_value,
+      residual_ci_level=95.0,
+      residual_ci_lower=residual_ci_lower,
+      residual_ci_upper=residual_ci_upper,
+      residual_distribution=residual_distribution,
+      residual_df=residual_df,
     )
     self.state.xt_regressions = _XtModelCache()
     return CfRegressionResult(
@@ -1286,14 +1306,26 @@ def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult
     or cf_regression.residual_standard_error is None
     or cf_regression.residual_statistic is None
     or cf_regression.residual_p_value is None
+    or cf_regression.residual_ci_level is None
+    or cf_regression.residual_ci_lower is None
+    or cf_regression.residual_ci_upper is None
+    or cf_regression.residual_distribution is None
   ):
     raise ExecutionError("estat endogenous failed for current model")
+  distribution_df = (
+    cf_regression.residual_df if cf_regression.residual_df is not None else "not_available"
+  )
   rows = (
     ("control_function_residual", "test", "cf_residual"),
     ("control_function_residual", "estimate", cf_regression.residual_estimate),
     ("control_function_residual", "std_error", cf_regression.residual_standard_error),
     ("control_function_residual", "statistic", cf_regression.residual_statistic),
     ("control_function_residual", "p_value", cf_regression.residual_p_value),
+    ("control_function_residual", "ci_level", cf_regression.residual_ci_level),
+    ("control_function_residual", "ci_lower", cf_regression.residual_ci_lower),
+    ("control_function_residual", "ci_upper", cf_regression.residual_ci_upper),
+    ("control_function_residual", "distribution", cf_regression.residual_distribution),
+    ("control_function_residual", "df", distribution_df),
   )
   return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
 
@@ -1314,6 +1346,31 @@ def _cf_residual_diagnostic(
     residual_coefficient.statistic,
     residual_coefficient.p_value,
   )
+
+
+def _cf_residual_confidence_interval(
+  *,
+  fitted_model: object,
+  include_intercept: bool,
+  residual_index: int,
+) -> tuple[float | None, float | None, str | None, float | None]:
+  coefficient_index = residual_index + (1 if include_intercept else 0)
+  if coefficient_index < 0:
+    return (None, None, None, None)
+  try:
+    confidence_intervals = np.asarray(getattr(fitted_model, "conf_int")(), dtype=float)
+  except Exception:
+    return (None, None, None, None)
+  if confidence_intervals.ndim != 2 or confidence_intervals.shape[1] < 2:
+    return (None, None, None, None)
+  if coefficient_index >= confidence_intervals.shape[0]:
+    return (None, None, None, None)
+  lower = float(confidence_intervals[coefficient_index, 0])
+  upper = float(confidence_intervals[coefficient_index, 1])
+  use_t = bool(getattr(fitted_model, "use_t", False))
+  distribution = "t" if use_t else "normal"
+  degrees_of_freedom = _to_float(getattr(fitted_model, "df_resid", None)) if use_t else None
+  return (lower, upper, distribution, degrees_of_freedom)
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
