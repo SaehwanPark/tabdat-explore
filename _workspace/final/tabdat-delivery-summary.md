@@ -1,39 +1,29 @@
-# Phase 14 Slice 9 Delivery Summary
+# Phase 14 Slices 10-11 Delivery Summary
 
 ## Outcome
 
-Completed Phase 14 Slice 9 in one bounded delivery branch:
+Completed two bounded Phase 14 slices in one branch:
 
-- Slice 9: expanded control-function endogenous diagnostics via existing command surface:
-  - `estat endogenous`
-  - after successful `cfregress`
+- Slice 10: `ivregress gmm` plus estimator-compatible `estat overid`
+- Slice 11: `estat endogenous` after `ivregress 2sls`
 
 ## Implemented
 
-- Extended executor-held control-function endogenous diagnostic state from `cfregress` fits with
-  residual-inclusion confidence-interval and distribution metadata.
-- Expanded deterministic `estat endogenous` table output for residual-inclusion test rows:
-  - `test=cf_residual`
-  - `estimate=<coef>`
-  - `std_error=<se>`
-  - `statistic=<t/z>`
-  - `p_value=<p>`
-  - `ci_level=95`
-  - `ci_lower=<lower>`
-  - `ci_upper=<upper>`
-  - `distribution=t|normal`
-  - `df=<df>|not_available`
-- Preserved `estat endogenous` parser/shell command surface with no new options.
-- Added focused executor and CLI coverage for expanded `cfregress -> estat endogenous` diagnostics.
-- Updated SDD/docs and `_workspace` artifacts.
+- Expanded `ivregress` command surface to `2sls|gmm` while preserving existing IV options.
+- Added Python-first `IVGMM` execution path via `linearmodels`.
+- Preserved deterministic covariance output across IV estimator modes.
+- Extended `estat overid` output routing:
+  - `2sls`: `sargan` and `wooldridge_overid`
+  - `gmm`: `gmm_j`
+- Extended `estat endogenous` routing:
+  - existing `cfregress` residual-inclusion diagnostics unchanged
+  - new IV path after `ivregress 2sls` with Durbin/Wu-Hausman diagnostics
+  - explicit non-2SLS IV guard message
+- Updated focused parser/executor/CLI/shell coverage and SDD/docs.
 
 ## Validation
 
-- `uv run pytest -q tests/test_executor.py -k "estat_endogenous"`
-- `uv run pytest -q tests/test_cli.py -k "phase_14_cfregress_flow"`
-- `uv run pytest -q tests/test_executor.py -k "cfregress or estat"`
-- `uv run pytest -q tests/test_cli.py -k "cfregress_flow or estat"`
-- `uv run pytest -q tests/test_parser.py -k "estat"`
+- Focused parser/executor/CLI/shell tests for IV Phase 14 flows passed.
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
@@ -45,10 +35,10 @@ All commands passed.
 
 ## Residual Risk
 
-- `estat endogenous` remains intentionally scoped to residual-inclusion coefficient diagnostics and
-  fixed 95% confidence-interval metadata.
+- `estat endogenous` IV path is intentionally scoped to prior `ivregress 2sls` state; GMM-specific
+  endogenous diagnostics remain out of scope for this slice.
 
 ## Suggested Follow-up
 
-- Continue Phase 14 with any remaining control-function or panel-semantic extensions under
-  dedicated contracts.
+- Continue Phase 14 with remaining panel/control-function semantic extensions under dedicated
+  contracts.

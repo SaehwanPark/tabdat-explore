@@ -1,4 +1,4 @@
-# Phase 14 Slice 9 QA Report
+# Phase 14 Slices 10-11 QA Report
 
 ## Status
 
@@ -6,14 +6,16 @@ pass
 
 ## Boundaries Checked
 
-- Contract -> parser/shell routing:
-  - `estat endogenous` syntax/options remain unchanged.
+- Contract -> parser/model routing:
+  - `ivregress` accepts `2sls|gmm` and preserves existing IV option constraints.
 - Contract -> executor routing:
-  - `estat endogenous` still requires prior `cfregress` model state.
-- Executor -> CLI:
-  - deterministic terminal output now includes CI/distribution rows after `cfregress`.
-- Regression-family isolation:
-  - existing `estat` and prediction behavior remain unchanged.
+  - `ivregress` dispatches to `IV2SLS` or `IVGMM` with deterministic covariance labeling.
+  - `estat overid` returns estimator-appropriate rows (`sargan`/`wooldridge_overid` vs `gmm_j`).
+  - `estat endogenous` keeps existing `cfregress` path and adds `ivregress 2sls` path.
+- Guard behavior:
+  - `estat endogenous` rejects prior `ivregress gmm` with explicit diagnostic guard message.
+- CLI/shell surfaces:
+  - Phase 14 IV command/diagnostic flows are covered and deterministic.
 - SDD/docs -> implementation:
   - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` aligned.
 
@@ -21,21 +23,12 @@ pass
 
 - None found in validation.
 
-## Non-Blocking Follow-Ups
-
-- Consider a future dedicated contract for alternate CI levels or additional post-estimation
-  distribution metadata if broader diagnostic parity is required.
-
 ## Validation Evidence
 
-- `uv run pytest -q tests/test_executor.py -k "estat_endogenous"` passed.
-- `uv run pytest -q tests/test_cli.py -k "phase_14_cfregress_flow"` passed.
-- `uv run pytest -q tests/test_executor.py -k "cfregress or estat"` passed.
-- `uv run pytest -q tests/test_cli.py -k "cfregress_flow or estat"` passed.
-- `uv run pytest -q tests/test_parser.py -k "estat"` passed.
-- Full quality gate commands passed.
+- Focused tests for parser/executor/CLI/shell IV Phase 14 surfaces passed.
+- Full quality gates passed.
 - Integrated E2E scenarios (`s1` through `s5`) passed.
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice9-cf-endogenous-ci`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice10-11-ivgmm-endogenous`, open one PR, and mark it ready for review.

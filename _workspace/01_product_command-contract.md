@@ -1,11 +1,43 @@
-# Phase 14 Slice 9 Command Contract
+# Phase 14 Slices 10-11 Command Contract
 
 ## Roadmap Phase
 
 - Phase 14 endogeneity and panel foundations
-  - Slice 9: expanded control-function endogenous diagnostics (`estat endogenous`)
+  - Slice 10: IV estimator expansion (`ivregress gmm`)
+  - Slice 11: IV endogenous diagnostics (`estat endogenous` after `ivregress 2sls`)
 
-## `estat endogenous` after `cfregress`
+## `ivregress` estimator expansion
+
+### Syntax
+
+```stata
+ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]
+```
+
+### Rules
+
+- Keeps one endogenous variable and one-or-more instruments.
+- Supports `2sls` and `gmm` estimators through Python-first `linearmodels`.
+- Preserves covariance modes:
+  - nonrobust (default)
+  - robust
+  - cluster(`<var>`)
+
+## `estat overid` after `ivregress`
+
+### Syntax
+
+```stata
+estat overid
+```
+
+### Rules
+
+- Requires prior `ivregress` model state.
+- After `ivregress 2sls`: returns deterministic `sargan` and `wooldridge_overid` rows.
+- After `ivregress gmm`: returns deterministic `gmm_j` rows.
+
+## `estat endogenous`
 
 ### Syntax
 
@@ -15,36 +47,18 @@ estat endogenous
 
 ### Rules
 
-- Requires an active dataset.
-- Requires a prior fitted model from `cfregress`.
-- Runs a control-function residual-inclusion endogeneity diagnostic using the second-stage
-  control-function coefficient on `cf_residual`.
-- Returns a deterministic table with rows for:
-  - `test`: `cf_residual`
-  - `estimate`: coefficient value of `cf_residual`
-  - `std_error`: standard error of `cf_residual`
-  - `statistic`: t/z statistic of `cf_residual`
-  - `p_value`: p-value of `cf_residual`
-  - `ci_level`: confidence interval level (95)
-  - `ci_lower`: lower confidence bound of `cf_residual`
-  - `ci_upper`: upper confidence bound of `cf_residual`
-  - `distribution`: `t` or `normal` for the statistic family
-  - `df`: residual degrees of freedom for `t`; `not_available` for normal-approximation output
-- No new `cfregress` or `estat` options are introduced.
-
-### User-facing errors
-
-- Missing prerequisite model state:
-  - `estat endogenous requires a prior cfregress model`
-- Missing residual-inclusion term statistics in fitted model:
-  - `estat endogenous failed for current model`
+- Existing behavior remains unchanged after prior `cfregress`.
+- New behavior: after prior `ivregress 2sls`, returns deterministic rows for:
+  - `durbin`
+  - `wu_hausman`
+  with metrics `statistic`, `p_value`, `df`, and `distribution`.
+- Guard: after prior `ivregress gmm`, returns
+  - `estat endogenous requires a prior ivregress 2sls model`
 
 ## Acceptance Criteria
 
-- `estat endogenous` succeeds after `cfregress` with deterministic expanded output shape.
-- Existing `estat` behavior for `residuals`, `ovtest`, `vif`, `firststage`, `overid`, and `hausman`
-  remains unchanged.
-- CLI coverage demonstrates `use -> cfregress -> estat endogenous` flow with expanded diagnostics.
-- Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`).
-- Integrated E2E scenarios `s1` through `s5` pass.
-- SDD/docs and `_workspace` artifacts reflect delivered behavior.
+- `ivregress gmm` parses and executes with existing IV option/covariance surface.
+- `estat overid` works deterministically after both `ivregress 2sls` and `ivregress gmm`.
+- `estat endogenous` works after `ivregress 2sls` and preserves current `cfregress` path.
+- Existing `regress`/`cfregress`/`xtreg`/`xtdata` behavior remains stable.
+- Focused parser/executor/CLI/shell tests pass.

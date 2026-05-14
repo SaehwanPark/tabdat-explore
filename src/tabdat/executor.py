@@ -1336,7 +1336,7 @@ def _invoke_iv_test_stat(fitted_model: object, attribute_name: str) -> object | 
   if not callable(test_method):
     return None
   try:
-    return test_method()
+    return cast(object, test_method())
   except Exception:
     return None
 
