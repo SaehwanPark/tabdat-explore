@@ -176,6 +176,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     regress_command = _completion_texts(completer, "regr")
     regress_columns = _completion_texts(completer, "regress c")
     regress_options = _completion_texts(completer, "regress cost age, ")
+    logit_command = _completion_texts(completer, "log")
+    logit_columns = _completion_texts(completer, "logit c")
+    logit_options = _completion_texts(completer, "logit cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -200,6 +203,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert regress_command == ["regress"]
   assert regress_columns == ["cost"]
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
+  assert logit_command == ["logit"]
+  assert logit_columns == ["cost"]
+  assert logit_options == ["robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]

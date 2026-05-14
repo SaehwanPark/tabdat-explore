@@ -31,6 +31,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  LogitCommand,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -85,6 +86,7 @@ _EXECUTABLE_COMMANDS = {
   "save",
   "export",
   "regress",
+  "logit",
   "predict",
   "estat",
   "ivregress",
@@ -304,6 +306,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "regress":
     return _parse_regress(parts)
+
+  if parts.name == "logit":
+    return _parse_logit(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -815,6 +820,32 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
   return PredictCommand(
     target_variable=parts.arguments[0],
     kind="residuals" if "residuals" in option_names else "xb",
+  )
+
+
+def _parse_logit(parts: _CommandParts) -> LogitCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("logit expects syntax: logit <y> <xvars>")
+  if len(parts.arguments) < 2:
+    raise ParseError("logit expects syntax: logit <y> <xvars>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"logit unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "logit", {"robust", "noconstant"})
+  cluster_values = _single_tuple_option(parts.options, "cluster", "logit")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("logit option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("logit cannot combine robust and cluster")
+  return LogitCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
   )
 
 
