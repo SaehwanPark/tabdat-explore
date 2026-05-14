@@ -31,6 +31,7 @@ from tabdat.models import (
   PanelCommand,
   ParsedCommand,
   PredictCommand,
+  ProbitCommand,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -388,6 +389,28 @@ def test_parse_phase_15_logit_command() -> None:
   )
 
 
+def test_parse_phase_15_probit_command() -> None:
+  assert parse_command("probit outcome x1 x2") == ProbitCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+  )
+  assert parse_command("probit outcome x1, robust") == ProbitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    robust=True,
+  )
+  assert parse_command("probit outcome x1, cluster(group_id)") == ProbitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("probit outcome x1, noconstant") == ProbitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -396,6 +419,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat overid") == EstatCommand(subcommand="overid")
   assert parse_command("estat hausman") == EstatCommand(subcommand="hausman")
   assert parse_command("estat endogenous") == EstatCommand(subcommand="endogenous")
+  assert parse_command("estat margins") == EstatCommand(subcommand="margins")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -693,6 +717,13 @@ def test_parse_exit_aliases() -> None:
     "logit y x, cluster()",
     "logit y x, cluster(group firm)",
     "logit y x, robust=true",
+    "probit",
+    "probit y",
+    "probit y x if y == 1",
+    "probit y x, robust cluster(group)",
+    "probit y x, cluster()",
+    "probit y x, cluster(group firm)",
+    "probit y x, robust=true",
     "predict",
     "predict a b",
     "predict cost_hat if age > 18",
@@ -705,6 +736,7 @@ def test_parse_exit_aliases() -> None:
     "estat residuals, detail",
     "estat first",
     "estat endog",
+    "estat margin",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",

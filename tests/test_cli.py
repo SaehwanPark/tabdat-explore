@@ -395,6 +395,94 @@ def test_cli_runs_phase_15_logit_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_15_probit_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "probit.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (0, 22.0, 1.0, 'a'),
+        (0, 25.0, 2.0, 'b'),
+        (1, 30.0, 2.0, 'b'),
+        (1, 34.0, 3.0, 'c'),
+        (1, 38.0, 3.0, 'c'),
+        (1, 42.0, 4.0, 'd'),
+        (1, 45.0, 4.0, 'd')
+    ) as probit_data(y, x, z, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "probit y x z",
+      "-c",
+      "probit y x z, robust",
+      "-c",
+      "probit y x z, cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: probit y on x z" in captured.out
+  assert "Estimator: probit" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Pseudo R-squared:" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_15_estat_margins_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "binary.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (0, 22.0, 1.0, 'a'),
+        (0, 25.0, 2.0, 'b'),
+        (1, 30.0, 2.0, 'b'),
+        (1, 34.0, 3.0, 'c'),
+        (1, 38.0, 3.0, 'c'),
+        (1, 42.0, 4.0, 'd'),
+        (1, 45.0, 4.0, 'd')
+    ) as binary_data(y, x, z, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "logit y x z",
+      "-c",
+      "estat margins",
+      "-c",
+      "probit y x z",
+      "-c",
+      "estat margins",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: logit y on x z" in captured.out
+  assert "Model: probit y on x z" in captured.out
+  assert "Variable  Metric" in captured.out
+  assert "dy_dx" in captured.out
+  assert "ci_lower" in captured.out
+  assert "ci_upper" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(
