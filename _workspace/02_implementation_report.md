@@ -1,28 +1,29 @@
-# Phase 15 Slice 1 Implementation Report
+# Phase 15 Slice 2-3 Implementation Report
 
 ## Scope
 
-Implemented one bounded Phase 15 slice on branch `codex/tmp-phase15-slice1-logit-core`:
+Implemented two bounded Phase 15 slices on branch `codex/tmp-phase15-slice2-3-probit-estat-margins`:
 
-- Slice 1: `logit` nonlinear binary-choice estimator core
+- Slice 2: `probit` nonlinear binary-choice estimator core
+- Slice 3: `estat margins` after binary-choice estimators
 
 ## What Changed
 
 ### Parser and shell command surface
 
-- Added `logit <y> <xvars>[, robust cluster(<var>) noconstant]` command parsing.
+- Added `probit <y> <xvars>[, robust cluster(<var>) noconstant]` command parsing.
 - Added parser guards for:
   - required outcome plus one-or-more predictors
   - `robust` and `cluster(<var>)` mutual exclusion
   - valid single-variable `cluster(...)` syntax
+- Extended `estat` subcommand routing with `margins`.
 - Added interactive shell completion support for:
-  - `logit` command name
-  - active dataset columns after `logit`
-  - options `robust`, `cluster(`, and `noconstant`
+  - `probit` command name, active-dataset columns, and options
+  - `estat margins` completion.
 
 ### Executor and formatting
 
-- Added bounded `statsmodels`-based `logit` execution with covariance modes:
+- Added bounded `statsmodels`-based `probit` execution with covariance modes:
   - nonrobust (default)
   - robust (`HC1`)
   - clustered (`cluster(<var>)`)
@@ -32,41 +33,46 @@ Implemented one bounded Phase 15 slice on branch `codex/tmp-phase15-slice1-logit
   - non-numeric variables
   - non-binary outcome (must be `0/1`)
   - empty complete-case sample
-- Added deterministic `logit` formatter output with:
+  - incomplete cluster values in clustered mode
+- Added deterministic `probit` formatter output with:
   - model header
   - covariance label
   - observation count
   - pseudo R-squared
   - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
+- Added `estat margins` execution for the latest `logit`/`probit` state with deterministic
+  predictor-level rows:
+  - `dy_dx`, `std_error`, `statistic`, `p_value`, `ci_lower`, `ci_upper`.
 
 ### State behavior
 
-- Added `logit` estimation-family state handling:
-  - clears stale `regress`, `ivregress`, `cfregress`, and `xtreg` state
-  - prevents cross-family `predict`/`estat` misuse after `logit`
-- No new `predict` or `estat` behavior was added for `logit` in this slice.
+- Added binary-estimation state tracking so `estat margins` can run after `logit` or `probit`.
+- Preserved existing family boundaries:
+  - linear `predict` still requires prior `regress` or `cfregress`
+  - existing `estat` flows for linear/IV/panel/control-function remain unchanged.
 
 ### Tests
 
-- Added focused parser coverage for valid/invalid `logit` syntax.
-- Added focused shell completion coverage for `logit` command/options.
+- Added focused parser coverage for valid/invalid `probit` and `estat margins` syntax.
+- Added focused shell completion coverage for `probit` and `estat margins`.
 - Added focused executor coverage for:
-  - typed `logit` result path
+  - typed `probit` result path
   - covariance mode behavior
   - guard/prerequisite errors
-  - estimation-state invalidation behavior
-- Added focused CLI coverage for nonrobust/robust/clustered `logit` runs.
+  - `estat margins` after `logit` and `probit`
+- Added focused CLI coverage for:
+  - nonrobust/robust/clustered `probit` runs
+  - `estat margins` flow after `logit` and `probit`.
 
 ### Documentation and SDD state
 
-- Updated `README.md`, `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` for Phase 15 Slice 1.
+- Updated `README.md`, `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` for Phase 15 slices 2-3.
 - Updated `_workspace` handoff artifacts for this delivery.
 
 ## Checkpoint Commits
 
-- `980121b` `feat(logit): add phase15 parser and shell command surface`
-- `131c129` `feat(logit): implement phase15 estimator execution and output`
-- `docs(phase15): record slice1 logit delivery and validation` (this final documentation commit)
+- `63684de` `feat(phase15): add probit core and estat margins diagnostics`
+- `docs/SDD checkpoint commit recorded after this implementation report update`
 
 ## Files Changed
 

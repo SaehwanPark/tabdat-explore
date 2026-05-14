@@ -1512,15 +1512,14 @@ def _estat_binary_margins_table(
   try:
     margins = cast(Any, fitted_model).get_margeff(at="overall")
     summary = margins.summary_frame()
-    index = tuple(getattr(summary, "index", ()))
+    raw_index = getattr(summary, "index", ())
+    index: tuple[object, ...] = tuple(raw_index)
   except Exception as exc:
     raise ExecutionError("estat margins failed for current model") from exc
   if not index:
     raise ExecutionError("estat margins failed for current model")
   margin_variables = (
-    predictor_names
-    if len(predictor_names) == len(index)
-    else tuple(str(name) for name in index)
+    predictor_names if len(predictor_names) == len(index) else tuple(str(name) for name in index)
   )
   rows: list[tuple[object, ...]] = []
   for variable, summary_name in zip(margin_variables, index, strict=True):

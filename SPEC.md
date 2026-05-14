@@ -243,30 +243,43 @@ and describe the active work with concise verification criteria.
     modes
   - deterministic logit result formatting with pseudo R-squared and coefficient output
   - focused parser, executor, CLI, and shell coverage
+- Implemented the second Phase 15 nonlinear estimation core slice:
+  - `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - Python-first `statsmodels` probit fitting with nonrobust, robust, and clustered covariance
+    modes
+  - deterministic probit result formatting with pseudo R-squared and coefficient output
+  - focused parser, executor, CLI, and shell coverage
+- Implemented the third Phase 15 nonlinear estimation core slice:
+  - `estat margins` after successful `logit` or `probit`
+  - deterministic predictor-level marginal-effects table output
+    (`dy_dx`, `std_error`, `statistic`, `p_value`, `ci_lower`, `ci_upper`)
+  - strict prerequisite guard requiring prior binary-choice model state
+  - focused parser, executor, CLI, and shell coverage
 
 ## Present
 
 - Feature: Phase 15 nonlinear estimation core
   Status: Active
   Started: 2026-05-14
-  Branch: codex/tmp-phase15-slice1-logit-core
+  Branch: codex/tmp-phase15-slice2-3-probit-estat-margins
 
   Summary:
-  Continue from completed Phase 14 endogeneity/panel foundations with the first bounded Phase 15
-  nonlinear slice (`logit`) before extending to broader nonlinear and marginal-effect workflows.
+  Continue from completed Phase 14 endogeneity/panel foundations with bounded Phase 15 nonlinear
+  slices (`logit`, `probit`, and `estat margins`) before extending to broader nonlinear workflows.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
-  - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
-  - Integrated E2E scenarios `s1` through `s5` pass
   - `logit` parses and executes with nonrobust, robust, and clustered covariance modes
+  - `probit` parses and executes with nonrobust, robust, and clustered covariance modes
+  - `estat margins` executes after `logit` and `probit` with deterministic table output
   - `logit` output includes deterministic pseudo R-squared and coefficient rows
+  - `probit` output includes deterministic pseudo R-squared and coefficient rows
   - Existing `regress`/`ivregress`/`cfregress`/`xtreg` command behavior remains stable
 
   Out of Scope:
-  - Probit and other nonlinear command families
-  - Marginal effects and nonlinear prediction workflows
+  - Nonlinear `predict` workflow expansion for binary-choice models
+  - Tobit, truncated-regression, and sample-selection command families
   - R fallback adapters while Python-first coverage is available
 
 ## Future
@@ -284,6 +297,15 @@ and describe the active work with concise verification criteria.
 - Phase 15 nonlinear estimation core:
   - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
     variable models such as Tobit, truncated regression, and sample selection
+  - remaining meaningful slices in this phase (one-sentence summaries):
+    - add bounded nonlinear prediction routing for binary-choice models without changing existing
+      `predict` linear/control-function guarantees
+    - add a bounded limited-dependent estimator entrypoint (Tobit or truncated regression) with
+      deterministic output and strict prerequisites
+    - add a bounded sample-selection (Heckman-style) command surface only after the limited
+      dependent estimator contract is stable
+    - add bounded general nonlinear-regression command semantics that reuse Phase 12 shared
+      estimation contracts
   - library strategy:
     - approach (1): `statsmodels` for logit/probit workflows, marginal effects, and core nonlinear
       likelihood models

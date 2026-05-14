@@ -6,6 +6,13 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the second Phase 15 nonlinear estimation core slice with
+  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` probit
+  execution, deterministic pseudo R-squared and coefficient output, and focused
+  parser/executor/CLI/shell coverage.
+- Added the third Phase 15 nonlinear estimation core slice with `estat margins` after `logit` or
+  `probit`, deterministic predictor-level marginal-effects output (`dy_dx`, `std_error`,
+  `statistic`, `p_value`, `ci_lower`, `ci_upper`), and focused parser/executor/CLI/shell coverage.
 - Added the first Phase 15 nonlinear estimation core slice with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` logit
   execution, deterministic pseudo R-squared and coefficient output, and focused
@@ -158,6 +165,9 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed binary-choice estimation-state handling so `logit` and `probit` both register compatible
+  post-estimation model state for `estat margins` while preserving existing `predict` and other
+  `estat` family boundaries.
 - Changed estimation-state handling so `logit` clears incompatible prior estimation family state
   (`regress`, `ivregress`, `cfregress`, and `xtreg`) before later post-estimation usage.
 - Changed estimation-state handling so `regress`, `ivregress`, and `xtreg` clear incompatible
