@@ -28,6 +28,7 @@ from tabdat.models import (
   IdentifierExpression,
   NumberExpression,
   PanelMetadata,
+  PanelStructureSummary,
   StringExpression,
   SummaryRow,
   UnaryExpression,
@@ -380,6 +381,32 @@ class DuckDBBackend:
       )
     if self._has_duplicate_panel_pairs(metadata):
       raise ExecutionError("panel id/time pairs must be unique")
+
+  def panel_structure_summary(self, metadata: PanelMetadata) -> PanelStructureSummary:
+    id_sql = _quote_identifier(metadata.id_variable)
+    time_sql = _quote_identifier(metadata.time_variable)
+    summary_sql = f"""
+      with entity_counts as (
+        select count(*) as obs_count
+        from {ACTIVE_TABLE}
+        group by {id_sql}
+      )
+      select
+        cast((select count(*) from {ACTIVE_TABLE}) as bigint) as observation_count,
+        cast((select count(distinct {id_sql}) from {ACTIVE_TABLE}) as bigint) as entity_count,
+        cast((select count(distinct {time_sql}) from {ACTIVE_TABLE}) as bigint) as time_count,
+        cast(coalesce(min(obs_count), 0) as bigint) as min_observations_per_entity,
+        cast(coalesce(max(obs_count), 0) as bigint) as max_observations_per_entity
+      from entity_counts
+    """
+    row = self._fetch_one(summary_sql, "panel")
+    return PanelStructureSummary(
+      observation_count=cast(int, row[0]),
+      entity_count=cast(int, row[1]),
+      time_count=cast(int, row[2]),
+      min_observations_per_entity=cast(int, row[3]),
+      max_observations_per_entity=cast(int, row[4]),
+    )
 
   def save_active_parquet(self, path: Path, *, replace: bool) -> None:
     normalized = path.expanduser()

@@ -364,6 +364,19 @@ class PanelMetadata:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PanelStructureSummary:
+  observation_count: int
+  entity_count: int
+  time_count: int
+  min_observations_per_entity: int
+  max_observations_per_entity: int
+
+  @property
+  def is_balanced(self) -> bool:
+    return self.min_observations_per_entity == self.max_observations_per_entity
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasetInfo:
   path: Path | str
   row_count: int | None
@@ -498,6 +511,7 @@ class CfRegressionResult:
 class PanelResult:
   action: Literal["report", "set", "clear"]
   metadata: PanelMetadata | None = None
+  summary: PanelStructureSummary | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

@@ -49,6 +49,7 @@ from tabdat.models import (
   PanelCommand,
   PanelMetadata,
   PanelResult,
+  PanelStructureSummary,
   ParsedCommand,
   PlotResult,
   PredictCommand,
@@ -1814,9 +1815,29 @@ def test_phase_11_panel_set_report_clear_and_named_table_restore(tmp_path: Path)
 
   assert report_before == PanelResult(action="report")
   assert set_result == PanelResult("set", PanelMetadata("firm_id", "year"))
-  assert report_after == PanelResult("report", PanelMetadata("firm_id", "year"))
+  assert report_after == PanelResult(
+    "report",
+    PanelMetadata("firm_id", "year"),
+    summary=PanelStructureSummary(
+      observation_count=3,
+      entity_count=2,
+      time_count=2,
+      min_observations_per_entity=1,
+      max_observations_per_entity=2,
+    ),
+  )
   assert cleared == PanelResult(action="report")
-  assert restored == PanelResult("report", PanelMetadata("firm_id", "year"))
+  assert restored == PanelResult(
+    "report",
+    PanelMetadata("firm_id", "year"),
+    summary=PanelStructureSummary(
+      observation_count=3,
+      entity_count=2,
+      time_count=2,
+      min_observations_per_entity=1,
+      max_observations_per_entity=2,
+    ),
+  )
 
 
 def test_phase_11_panel_reports_validation_errors(sample_parquet: Path, tmp_path: Path) -> None:

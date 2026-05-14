@@ -215,7 +215,28 @@ def format_result(result: Result) -> str:
     if result.metadata is None:
       return "Panel: none"
     prefix = "Panel set" if result.action == "set" else "Panel"
-    return f"{prefix}: id={result.metadata.id_variable}, time={result.metadata.time_variable}"
+    panel_header = (
+      f"{prefix}: id={result.metadata.id_variable}, time={result.metadata.time_variable}"
+    )
+    if result.action != "report" or result.summary is None:
+      return panel_header
+    panel_summary = result.summary
+    balanced = "yes" if panel_summary.is_balanced else "no"
+    return "\n".join(
+      (
+        panel_header,
+        f"Observations: {panel_summary.observation_count}",
+        f"Entities: {panel_summary.entity_count}",
+        f"Time periods: {panel_summary.time_count}",
+        (
+          "Obs per entity: "
+          "min="
+          f"{panel_summary.min_observations_per_entity}, max="
+          f"{panel_summary.max_observations_per_entity}"
+        ),
+        f"Balanced: {balanced}",
+      )
+    )
 
   if isinstance(result, SqlCreateResult):
     dataset = result.dataset

@@ -512,7 +512,11 @@ class Executor:
   def _execute_panel(self, command: PanelCommand) -> PanelResult:
     dataset = self._require_active_dataset("panel")
     if command.action == "report":
-      return PanelResult(action="report", metadata=dataset.panel_metadata)
+      metadata = dataset.panel_metadata
+      if metadata is None:
+        return PanelResult(action="report")
+      summary = self.backend.panel_structure_summary(metadata)
+      return PanelResult(action="report", metadata=metadata, summary=summary)
     if command.action == "clear":
       cleared = replace(dataset, panel_metadata=None)
       self._set_active_dataset(cleared)
