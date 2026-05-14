@@ -253,6 +253,15 @@ class RegressCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class LogitCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PredictCommand:
   target_variable: str
   kind: Literal["xb", "residuals"] = "xb"
@@ -341,6 +350,7 @@ Command = (
   | SaveCommand
   | ExportCommand
   | RegressCommand
+  | LogitCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -468,6 +478,17 @@ class RegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class LogitRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  pseudo_r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -560,6 +581,7 @@ Result = (
   | PreviewResult
   | TransformResult
   | RegressionResult
+  | LogitRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

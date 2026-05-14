@@ -26,6 +26,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  LogitCommand,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -365,6 +366,28 @@ def test_parse_phase_13_predict_command() -> None:
   )
 
 
+def test_parse_phase_15_logit_command() -> None:
+  assert parse_command("logit outcome x1 x2") == LogitCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+  )
+  assert parse_command("logit outcome x1, robust") == LogitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    robust=True,
+  )
+  assert parse_command("logit outcome x1, cluster(group_id)") == LogitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("logit outcome x1, noconstant") == LogitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -663,6 +686,13 @@ def test_parse_exit_aliases() -> None:
     "regress cost age, wls(age) gls(sigma)",
     "regress cost age, robust=true",
     "regress cost age, noconstant=true",
+    "logit",
+    "logit y",
+    "logit y x if y == 1",
+    "logit y x, robust cluster(group)",
+    "logit y x, cluster()",
+    "logit y x, cluster(group firm)",
+    "logit y x, robust=true",
     "predict",
     "predict a b",
     "predict cost_hat if age > 18",

@@ -1,55 +1,87 @@
-# Phase 14 Slices 12-13 Implementation Report
+# Phase 15 Slice 1 Implementation Report
 
 ## Scope
 
-Implemented two bounded Phase 14 slices on one branch:
+Implemented one bounded Phase 15 slice on branch `codex/tmp-phase15-slice1-logit-core`:
 
-- Slice 12: `estat firststage` support after `cfregress`
-- Slice 13: deterministic panel report semantic expansion
+- Slice 1: `logit` nonlinear binary-choice estimator core
 
 ## What Changed
 
-### Slice 12: `estat firststage` after `cfregress`
+### Parser and shell command surface
 
-- Extended control-function estimation state to persist first-stage diagnostics context.
-- Added `estat` routing so `firststage` now:
-  - keeps existing IV path after `ivregress`
-  - supports a new control-function path after `cfregress`
-  - preserves the prior prerequisite error when neither state is available
-- Added deterministic control-function first-stage diagnostics table output.
-- Added focused executor and CLI coverage.
+- Added `logit <y> <xvars>[, robust cluster(<var>) noconstant]` command parsing.
+- Added parser guards for:
+  - required outcome plus one-or-more predictors
+  - `robust` and `cluster(<var>)` mutual exclusion
+  - valid single-variable `cluster(...)` syntax
+- Added interactive shell completion support for:
+  - `logit` command name
+  - active dataset columns after `logit`
+  - options `robust`, `cluster(`, and `noconstant`
 
-### Slice 13: panel report semantic expansion
+### Executor and formatting
 
-- Added typed panel-structure summary model fields for deterministic reporting.
-- Added backend summary computation over the active relation for panel metadata.
-- Updated executor `panel` report path to attach summary metrics when metadata exists.
-- Updated formatter to print structure and balancedness metrics for report actions while
-  preserving `panel set` and `panel clear` output strings.
-- Added focused executor and CLI coverage.
+- Added bounded `statsmodels`-based `logit` execution with covariance modes:
+  - nonrobust (default)
+  - robust (`HC1`)
+  - clustered (`cluster(<var>)`)
+- Added complete-case sample extraction and guards for:
+  - missing active dataset
+  - missing variables
+  - non-numeric variables
+  - non-binary outcome (must be `0/1`)
+  - empty complete-case sample
+- Added deterministic `logit` formatter output with:
+  - model header
+  - covariance label
+  - observation count
+  - pseudo R-squared
+  - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
+
+### State behavior
+
+- Added `logit` estimation-family state handling:
+  - clears stale `regress`, `ivregress`, `cfregress`, and `xtreg` state
+  - prevents cross-family `predict`/`estat` misuse after `logit`
+- No new `predict` or `estat` behavior was added for `logit` in this slice.
+
+### Tests
+
+- Added focused parser coverage for valid/invalid `logit` syntax.
+- Added focused shell completion coverage for `logit` command/options.
+- Added focused executor coverage for:
+  - typed `logit` result path
+  - covariance mode behavior
+  - guard/prerequisite errors
+  - estimation-state invalidation behavior
+- Added focused CLI coverage for nonrobust/robust/clustered `logit` runs.
 
 ### Documentation and SDD state
 
-- Updated `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md`.
-- Updated `_workspace` handoff artifacts for slices 12-13 delivery.
+- Updated `README.md`, `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md` for Phase 15 Slice 1.
+- Updated `_workspace` handoff artifacts for this delivery.
 
 ## Checkpoint Commits
 
-- `feat(estat): support cfregress firststage diagnostics`
-- `feat(panel): add deterministic panel structure reporting`
-- `docs(phase14): record slices12-13 cf firststage and panel report`
+- `980121b` `feat(logit): add phase15 parser and shell command surface`
+- `131c129` `feat(logit): implement phase15 estimator execution and output`
+- `docs(phase15): record slice1 logit delivery and validation` (this final documentation commit)
 
 ## Files Changed
 
 - `src/tabdat/models.py`
-- `src/tabdat/backend.py`
+- `src/tabdat/parser.py`
+- `src/tabdat/shell.py`
 - `src/tabdat/executor.py`
 - `src/tabdat/formatter.py`
+- `tests/test_parser.py`
+- `tests/test_shell.py`
 - `tests/test_executor.py`
 - `tests/test_cli.py`
+- `README.md`
 - `SPEC.md`
 - `ARCHITECTURE.md`
-- `README.md`
 - `CHANGELOG.md`
 - `_workspace/00_input/request-summary.md`
 - `_workspace/01_product_command-contract.md`

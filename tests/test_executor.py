@@ -45,6 +45,8 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LoadResult,
+  LogitCommand,
+  LogitRegressionResult,
   NumberExpression,
   PanelCommand,
   PanelMetadata,
@@ -209,6 +211,55 @@ def _write_panel_regression_parquet(path: Path) -> None:
         (3, 2021, 10.0, 2.0, 2.0, 'c'),
         (3, 2022, 11.0, 3.0, 1.0, 'c')
     ) as panel_data(firm_id, year, wage, exper, tenure, cluster_id)
+    """,
+  )
+
+
+def _write_logit_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (0, 22.0, 1.0, 'a'),
+        (0, 25.0, 2.0, 'b'),
+        (1, 30.0, 2.0, 'b'),
+        (1, 34.0, 3.0, 'c'),
+        (1, 38.0, 3.0, 'c'),
+        (1, 42.0, 4.0, 'd'),
+        (1, 45.0, 4.0, 'd')
+    ) as logit_data(y, x, z, cluster_id)
+    """,
+  )
+
+
+def _write_nonbinary_logit_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0),
+        (1, 25.0),
+        (2, 30.0),
+        (1, 35.0)
+    ) as logit_data(y, x)
+    """,
+  )
+
+
+def _write_missing_cluster_logit_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 'a'),
+        (0, 22.0, null),
+        (1, 30.0, 'b'),
+        (1, 35.0, 'b')
+    ) as logit_data(y, x, cluster_id)
     """,
   )
 
@@ -426,6 +477,85 @@ def test_phase_13_regress_supports_weighted_covariance_modes(tmp_path: Path) -> 
   assert wls_cluster.covariance == "cluster(cluster_id)"
   assert isinstance(gls_robust, RegressionResult)
   assert gls_robust.covariance == "robust"
+
+
+def test_phase_15_logit_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "logit.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(LogitCommand(outcome="y", predictors=("x", "z")))
+  finally:
+    executor.close()
+
+  assert isinstance(result, LogitRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x", "z")
+  assert result.observation_count == 8
+  assert result.pseudo_r_squared is not None
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x", "z"]
+
+
+def test_phase_15_logit_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "logit.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(LogitCommand(outcome="y", predictors=("x",), robust=True))
+    clustered = executor.execute(
+      LogitCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, LogitRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, LogitRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_15_logit_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  nonbinary_path = tmp_path / "nonbinary.parquet"
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  _write_nonbinary_logit_parquet(nonbinary_path)
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="logit requires an active dataset"):
+      executor.execute(LogitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="logit unknown variable: y, x"):
+      executor.execute(LogitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(nonbinary_path))
+    with pytest.raises(
+      ExecutionError,
+      match="logit outcome must be binary with values 0 and 1",
+    ):
+      executor.execute(LogitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="logit requires complete cluster values"):
+      executor.execute(LogitCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id"))
+  finally:
+    executor.close()
+
+
+def test_phase_15_logit_clears_prior_regress_state(tmp_path: Path) -> None:
+  path = tmp_path / "logit.parquet"
+  _write_logit_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    executor.execute(LogitCommand(outcome="y", predictors=("x",)))
+    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
+      executor.execute(PredictCommand(target_variable="y_hat"))
+    with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="ovtest"))
+  finally:
+    executor.close()
 
 
 def test_phase_13_regress_rejects_non_positive_weight_or_sigma(tmp_path: Path) -> None:

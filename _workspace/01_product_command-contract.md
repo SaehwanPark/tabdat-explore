@@ -1,58 +1,61 @@
-# Phase 14 Slices 12-13 Command Contract
+# Phase 15 Slice 1 Command Contract
 
 ## Roadmap Phase
 
-- Phase 14 endogeneity and panel foundations
-  - Slice 12: control-function first-stage diagnostics (`estat firststage` after `cfregress`)
-  - Slice 13: panel report semantic expansion
+- Phase 15 nonlinear estimation core
+  - Slice 1: bounded binary-choice `logit` estimator foundation
 
-## `estat firststage` after `cfregress`
-
-### Syntax
-
-```stata
-estat firststage
-```
-
-### Rules
-
-- Existing behavior remains unchanged after prior `ivregress`.
-- New behavior: after prior `cfregress`, return deterministic first-stage diagnostic rows with
-  headers `Variable`, `Metric`, and `Value`.
-- Include coefficient-level metrics for first-stage terms:
-  - `coefficient`
-  - `std_error`
-  - `statistic`
-  - `p_value`
-- Include first-stage fit summary rows:
-  - `observation_count`
-  - `r_squared`
-- Preserve existing error when no compatible prior model state exists:
-  - `estat firststage requires a prior ivregress model`
-
-## `panel` report semantic expansion
+## `logit`
 
 ### Syntax
 
 ```stata
-panel
+logit <y> <xvars>[, robust cluster(<var>) noconstant]
 ```
 
 ### Rules
 
-- Existing `panel set <id_var> <time_var>` and `panel clear` behavior remains unchanged.
-- Existing `panel` with no active metadata remains unchanged (`Panel: none`).
-- After panel metadata is set, `panel` report output includes deterministic structure metrics:
-  - total observations
-  - distinct entity count
-  - distinct time count
-  - per-entity minimum and maximum observation counts
-  - balancedness indicator (`yes` when min==max, else `no`)
+- Requires one active dataset.
+- Requires one outcome variable and one-or-more predictor variables.
+- Requires numeric outcome and predictor columns.
+- Outcome must be binary on complete-case rows (`0/1`).
+- Supports covariance modes:
+  - nonrobust (default)
+  - robust
+  - cluster(`<var>`)
+- `robust` and `cluster(<var>)` are mutually exclusive.
+- `noconstant` disables intercept inclusion.
+- On successful fit, returns deterministic model output with:
+  - model identification (`logit`, outcome, predictors)
+  - covariance label
+  - observation count
+  - pseudo R-squared
+  - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
+
+## Error/guard behavior
+
+- No active dataset:
+  - `logit requires an active dataset; run use <path> first`
+- Invalid syntax/options:
+  - parser errors consistent with existing command-family style
+- Non-binary outcome on complete-case sample:
+  - `logit outcome must be binary with values 0 and 1`
+- No complete-case observations:
+  - `logit requires at least one complete observation`
+- Cluster option with incomplete cluster values on retained sample:
+  - `logit requires complete cluster values`
+- Backend fit failures:
+  - `logit failed`
+
+## State behavior
+
+- Running `logit` clears incompatible prior estimation family state to prevent stale post-estimation
+  use from other model families.
+- This slice does not add new `predict` or `estat` behaviors for `logit`.
 
 ## Acceptance Criteria
 
-- `estat firststage` works after both `ivregress` and `cfregress`.
-- Existing `ivregress` diagnostics and `cfregress` `predict`/`estat endogenous` behavior remain stable.
-- `panel` report includes deterministic structure metrics when metadata is set.
-- Existing `panel set`, `panel clear`, and `panel`-without-metadata behavior remain stable.
-- Focused executor/backend/formatter/CLI tests pass.
+- `logit` parses and executes with nonrobust, robust, and clustered covariance modes.
+- Deterministic CLI formatting is available for `logit` results.
+- Focused parser/executor/CLI/shell coverage passes.
+- Existing `regress`/`ivregress`/`cfregress`/`xtreg`/`predict`/`estat` behavior remains stable.
