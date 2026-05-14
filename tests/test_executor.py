@@ -682,6 +682,34 @@ def test_phase_14_ivregress_supports_covariance_modes(tmp_path: Path) -> None:
   assert clustered.covariance == "cluster(cluster_id)"
 
 
+def test_phase_14_ivregress_gmm_returns_typed_result_and_overid(tmp_path: Path) -> None:
+  path = tmp_path / "iv-overid.parquet"
+  _write_iv_overid_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    gmm = executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("w",),
+        endogenous="x_endog",
+        instruments=("z_inst", "z_inst2"),
+        estimator="gmm",
+      )
+    )
+    overid = executor.execute(EstatCommand(subcommand="overid"))
+  finally:
+    executor.close()
+
+  assert isinstance(gmm, IvRegressionResult)
+  assert gmm.estimator == "gmm"
+  assert gmm.covariance == "nonrobust"
+  assert isinstance(overid, TableResult)
+  assert overid.headers == ("Test", "Metric", "Value")
+  assert any(row[0] == "gmm_j" for row in overid.rows)
+  assert not any(row[0] == "sargan" for row in overid.rows)
+
+
 def test_phase_14_cfregress_returns_typed_result_and_covariance(tmp_path: Path) -> None:
   path = tmp_path / "iv-regression.parquet"
   _write_iv_regression_parquet(path)
