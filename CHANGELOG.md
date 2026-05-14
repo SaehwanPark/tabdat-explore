@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the ninth Phase 14 control-function diagnostics expansion slice with `estat endogenous`
+  output rows for `ci_level`, `ci_lower`, `ci_upper`, `distribution`, and `df` (in addition to
+  `test`, `estimate`, `std_error`, `statistic`, and `p_value`) after `cfregress`, with focused
+  executor/CLI coverage.
 - Added the eighth Phase 14 control-function diagnostics expansion slice with `estat endogenous`
   output rows for `estimate` and `std_error` (in addition to `test`, `statistic`, and `p_value`)
   after `cfregress`, with focused executor/CLI coverage.

@@ -560,6 +560,11 @@ def test_cli_runs_phase_14_cfregress_flow(tmp_path: Path, capsys) -> None:
   assert "control_function_residual  std_error" in captured.out
   assert "control_function_residual  statistic" in captured.out
   assert "control_function_residual  p_value" in captured.out
+  assert "control_function_residual  ci_level" in captured.out
+  assert "control_function_residual  ci_lower" in captured.out
+  assert "control_function_residual  ci_upper" in captured.out
+  assert "control_function_residual  distribution" in captured.out
+  assert "control_function_residual  df" in captured.out
   assert captured.err == ""
 
 

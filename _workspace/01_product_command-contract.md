@@ -1,9 +1,9 @@
-# Phase 14 Slice 8 Command Contract
+# Phase 14 Slice 9 Command Contract
 
 ## Roadmap Phase
 
 - Phase 14 endogeneity and panel foundations
-  - Slice 8: expanded control-function endogenous diagnostics (`estat endogenous`)
+  - Slice 9: expanded control-function endogenous diagnostics (`estat endogenous`)
 
 ## `estat endogenous` after `cfregress`
 
@@ -23,8 +23,13 @@ estat endogenous
   - `test`: `cf_residual`
   - `estimate`: coefficient value of `cf_residual`
   - `std_error`: standard error of `cf_residual`
-  - `statistic`: t-statistic of `cf_residual`
+  - `statistic`: t/z statistic of `cf_residual`
   - `p_value`: p-value of `cf_residual`
+  - `ci_level`: confidence interval level (95)
+  - `ci_lower`: lower confidence bound of `cf_residual`
+  - `ci_upper`: upper confidence bound of `cf_residual`
+  - `distribution`: `t` or `normal` for the statistic family
+  - `df`: residual degrees of freedom for `t`; `not_available` for normal-approximation output
 - No new `cfregress` or `estat` options are introduced.
 
 ### User-facing errors

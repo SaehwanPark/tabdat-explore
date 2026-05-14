@@ -1,23 +1,28 @@
-# Phase 14 Slice 8 Delivery Summary
+# Phase 14 Slice 9 Delivery Summary
 
 ## Outcome
 
-Completed Phase 14 Slice 8 in one bounded delivery branch:
+Completed Phase 14 Slice 9 in one bounded delivery branch:
 
-- Slice 8: expanded control-function endogenous diagnostics via existing command surface:
+- Slice 9: expanded control-function endogenous diagnostics via existing command surface:
   - `estat endogenous`
   - after successful `cfregress`
 
 ## Implemented
 
 - Extended executor-held control-function endogenous diagnostic state from `cfregress` fits with
-  residual-inclusion estimate and standard error.
+  residual-inclusion confidence-interval and distribution metadata.
 - Expanded deterministic `estat endogenous` table output for residual-inclusion test rows:
   - `test=cf_residual`
   - `estimate=<coef>`
   - `std_error=<se>`
-  - `statistic=<t>`
+  - `statistic=<t/z>`
   - `p_value=<p>`
+  - `ci_level=95`
+  - `ci_lower=<lower>`
+  - `ci_upper=<upper>`
+  - `distribution=t|normal`
+  - `df=<df>|not_available`
 - Preserved `estat endogenous` parser/shell command surface with no new options.
 - Added focused executor and CLI coverage for expanded `cfregress -> estat endogenous` diagnostics.
 - Updated SDD/docs and `_workspace` artifacts.
@@ -41,7 +46,7 @@ All commands passed.
 ## Residual Risk
 
 - `estat endogenous` remains intentionally scoped to residual-inclusion coefficient diagnostics and
-  does not yet include confidence intervals or distribution metadata.
+  fixed 95% confidence-interval metadata.
 
 ## Suggested Follow-up
 
