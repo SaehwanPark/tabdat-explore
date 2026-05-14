@@ -1,9 +1,9 @@
-# Phase 14 Slice 7 Command Contract
+# Phase 14 Slice 8 Command Contract
 
 ## Roadmap Phase
 
 - Phase 14 endogeneity and panel foundations
-  - Slice 7: control-function endogenous diagnostics (`estat endogenous`)
+  - Slice 8: expanded control-function endogenous diagnostics (`estat endogenous`)
 
 ## `estat endogenous` after `cfregress`
 
@@ -20,7 +20,9 @@ estat endogenous
 - Runs a control-function residual-inclusion endogeneity diagnostic using the second-stage
   control-function coefficient on `cf_residual`.
 - Returns a deterministic table with rows for:
-  - `test`: `control_function_residual`
+  - `test`: `cf_residual`
+  - `estimate`: coefficient value of `cf_residual`
+  - `std_error`: standard error of `cf_residual`
   - `statistic`: t-statistic of `cf_residual`
   - `p_value`: p-value of `cf_residual`
 - No new `cfregress` or `estat` options are introduced.
@@ -34,10 +36,10 @@ estat endogenous
 
 ## Acceptance Criteria
 
-- `estat endogenous` succeeds after `cfregress` with deterministic output shape.
+- `estat endogenous` succeeds after `cfregress` with deterministic expanded output shape.
 - Existing `estat` behavior for `residuals`, `ovtest`, `vif`, `firststage`, `overid`, and `hausman`
   remains unchanged.
-- CLI coverage demonstrates `use -> cfregress -> estat endogenous` flow.
+- CLI coverage demonstrates `use -> cfregress -> estat endogenous` flow with expanded diagnostics.
 - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`).
 - Integrated E2E scenarios `s1` through `s5` pass.
 - SDD/docs and `_workspace` artifacts reflect delivered behavior.

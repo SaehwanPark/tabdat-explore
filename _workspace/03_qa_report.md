@@ -1,4 +1,4 @@
-# Phase 14 Slice 7 QA Report
+# Phase 14 Slice 8 QA Report
 
 ## Status
 
@@ -7,11 +7,11 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell routing:
-  - `estat endogenous` parses and autocompletes correctly.
+  - `estat endogenous` syntax/options remain unchanged.
 - Contract -> executor routing:
-  - `estat endogenous` requires prior `cfregress` model state.
+  - `estat endogenous` still requires prior `cfregress` model state.
 - Executor -> CLI:
-  - deterministic terminal output includes endogenous diagnostic rows after `cfregress`.
+  - deterministic terminal output now includes `estimate` and `std_error` rows after `cfregress`.
 - Regression-family isolation:
   - existing `estat` and prediction behavior remain unchanged.
 - SDD/docs -> implementation:
@@ -23,18 +23,19 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Consider a future dedicated contract for expanded control-function diagnostics beyond
-  residual-inclusion t/p-value output.
+- Consider a future dedicated contract for confidence intervals or distribution metadata in
+  `estat endogenous` if broader diagnostic parity is required.
 
 ## Validation Evidence
 
-- `uv run pytest -q tests/test_parser.py -k "estat"` passed.
-- `uv run pytest -q tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options` passed.
+- `uv run pytest -q tests/test_executor.py -k "estat_endogenous"` passed.
+- `uv run pytest -q tests/test_cli.py -k "phase_14_cfregress_flow"` passed.
 - `uv run pytest -q tests/test_executor.py -k "cfregress or estat"` passed.
 - `uv run pytest -q tests/test_cli.py -k "cfregress_flow or estat"` passed.
+- `uv run pytest -q tests/test_parser.py -k "estat"` passed.
 - Full quality gate commands passed.
 - Integrated E2E scenarios (`s1` through `s5`) passed.
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice7-cf-endogenous`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice8-cf-endogenous-expanded`, open one PR, and mark it ready for review.

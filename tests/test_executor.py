@@ -1079,11 +1079,17 @@ def test_phase_14_estat_endogenous_after_cfregress(tmp_path: Path) -> None:
   assert endogenous.headers == ("Test", "Metric", "Value")
   assert endogenous.rows[0] == ("control_function_residual", "test", "cf_residual")
   assert endogenous.rows[1][0] == "control_function_residual"
-  assert endogenous.rows[1][1] == "statistic"
+  assert endogenous.rows[1][1] == "estimate"
   assert isinstance(endogenous.rows[1][2], float)
   assert endogenous.rows[2][0] == "control_function_residual"
-  assert endogenous.rows[2][1] == "p_value"
+  assert endogenous.rows[2][1] == "std_error"
   assert isinstance(endogenous.rows[2][2], float)
+  assert endogenous.rows[3][0] == "control_function_residual"
+  assert endogenous.rows[3][1] == "statistic"
+  assert isinstance(endogenous.rows[3][2], float)
+  assert endogenous.rows[4][0] == "control_function_residual"
+  assert endogenous.rows[4][1] == "p_value"
+  assert isinstance(endogenous.rows[4][2], float)
 
 
 def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collision(
@@ -1112,6 +1118,8 @@ def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collis
   assert expected_residual.name == "cf_residual"
   observed = {row[1]: row[2] for row in endogenous.rows}
   assert observed["test"] == "cf_residual"
+  assert observed["estimate"] == pytest.approx(expected_residual.value)
+  assert observed["std_error"] == pytest.approx(expected_residual.standard_error)
   assert observed["statistic"] == pytest.approx(expected_residual.statistic)
   assert observed["p_value"] == pytest.approx(expected_residual.p_value)
 

@@ -1,7 +1,7 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented seven Phase 14
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented eight Phase 14
 slices (`ivregress`, IV diagnostics, panel FE/RE starter, `xtdata` transforms, `cfregress` core, and
 `predict` plus `estat endogenous` support after `cfregress`). This document records the
 implemented shell UX, script
@@ -242,7 +242,8 @@ display formatting.
 - Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
   until broader panel-indexing/transformation contracts are written.
 - Keep `cfregress` diagnostics scoped to bounded `estat endogenous` residual-inclusion output
-  until broader control-function diagnostics contracts are written.
+  (`test`, `estimate`, `std_error`, `statistic`, `p_value`) until broader control-function
+  diagnostics contracts are written.
 - Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
   eager fallback until a broader Polars-native contract is written.
 - Use 2-space tab size across project files.

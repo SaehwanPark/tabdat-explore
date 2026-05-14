@@ -115,6 +115,8 @@ class _CfRegressionState:
   second_stage_intercept: float | None
   include_intercept: bool
   second_stage_residual_index: int
+  residual_estimate: float | None
+  residual_standard_error: float | None
   residual_statistic: float | None
   residual_p_value: float | None
 
@@ -779,7 +781,12 @@ class Executor:
     )
     self.state.regression = None
     self.state.iv_regression = None
-    residual_statistic, residual_p_value = _cf_residual_diagnostic(
+    (
+      residual_estimate,
+      residual_standard_error,
+      residual_statistic,
+      residual_p_value,
+    ) = _cf_residual_diagnostic(
       coefficients=coefficients,
       include_intercept=command.include_intercept,
       residual_index=len(command.exogenous) + 1,
@@ -795,6 +802,8 @@ class Executor:
       second_stage_intercept=second_stage_intercept,
       include_intercept=command.include_intercept,
       second_stage_residual_index=len(command.exogenous) + 1,
+      residual_estimate=residual_estimate,
+      residual_standard_error=residual_standard_error,
       residual_statistic=residual_statistic,
       residual_p_value=residual_p_value,
     )
@@ -1272,10 +1281,17 @@ def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:
 
 
 def _estat_cf_endogenous_table(cf_regression: _CfRegressionState) -> TableResult:
-  if cf_regression.residual_statistic is None or cf_regression.residual_p_value is None:
+  if (
+    cf_regression.residual_estimate is None
+    or cf_regression.residual_standard_error is None
+    or cf_regression.residual_statistic is None
+    or cf_regression.residual_p_value is None
+  ):
     raise ExecutionError("estat endogenous failed for current model")
   rows = (
     ("control_function_residual", "test", "cf_residual"),
+    ("control_function_residual", "estimate", cf_regression.residual_estimate),
+    ("control_function_residual", "std_error", cf_regression.residual_standard_error),
     ("control_function_residual", "statistic", cf_regression.residual_statistic),
     ("control_function_residual", "p_value", cf_regression.residual_p_value),
   )
@@ -1287,12 +1303,17 @@ def _cf_residual_diagnostic(
   coefficients: tuple[CoefficientEstimate, ...],
   include_intercept: bool,
   residual_index: int,
-) -> tuple[float | None, float | None]:
+) -> tuple[float | None, float | None, float | None, float | None]:
   coefficient_index = residual_index + (1 if include_intercept else 0)
   if coefficient_index < 0 or coefficient_index >= len(coefficients):
-    return (None, None)
+    return (None, None, None, None)
   residual_coefficient = coefficients[coefficient_index]
-  return (residual_coefficient.statistic, residual_coefficient.p_value)
+  return (
+    residual_coefficient.value,
+    residual_coefficient.standard_error,
+    residual_coefficient.statistic,
+    residual_coefficient.p_value,
+  )
 
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:

@@ -48,10 +48,10 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes seven Phase 14 slices: `ivregress`, IV diagnostics,
+Phase 12 estimation substrate and now includes eight Phase 14 slices: `ivregress`, IV diagnostics,
 panel FE/RE + Hausman starter, `xtdata` within/between transforms, `cfregress` control-function
 core, `predict` support after `cfregress` for `xb` and `residuals`, and
-`estat endogenous` support after `cfregress`.
+`estat endogenous` support after `cfregress` with expanded residual-inclusion diagnostics.
 
 ## Quickstart
 

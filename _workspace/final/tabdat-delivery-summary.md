@@ -1,30 +1,34 @@
-# Phase 14 Slice 7 Delivery Summary
+# Phase 14 Slice 8 Delivery Summary
 
 ## Outcome
 
-Completed Phase 14 Slice 7 in one bounded delivery branch:
+Completed Phase 14 Slice 8 in one bounded delivery branch:
 
-- Slice 7: control-function endogenous diagnostics via existing command surface:
+- Slice 8: expanded control-function endogenous diagnostics via existing command surface:
   - `estat endogenous`
   - after successful `cfregress`
 
 ## Implemented
 
-- Added executor-held control-function endogenous diagnostic state from `cfregress` fits.
-- Added deterministic `estat endogenous` table output for residual-inclusion test rows:
+- Extended executor-held control-function endogenous diagnostic state from `cfregress` fits with
+  residual-inclusion estimate and standard error.
+- Expanded deterministic `estat endogenous` table output for residual-inclusion test rows:
   - `test=cf_residual`
+  - `estimate=<coef>`
+  - `std_error=<se>`
   - `statistic=<t>`
   - `p_value=<p>`
-- Extended parser/shell `estat` surface to include `endogenous` without new options.
-- Added focused parser, shell, executor, and CLI coverage for `cfregress -> estat endogenous`.
+- Preserved `estat endogenous` parser/shell command surface with no new options.
+- Added focused executor and CLI coverage for expanded `cfregress -> estat endogenous` diagnostics.
 - Updated SDD/docs and `_workspace` artifacts.
 
 ## Validation
 
-- `uv run pytest -q tests/test_parser.py -k "estat"`
-- `uv run pytest -q tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options`
+- `uv run pytest -q tests/test_executor.py -k "estat_endogenous"`
+- `uv run pytest -q tests/test_cli.py -k "phase_14_cfregress_flow"`
 - `uv run pytest -q tests/test_executor.py -k "cfregress or estat"`
 - `uv run pytest -q tests/test_cli.py -k "cfregress_flow or estat"`
+- `uv run pytest -q tests/test_parser.py -k "estat"`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
@@ -36,7 +40,8 @@ All commands passed.
 
 ## Residual Risk
 
-- `estat endogenous` is intentionally scoped to residual-inclusion t/p-value diagnostics only.
+- `estat endogenous` remains intentionally scoped to residual-inclusion coefficient diagnostics and
+  does not yet include confidence intervals or distribution metadata.
 
 ## Suggested Follow-up
 

@@ -203,13 +203,17 @@ and describe the active work with concise verification criteria.
   - `estat endogenous` after successful `cfregress`
   - deterministic residual-inclusion diagnostic table output (`cf_residual` statistic and p-value)
   - focused parser, shell, executor/backend, and CLI coverage
+- Implemented the eighth Phase 14 control-function diagnostics expansion slice:
+  - expanded `estat endogenous` residual-inclusion output with `estimate` and `std_error`
+  - preserved existing `estat endogenous` command surface and precondition behavior
+  - focused executor/backend and CLI coverage
 
 ## Present
 
 - Feature: Phase 14 endogeneity and panel foundations
   Status: Active
   Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice7-cf-endogenous
+  Branch: codex/tmp-phase14-slice8-cf-endogenous-expanded
 
   Summary:
   Continue from implemented `ivregress`, IV diagnostics, panel FE/RE/Hausman starter,
@@ -227,6 +231,7 @@ and describe the active work with concise verification criteria.
   - `cfregress` works with nonrobust, robust, and clustered covariance modes
   - `predict <newvar>[, xb residuals]` works after `cfregress`
   - `estat endogenous` works after `cfregress`
+  - `estat endogenous` reports `test`, `estimate`, `std_error`, `statistic`, and `p_value`
 
   Out of Scope:
   - Broad panel workflow redesign
