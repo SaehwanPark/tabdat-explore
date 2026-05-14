@@ -632,7 +632,7 @@ class Executor:
     if command.cluster_variable is not None:
       row_columns.append(command.cluster_variable)
     rows = self.backend.regression_rows(dataset, tuple(row_columns))
-    outcomes, predictors, groups = _logit_sample(
+    outcomes, predictors, groups, missing_cluster_detected = _logit_sample(
       rows=rows,
       predictor_count=len(command.predictors),
       has_cluster=command.cluster_variable is not None,
@@ -656,12 +656,14 @@ class Executor:
         fitted = model.fit(disp=0, cov_type="HC1")
         covariance = "robust"
       elif command.cluster_variable is not None:
-        if groups is None:
+        if groups is None or missing_cluster_detected:
           raise ExecutionError("logit requires complete cluster values")
         fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
         covariance = f"cluster({command.cluster_variable})"
       else:
         fitted = model.fit(disp=0)
+    except ExecutionError:
+      raise
     except Exception as exc:
       raise ExecutionError("logit failed") from exc
     parameter_names = (
@@ -1663,10 +1665,11 @@ def _logit_sample(
   rows: tuple[tuple[object, ...], ...],
   predictor_count: int,
   has_cluster: bool,
-) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...], tuple[object, ...] | None]:
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...], tuple[object, ...] | None, bool]:
   outcomes: list[float] = []
   predictors: list[tuple[float, ...]] = []
   groups: list[object] = []
+  missing_cluster_detected = False
   row_width = predictor_count + 1 + (1 if has_cluster else 0)
   for row in rows:
     if len(row) != row_width:
@@ -1687,13 +1690,14 @@ def _logit_sample(
     if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
       continue
     if has_cluster and raw_group is None:
+      missing_cluster_detected = True
       continue
     outcomes.append(outcome)
     predictors.append(predictor_values)
     if has_cluster:
       groups.append(raw_group)
   group_values: tuple[object, ...] | None = tuple(groups) if has_cluster else None
-  return tuple(outcomes), tuple(predictors), group_values
+  return tuple(outcomes), tuple(predictors), group_values, missing_cluster_detected
 
 
 def _iv_regression_sample(

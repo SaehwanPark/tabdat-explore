@@ -249,6 +249,21 @@ def _write_nonbinary_logit_parquet(path: Path) -> None:
   )
 
 
+def _write_missing_cluster_logit_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 'a'),
+        (0, 22.0, null),
+        (1, 30.0, 'b'),
+        (1, 35.0, 'b')
+    ) as logit_data(y, x, cluster_id)
+    """,
+  )
+
+
 def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -504,7 +519,9 @@ def test_phase_15_logit_supports_covariance_modes(tmp_path: Path) -> None:
 
 def test_phase_15_logit_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
   nonbinary_path = tmp_path / "nonbinary.parquet"
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
   _write_nonbinary_logit_parquet(nonbinary_path)
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
   executor = Executor()
   try:
     with pytest.raises(NoActiveDatasetError, match="logit requires an active dataset"):
@@ -518,6 +535,9 @@ def test_phase_15_logit_reports_prerequisite_errors(sample_parquet: Path, tmp_pa
       match="logit outcome must be binary with values 0 and 1",
     ):
       executor.execute(LogitCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="logit requires complete cluster values"):
+      executor.execute(LogitCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id"))
   finally:
     executor.close()
 
