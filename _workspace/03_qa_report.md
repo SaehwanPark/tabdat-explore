@@ -1,4 +1,4 @@
-# Phase 14 Slices 12-13 QA Report
+# Phase 15 Slice 1 QA Report
 
 ## Status
 
@@ -6,17 +6,18 @@ pass
 
 ## Boundaries Checked
 
+- Contract -> parser/shell:
+  - `logit` syntax and option validations match the command contract.
 - Contract -> executor/model routing:
-  - `estat firststage` preserves existing IV behavior and adds `cfregress` routing.
-- Contract -> backend/formatter:
-  - panel report with metadata includes deterministic structure and balancedness metrics.
+  - `logit` executes with nonrobust, robust, and clustered covariance modes.
+- Contract -> formatter/CLI:
+  - output includes deterministic pseudo R-squared and coefficient rows.
 - Guard behavior:
-  - `estat firststage` still rejects sessions without compatible prior estimation state.
-  - `panel set`/`panel clear`/`panel` without metadata remain stable.
-- CLI surfaces:
-  - CF and panel flows print deterministic expected output.
+  - missing active dataset, missing variables, and non-binary outcomes return deterministic errors.
+- Estimation-family isolation:
+  - running `logit` clears incompatible prior `regress`/`ivregress`/`cfregress`/`xtreg` state.
 - SDD/docs -> implementation:
-  - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` aligned.
+  - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` align with delivered scope.
 
 ## Blocking Issues
 
@@ -24,10 +25,10 @@ pass
 
 ## Validation Evidence
 
-- Focused tests for executor/CLI Phase 14 surfaces passed.
+- Focused tests for parser/shell/executor/CLI `logit` surfaces passed.
 - Full quality gates passed.
 - Integrated E2E scenarios (`s1` through `s5`) passed.
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice12-13-cf-firststage-panel-report`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase15-slice1-logit-core`, open one PR to `main`, and mark it ready for review.

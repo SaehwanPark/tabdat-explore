@@ -1,42 +1,48 @@
-# Phase 14 Slices 12-13 Delivery Summary
+# Phase 15 Slice 1 Delivery Summary
 
 ## Outcome
 
-Completed two bounded Phase 14 slices in one branch:
+Completed one bounded Phase 15 slice in one branch:
 
-- Slice 12: `estat firststage` support after `cfregress`
-- Slice 13: deterministic panel report semantic expansion
+- Slice 1: `logit` nonlinear binary-choice estimator core
 
 ## Implemented
 
-- Extended `estat firststage` routing so it now supports:
-  - existing IV first-stage diagnostics after `ivregress`
-  - control-function first-stage diagnostics after `cfregress`
-- Added deterministic control-function first-stage table output with coefficient metrics and fit
-  summary rows.
-- Added deterministic panel report structure metrics (observations, entities, time periods,
-  per-entity min/max counts, and balancedness).
-- Preserved existing `panel set`/`panel clear`, IV diagnostics, and CF endogenous diagnostics behavior.
-- Updated focused tests plus SDD/handoff docs.
+- Added `logit <y> <xvars>[, robust cluster(<var>) noconstant]` parser and shell completion support.
+- Added Python-first `statsmodels` `logit` execution with:
+  - default nonrobust covariance
+  - HC1 robust covariance
+  - clustered covariance via `cluster(<var>)`
+- Added deterministic `logit` CLI output with pseudo R-squared and coefficient rows.
+- Added strict outcome/sample guards (numeric + binary outcome, complete-case sample requirements).
+- Preserved existing command families and explicitly cleared stale estimation-family state after
+  `logit` runs.
+- Updated focused tests and SDD/handoff docs.
 
 ## Validation
 
-- Focused executor/CLI tests for slices 12-13 passed.
-- `uv run ruff check .`
-- `uv run ruff format --check .`
-- `uv run pyright`
-- `uv run mypy`
-- `uv run pytest -q`
-- `uv run python integrated_testing/run_e2e.py`
+- Focused tests:
+  - `uv run pytest tests/test_parser.py -k "phase_15_logit or invalid_commands"`
+  - `uv run pytest tests/test_shell.py -k "phase_13_and_phase_14_commands_and_options"`
+  - `uv run pytest tests/test_executor.py -k "phase_15_logit"`
+  - `uv run pytest tests/test_cli.py -k "phase_15_logit"`
+- Full quality and integration gates:
+  - `uv run ruff check .`
+  - `uv run ruff format --check .`
+  - `uv run pyright`
+  - `uv run mypy`
+  - `uv run pytest -q`
+  - `uv run python integrated_testing/run_e2e.py`
 
 All commands passed.
 
 ## Residual Risk
 
-- `estat firststage` output shape for `cfregress` is intentionally bounded to current metrics;
-  richer weak-instrument summary contracts remain future work.
+- `logit` fit stability depends on dataset separability and can emit convergence/perfect-separation
+  warnings on pathological or tiny samples; this slice keeps behavior bounded and deterministic but
+  does not add warning-specific UX beyond existing command success/failure surfaces.
 
 ## Suggested Follow-up
 
-- If Phase 14 is considered complete, start Phase 15 with a bounded command contract for
-  `logit` as the first nonlinear estimator slice.
+- Continue Phase 15 with the next bounded nonlinear slice (e.g., `probit` or marginal-effects
+  contract) after product-contract approval.

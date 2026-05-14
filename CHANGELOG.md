@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 15 nonlinear estimation core slice with
+  `logit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` logit
+  execution, deterministic pseudo R-squared and coefficient output, and focused
+  parser/executor/CLI/shell coverage.
 - Added the thirteenth Phase 14 panel semantics extension slice with deterministic `panel` report
   metrics (`observation_count`, `entity_count`, `time_count`, per-entity min/max observations, and
   balancedness), with focused backend/executor/formatter/CLI coverage.
@@ -154,6 +158,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed estimation-state handling so `logit` clears incompatible prior estimation family state
+  (`regress`, `ivregress`, `cfregress`, and `xtreg`) before later post-estimation usage.
 - Changed estimation-state handling so `regress`, `ivregress`, and `xtreg` clear incompatible
   prior model-family state before later `predict`/`estat` usage.
 - Updated script reproducibility integrated-E2E expectations to match current `export` output

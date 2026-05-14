@@ -640,27 +640,28 @@ class Executor:
     if not outcomes:
       raise ExecutionError("logit requires at least one complete observation")
     observed_outcomes = set(outcomes)
-    if observed_outcomes != {0.0, 1.0} and observed_outcomes != {0.0} and observed_outcomes != {1.0}:
+    if (
+      observed_outcomes != {0.0, 1.0} and observed_outcomes != {0.0} and observed_outcomes != {1.0}
+    ):
       raise ExecutionError("logit outcome must be binary with values 0 and 1")
     design = np.array(
       _design_matrix(predictors, include_intercept=command.include_intercept),
       dtype=float,
     )
     outcome_array = np.array(outcomes, dtype=float)
-    fit_kwargs: dict[str, object] = {"disp": 0}
     covariance = "nonrobust"
-    if command.robust:
-      fit_kwargs["cov_type"] = "HC1"
-      covariance = "robust"
-    if command.cluster_variable is not None:
-      if groups is None:
-        raise ExecutionError("logit requires complete cluster values")
-      fit_kwargs["cov_type"] = "cluster"
-      fit_kwargs["cov_kwds"] = {"groups": np.array(groups)}
-      covariance = f"cluster({command.cluster_variable})"
     model = sm.Logit(outcome_array, design)
     try:
-      fitted = model.fit(**fit_kwargs)
+      if command.robust:
+        fitted = model.fit(disp=0, cov_type="HC1")
+        covariance = "robust"
+      elif command.cluster_variable is not None:
+        if groups is None:
+          raise ExecutionError("logit requires complete cluster values")
+        fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
+        covariance = f"cluster({command.cluster_variable})"
+      else:
+        fitted = model.fit(disp=0)
     except Exception as exc:
       raise ExecutionError("logit failed") from exc
     parameter_names = (
@@ -1677,7 +1678,9 @@ def _logit_sample(
       continue
     outcome = _coerce_float(raw_outcome)
     predictor_values = tuple(
-      value for value in (_coerce_float(raw_value) for raw_value in raw_predictors) if value is not None
+      value
+      for value in (_coerce_float(raw_value) for raw_value in raw_predictors)
+      if value is not None
     )
     if outcome is None or len(predictor_values) != predictor_count:
       continue

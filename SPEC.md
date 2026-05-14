@@ -237,40 +237,36 @@ and describe the active work with concise verification criteria.
     per-entity min/max observation counts, and balancedness (`yes`/`no`)
   - preserved existing `panel set`, `panel clear`, and metadata-validation behavior
   - focused backend, executor, formatter, and CLI coverage
+- Implemented the first Phase 15 nonlinear estimation core slice:
+  - `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - Python-first `statsmodels` logit fitting with nonrobust, robust, and clustered covariance
+    modes
+  - deterministic logit result formatting with pseudo R-squared and coefficient output
+  - focused parser, executor, CLI, and shell coverage
 
 ## Present
 
-- Feature: Phase 14 endogeneity and panel foundations
+- Feature: Phase 15 nonlinear estimation core
   Status: Active
-  Started: 2026-05-12
-  Branch: codex/tmp-phase14-slice12-13-cf-firststage-panel-report
+  Started: 2026-05-14
+  Branch: codex/tmp-phase15-slice1-logit-core
 
   Summary:
-  Continue from implemented `ivregress` (`2sls` + `gmm`), IV diagnostics (`firststage`,
-  `overid`, and `endogenous` after `2sls`), panel FE/RE/Hausman starter, `xtdata`
-  within/between transforms, `cfregress` control-function core, and control-function
-  prediction/diagnostics routing with the new `estat firststage` CF extension and expanded
-  panel structure reporting.
+  Continue from completed Phase 14 endogeneity/panel foundations with the first bounded Phase 15
+  nonlinear slice (`logit`) before extending to broader nonlinear and marginal-effect workflows.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
-  - `ivregress 2sls|gmm` works with nonrobust, robust, and clustered covariance modes
-  - `estat firststage|overid` works after `ivregress`
-  - `estat firststage` works after `cfregress`
-  - `estat endogenous` works after `ivregress 2sls`
-  - `xtreg` FE/RE and `estat hausman` work with required panel metadata
-  - `xtdata ... , within|between` works with required panel metadata
-  - `cfregress` works with nonrobust, robust, and clustered covariance modes
-  - `predict <newvar>[, xb residuals]` works after `cfregress`
-  - `estat endogenous` works after `cfregress`
-  - `estat endogenous` reports `test`, `estimate`, `std_error`, `statistic`, `p_value`,
-    `ci_level`, `ci_lower`, `ci_upper`, `distribution`, and `df`
-  - `panel` report includes deterministic structure and balancedness metrics after `panel set`
+  - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
+  - Integrated E2E scenarios `s1` through `s5` pass
+  - `logit` parses and executes with nonrobust, robust, and clustered covariance modes
+  - `logit` output includes deterministic pseudo R-squared and coefficient rows
+  - Existing `regress`/`ivregress`/`cfregress`/`xtreg` command behavior remains stable
 
   Out of Scope:
-  - Broad panel workflow redesign
-  - Nonlinear estimators
+  - Probit and other nonlinear command families
+  - Marginal effects and nonlinear prediction workflows
   - R fallback adapters while Python-first coverage is available
 
 ## Future
@@ -285,17 +281,6 @@ and describe the active work with concise verification criteria.
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
-- Phase 14 endogeneity and panel foundations:
-  - complete the remaining Phase 14 scope beyond implemented `ivregress` (`2sls` + `gmm`),
-    IV diagnostics (`firststage`, `overid`, and `endogenous` after `2sls`),
-    FE/RE/Hausman, `xtdata` within/between transforms, `cfregress` core,
-    cf prediction, and bounded cf endogenous diagnostics:
-    control-function diagnostics/prediction surfaces and any additional panel-indexing semantics
-  - library strategy:
-    - approach (1): `linearmodels` for IV/2SLS, IV-GMM, and panel FE/RE; supplement with
-      `statsmodels` diagnostics when needed
-    - approach (2): `AER` (`ivreg`), `plm`, and `fixest` via `rpy2` for panel/IV gaps
-    - approach (3): targeted `numpy`/`scipy` implementations over the shared GMM substrate
 - Phase 15 nonlinear estimation core:
   - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
     variable models such as Tobit, truncated regression, and sample selection

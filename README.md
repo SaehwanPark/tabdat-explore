@@ -33,6 +33,8 @@ command line. The current CLI supports:
 - Parquet persistence with `save` and `export`
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
+- binary-choice logistic regression with
+  `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -48,12 +50,8 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate and now includes thirteen Phase 14 slices: `ivregress` (`2sls` +
-`gmm`), IV diagnostics (`firststage`, `overid`, and `endogenous` after `2sls`), panel FE/RE +
-Hausman starter, `xtdata` within/between transforms, `cfregress` control-function core, `predict`
-support after `cfregress` for `xb` and `residuals`, `estat endogenous` support after `cfregress`
-with expanded residual-inclusion diagnostics, `estat firststage` support after `cfregress`, and
-expanded `panel` structure reporting with balancedness metrics.
+Phase 12 estimation substrate, completed thirteen Phase 14 slices, and started Phase 15 with a
+bounded `logit` core slice.
 
 ## Quickstart
 

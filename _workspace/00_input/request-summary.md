@@ -1,19 +1,17 @@
-# Phase 14 Slices 12-13 Request Summary
+# Phase 15 Slice 1 Request Summary
 
 ## User Goal
 
-Resume development from the latest checkpoint by delivering remaining meaningful Phase 14 slices
+Resume development from the latest checkpoint by starting the next meaningful phase in `SPEC.md`
 with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 14 Slice 12:
-  - extend `estat firststage` to support prior `cfregress`
-  - preserve existing IV `estat firststage` behavior after `ivregress`
-  - keep existing prerequisite error behavior when no compatible estimation state exists
-- Phase 14 Slice 13:
-  - extend `panel` report semantics with deterministic structure metrics
-  - include panel balancedness signal while preserving existing `panel set`/`panel clear` behavior
+- Phase 15 Slice 1:
+  - add bounded nonlinear binary-choice estimation via `logit`
+  - command surface:
+    - `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - preserve current estimation family boundaries for `regress`, `ivregress`, `cfregress`, `xtreg`
 
 ## Constraints
 
@@ -26,7 +24,7 @@ with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review P
 
 ## Non-goals
 
-- No new nonlinear (Phase 15) estimators.
-- No broad panel workflow redesign.
+- No `probit` in this slice.
+- No marginal effects or nonlinear `predict` workflows in this slice.
+- No new command families outside the `logit` estimator surface.
 - No R adapter work while Python-first coverage is sufficient.
-- No new command families outside the existing `estat`/`panel` surfaces.
