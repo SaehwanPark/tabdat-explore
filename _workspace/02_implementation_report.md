@@ -72,7 +72,7 @@ Implemented two bounded Phase 15 slices on branch `codex/tmp-phase15-slice2-3-pr
 ## Checkpoint Commits
 
 - `63684de` `feat(phase15): add probit core and estat margins diagnostics`
-- `docs/SDD checkpoint commit recorded after this implementation report update`
+- `4e9252a` `docs(phase15): record probit and estat margins slices with SDD updates`
 
 ## Files Changed
 
