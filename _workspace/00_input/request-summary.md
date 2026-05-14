@@ -1,4 +1,4 @@
-# Phase 14 Slices 10-11 Request Summary
+# Phase 14 Slices 12-13 Request Summary
 
 ## User Goal
 
@@ -7,14 +7,13 @@ with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review P
 
 ## Scope
 
-- Phase 14 Slice 10:
-  - add IV-GMM support through existing command surface:
-    - `ivregress gmm`
-  - keep existing IV option surface (`endog`, `iv`, `robust`, `cluster`, `noconstant`)
-  - preserve deterministic `estat overid` behavior for both `2sls` and `gmm`
-- Phase 14 Slice 11:
-  - extend `estat endogenous` to support prior `ivregress 2sls`
-  - preserve existing `estat endogenous` behavior after `cfregress`
+- Phase 14 Slice 12:
+  - extend `estat firststage` to support prior `cfregress`
+  - preserve existing IV `estat firststage` behavior after `ivregress`
+  - keep existing prerequisite error behavior when no compatible estimation state exists
+- Phase 14 Slice 13:
+  - extend `panel` report semantics with deterministic structure metrics
+  - include panel balancedness signal while preserving existing `panel set`/`panel clear` behavior
 
 ## Constraints
 
@@ -30,4 +29,4 @@ with checkpoint commits, updated SDD/handoff artifacts, and a ready-for-review P
 - No new nonlinear (Phase 15) estimators.
 - No broad panel workflow redesign.
 - No R adapter work while Python-first coverage is sufficient.
-- No new command families outside the existing `ivregress`/`estat` surfaces.
+- No new command families outside the existing `estat`/`panel` surfaces.

@@ -1,10 +1,11 @@
 # TabDat-Explore Architecture
 
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
-linear econometrics with three `regress`/`predict`/`estat` slices, and implemented eleven Phase 14
+linear econometrics with three `regress`/`predict`/`estat` slices, and implemented thirteen Phase 14
 slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
 FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
-support after `cfregress`). This document records the
+support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
+semantics). This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
 lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
@@ -82,9 +83,10 @@ Phase 13 slices 1-3 add session-local regression state for the latest fitted lin
 deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
 `estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls|gmm` execution through `linearmodels`,
 IV-focused `estat firststage|overid` plus `estat endogenous` after `2sls`, panel `xtreg` FE/RE plus
-`estat hausman` with bounded covariance constraints, and bounded `cfregress` control-function
-execution through Python-first two-stage OLS residual inclusion plus `estat endogenous` over
-residual-inclusion statistics.
+`estat hausman` with bounded covariance constraints, bounded `cfregress` control-function execution
+through Python-first two-stage OLS residual inclusion plus `estat endogenous` over
+residual-inclusion statistics, `estat firststage` after `cfregress`, and panel report structure
+metrics (including balancedness).
 Estimation-family state is explicit: running one family clears
 stale state from the others to prevent cross-family `estat` reuse.
 
@@ -202,6 +204,10 @@ display formatting.
   `predict <newvar>[, xb residuals]` after successful `cfregress`.
 - Phase 14 control-function endogenous diagnostics are executable through
   `estat endogenous` after successful `cfregress`.
+- Phase 14 control-function first-stage diagnostics are executable through
+  `estat firststage` after successful `cfregress`.
+- `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
+  observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
 - Autocomplete reads active dataset and named table metadata from executor state but does not
   validate or mutate session state.
@@ -237,8 +243,9 @@ display formatting.
   or union contract is written.
 - Keep `reshape` scoped to active-dataset wide/long forms with required `i(...)` and `j(...)`
   options until panel metadata, aliases, or broader reshape ergonomics are designed.
-- Keep `panel` scoped to id/time metadata validation and reporting until balancedness diagnostics
-  or estimation commands define additional panel semantics.
+- Keep `panel` scoped to id/time metadata validation and bounded structure reporting
+  (including balancedness summary) until broader estimation commands define additional panel
+  semantics.
 - Keep `xtreg` scoped to panel-metadata-backed FE/RE estimators and `estat hausman` for matching
   non-cluster model pairs until broader panel-indexing/transformation contracts are written.
 - Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables

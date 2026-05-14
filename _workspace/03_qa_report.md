@@ -1,4 +1,4 @@
-# Phase 14 Slices 10-11 QA Report
+# Phase 14 Slices 12-13 QA Report
 
 ## Status
 
@@ -6,16 +6,15 @@ pass
 
 ## Boundaries Checked
 
-- Contract -> parser/model routing:
-  - `ivregress` accepts `2sls|gmm` and preserves existing IV option constraints.
-- Contract -> executor routing:
-  - `ivregress` dispatches to `IV2SLS` or `IVGMM` with deterministic covariance labeling.
-  - `estat overid` returns estimator-appropriate rows (`sargan`/`wooldridge_overid` vs `gmm_j`).
-  - `estat endogenous` keeps existing `cfregress` path and adds `ivregress 2sls` path.
+- Contract -> executor/model routing:
+  - `estat firststage` preserves existing IV behavior and adds `cfregress` routing.
+- Contract -> backend/formatter:
+  - panel report with metadata includes deterministic structure and balancedness metrics.
 - Guard behavior:
-  - `estat endogenous` rejects prior `ivregress gmm` with explicit diagnostic guard message.
-- CLI/shell surfaces:
-  - Phase 14 IV command/diagnostic flows are covered and deterministic.
+  - `estat firststage` still rejects sessions without compatible prior estimation state.
+  - `panel set`/`panel clear`/`panel` without metadata remain stable.
+- CLI surfaces:
+  - CF and panel flows print deterministic expected output.
 - SDD/docs -> implementation:
   - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` aligned.
 
@@ -25,10 +24,10 @@ pass
 
 ## Validation Evidence
 
-- Focused tests for parser/executor/CLI/shell IV Phase 14 surfaces passed.
+- Focused tests for executor/CLI Phase 14 surfaces passed.
 - Full quality gates passed.
 - Integrated E2E scenarios (`s1` through `s5`) passed.
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase14-slice10-11-ivgmm-endogenous`, open one PR, and mark it ready for review.
+Push `codex/tmp-phase14-slice12-13-cf-firststage-panel-report`, open one PR, and mark it ready for review.

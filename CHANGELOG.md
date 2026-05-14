@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the thirteenth Phase 14 panel semantics extension slice with deterministic `panel` report
+  metrics (`observation_count`, `entity_count`, `time_count`, per-entity min/max observations, and
+  balancedness), with focused backend/executor/formatter/CLI coverage.
+- Added the twelfth Phase 14 control-function diagnostics extension slice with
+  `estat firststage` support after `cfregress`, including deterministic first-stage coefficient and
+  fit-summary output plus focused executor/CLI coverage.
 - Added the eleventh Phase 14 IV endogenous diagnostics slice with `estat endogenous` support after
   `ivregress 2sls`, deterministic Durbin/Wu-Hausman output rows, and focused executor/CLI
   coverage while preserving existing `cfregress` endogenous diagnostics behavior.

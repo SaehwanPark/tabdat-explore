@@ -1,29 +1,27 @@
-# Phase 14 Slices 10-11 Delivery Summary
+# Phase 14 Slices 12-13 Delivery Summary
 
 ## Outcome
 
 Completed two bounded Phase 14 slices in one branch:
 
-- Slice 10: `ivregress gmm` plus estimator-compatible `estat overid`
-- Slice 11: `estat endogenous` after `ivregress 2sls`
+- Slice 12: `estat firststage` support after `cfregress`
+- Slice 13: deterministic panel report semantic expansion
 
 ## Implemented
 
-- Expanded `ivregress` command surface to `2sls|gmm` while preserving existing IV options.
-- Added Python-first `IVGMM` execution path via `linearmodels`.
-- Preserved deterministic covariance output across IV estimator modes.
-- Extended `estat overid` output routing:
-  - `2sls`: `sargan` and `wooldridge_overid`
-  - `gmm`: `gmm_j`
-- Extended `estat endogenous` routing:
-  - existing `cfregress` residual-inclusion diagnostics unchanged
-  - new IV path after `ivregress 2sls` with Durbin/Wu-Hausman diagnostics
-  - explicit non-2SLS IV guard message
-- Updated focused parser/executor/CLI/shell coverage and SDD/docs.
+- Extended `estat firststage` routing so it now supports:
+  - existing IV first-stage diagnostics after `ivregress`
+  - control-function first-stage diagnostics after `cfregress`
+- Added deterministic control-function first-stage table output with coefficient metrics and fit
+  summary rows.
+- Added deterministic panel report structure metrics (observations, entities, time periods,
+  per-entity min/max counts, and balancedness).
+- Preserved existing `panel set`/`panel clear`, IV diagnostics, and CF endogenous diagnostics behavior.
+- Updated focused tests plus SDD/handoff docs.
 
 ## Validation
 
-- Focused parser/executor/CLI/shell tests for IV Phase 14 flows passed.
+- Focused executor/CLI tests for slices 12-13 passed.
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
@@ -35,10 +33,10 @@ All commands passed.
 
 ## Residual Risk
 
-- `estat endogenous` IV path is intentionally scoped to prior `ivregress 2sls` state; GMM-specific
-  endogenous diagnostics remain out of scope for this slice.
+- `estat firststage` output shape for `cfregress` is intentionally bounded to current metrics;
+  richer weak-instrument summary contracts remain future work.
 
 ## Suggested Follow-up
 
-- Continue Phase 14 with remaining panel/control-function semantic extensions under dedicated
-  contracts.
+- If Phase 14 is considered complete, start Phase 15 with a bounded command contract for
+  `logit` as the first nonlinear estimator slice.
