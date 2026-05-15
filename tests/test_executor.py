@@ -937,7 +937,11 @@ def test_phase_15_heckman_returns_typed_result(tmp_path: Path) -> None:
   assert result.selection_dependent == "s"
   assert result.selection_predictors == ("z",)
   assert result.observation_count == 8
-  assert [estimate.name for estimate in result.outcome_coefficients] == ["intercept", "x", "mills_lambda"]
+  assert [estimate.name for estimate in result.outcome_coefficients] == [
+    "intercept",
+    "x",
+    "mills_lambda",
+  ]
   assert [estimate.name for estimate in result.selection_coefficients] == ["intercept", "z"]
 
 

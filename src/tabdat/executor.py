@@ -1193,7 +1193,9 @@ class Executor:
       and observed_selections != {0.0}
       and observed_selections != {1.0}
     ):
-      raise ExecutionError("heckman selection dependent variable must be binary with values 0 and 1")
+      raise ExecutionError(
+        "heckman selection dependent variable must be binary with values 0 and 1"
+      )
     try:
       covariance, outcome_coefficients, selection_coefficients = _fit_heckman_with_r(
         outcomes=outcomes,
@@ -2147,10 +2149,14 @@ def _heckman_sample(
     )
     if outcome_value is None or selection_value is None:
       continue
-    if len(out_predictors) != outcome_predictor_count or len(sel_predictors) != selection_predictor_count:
+    if (
+      len(out_predictors) != outcome_predictor_count
+      or len(sel_predictors) != selection_predictor_count
+    ):
       continue
     if any(
-      not math.isfinite(value) for value in (outcome_value, selection_value, *out_predictors, *sel_predictors)
+      not math.isfinite(value)
+      for value in (outcome_value, selection_value, *out_predictors, *sel_predictors)
     ):
       continue
     outcomes.append(outcome_value)
@@ -2422,7 +2428,9 @@ def _fit_heckman_with_r(
     outcome_base = np.array([outcome_predictors[index] for index in selected_indexes], dtype=float)
     if include_intercept:
       outcome_base = np.column_stack([np.ones(len(selected_indexes), dtype=float), outcome_base])
-    outcome_design = np.column_stack([outcome_base, np.array([imr[index] for index in selected_indexes])])
+    outcome_design = np.column_stack(
+      [outcome_base, np.array([imr[index] for index in selected_indexes])]
+    )
     outcome_model = sm.OLS(outcome_values, outcome_design)
     if robust:
       outcome_fit = outcome_model.fit(cov_type="HC1")

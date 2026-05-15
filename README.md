@@ -39,6 +39,8 @@ command line. The current CLI supports:
   `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - limited-dependent Tobit regression with
   `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`
+- sample-selection Heckman-style regression with
+  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -54,8 +56,9 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered three bounded
-Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, and `tobit`).
+Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered six bounded
+Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, and
+`heckman`).
 
 ## Quickstart
 
@@ -212,6 +215,9 @@ tabdat> run analysis.td
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
   boundary (`survival::survreg` via `rpy2`).
+- `heckman` currently provides a bounded sample-selection path with required `selectdep(...)`,
+  required `select(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) with
+  deterministic outcome/selection equation output.
 - `estat` currently provides:
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
   - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state

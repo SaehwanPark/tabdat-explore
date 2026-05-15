@@ -1,25 +1,17 @@
-# Phase 15 Slice 4-5 Delivery Summary
+# Phase 15 Slice 6 Delivery Summary
 
 ## Outcome
 
-Completed two bounded Phase 15 slices in one branch:
+Completed one bounded Phase 15 slice in one branch:
 
-- Slice 4: binary-choice `predict` routing expansion
-- Slice 5: limited-dependent Tobit estimator entrypoint
+- Slice 6: sample-selection Heckman estimator entrypoint
 
 ## Implemented
 
-- Extended `predict` syntax to `predict <newvar>[, xb residuals pr]` with mutual exclusivity.
-- Added binary-model prediction routing after `logit`/`probit`:
-  - `xb` linear predictor
-  - `pr` fitted probabilities
-- Added deterministic binary prediction guards:
-  - `predict option pr requires a prior logit or probit model`
-  - `predict residuals is not available after logit or probit`
-- Added `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]` parser and
-  executor support.
-- Added bounded Tobit execution with deterministic covariance/guard behavior.
-- Added bounded R adapter fallback (`survival::survreg` via `rpy2`) for Tobit execution.
+- Added `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
+  parser and executor support.
+- Added bounded Heckman execution with deterministic covariance/guard behavior.
+- Added deterministic typed/formatted output for outcome and selection equations.
 - Updated parser/shell/executor/backend/formatter/tests/SDD/workspace artifacts.
 
 ## Validation
@@ -35,11 +27,10 @@ All commands passed.
 
 ## Residual Risk
 
-- Environment-specific R library path warnings are emitted by `rpy2` in this environment, but they
-  did not block deterministic Tobit execution or validation.
+- Perfect-separation warnings may appear in small synthetic test data for the selection equation,
+  but they do not break deterministic command behavior or output contracts.
 
 ## Suggested Follow-up
 
 - Continue Phase 15 with one bounded remaining slice from `SPEC.md`:
-  - sample-selection command surface, or
   - general nonlinear-regression command semantics.

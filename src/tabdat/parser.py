@@ -25,8 +25,8 @@ from tabdat.models import (
   Expression,
   FunctionCallExpression,
   GenerateCommand,
-  HeckmanCommand,
   HeadCommand,
+  HeckmanCommand,
   HistogramCommand,
   IdentifierExpression,
   IvRegressCommand,
@@ -930,13 +930,9 @@ def _parse_tobit(parts: _CommandParts) -> TobitCommand:
 
 def _parse_heckman(parts: _CommandParts) -> HeckmanCommand:
   if parts.condition is not None or parts.expression is not None:
-    raise ParseError(
-      "heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)"
-    )
+    raise ParseError("heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)")
   if len(parts.arguments) < 2:
-    raise ParseError(
-      "heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)"
-    )
+    raise ParseError("heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)")
   option_names = {option.name for option in parts.options}
   unsupported = option_names - {"selectdep", "select", "robust", "cluster", "noconstant"}
   if unsupported:
