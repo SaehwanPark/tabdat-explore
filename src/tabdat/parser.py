@@ -51,6 +51,7 @@ from tabdat.models import (
   SummarizeCommand,
   TabulateCommand,
   TailCommand,
+  TobitCommand,
   UnaryExpression,
   UseCommand,
   XtDataCommand,
@@ -89,6 +90,7 @@ _EXECUTABLE_COMMANDS = {
   "regress",
   "logit",
   "probit",
+  "tobit",
   "predict",
   "estat",
   "ivregress",
@@ -314,6 +316,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "probit":
     return _parse_probit(parts)
+
+  if parts.name == "tobit":
+    return _parse_tobit(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -816,15 +821,21 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
   if len(parts.arguments) != 1:
     raise ParseError("predict expects syntax: predict <newvar>")
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"xb", "residuals"}
+  unsupported = option_names - {"xb", "residuals", "pr"}
   if unsupported:
     raise ParseError(f"predict unsupported option: {', '.join(sorted(unsupported))}")
-  _require_flag_options(parts.options, "predict", {"xb", "residuals"})
-  if "xb" in option_names and "residuals" in option_names:
-    raise ParseError("predict options xb and residuals cannot be combined")
+  _require_flag_options(parts.options, "predict", {"xb", "residuals", "pr"})
+  selected_kinds = {"xb", "residuals", "pr"} & option_names
+  if len(selected_kinds) > 1:
+    raise ParseError("predict options xb, residuals, and pr cannot be combined")
+  kind: Literal["xb", "residuals", "pr"] = "xb"
+  if "residuals" in option_names:
+    kind = "residuals"
+  if "pr" in option_names:
+    kind = "pr"
   return PredictCommand(
     target_variable=parts.arguments[0],
-    kind="residuals" if "residuals" in option_names else "xb",
+    kind=kind,
   )
 
 
@@ -874,6 +885,38 @@ def _parse_probit(parts: _CommandParts) -> ProbitCommand:
   return ProbitCommand(
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_tobit(parts: _CommandParts) -> TobitCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("tobit expects syntax: tobit <y> <xvars>, ll(<num>) [ul(<num>)]")
+  if len(parts.arguments) < 2:
+    raise ParseError("tobit expects syntax: tobit <y> <xvars>, ll(<num>) [ul(<num>)]")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"ll", "ul", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"tobit unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "tobit", {"robust", "noconstant"})
+  lower_limit = _single_float_option(parts.options, "ll", "tobit")
+  if lower_limit is None:
+    raise ParseError("tobit option ll expects one numeric value")
+  upper_limit = _single_float_option(parts.options, "ul", "tobit")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "tobit")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("tobit option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("tobit cannot combine robust and cluster")
+  return TobitCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    lower_limit=lower_limit,
+    upper_limit=upper_limit,
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,
@@ -1067,6 +1110,29 @@ def _single_integer_option(
   if value < minimum:
     raise ParseError(f"{command_name} option {name} must be at least {minimum}")
   return value
+
+
+def _single_float_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> float | None:
+  matched = [option for option in options if option.name == name]
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option {name} may only be supplied once")
+  value = matched[0].value
+  if isinstance(value, tuple):
+    if len(value) != 1:
+      raise ParseError(f"{command_name} option {name} expects one value")
+    try:
+      return float(value[0])
+    except ValueError as exc:
+      raise ParseError(f"{command_name} option {name} expects a numeric value") from exc
+  if isinstance(value, bool) or not isinstance(value, (int, float)):
+    raise ParseError(f"{command_name} option {name} expects a numeric value")
+  return float(value)
 
 
 def _single_path_option(
@@ -1306,9 +1372,15 @@ def _option_value(token: _Token) -> str | int | float:
 def _parenthesized_option_value(
   option_name: str,
   tokens: tuple[_Token, ...],
-) -> str | tuple[str, ...]:
+) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
+  if option_name in {"ll", "ul"}:
+    numeric_text = "".join(token.text for token in tokens)
+    try:
+      return float(numeric_text)
+    except ValueError as exc:
+      raise ParseError(f"option {option_name} expects a numeric value") from exc
 
   values: list[str] = []
   for token in tokens:

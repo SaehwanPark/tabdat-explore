@@ -483,6 +483,92 @@ def test_cli_runs_phase_15_estat_margins_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_15_binary_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "binary.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (0, 22.0, 1.0, 'a'),
+        (0, 25.0, 2.0, 'b'),
+        (1, 30.0, 2.0, 'b'),
+        (1, 34.0, 3.0, 'c'),
+        (1, 38.0, 3.0, 'c'),
+        (1, 42.0, 4.0, 'd'),
+        (1, 45.0, 4.0, 'd')
+    ) as binary_data(y, x, z, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "logit y x z",
+      "-c",
+      "predict xb_hat, xb",
+      "-c",
+      "predict pr_hat, pr",
+      "-c",
+      "head 2",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Predicted xb_hat: 8 rows, 5 columns" in captured.out
+  assert "Predicted pr_hat: 8 rows, 6 columns" in captured.out
+  assert "xb_hat" in captured.out
+  assert "pr_hat" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_15_tobit_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "tobit.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 18.0, 1.0, 'a'),
+        (0.0, 22.0, 1.0, 'a'),
+        (1.5, 25.0, 2.0, 'b'),
+        (2.0, 30.0, 2.0, 'b'),
+        (4.0, 34.0, 3.0, 'c'),
+        (8.0, 38.0, 3.0, 'c'),
+        (10.0, 42.0, 4.0, 'd'),
+        (10.0, 45.0, 4.0, 'd')
+    ) as tobit_data(y, x, z, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "tobit y x z, ll(0) ul(10)",
+      "-c",
+      "tobit y x z, ll(0) robust",
+      "-c",
+      "tobit y x z, ll(0) cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: tobit y on x z" in captured.out
+  assert "Estimator: tobit" in captured.out
+  assert "Limits: ll=0, ul=10" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(

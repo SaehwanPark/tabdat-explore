@@ -1,4 +1,4 @@
-# Phase 15 Slice 2-3 QA Report
+# Phase 15 Slice 4-5 QA Report
 
 ## Status
 
@@ -7,22 +7,18 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `probit` syntax and option validations match the command contract.
-  - `estat margins` subcommand routing and completion behavior match the command contract.
-- Contract -> executor/model routing:
-  - `probit` executes with nonrobust, robust, and clustered covariance modes.
-  - `estat margins` executes after `logit` and `probit`, and rejects missing prerequisites.
+  - `predict` option expansion (`pr`) and mutual exclusion checks match contract.
+  - `tobit` syntax/options and completion behavior match contract.
+- Contract -> executor/backend:
+  - binary `predict` supports `xb` and `pr` after `logit`/`probit`.
+  - binary `predict` guard behavior is deterministic for unsupported modes/prerequisites.
+  - `tobit` executes with required limits, covariance modes, and deterministic guard behavior.
 - Contract -> formatter/CLI:
-  - `probit` output includes deterministic pseudo R-squared and coefficient rows.
-  - `estat margins` output includes deterministic `Variable/Metric/Value` rows.
-- Guard behavior:
-  - missing active dataset, missing variables, non-binary outcomes, and missing cluster values
-    return deterministic errors for `probit`.
-  - missing binary-model state returns deterministic prerequisite error for `estat margins`.
-- Estimation-family isolation:
-  - existing `predict` and non-margins `estat` boundaries remain intact.
-- SDD/docs -> implementation:
-  - `SPEC.md`, `ARCHITECTURE.md`, `README.md`, and `CHANGELOG.md` align with delivered scope.
+  - Tobit output formatting is deterministic and includes model/covariance/limits/coefficients.
+  - CLI flows for binary `predict` and Tobit execute successfully.
+- Regression boundaries:
+  - existing `regress`/`cfregress` prediction behavior remains intact.
+  - existing `estat` linear/IV/panel/control-function behavior remains stable.
 
 ## Blocking Issues
 
@@ -30,7 +26,6 @@ pass
 
 ## Validation Evidence
 
-- Focused tests for parser/shell/executor/CLI `probit` + `estat margins` surfaces passed.
 - Full quality gates passed:
   - `uv run ruff check .`
   - `uv run ruff format --check .`
@@ -42,5 +37,5 @@ pass
 
 ## Recommended Next Action
 
-Push `codex/tmp-phase15-slice2-3-probit-estat-margins`, open one PR to `main`, and mark it ready
+Push `codex/tmp-phase15-slice4-5-binary-predict-tobit`, open one PR to `main`, and mark it ready
 for review.

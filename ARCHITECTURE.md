@@ -5,7 +5,8 @@ linear econometrics with three `regress`/`predict`/`estat` slices, implemented t
 slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
 FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
 support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
-semantics), and delivered three bounded Phase 15 slices (`logit`, `probit`, and `estat margins`).
+semantics), and delivered five bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
+binary `predict` routing, and `tobit`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -63,7 +64,9 @@ constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gl
 `xtdata <varlist>, within|between`, and
 `cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
 Phase 15 parsing adds
-`logit|probit <y> <xvars>[, robust cluster(...) noconstant]` plus `estat margins`.
+`logit|probit <y> <xvars>[, robust cluster(...) noconstant]`, `estat margins`,
+`predict <newvar>[, xb residuals pr]`, and
+`tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(...) noconstant]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -93,7 +96,10 @@ metrics (including balancedness).
 Phase 15 adds bounded binary-choice `logit` and `probit` execution through `statsmodels` with
 nonrobust, HC1 robust, and clustered covariance modes plus deterministic pseudo R-squared output.
 `estat margins` routes to deterministic predictor-level marginal-effects output after the latest
-binary-choice model state.
+binary-choice model state. `predict` now routes binary `xb` and `pr` outputs after binary-choice
+fits while preserving existing linear/control-function `predict` paths. Phase 15 also adds bounded
+Tobit estimation through an R adapter boundary (`survival::survreg` via `rpy2`) when Python-first
+direct support is insufficient.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -215,7 +221,10 @@ display formatting.
   `estat firststage` after successful `cfregress`.
 - Phase 15 nonlinear estimation core currently includes
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`,
-  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`, and `estat margins`.
+  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `estat margins`,
+  binary `predict` routing via `predict <newvar>[, xb residuals pr]`, and
+  `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.

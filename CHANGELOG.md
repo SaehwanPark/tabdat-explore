@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 15 nonlinear estimation core slice with bounded binary-choice prediction
+  routing via `predict <newvar>[, xb residuals pr]`, including `pr` support after `logit`/`probit`
+  and focused parser/executor/CLI/shell coverage.
+- Added the fifth Phase 15 nonlinear estimation core slice with
+  `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`, deterministic
+  bounded output/guards, and focused parser/executor/CLI/shell coverage.
 - Added the second Phase 15 nonlinear estimation core slice with
   `probit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` probit
   execution, deterministic pseudo R-squared and coefficient output, and focused
@@ -64,6 +70,7 @@ All notable project changes are tracked here.
   Python-first `linearmodels` IV2SLS execution, deterministic formatter output, and focused
   parser/executor/CLI/shell coverage.
 - Added `linearmodels` as the Phase 14 Python-first IV/2SLS backend dependency.
+- Added `rpy2` as the bounded Phase 15 adapter dependency for R-backed Tobit execution.
 - Added integrated E2E scenario `s5_titanic_phase13_dogfood` to exercise real-dataset
   `regress`/`predict`/`estat` flows as a Phase 13 hardening gate.
 - Added the third Phase 13 linear econometrics slice with `estat <residuals|ovtest|vif>`
@@ -165,6 +172,9 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed `predict` routing so binary-model state (`logit`/`probit`) now supports `xb` and `pr`,
+  while preserving existing linear/control-function prediction behavior and keeping binary
+  residual prediction out of scope.
 - Changed binary-choice estimation-state handling so `logit` and `probit` both register compatible
   post-estimation model state for `estat margins` while preserving existing `predict` and other
   `estat` family boundaries.

@@ -1,17 +1,37 @@
-# Phase 15 Slice 2-3 Command Contract
+# Phase 15 Slice 4-5 Command Contract
 
 ## Roadmap Phase
 
 - Phase 15 nonlinear estimation core
-  - Slice 2: bounded binary-choice `probit` estimator foundation
-  - Slice 3: bounded binary-choice `estat margins` diagnostics
+  - Slice 4: bounded nonlinear binary-choice prediction routing
+  - Slice 5: bounded limited-dependent Tobit entrypoint
 
-## `probit`
+## `predict` extension for binary-choice models
 
 ### Syntax
 
 ```stata
-probit <y> <xvars>[, robust cluster(<var>) noconstant]
+predict <newvar>[, xb residuals pr]
+```
+
+### Rules
+
+- Requires one active dataset.
+- Existing behavior remains unchanged:
+  - after `regress`/`cfregress`, `xb` and `residuals` continue to work as before.
+- New binary-choice behavior:
+  - after successful `logit` or `probit`, supports:
+    - `xb` for linear predictor
+    - `pr` for fitted probabilities
+- For this slice, binary `predict` does not support `residuals`.
+- Options `xb`, `residuals`, and `pr` are pairwise mutually exclusive.
+
+## `tobit`
+
+### Syntax
+
+```stata
+tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]
 ```
 
 ### Rules
@@ -19,67 +39,57 @@ probit <y> <xvars>[, robust cluster(<var>) noconstant]
 - Requires one active dataset.
 - Requires one outcome variable and one-or-more predictor variables.
 - Requires numeric outcome and predictor columns.
-- Outcome must be binary on complete-case rows (`0/1`).
+- `ll(<num>)` is required.
+- `ul(<num>)` is optional.
+- If `ul(<num>)` is present, `ll < ul` is required.
 - Supports covariance modes:
   - nonrobust (default)
   - robust
   - cluster(`<var>`)
 - `robust` and `cluster(<var>)` are mutually exclusive.
 - `noconstant` disables intercept inclusion.
+- Uses Python-first strategy; if direct Python support is insufficient, uses bounded R fallback via
+  `rpy2` adapter.
 - On successful fit, returns deterministic model output with:
-  - model identification (`probit`, outcome, predictors)
+  - model identification (`tobit`, outcome, predictors)
+  - censoring limits summary (`ll`, `ul`/none)
   - covariance label
   - observation count
-  - pseudo R-squared
   - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
-
-## `estat margins`
-
-### Syntax
-
-```stata
-estat margins
-```
-
-### Rules
-
-- Requires one active dataset.
-- Requires successful prior binary-choice model state from `logit` or `probit`.
-- Returns deterministic predictor-level rows with columns:
-  - `Variable`, `Metric`, `Value`
-- Supported metrics per predictor:
-  - `dy_dx`, `std_error`, `statistic`, `p_value`, `ci_lower`, `ci_upper`
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `probit requires an active dataset; run use <path> first`
-  - `estat requires an active dataset; run use <path> first`
+  - `predict requires an active dataset; run use <path> first`
+  - `tobit requires an active dataset; run use <path> first`
 - Invalid syntax/options:
   - parser errors consistent with existing command-family style
-- Non-binary outcome on complete-case sample:
-  - `probit outcome must be binary with values 0 and 1`
-- No complete-case observations:
-  - `probit requires at least one complete observation`
-- Cluster option with incomplete cluster values on retained sample:
-  - `probit requires complete cluster values`
-- Backend fit failures:
-  - `probit failed`
-- Missing binary-model prerequisite for margins:
-  - `estat margins requires a prior logit or probit model`
-- Marginal effects extraction failures:
-  - `estat margins failed for current model`
+- Invalid `predict` option combos:
+  - parse error for combined `xb`/`residuals`/`pr`
+- Missing compatible model for `predict`:
+  - unchanged existing linear/control-function error when applicable
+  - `predict option pr requires a prior logit or probit model`
+  - `predict residuals is not available after logit or probit`
+- Tobit prerequisites:
+  - unknown/missing variables and non-numeric variable errors consistent with existing estimators
+  - `tobit requires at least one complete observation`
+  - `tobit lower limit must be less than upper limit`
+  - clustered mode with incomplete cluster values:
+    - `tobit requires complete cluster values`
+- Backend/adapter fit failures:
+  - `tobit failed`
 
 ## State behavior
 
-- Running `probit` clears incompatible prior estimation family state to prevent stale post-estimation
-  use from other model families.
-- Running `logit` or `probit` registers binary-model state for `estat margins`.
-- This slice pair does not add new nonlinear `predict` behavior.
+- Running `tobit` clears incompatible prior estimation-family state.
+- Existing family boundaries remain:
+  - `estat margins` remains tied to prior `logit`/`probit` model state.
+  - existing `estat` linear/IV/panel/control-function behaviors remain unchanged.
 
 ## Acceptance Criteria
 
-- `probit` parses and executes with nonrobust, robust, and clustered covariance modes.
-- `estat margins` parses and executes after `logit` and `probit` with deterministic output.
+- `predict ..., pr` parses and executes after `logit` and `probit` with deterministic output.
+- `predict` linear/control-function behavior remains stable.
+- `tobit` parses and executes with `ll(...)`, optional `ul(...)`, and covariance modes.
 - Focused parser/executor/CLI/shell coverage passes.
-- Existing `regress`/`ivregress`/`cfregress`/`xtreg`/`predict`/other `estat` behavior remains stable.
+- Existing `regress`/`ivregress`/`cfregress`/`xtreg`/other `predict`/`estat` behavior remains stable.

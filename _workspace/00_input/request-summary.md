@@ -1,19 +1,21 @@
-# Phase 15 Slice 2-3 Request Summary
+# Phase 15 Slice 4-5 Request Summary
 
 ## User Goal
 
-Resume development from the latest checkpoint by implementing remaining meaningful Phase 15 slices
-in one bounded PR with checkpoint commits, updated SDD artifacts, and a ready-for-review PR.
+Resume development from the latest checkpoint by implementing two remaining meaningful Phase 15
+slices in one bounded PR with checkpoint commits, updated SDD artifacts, and a ready-for-review PR.
 
 ## Scope
 
-- Phase 15 Slice 2:
-  - add bounded nonlinear binary-choice estimation via `probit`
+- Phase 15 Slice 4:
+  - add bounded nonlinear prediction routing for binary-choice models
+  - extend command surface:
+    - `predict <newvar>[, xb residuals pr]`
+  - `pr` returns fitted probabilities after `logit`/`probit`
+- Phase 15 Slice 5:
+  - add bounded limited-dependent estimator entrypoint via Tobit
   - command surface:
-    - `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
-- Phase 15 Slice 3:
-  - add bounded post-estimation marginal effects via `estat margins`
-  - available after successful `logit` or `probit`
+    - `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`
 
 ## Constraints
 
@@ -22,10 +24,10 @@ in one bounded PR with checkpoint commits, updated SDD artifacts, and a ready-fo
   2. R via `rpy2` only if Python-first is insufficient
   3. lower-level custom numerical implementation only as a last resort
 - Keep behavior deterministic and bounded to one PR with meaningful checkpoint commits.
-- Keep existing Phase 13/14 command behavior stable unless explicitly extended above.
+- Keep existing Phase 13/14/15 command behavior stable unless explicitly extended above.
 
 ## Non-goals
 
-- No nonlinear `predict` expansion in this slice pair.
-- No limited-dependent command families (`tobit`, `truncated`, `sample selection`) in this PR.
-- No R adapter work while Python-first coverage is sufficient.
+- No nonlinear binary residual diagnostics expansion.
+- No sample-selection (`heckman`) command family in this PR.
+- No broad nonlinear-regression command family in this PR.

@@ -46,6 +46,7 @@ from tabdat.models import (
   SummarizeCommand,
   TabulateCommand,
   TailCommand,
+  TobitCommand,
   UseCommand,
   XtDataCommand,
   XtRegCommand,
@@ -365,6 +366,10 @@ def test_parse_phase_13_predict_command() -> None:
     target_variable="resid",
     kind="residuals",
   )
+  assert parse_command("predict p_hat, pr") == PredictCommand(
+    target_variable="p_hat",
+    kind="pr",
+  )
 
 
 def test_parse_phase_15_logit_command() -> None:
@@ -407,6 +412,28 @@ def test_parse_phase_15_probit_command() -> None:
   assert parse_command("probit outcome x1, noconstant") == ProbitCommand(
     outcome="outcome",
     predictors=("x1",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_15_tobit_command() -> None:
+  assert parse_command("tobit outcome x1, ll(0)") == TobitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    lower_limit=0.0,
+  )
+  assert parse_command("tobit outcome x1 x2, ll(-1) ul(10) robust") == TobitCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+    lower_limit=-1.0,
+    upper_limit=10.0,
+    robust=True,
+  )
+  assert parse_command("tobit outcome x1, ll(0) cluster(group_id) noconstant") == TobitCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    lower_limit=0.0,
+    cluster_variable="group_id",
     include_intercept=False,
   )
 
@@ -728,7 +755,19 @@ def test_parse_exit_aliases() -> None:
     "predict a b",
     "predict cost_hat if age > 18",
     "predict cost_hat, xb residuals",
+    "predict cost_hat, pr residuals",
     "predict cost_hat, residuals=true",
+    "tobit",
+    "tobit y",
+    "tobit y x",
+    "tobit y x if y > 0",
+    "tobit y x, ll()",
+    "tobit y x, ll(low)",
+    "tobit y x, ul(1)",
+    "tobit y x, ll(0) robust cluster(group)",
+    "tobit y x, ll(0) cluster()",
+    "tobit y x, ll(0) cluster(group firm)",
+    "tobit y x, ll(0) robust=true",
     "estat",
     "estat vif extra",
     "estat, vif",
