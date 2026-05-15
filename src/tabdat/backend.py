@@ -2,6 +2,7 @@
 
 import math
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, cast
 from urllib.parse import urlparse
@@ -923,6 +924,54 @@ class DuckDBBackend:
       f"select *, {expression_sql} as {_quote_identifier(target_variable)} from {ACTIVE_TABLE}",
       "predict",
     )
+    return self.active_dataset_info(dataset.path)
+
+  def add_numeric_column_from_values(
+    self,
+    dataset: DatasetInfo,
+    *,
+    target_variable: str,
+    values: Sequence[float],
+    command_name: str,
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if target_variable in column_types:
+      raise ExecutionError(f"{command_name} target already exists: {target_variable}")
+    expected_count = self.active_row_count()
+    if expected_count != len(values):
+      raise ExecutionError(f"{command_name} failed")
+    row_table = "__tabdat_pred_rows"
+    value_table = "__tabdat_pred_values"
+    try:
+      self._connection.execute(
+        f"""
+        create or replace temp table {row_table} as
+        select row_number() over () as __row_id, * from {ACTIVE_TABLE}
+        """
+      )
+      self._connection.execute(
+        f"create or replace temp table {value_table} (__row_id bigint, __value double)"
+      )
+      self._connection.executemany(
+        f"insert into {value_table} values (?, ?)",
+        tuple((index + 1, float(value)) for index, value in enumerate(values)),
+      )
+      self._replace_active(
+        f"""
+        select
+          row_data.* exclude (__row_id),
+          values_data.__value as {_quote_identifier(target_variable)}
+        from {row_table} as row_data
+        inner join {value_table} as values_data
+        on row_data.__row_id = values_data.__row_id
+        order by row_data.__row_id
+        """,
+        command_name,
+      )
+      self._connection.execute(f"drop table if exists {row_table}")
+      self._connection.execute(f"drop table if exists {value_table}")
+    except duckdb.Error as exc:
+      raise ExecutionError(f"{command_name} failed") from exc
     return self.active_dataset_info(dataset.path)
 
   def _summarize_variable(self, variable: str) -> SummaryRow:

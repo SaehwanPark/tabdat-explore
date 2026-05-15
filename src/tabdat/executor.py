@@ -83,6 +83,8 @@ from tabdat.models import (
   TableResult,
   TabulateCommand,
   TailCommand,
+  TobitCommand,
+  TobitRegressionResult,
   TransformResult,
   UseCommand,
   XtDataCommand,
@@ -149,7 +151,9 @@ class _XtRegressionState:
 @dataclass(frozen=True)
 class _BinaryRegressionState:
   family: Literal["logit", "probit"]
+  outcome_variable: str
   predictor_names: tuple[str, ...]
+  include_intercept: bool
   fitted_model: object
 
 
@@ -351,6 +355,9 @@ class Executor:
 
     if isinstance(command, ProbitCommand):
       return self._execute_probit(command)
+
+    if isinstance(command, TobitCommand):
+      return self._execute_tobit(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -687,7 +694,9 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = _BinaryRegressionState(
       family="logit",
+      outcome_variable=command.outcome,
       predictor_names=command.predictors,
+      include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
     self.state.iv_regression = None
@@ -752,7 +761,9 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = _BinaryRegressionState(
       family="probit",
+      outcome_variable=command.outcome,
       predictor_names=command.predictors,
+      include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
     self.state.iv_regression = None
@@ -1017,6 +1028,47 @@ class Executor:
 
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
+    if command.kind == "pr":
+      binary_regression = self.state.binary_regression
+      if binary_regression is None:
+        raise ExecutionError("predict option pr requires a prior logit or probit model")
+      available_columns = {column.name for column in dataset.columns}
+      if any(name not in available_columns for name in binary_regression.predictor_names):
+        raise ExecutionError("predict option pr requires a prior logit or probit model")
+      rows = self.backend.regression_rows(dataset, binary_regression.predictor_names)
+      predictions = _binary_predictions(
+        rows=rows,
+        fitted_model=binary_regression.fitted_model,
+        predictor_count=len(binary_regression.predictor_names),
+        include_intercept=binary_regression.include_intercept,
+        kind="pr",
+      )
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    binary_regression = self.state.binary_regression
+    if binary_regression is not None:
+      if command.kind == "residuals":
+        raise ExecutionError("predict residuals is not available after logit or probit")
+      rows = self.backend.regression_rows(dataset, binary_regression.predictor_names)
+      predictions = _binary_predictions(
+        rows=rows,
+        fitted_model=binary_regression.fitted_model,
+        predictor_count=len(binary_regression.predictor_names),
+        include_intercept=binary_regression.include_intercept,
+        kind="xb",
+      )
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     regression = self.state.regression
     if regression is not None:
       next_dataset = self.backend.add_linear_prediction_column(
@@ -1047,6 +1099,57 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError("predict requires a prior regress or cfregress model")
+
+  def _execute_tobit(self, command: TobitCommand) -> TobitRegressionResult:
+    if command.upper_limit is not None and command.lower_limit >= command.upper_limit:
+      raise ExecutionError("tobit lower limit must be less than upper limit")
+    dataset = self._require_active_dataset("tobit")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("tobit", dataset, numeric_variables)
+    row_columns = [command.outcome, *command.predictors]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    outcomes, predictors, groups, missing_cluster_detected = _logit_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("tobit requires at least one complete observation")
+    if command.cluster_variable is not None and (groups is None or missing_cluster_detected):
+      raise ExecutionError("tobit requires complete cluster values")
+    try:
+      covariance, coefficients = _fit_tobit_with_r(
+        outcomes=outcomes,
+        predictors=predictors,
+        predictor_names=command.predictors,
+        include_intercept=command.include_intercept,
+        lower_limit=command.lower_limit,
+        upper_limit=command.upper_limit,
+        robust=command.robust,
+        cluster_values=groups,
+        cluster_variable=command.cluster_variable,
+      )
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("tobit failed") from exc
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return TobitRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      lower_limit=command.lower_limit,
+      upper_limit=command.upper_limit,
+      coefficients=coefficients,
+    )
 
   def _execute_estat(self, command: EstatCommand) -> TableResult:
     dataset = self._require_active_dataset("estat")
@@ -2069,6 +2172,172 @@ def _data_frame(data: dict[str, object], id_name: str, time_name: str) -> Any:
 
   frame = pd.DataFrame(data)
   return frame.set_index([id_name, time_name])
+
+
+def _binary_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  fitted_model: object,
+  predictor_count: int,
+  include_intercept: bool,
+  kind: Literal["xb", "pr"],
+) -> tuple[float, ...]:
+  row_values: list[float] = [math.nan for _ in rows]
+  complete_indexes: list[int] = []
+  complete_predictors: list[tuple[float, ...]] = []
+  for row_index, row in enumerate(rows):
+    if len(row) != predictor_count:
+      raise ExecutionError("predict failed")
+    if any(value is None for value in row):
+      continue
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw_value) for raw_value in row) if value is not None
+    )
+    if len(predictor_values) != predictor_count:
+      continue
+    if any(not math.isfinite(value) for value in predictor_values):
+      continue
+    complete_indexes.append(row_index)
+    complete_predictors.append(predictor_values)
+  if complete_predictors:
+    design = np.array(
+      _design_matrix(tuple(complete_predictors), include_intercept=include_intercept),
+      dtype=float,
+    )
+    try:
+      model = cast(Any, fitted_model).model
+      params = cast(Any, fitted_model).params
+      which = "linear" if kind == "xb" else "mean"
+      predicted = np.array(model.predict(params, design, which=which), dtype=float)
+    except Exception:
+      try:
+        linear = kind == "xb"
+        predicted = np.array(cast(Any, fitted_model).predict(design, linear=linear), dtype=float)
+      except Exception as exc:
+        raise ExecutionError("predict failed") from exc
+    if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
+      raise ExecutionError("predict failed")
+    for row_index, value in zip(complete_indexes, predicted, strict=True):
+      row_values[row_index] = float(value)
+  return tuple(row_values)
+
+
+def _fit_tobit_with_r(
+  *,
+  outcomes: tuple[float, ...],
+  predictors: tuple[tuple[float, ...], ...],
+  predictor_names: tuple[str, ...],
+  include_intercept: bool,
+  lower_limit: float,
+  upper_limit: float | None,
+  robust: bool,
+  cluster_values: tuple[object, ...] | None,
+  cluster_variable: str | None,
+) -> tuple[str, tuple[CoefficientEstimate, ...]]:
+  try:
+    from rpy2 import robjects
+    from rpy2.robjects import packages
+    from rpy2.robjects.vectors import FloatVector, StrVector
+  except Exception as exc:
+    raise ExecutionError("tobit failed") from exc
+  try:
+    require_namespace = cast(Any, robjects.r["requireNamespace"])
+    if not bool(require_namespace("survival", quietly=True)[0]):
+      raise ExecutionError("tobit failed")
+    survival = packages.importr("survival")
+    stats = packages.importr("stats")
+    left_bounds: list[float] = []
+    right_bounds: list[float] = []
+    for outcome in outcomes:
+      if upper_limit is None:
+        if outcome <= lower_limit:
+          left_bounds.append(float("-inf"))
+          right_bounds.append(lower_limit)
+        else:
+          left_bounds.append(outcome)
+          right_bounds.append(outcome)
+        continue
+      if outcome <= lower_limit:
+        left_bounds.append(float("-inf"))
+        right_bounds.append(lower_limit)
+      elif outcome >= upper_limit:
+        left_bounds.append(upper_limit)
+        right_bounds.append(float("inf"))
+      else:
+        left_bounds.append(outcome)
+        right_bounds.append(outcome)
+    left_name = "tabdat_left"
+    right_name = "tabdat_right"
+    cluster_name = "tabdat_cluster"
+    frame_columns: dict[str, object] = {
+      left_name: FloatVector(left_bounds),
+      right_name: FloatVector(right_bounds),
+    }
+    for index, predictor in enumerate(predictor_names):
+      frame_columns[predictor] = FloatVector(tuple(row[index] for row in predictors))
+    frame = robjects.DataFrame(frame_columns)
+    cluster_argument = None
+    if cluster_values is not None:
+      frame_columns[cluster_name] = StrVector(tuple(str(value) for value in cluster_values))
+      frame = robjects.DataFrame(frame_columns)
+      cluster_argument = frame.rx2(cluster_name)
+    rhs = " + ".join(predictor_names)
+    if not include_intercept:
+      rhs = f"0 + {rhs}"
+    formula = stats.as_formula(
+      f"survival::Surv({left_name}, {right_name}, type='interval2') ~ {rhs}"
+    )
+    fit_kwargs: dict[str, object] = {"data": frame, "dist": "gaussian"}
+    covariance = "nonrobust"
+    if robust:
+      fit_kwargs["robust"] = True
+      covariance = "robust"
+    if cluster_argument is not None:
+      fit_kwargs["cluster"] = cluster_argument
+      fit_kwargs["robust"] = True
+      covariance = f"cluster({cluster_variable})"
+    fit = survival.survreg(formula, **fit_kwargs)
+    summary_fn = cast(Any, robjects.r["summary"])
+    rownames_fn = cast(Any, robjects.r["rownames"])
+    summary = summary_fn(fit)
+    table = np.array(summary.rx2("table"), dtype=float)
+    row_names = tuple(str(name) for name in rownames_fn(summary.rx2("table")))
+    if table.ndim != 2 or table.shape[1] < 4:
+      raise ExecutionError("tobit failed")
+    coefficients_by_name: dict[str, CoefficientEstimate] = {}
+    for index, name in enumerate(row_names):
+      if name == "Log(scale)":
+        continue
+      value = float(table[index, 0])
+      std_error = float(table[index, 1])
+      statistic = float(table[index, 2])
+      p_value = float(table[index, 3])
+      coefficients_by_name[name] = CoefficientEstimate(
+        name=name,
+        value=value,
+        standard_error=std_error if math.isfinite(std_error) else None,
+        statistic=statistic if math.isfinite(statistic) else None,
+        p_value=p_value if math.isfinite(p_value) else None,
+      )
+    ordered_names = ("(Intercept)", *predictor_names) if include_intercept else predictor_names
+    coefficients = tuple(
+      CoefficientEstimate(
+        name=("intercept" if name == "(Intercept)" else name),
+        value=coefficients_by_name[name].value,
+        standard_error=coefficients_by_name[name].standard_error,
+        statistic=coefficients_by_name[name].statistic,
+        p_value=coefficients_by_name[name].p_value,
+      )
+      for name in ordered_names
+      if name in coefficients_by_name
+    )
+    if len(coefficients) != len(ordered_names):
+      raise ExecutionError("tobit failed")
+    return covariance, coefficients
+  except ExecutionError:
+    raise
+  except Exception as exc:
+    raise ExecutionError("tobit failed") from exc
 
 
 def _regression_model(

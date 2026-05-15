@@ -273,7 +273,18 @@ class ProbitCommand:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class PredictCommand:
   target_variable: str
-  kind: Literal["xb", "residuals"] = "xb"
+  kind: Literal["xb", "residuals", "pr"] = "xb"
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class TobitCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  lower_limit: float
+  upper_limit: float | None = None
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -363,6 +374,7 @@ Command = (
   | RegressCommand
   | LogitCommand
   | ProbitCommand
+  | TobitCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -512,6 +524,18 @@ class ProbitRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class TobitRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  lower_limit: float
+  upper_limit: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -606,6 +630,7 @@ Result = (
   | RegressionResult
   | LogitRegressionResult
   | ProbitRegressionResult
+  | TobitRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult
