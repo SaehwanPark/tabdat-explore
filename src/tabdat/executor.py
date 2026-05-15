@@ -11,7 +11,7 @@ import numpy as np
 import statsmodels.api as sm
 from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
-from scipy.stats import chi2
+from scipy.stats import chi2, norm
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
@@ -48,6 +48,8 @@ from tabdat.models import (
   ExportResult,
   GenerateCommand,
   HeadCommand,
+  HeckmanCommand,
+  HeckmanRegressionResult,
   HistogramCommand,
   IvRegressCommand,
   IvRegressionResult,
@@ -358,6 +360,9 @@ class Executor:
 
     if isinstance(command, TobitCommand):
       return self._execute_tobit(command)
+
+    if isinstance(command, HeckmanCommand):
+      return self._execute_heckman(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -1149,6 +1154,78 @@ class Executor:
       lower_limit=command.lower_limit,
       upper_limit=command.upper_limit,
       coefficients=coefficients,
+    )
+
+  def _execute_heckman(self, command: HeckmanCommand) -> HeckmanRegressionResult:
+    dataset = self._require_active_dataset("heckman")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.predictors,
+      command.selection_dependent,
+      *command.selection_predictors,
+    )
+    _require_numeric_columns("heckman", dataset, numeric_variables)
+    row_columns = [*numeric_variables]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    sample = _heckman_sample(
+      rows=rows,
+      outcome_predictor_count=len(command.predictors),
+      selection_predictor_count=len(command.selection_predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    (
+      outcomes,
+      outcome_predictors,
+      selection_outcomes,
+      selection_predictors,
+      clusters,
+      missing_cluster_detected,
+    ) = sample
+    if not outcomes:
+      raise ExecutionError("heckman requires at least one complete observation")
+    if command.cluster_variable is not None and (clusters is None or missing_cluster_detected):
+      raise ExecutionError("heckman requires complete cluster values")
+    observed_selections = set(selection_outcomes)
+    if (
+      observed_selections != {0.0, 1.0}
+      and observed_selections != {0.0}
+      and observed_selections != {1.0}
+    ):
+      raise ExecutionError("heckman selection dependent variable must be binary with values 0 and 1")
+    try:
+      covariance, outcome_coefficients, selection_coefficients = _fit_heckman_with_r(
+        outcomes=outcomes,
+        outcome_predictors=outcome_predictors,
+        outcome_predictor_names=command.predictors,
+        selection_outcomes=selection_outcomes,
+        selection_predictors=selection_predictors,
+        selection_predictor_names=command.selection_predictors,
+        include_intercept=command.include_intercept,
+        robust=command.robust,
+        cluster_values=clusters,
+        cluster_variable=command.cluster_variable,
+      )
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("heckman failed") from exc
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return HeckmanRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      selection_dependent=command.selection_dependent,
+      selection_predictors=command.selection_predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      outcome_coefficients=outcome_coefficients,
+      selection_coefficients=selection_coefficients,
     )
 
   def _execute_estat(self, command: EstatCommand) -> TableResult:
@@ -2013,6 +2090,85 @@ def _iv_regression_sample(
   )
 
 
+def _heckman_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  outcome_predictor_count: int,
+  selection_predictor_count: int,
+  has_cluster: bool,
+) -> tuple[
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[object, ...] | None,
+  bool,
+]:
+  outcomes: list[float] = []
+  outcome_predictors: list[tuple[float, ...]] = []
+  selection_outcomes: list[float] = []
+  selection_predictors: list[tuple[float, ...]] = []
+  clusters: list[object] = []
+  missing_cluster_detected = False
+  row_width = (
+    1 + outcome_predictor_count + 1 + selection_predictor_count + (1 if has_cluster else 0)
+  )
+  outcome_predictor_end = 1 + outcome_predictor_count
+  selection_index = outcome_predictor_end
+  selection_predictor_start = selection_index + 1
+  selection_predictor_end = selection_predictor_start + selection_predictor_count
+  for row in rows:
+    if len(row) != row_width:
+      continue
+    cluster_value = row[selection_predictor_end] if has_cluster else None
+    if (
+      row[0] is None
+      or row[selection_index] is None
+      or any(value is None for value in row[1:outcome_predictor_end])
+      or any(value is None for value in row[selection_predictor_start:selection_predictor_end])
+    ):
+      continue
+    if has_cluster and cluster_value is None:
+      missing_cluster_detected = True
+      continue
+    outcome_value = _coerce_float(row[0])
+    selection_value = _coerce_float(row[selection_index])
+    out_predictors = tuple(
+      value
+      for value in (_coerce_float(raw) for raw in row[1:outcome_predictor_end])
+      if value is not None
+    )
+    sel_predictors = tuple(
+      value
+      for value in (
+        _coerce_float(raw) for raw in row[selection_predictor_start:selection_predictor_end]
+      )
+      if value is not None
+    )
+    if outcome_value is None or selection_value is None:
+      continue
+    if len(out_predictors) != outcome_predictor_count or len(sel_predictors) != selection_predictor_count:
+      continue
+    if any(
+      not math.isfinite(value) for value in (outcome_value, selection_value, *out_predictors, *sel_predictors)
+    ):
+      continue
+    outcomes.append(outcome_value)
+    outcome_predictors.append(out_predictors)
+    selection_outcomes.append(selection_value)
+    selection_predictors.append(sel_predictors)
+    if has_cluster:
+      clusters.append(cluster_value)
+  return (
+    tuple(outcomes),
+    tuple(outcome_predictors),
+    tuple(selection_outcomes),
+    tuple(selection_predictors),
+    tuple(clusters) if has_cluster else None,
+    missing_cluster_detected,
+  )
+
+
 def _xt_panel_sample(
   *,
   rows: tuple[tuple[object, ...], ...],
@@ -2221,6 +2377,71 @@ def _binary_predictions(
       float_value = float(value)
       row_values[row_index] = float_value if math.isfinite(float_value) else None
   return tuple(row_values)
+
+
+def _fit_heckman_with_r(
+  *,
+  outcomes: tuple[float, ...],
+  outcome_predictors: tuple[tuple[float, ...], ...],
+  outcome_predictor_names: tuple[str, ...],
+  selection_outcomes: tuple[float, ...],
+  selection_predictors: tuple[tuple[float, ...], ...],
+  selection_predictor_names: tuple[str, ...],
+  include_intercept: bool,
+  robust: bool,
+  cluster_values: tuple[object, ...] | None,
+  cluster_variable: str | None,
+) -> tuple[str, tuple[CoefficientEstimate, ...], tuple[CoefficientEstimate, ...]]:
+  selection_design = np.array(
+    _design_matrix(selection_predictors, include_intercept=include_intercept),
+    dtype=float,
+  )
+  selection_array = np.array(selection_outcomes, dtype=float)
+  covariance = "nonrobust"
+  try:
+    selection_model = sm.Probit(selection_array, selection_design)
+    if robust:
+      selection_fit = selection_model.fit(disp=0, cov_type="HC1")
+      covariance = "robust"
+    elif cluster_values is not None:
+      selection_fit = selection_model.fit(
+        disp=0,
+        cov_type="cluster",
+        cov_kwds={"groups": np.array(cluster_values)},
+      )
+      covariance = f"cluster({cluster_variable})"
+    else:
+      selection_fit = selection_model.fit(disp=0)
+    xb = np.array(selection_model.predict(selection_fit.params, selection_design, which="linear"))
+    cdf = np.maximum(norm.cdf(xb), 1e-12)
+    imr = norm.pdf(xb) / cdf
+    selected_indexes = [index for index, value in enumerate(selection_outcomes) if value == 1.0]
+    if not selected_indexes:
+      raise ExecutionError("heckman failed")
+    outcome_values = np.array([outcomes[index] for index in selected_indexes], dtype=float)
+    outcome_base = np.array([outcome_predictors[index] for index in selected_indexes], dtype=float)
+    if include_intercept:
+      outcome_base = np.column_stack([np.ones(len(selected_indexes), dtype=float), outcome_base])
+    outcome_design = np.column_stack([outcome_base, np.array([imr[index] for index in selected_indexes])])
+    outcome_model = sm.OLS(outcome_values, outcome_design)
+    if robust:
+      outcome_fit = outcome_model.fit(cov_type="HC1")
+    elif cluster_values is not None:
+      selected_clusters = np.array([cluster_values[index] for index in selected_indexes])
+      outcome_fit = outcome_model.fit(cov_type="cluster", cov_kwds={"groups": selected_clusters})
+    else:
+      outcome_fit = outcome_model.fit()
+  except ExecutionError:
+    raise
+  except Exception as exc:
+    raise ExecutionError("heckman failed") from exc
+  selection_names = (
+    ("intercept", *selection_predictor_names) if include_intercept else selection_predictor_names
+  )
+  outcome_names = ("intercept", *outcome_predictor_names, "mills_lambda")
+  selection_coefficients = _coefficient_estimates(selection_names, selection_fit)
+  outcome_coefficients = _coefficient_estimates(outcome_names, outcome_fit)
+  return covariance, outcome_coefficients, selection_coefficients
 
 
 def _fit_tobit_with_r(
