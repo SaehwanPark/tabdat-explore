@@ -268,17 +268,23 @@ and describe the active work with concise verification criteria.
   - Python-first policy preserved by using R fallback (`survival::survreg` via `rpy2`) only where
     direct Python support is insufficient
   - focused parser, executor, CLI, and shell coverage
+- Implemented the sixth Phase 15 nonlinear estimation core slice:
+  - `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
+  - deterministic bounded sample-selection execution with explicit covariance labels and
+    deterministic guard behavior
+  - deterministic typed/formatted output for outcome and selection equations
+  - focused parser, executor, CLI, and shell coverage
 
 ## Present
 
 - Feature: Phase 15 nonlinear estimation core
   Status: Active
   Started: 2026-05-14
-  Branch: codex/tmp-phase15-slice4-5-binary-predict-tobit
+  Branch: codex/tmp-phase15-slice6-heckman-sample-selection
 
   Summary:
   Continue from completed Phase 14 endogeneity/panel foundations with bounded Phase 15 nonlinear
-  slices (`logit`, `probit`, `estat margins`, binary `predict` routing, and `tobit`) before
+  slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, and `heckman`) before
   extending to broader nonlinear workflows.
 
   Verification:
@@ -289,12 +295,14 @@ and describe the active work with concise verification criteria.
   - `estat margins` executes after `logit` and `probit` with deterministic table output
   - `predict ..., pr` executes after `logit` and `probit` with deterministic output
   - `tobit` parses and executes with `ll(...)`, optional `ul(...)`, and supported covariance modes
+  - `heckman` parses and executes with required `selectdep(...)` and `select(...)` plus supported
+    covariance modes
   - `logit` output includes deterministic pseudo R-squared and coefficient rows
   - `probit` output includes deterministic pseudo R-squared and coefficient rows
-  - Existing `regress`/`ivregress`/`cfregress`/`xtreg` command behavior remains stable
+  - Existing `regress`/`logit`/`probit`/`tobit`/`ivregress`/`cfregress`/`xtreg` command behavior
+    remains stable
 
   Out of Scope:
-  - Sample-selection (Heckman-style) command surface
   - General nonlinear-regression command semantics
 
 ## Future
@@ -312,9 +320,7 @@ and describe the active work with concise verification criteria.
 - Phase 15 nonlinear estimation core:
   - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
     variable models such as Tobit, truncated regression, and sample selection
-  - remaining meaningful slices in this phase (one-sentence summaries):
-    - add a bounded sample-selection (Heckman-style) command surface only after the limited
-      dependent estimator contract is stable
+  - remaining meaningful slice in this phase (one-sentence summary):
     - add bounded general nonlinear-regression command semantics that reuse Phase 12 shared
       estimation contracts
   - library strategy:

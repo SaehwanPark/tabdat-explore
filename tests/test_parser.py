@@ -21,6 +21,7 @@ from tabdat.models import (
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
+  HeckmanCommand,
   HistogramCommand,
   IdentifierExpression,
   IvRegressCommand,
@@ -438,6 +439,34 @@ def test_parse_phase_15_tobit_command() -> None:
   )
 
 
+def test_parse_phase_15_heckman_command() -> None:
+  assert parse_command("heckman outcome x1, selectdep(s) select(z1)") == HeckmanCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    selection_dependent="s",
+    selection_predictors=("z1",),
+  )
+  assert parse_command("heckman outcome x1 x2, selectdep(s) select(z1 z2) robust") == (
+    HeckmanCommand(
+      outcome="outcome",
+      predictors=("x1", "x2"),
+      selection_dependent="s",
+      selection_predictors=("z1", "z2"),
+      robust=True,
+    )
+  )
+  assert parse_command(
+    "heckman outcome x1, selectdep(s) select(z1) cluster(group_id) noconstant"
+  ) == HeckmanCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    selection_dependent="s",
+    selection_predictors=("z1",),
+    cluster_variable="group_id",
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -768,6 +797,19 @@ def test_parse_exit_aliases() -> None:
     "tobit y x, ll(0) cluster()",
     "tobit y x, ll(0) cluster(group firm)",
     "tobit y x, ll(0) robust=true",
+    "heckman",
+    "heckman y",
+    "heckman y x",
+    "heckman y x if y > 0",
+    "heckman y x, selectdep() select(z)",
+    "heckman y x, selectdep(s t) select(z)",
+    "heckman y x, selectdep(s)",
+    "heckman y x, select(s)",
+    "heckman y x, selectdep(s) select()",
+    "heckman y x, selectdep(s) select(z) robust cluster(group)",
+    "heckman y x, selectdep(s) select(z) cluster()",
+    "heckman y x, selectdep(s) select(z) cluster(group firm)",
+    "heckman y x, selectdep(s) select(z) robust=true",
     "estat",
     "estat vif extra",
     "estat, vif",

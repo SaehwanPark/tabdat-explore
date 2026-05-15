@@ -569,6 +569,50 @@ def test_cli_runs_phase_15_tobit_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_15_heckman_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.2, 18.0, 0.2, 0, 'a'),
+        (2.1, 22.0, 0.3, 1, 'a'),
+        (2.8, 25.0, 0.5, 1, 'b'),
+        (3.1, 30.0, 0.7, 1, 'b'),
+        (1.0, 34.0, 0.1, 0, 'c'),
+        (3.3, 38.0, 0.8, 1, 'c'),
+        (0.9, 42.0, 0.2, 0, 'd'),
+        (3.5, 45.0, 0.9, 1, 'd')
+    ) as heckman_data(y, x, z, s, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "heckman y x, selectdep(s) select(z)",
+      "-c",
+      "heckman y x, selectdep(s) select(z) robust",
+      "-c",
+      "heckman y x, selectdep(s) select(z) cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: heckman y on x (selectdep=s; select=z)" in captured.out
+  assert "Estimator: heckman" in captured.out
+  assert "Outcome Equation" in captured.out
+  assert "Selection Equation" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(

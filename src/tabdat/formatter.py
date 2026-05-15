@@ -10,6 +10,7 @@ from tabdat.models import (
   CountResult,
   DescribeResult,
   ExportResult,
+  HeckmanRegressionResult,
   IvRegressionResult,
   LoadResult,
   LogitRegressionResult,
@@ -200,6 +201,51 @@ def format_result(result: Result) -> str:
     )
     body = _table(("Variable", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
     return "\n".join([*header, *body])
+
+  if isinstance(result, HeckmanRegressionResult):
+    outcome_header = [
+      (
+        f"Model: heckman {result.outcome} on {' '.join(result.predictors)} "
+        f"(selectdep={result.selection_dependent}; select={' '.join(result.selection_predictors)})"
+      ),
+      "Estimator: heckman",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      "",
+      "Outcome Equation",
+    ]
+    outcome_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.outcome_coefficients
+    )
+    selection_header = [
+      "",
+      "Selection Equation",
+    ]
+    selection_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.selection_coefficients
+    )
+    return "\n".join(
+      [
+        *outcome_header,
+        *_table(("Variable", "Coef", "Std Err", "z", "P>|z|"), outcome_rows),
+        *selection_header,
+        *_table(("Variable", "Coef", "Std Err", "z", "P>|z|"), selection_rows),
+      ]
+    )
 
   if isinstance(result, IvRegressionResult):
     exogenous = " ".join(result.exogenous) if result.exogenous else "(none)"

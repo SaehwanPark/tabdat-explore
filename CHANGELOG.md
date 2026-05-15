@@ -6,6 +6,9 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the sixth Phase 15 nonlinear estimation core slice with
+  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`,
+  deterministic bounded sample-selection execution, and focused parser/executor/CLI/shell coverage.
 - Added the fourth Phase 15 nonlinear estimation core slice with bounded binary-choice prediction
   routing via `predict <newvar>[, xb residuals pr]`, including `pr` support after `logit`/`probit`
   and focused parser/executor/CLI/shell coverage.

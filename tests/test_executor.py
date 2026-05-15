@@ -38,6 +38,8 @@ from tabdat.models import (
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
+  HeckmanCommand,
+  HeckmanRegressionResult,
   HistogramCommand,
   IdentifierExpression,
   IvRegressCommand,
@@ -317,6 +319,40 @@ def _write_tobit_internal_name_collision_parquet(path: Path) -> None:
         (10.0, 42.0, 4.0),
         (10.0, 45.0, 4.0)
     ) as tobit_data(y, tabdat_left, tabdat_right)
+    """,
+  )
+
+
+def _write_heckman_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.2, 18.0, 0.2, 0, 'a'),
+        (2.1, 22.0, 0.3, 1, 'a'),
+        (2.8, 25.0, 0.5, 1, 'b'),
+        (3.1, 30.0, 0.7, 1, 'b'),
+        (1.0, 34.0, 0.1, 0, 'c'),
+        (3.3, 38.0, 0.8, 1, 'c'),
+        (0.9, 42.0, 0.2, 0, 'd'),
+        (3.5, 45.0, 0.9, 1, 'd')
+    ) as heckman_data(y, x, z, s, cluster_id)
+    """,
+  )
+
+
+def _write_missing_cluster_heckman_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.2, 18.0, 0.2, 0, 'a'),
+        (2.1, 22.0, 0.3, 1, null),
+        (2.8, 25.0, 0.5, 1, 'b'),
+        (3.1, 30.0, 0.7, 1, 'b')
+    ) as heckman_data(y, x, z, s, cluster_id)
     """,
   )
 
@@ -872,6 +908,135 @@ def test_phase_15_tobit_reports_prerequisite_errors(sample_parquet: Path, tmp_pa
     with pytest.raises(ExecutionError, match="tobit lower limit must be less than upper limit"):
       executor.execute(
         TobitCommand(outcome="y", predictors=("x",), lower_limit=1.0, upper_limit=1.0)
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_15_heckman_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_heckman_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, HeckmanRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.selection_dependent == "s"
+  assert result.selection_predictors == ("z",)
+  assert result.observation_count == 8
+  assert [estimate.name for estimate in result.outcome_coefficients] == [
+    "intercept",
+    "x",
+    "mills_lambda",
+  ]
+  assert [estimate.name for estimate in result.selection_coefficients] == ["intercept", "z"]
+
+
+def test_phase_15_heckman_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_heckman_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+        robust=True,
+      )
+    )
+    clustered = executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, HeckmanRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, HeckmanRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_15_heckman_noconstant_labels_coefficients(tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_heckman_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+        include_intercept=False,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, HeckmanRegressionResult)
+  assert [estimate.name for estimate in result.outcome_coefficients] == ["x", "mills_lambda"]
+  assert [estimate.name for estimate in result.selection_coefficients] == ["z"]
+
+
+def test_phase_15_heckman_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  _write_heckman_parquet(path)
+  _write_missing_cluster_heckman_parquet(missing_cluster_path)
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="heckman requires an active dataset"):
+      executor.execute(
+        HeckmanCommand(
+          outcome="y",
+          predictors=("x",),
+          selection_dependent="s",
+          selection_predictors=("z",),
+        )
+      )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="heckman unknown variable: y, x, s, z"):
+      executor.execute(
+        HeckmanCommand(
+          outcome="y",
+          predictors=("x",),
+          selection_dependent="s",
+          selection_predictors=("z",),
+        )
+      )
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="heckman requires complete cluster values"):
+      executor.execute(
+        HeckmanCommand(
+          outcome="y",
+          predictors=("x",),
+          selection_dependent="s",
+          selection_predictors=("z",),
+          cluster_variable="cluster_id",
+        )
       )
   finally:
     executor.close()

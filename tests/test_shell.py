@@ -185,6 +185,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     tobit_command = _completion_texts(completer, "tob")
     tobit_columns = _completion_texts(completer, "tobit c")
     tobit_options = _completion_texts(completer, "tobit cost age, ")
+    heckman_command = _completion_texts(completer, "heck")
+    heckman_columns = _completion_texts(completer, "heckman c")
+    heckman_options = _completion_texts(completer, "heckman cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -219,6 +222,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert tobit_command == ["tobit"]
   assert tobit_columns == ["cost"]
   assert tobit_options == ["ll(", "ul(", "robust", "cluster(", "noconstant"]
+  assert heckman_command == ["heckman"]
+  assert heckman_columns == ["cost"]
+  assert heckman_options == ["selectdep(", "select(", "robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]
