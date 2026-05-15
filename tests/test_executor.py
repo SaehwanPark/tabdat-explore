@@ -733,6 +733,47 @@ def test_phase_15_nl_reports_prerequisite_errors(sample_parquet: Path) -> None:
     executor.close()
 
 
+def test_phase_15_nl_predict_supports_parameter_only_models(tmp_path: Path) -> None:
+  path = tmp_path / "nl-constant.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0),
+        (2.5),
+        (4.0)
+    ) as nl_data(y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      NlCommand(
+        outcome="y",
+        expression=IdentifierExpression("a"),
+        parameter_names=("a",),
+        start_values=(2.0,),
+      )
+    )
+    xb = executor.execute(PredictCommand(target_variable="y_hat", kind="xb"))
+    residuals = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(xb, TransformResult)
+  assert isinstance(residuals, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("y", "y_hat", "u_hat")
+  assert preview.rows == (
+    (1.0, pytest.approx(2.5), pytest.approx(-1.5)),
+    (2.5, pytest.approx(2.5), pytest.approx(0.0)),
+    (4.0, pytest.approx(2.5), pytest.approx(1.5)),
+  )
+
+
 def test_phase_15_logit_returns_typed_result(tmp_path: Path) -> None:
   path = tmp_path / "logit.parquet"
   _write_logit_parquet(path)

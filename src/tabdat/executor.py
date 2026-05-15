@@ -1214,14 +1214,22 @@ class Executor:
       available_columns = {column.name for column in dataset.columns}
       if any(name not in available_columns for name in nl_regression.predictor_names):
         raise ExecutionError("predict requires a prior nl model with matching variables")
-      rows = self.backend.regression_rows(dataset, nl_regression.predictor_names)
-      predicted = _nl_predictions(
-        expression=nl_regression.expression,
-        rows=rows,
-        predictor_names=nl_regression.predictor_names,
-        parameter_names=nl_regression.parameter_names,
-        parameter_values=nl_regression.parameter_values,
-      )
+      if nl_regression.predictor_names:
+        rows = self.backend.regression_rows(dataset, nl_regression.predictor_names)
+        predicted = _nl_predictions(
+          expression=nl_regression.expression,
+          rows=rows,
+          predictor_names=nl_regression.predictor_names,
+          parameter_names=nl_regression.parameter_names,
+          parameter_values=nl_regression.parameter_values,
+        )
+      else:
+        predicted = _nl_constant_predictions(
+          expression=nl_regression.expression,
+          parameter_names=nl_regression.parameter_names,
+          parameter_values=nl_regression.parameter_values,
+          row_count=self.backend.active_row_count(),
+        )
       if command.kind == "residuals":
         outcomes = self.backend.regression_rows(dataset, (nl_regression.outcome_variable,))
         residual_values: list[float | None] = []
@@ -3155,6 +3163,25 @@ def _nl_predictions(
       )
     )
   return tuple(values)
+
+
+def _nl_constant_predictions(
+  *,
+  expression: Expression,
+  parameter_names: tuple[str, ...],
+  parameter_values: tuple[float, ...],
+  row_count: int,
+) -> tuple[float | None, ...]:
+  parameter_vector = np.array(parameter_values, dtype=float)
+  param_index = {name: index for index, name in enumerate(parameter_names)}
+  value = _evaluate_nl_expression(
+    expression,
+    predictor_row=(),
+    predictor_index={},
+    params=parameter_vector,
+    param_index=param_index,
+  )
+  return tuple(value for _ in range(row_count))
 
 
 def _format_expression(expression: Expression) -> str:
