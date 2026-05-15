@@ -25,6 +25,7 @@ from tabdat.models import (
   Expression,
   FunctionCallExpression,
   GenerateCommand,
+  HeckmanCommand,
   HeadCommand,
   HistogramCommand,
   IdentifierExpression,
@@ -91,6 +92,7 @@ _EXECUTABLE_COMMANDS = {
   "logit",
   "probit",
   "tobit",
+  "heckman",
   "predict",
   "estat",
   "ivregress",
@@ -319,6 +321,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "tobit":
     return _parse_tobit(parts)
+
+  if parts.name == "heckman":
+    return _parse_heckman(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -917,6 +922,44 @@ def _parse_tobit(parts: _CommandParts) -> TobitCommand:
     predictors=parts.arguments[1:],
     lower_limit=lower_limit,
     upper_limit=upper_limit,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_heckman(parts: _CommandParts) -> HeckmanCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)"
+    )
+  if len(parts.arguments) < 2:
+    raise ParseError(
+      "heckman expects syntax: heckman <y> <xvars>, selectdep(<var>) select(<vars>)"
+    )
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"selectdep", "select", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"heckman unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "heckman", {"robust", "noconstant"})
+  selectdep_values = _single_tuple_option(parts.options, "selectdep", "heckman")
+  if selectdep_values is None or len(selectdep_values) != 1:
+    raise ParseError("heckman option selectdep expects one variable")
+  select_values = _single_tuple_option(parts.options, "select", "heckman")
+  if select_values is None:
+    raise ParseError("heckman option select expects at least one variable")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "heckman")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("heckman option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("heckman cannot combine robust and cluster")
+  return HeckmanCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    selection_dependent=selectdep_values[0],
+    selection_predictors=select_values,
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,

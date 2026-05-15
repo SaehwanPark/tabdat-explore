@@ -288,6 +288,17 @@ class TobitCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class HeckmanCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  selection_dependent: str
+  selection_predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
     "residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous", "margins"
@@ -375,6 +386,7 @@ Command = (
   | LogitCommand
   | ProbitCommand
   | TobitCommand
+  | HeckmanCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -536,6 +548,19 @@ class TobitRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class HeckmanRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  selection_dependent: str
+  selection_predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  outcome_coefficients: tuple[CoefficientEstimate, ...]
+  selection_coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -631,6 +656,7 @@ Result = (
   | LogitRegressionResult
   | ProbitRegressionResult
   | TobitRegressionResult
+  | HeckmanRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult
