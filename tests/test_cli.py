@@ -613,6 +613,48 @@ def test_cli_runs_phase_15_heckman_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_15_nl_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "nl.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 2.718281828),
+        (2.0, 7.389056099),
+        (3.0, 20.08553692),
+        (4.0, 54.59815003),
+        (5.0, 148.4131591)
+    ) as nl_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "nl y = exp(a + b * x), params(a b) start(0.5 0.5)",
+      "-c",
+      "nl y = exp(a + b * x), params(a b) start(0.5 0.5) robust",
+      "-c",
+      "predict y_hat, xb",
+      "-c",
+      "predict u_hat, residuals",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: nl y = exp((a + (b * x)))" in captured.out
+  assert "Estimator: nl" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Predicted y_hat: 5 rows, 3 columns" in captured.out
+  assert "Predicted u_hat: 5 rows, 4 columns" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(
@@ -670,7 +712,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
 
   assert exit_code == 1
   assert "Loaded:" in captured.out
-  assert "Error: predict requires a prior regress or cfregress model" in captured.err
+  assert "Error: predict requires a prior regress, cfregress, or nl model" in captured.err
 
 
 def test_cli_runs_phase_13_estat_flow(tmp_path: Path, capsys) -> None:

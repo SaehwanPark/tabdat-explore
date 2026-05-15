@@ -299,6 +299,16 @@ class HeckmanCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class NlCommand:
+  outcome: str
+  expression: Expression
+  parameter_names: tuple[str, ...]
+  start_values: tuple[float, ...]
+  robust: bool = False
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
     "residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous", "margins"
@@ -387,6 +397,7 @@ Command = (
   | ProbitCommand
   | TobitCommand
   | HeckmanCommand
+  | NlCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -561,6 +572,17 @@ class HeckmanRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class NlRegressionResult:
+  covariance: str
+  outcome: str
+  expression: str
+  parameter_names: tuple[str, ...]
+  observation_count: int
+  residual_sum_of_squares: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -657,6 +679,7 @@ Result = (
   | ProbitRegressionResult
   | TobitRegressionResult
   | HeckmanRegressionResult
+  | NlRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

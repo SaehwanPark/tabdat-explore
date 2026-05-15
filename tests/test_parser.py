@@ -28,6 +28,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  NlCommand,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -467,6 +468,46 @@ def test_parse_phase_15_heckman_command() -> None:
   )
 
 
+def test_parse_phase_15_nl_command() -> None:
+  assert parse_command("nl y = a + b * x, params(a b) start(1 0.5)") == NlCommand(
+    outcome="y",
+    expression=BinaryExpression(
+      left=IdentifierExpression("a"),
+      operator="+",
+      right=BinaryExpression(
+        left=IdentifierExpression("b"),
+        operator="*",
+        right=IdentifierExpression("x"),
+      ),
+    ),
+    parameter_names=("a", "b"),
+    start_values=(1.0, 0.5),
+  )
+  assert parse_command("nl y = exp(a + b * x), params(a b) start(0 1) robust noconstant") == (
+    NlCommand(
+      outcome="y",
+      expression=FunctionCallExpression(
+        name="exp",
+        arguments=(
+          BinaryExpression(
+            left=IdentifierExpression("a"),
+            operator="+",
+            right=BinaryExpression(
+              left=IdentifierExpression("b"),
+              operator="*",
+              right=IdentifierExpression("x"),
+            ),
+          ),
+        ),
+      ),
+      parameter_names=("a", "b"),
+      start_values=(0.0, 1.0),
+      robust=True,
+      include_intercept=False,
+    )
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -810,6 +851,16 @@ def test_parse_exit_aliases() -> None:
     "heckman y x, selectdep(s) select(z) cluster()",
     "heckman y x, selectdep(s) select(z) cluster(group firm)",
     "heckman y x, selectdep(s) select(z) robust=true",
+    "nl",
+    "nl y x",
+    "nl y = x",
+    "nl y = a + b*x, params(a b)",
+    "nl y = a + b*x, start(1 2)",
+    "nl y = a + b*x, params(a b) start(1)",
+    "nl y = a + b*x, params(a b) start(1 two)",
+    "nl y = a + b*x, params(a a) start(1 2)",
+    "nl y = a + b*x if y > 0, params(a b) start(1 2)",
+    "nl y = a + b*x, robust=true params(a b) start(1 2)",
     "estat",
     "estat vif extra",
     "estat, vif",

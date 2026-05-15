@@ -11,6 +11,7 @@ import numpy as np
 import statsmodels.api as sm
 from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
+from scipy.optimize import least_squares
 from scipy.stats import chi2, norm
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
@@ -29,6 +30,7 @@ from tabdat.models import (
   ActivateResult,
   AppendCommand,
   BarCommand,
+  BinaryExpression,
   ByCommand,
   CfRegressCommand,
   CfRegressionResult,
@@ -46,11 +48,14 @@ from tabdat.models import (
   ExitCommand,
   ExportCommand,
   ExportResult,
+  Expression,
+  FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
   HeckmanCommand,
   HeckmanRegressionResult,
   HistogramCommand,
+  IdentifierExpression,
   IvRegressCommand,
   IvRegressionResult,
   JoinCommand,
@@ -58,6 +63,9 @@ from tabdat.models import (
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
+  NlCommand,
+  NlRegressionResult,
+  NumberExpression,
   PanelCommand,
   PanelMetadata,
   PanelResult,
@@ -80,6 +88,7 @@ from tabdat.models import (
   SetResult,
   SqlCommand,
   SqlCreateResult,
+  StringExpression,
   SummarizeCommand,
   SummarizeResult,
   TableResult,
@@ -88,6 +97,7 @@ from tabdat.models import (
   TobitCommand,
   TobitRegressionResult,
   TransformResult,
+  UnaryExpression,
   UseCommand,
   XtDataCommand,
   XtRegCommand,
@@ -159,6 +169,16 @@ class _BinaryRegressionState:
   fitted_model: object
 
 
+@dataclass(frozen=True)
+class _NlRegressionState:
+  outcome_variable: str
+  parameter_names: tuple[str, ...]
+  parameter_values: tuple[float, ...]
+  include_intercept: bool
+  expression: Expression
+  predictor_names: tuple[str, ...]
+
+
 @dataclass
 class _XtModelCache:
   fe: _XtRegressionState | None = None
@@ -173,6 +193,7 @@ class SessionState:
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
+  nl_regression: _NlRegressionState | None = None
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
@@ -363,6 +384,9 @@ class Executor:
 
     if isinstance(command, HeckmanCommand):
       return self._execute_heckman(command)
+
+    if isinstance(command, NlCommand):
+      return self._execute_nl(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -630,6 +654,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -705,6 +730,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.iv_regression = None
+    self.state.nl_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return LogitRegressionResult(
@@ -772,6 +798,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.iv_regression = None
+    self.state.nl_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return ProbitRegressionResult(
@@ -851,6 +878,7 @@ class Executor:
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
       fitted_model=fitted,
@@ -973,6 +1001,7 @@ class Executor:
     )
     self.state.regression = None
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = None
     (
       residual_estimate,
@@ -1028,6 +1057,83 @@ class Executor:
       observation_count=len(outcomes),
       include_intercept=command.include_intercept,
       r_squared=_to_float(getattr(fitted, "rsquared", None)),
+      coefficients=coefficients,
+    )
+
+  def _execute_nl(self, command: NlCommand) -> NlRegressionResult:
+    dataset = self._require_active_dataset("nl")
+    predictor_names = _nl_predictor_names(command.expression, command.parameter_names)
+    if command.outcome in command.parameter_names:
+      raise ExecutionError("nl outcome must not appear in params")
+    variables = (command.outcome, *predictor_names)
+    _require_numeric_columns("nl", dataset, variables)
+    rows = self.backend.regression_rows(dataset, variables)
+    outcomes, predictors = _nl_sample(rows=rows, predictor_count=len(predictor_names))
+    if not outcomes:
+      raise ExecutionError("nl requires at least one complete observation")
+    predictor_index = {name: index for index, name in enumerate(predictor_names)}
+    param_index = {name: index for index, name in enumerate(command.parameter_names)}
+    initial = np.array(command.start_values, dtype=float)
+    outcome_array = np.array(outcomes, dtype=float)
+
+    def residual_fn(params: np.ndarray) -> np.ndarray:
+      predicted = np.array(
+        [
+          _evaluate_nl_expression(
+            command.expression,
+            predictor_row=row,
+            predictor_index=predictor_index,
+            params=params,
+            param_index=param_index,
+          )
+          for row in predictors
+        ],
+        dtype=float,
+      )
+      residuals = np.asarray(outcome_array - predicted, dtype=float)
+      return cast(np.ndarray, residuals)
+
+    try:
+      fit = least_squares(residual_fn, x0=initial)
+    except Exception as exc:
+      raise ExecutionError("nl failed") from exc
+    if not fit.success:
+      raise ExecutionError("nl failed")
+
+    residuals = residual_fn(fit.x)
+    jacobian = np.array(fit.jac, dtype=float)
+    covariance, covariance_label = _nl_covariance_matrix(
+      jacobian=jacobian,
+      residuals=np.array(residuals, dtype=float),
+      robust=command.robust,
+    )
+    coefficients = _nl_coefficient_estimates(
+      parameter_names=command.parameter_names,
+      values=np.array(fit.x, dtype=float),
+      covariance=covariance,
+      residual_df=max(len(outcomes) - len(command.parameter_names), 1),
+    )
+    rss = float(np.dot(residuals, residuals))
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = _NlRegressionState(
+      outcome_variable=command.outcome,
+      parameter_names=command.parameter_names,
+      parameter_values=tuple(float(value) for value in fit.x),
+      include_intercept=command.include_intercept,
+      expression=command.expression,
+      predictor_names=predictor_names,
+    )
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return NlRegressionResult(
+      covariance=covariance_label,
+      outcome=command.outcome,
+      expression=_format_expression(command.expression),
+      parameter_names=command.parameter_names,
+      observation_count=len(outcomes),
+      residual_sum_of_squares=rss,
       coefficients=coefficients,
     )
 
@@ -1103,7 +1209,40 @@ class Executor:
         kind=command.kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
-    raise ExecutionError("predict requires a prior regress or cfregress model")
+    nl_regression = self.state.nl_regression
+    if nl_regression is not None:
+      available_columns = {column.name for column in dataset.columns}
+      if any(name not in available_columns for name in nl_regression.predictor_names):
+        raise ExecutionError("predict requires a prior nl model with matching variables")
+      rows = self.backend.regression_rows(dataset, nl_regression.predictor_names)
+      predicted = _nl_predictions(
+        expression=nl_regression.expression,
+        rows=rows,
+        predictor_names=nl_regression.predictor_names,
+        parameter_names=nl_regression.parameter_names,
+        parameter_values=nl_regression.parameter_values,
+      )
+      if command.kind == "residuals":
+        outcomes = self.backend.regression_rows(dataset, (nl_regression.outcome_variable,))
+        residual_values: list[float | None] = []
+        for outcome, value in zip(outcomes, predicted, strict=True):
+          if value is None or len(outcome) != 1:
+            residual_values.append(None)
+            continue
+          outcome_value = _coerce_float(outcome[0])
+          if outcome_value is None:
+            residual_values.append(None)
+            continue
+          residual_values.append(outcome_value - value)
+        predicted = tuple(residual_values)
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predicted,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    raise ExecutionError("predict requires a prior regress, cfregress, or nl model")
 
   def _execute_tobit(self, command: TobitCommand) -> TobitRegressionResult:
     if command.upper_limit is not None and command.lower_limit >= command.upper_limit:
@@ -1142,6 +1281,7 @@ class Executor:
       raise ExecutionError("tobit failed") from exc
     self.state.regression = None
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1215,6 +1355,7 @@ class Executor:
       raise ExecutionError("heckman failed") from exc
     self.state.regression = None
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1400,6 +1541,7 @@ class Executor:
       self.state.xt_regressions.re = state
     self.state.regression = None
     self.state.binary_regression = None
+    self.state.nl_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     return XtRegressionResult(
@@ -2774,6 +2916,265 @@ def _coerce_float(value: object) -> float | None:
   if not math.isfinite(numeric):
     return None
   return numeric
+
+
+def _nl_predictor_names(
+  expression: Expression,
+  parameter_names: tuple[str, ...],
+) -> tuple[str, ...]:
+  names: list[str] = []
+  seen = set(parameter_names)
+  for identifier in _expression_identifiers(expression):
+    if identifier in seen:
+      continue
+    seen.add(identifier)
+    names.append(identifier)
+  return tuple(names)
+
+
+def _expression_identifiers(expression: Expression) -> tuple[str, ...]:
+  if isinstance(expression, IdentifierExpression):
+    return (expression.name,)
+  if isinstance(expression, (NumberExpression, StringExpression)):
+    return ()
+  if isinstance(expression, UnaryExpression):
+    return _expression_identifiers(expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return (*_expression_identifiers(expression.left), *_expression_identifiers(expression.right))
+  if isinstance(expression, FunctionCallExpression):
+    values: list[str] = []
+    for argument in expression.arguments:
+      values.extend(_expression_identifiers(argument))
+    return tuple(values)
+  return ()
+
+
+def _nl_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+) -> tuple[tuple[float, ...], tuple[tuple[float, ...], ...]]:
+  outcomes: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  row_width = predictor_count + 1
+  for row in rows:
+    if len(row) != row_width:
+      raise ExecutionError("nl failed")
+    raw_outcome = row[0]
+    raw_predictors = row[1:]
+    if raw_outcome is None or any(value is None for value in raw_predictors):
+      continue
+    outcome = _coerce_float(raw_outcome)
+    predictor_values = tuple(_coerce_float(value) for value in raw_predictors)
+    if outcome is None or any(value is None for value in predictor_values):
+      continue
+    complete_predictors = tuple(value for value in predictor_values if value is not None)
+    outcomes.append(outcome)
+    predictors.append(complete_predictors)
+  return tuple(outcomes), tuple(predictors)
+
+
+def _nl_covariance_matrix(
+  *,
+  jacobian: np.ndarray,
+  residuals: np.ndarray,
+  robust: bool,
+) -> tuple[np.ndarray, str]:
+  if jacobian.ndim != 2:
+    raise ExecutionError("nl failed")
+  n_obs, n_params = jacobian.shape
+  if n_obs == 0 or n_params == 0:
+    raise ExecutionError("nl failed")
+  xtx = jacobian.T @ jacobian
+  try:
+    xtx_inv = np.linalg.pinv(xtx)
+  except Exception as exc:
+    raise ExecutionError("nl failed") from exc
+  if robust:
+    # HC1 sandwich covariance over local linearization Jacobian.
+    scale = float(n_obs) / float(max(n_obs - n_params, 1))
+    weighted = jacobian * residuals[:, np.newaxis]
+    meat = weighted.T @ weighted
+    covariance = scale * (xtx_inv @ meat @ xtx_inv)
+    return covariance, "robust"
+  sigma2 = float(np.dot(residuals, residuals)) / float(max(n_obs - n_params, 1))
+  return sigma2 * xtx_inv, "nonrobust"
+
+
+def _nl_coefficient_estimates(
+  *,
+  parameter_names: tuple[str, ...],
+  values: np.ndarray,
+  covariance: np.ndarray,
+  residual_df: int,
+) -> tuple[CoefficientEstimate, ...]:
+  if values.ndim != 1 or covariance.ndim != 2:
+    raise ExecutionError("nl failed")
+  if len(parameter_names) != len(values) or covariance.shape[0] != covariance.shape[1]:
+    raise ExecutionError("nl failed")
+  z_dist = norm()
+  estimates: list[CoefficientEstimate] = []
+  for index, name in enumerate(parameter_names):
+    value = float(values[index])
+    variance = float(covariance[index, index]) if index < covariance.shape[0] else float("nan")
+    std_error = math.sqrt(variance) if math.isfinite(variance) and variance >= 0.0 else None
+    statistic: float | None = None
+    p_value: float | None = None
+    if std_error is not None and std_error > 0.0:
+      statistic = value / std_error
+      p_value = 2.0 * (1.0 - z_dist.cdf(abs(statistic)))
+    estimates.append(
+      CoefficientEstimate(
+        name=name,
+        value=value,
+        standard_error=std_error,
+        statistic=statistic,
+        p_value=p_value,
+      )
+    )
+  return tuple(estimates)
+
+
+def _evaluate_nl_expression(
+  expression: Expression,
+  *,
+  predictor_row: tuple[float, ...],
+  predictor_index: dict[str, int],
+  params: np.ndarray,
+  param_index: dict[str, int],
+) -> float:
+  if isinstance(expression, NumberExpression):
+    return float(expression.value)
+  if isinstance(expression, IdentifierExpression):
+    if expression.name in param_index:
+      return float(params[param_index[expression.name]])
+    if expression.name in predictor_index:
+      return float(predictor_row[predictor_index[expression.name]])
+    raise ExecutionError(f"nl unknown variable: {expression.name}")
+  if isinstance(expression, UnaryExpression):
+    if expression.operator == "-":
+      return -_evaluate_nl_expression(
+        expression.operand,
+        predictor_row=predictor_row,
+        predictor_index=predictor_index,
+        params=params,
+        param_index=param_index,
+      )
+    raise ExecutionError("nl failed")
+  if isinstance(expression, BinaryExpression):
+    left = _evaluate_nl_expression(
+      expression.left,
+      predictor_row=predictor_row,
+      predictor_index=predictor_index,
+      params=params,
+      param_index=param_index,
+    )
+    right = _evaluate_nl_expression(
+      expression.right,
+      predictor_row=predictor_row,
+      predictor_index=predictor_index,
+      params=params,
+      param_index=param_index,
+    )
+    if expression.operator == "+":
+      return left + right
+    if expression.operator == "-":
+      return left - right
+    if expression.operator == "*":
+      return left * right
+    if expression.operator == "/":
+      return left / right
+    raise ExecutionError("nl supports arithmetic expressions only")
+  if isinstance(expression, FunctionCallExpression):
+    args = tuple(
+      _evaluate_nl_expression(
+        argument,
+        predictor_row=predictor_row,
+        predictor_index=predictor_index,
+        params=params,
+        param_index=param_index,
+      )
+      for argument in expression.arguments
+    )
+    return _evaluate_nl_function(expression.name.lower(), args)
+  raise ExecutionError("nl failed")
+
+
+def _evaluate_nl_function(name: str, arguments: tuple[float, ...]) -> float:
+  if name == "abs" and len(arguments) == 1:
+    return abs(arguments[0])
+  if name == "ceil" and len(arguments) == 1:
+    return float(math.ceil(arguments[0]))
+  if name == "floor" and len(arguments) == 1:
+    return float(math.floor(arguments[0]))
+  if name == "ln" and len(arguments) == 1:
+    return math.log(arguments[0])
+  if name == "log" and len(arguments) == 1:
+    return math.log10(arguments[0])
+  if name == "round" and len(arguments) in {1, 2}:
+    if len(arguments) == 2:
+      return float(round(arguments[0], int(arguments[1])))
+    return float(round(arguments[0]))
+  if name == "sqrt" and len(arguments) == 1:
+    return math.sqrt(arguments[0])
+  if name == "exp" and len(arguments) == 1:
+    return math.exp(arguments[0])
+  raise ExecutionError(f"nl unsupported function: {name}")
+
+
+def _nl_predictions(
+  *,
+  expression: Expression,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_names: tuple[str, ...],
+  parameter_names: tuple[str, ...],
+  parameter_values: tuple[float, ...],
+) -> tuple[float | None, ...]:
+  parameter_vector = np.array(parameter_values, dtype=float)
+  predictor_index = {name: index for index, name in enumerate(predictor_names)}
+  param_index = {name: index for index, name in enumerate(parameter_names)}
+  values: list[float | None] = []
+  for row in rows:
+    if len(row) != len(predictor_names):
+      raise ExecutionError("predict failed")
+    if any(value is None for value in row):
+      values.append(None)
+      continue
+    predictor_row = tuple(_coerce_float(value) for value in row)
+    if any(value is None for value in predictor_row):
+      values.append(None)
+      continue
+    complete_row = tuple(value for value in predictor_row if value is not None)
+    values.append(
+      _evaluate_nl_expression(
+        expression,
+        predictor_row=complete_row,
+        predictor_index=predictor_index,
+        params=parameter_vector,
+        param_index=param_index,
+      )
+    )
+  return tuple(values)
+
+
+def _format_expression(expression: Expression) -> str:
+  if isinstance(expression, IdentifierExpression):
+    return expression.name
+  if isinstance(expression, NumberExpression):
+    return str(expression.value)
+  if isinstance(expression, StringExpression):
+    return repr(expression.value)
+  if isinstance(expression, UnaryExpression):
+    return f"-({_format_expression(expression.operand)})"
+  if isinstance(expression, BinaryExpression):
+    return (
+      f"({_format_expression(expression.left)} {expression.operator} "
+      f"{_format_expression(expression.right)})"
+    )
+  if isinstance(expression, FunctionCallExpression):
+    args = ", ".join(_format_expression(argument) for argument in expression.arguments)
+    return f"{expression.name}({args})"
+  return "<expr>"
 
 
 def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:
