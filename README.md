@@ -37,6 +37,8 @@ command line. The current CLI supports:
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
   `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
+- limited-dependent Tobit regression with
+  `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -45,7 +47,7 @@ command line. The current CLI supports:
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - panel-data transforms with
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
-- prediction workflows with `predict <newvar>[, xb residuals]`
+- prediction workflows with `predict <newvar>[, xb residuals pr]`
 - post-estimation diagnostics with
   `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
@@ -53,7 +55,7 @@ command line. The current CLI supports:
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
 Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered three bounded
-Phase 15 slices (`logit`, `probit`, and `estat margins`).
+Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, and `tobit`).
 
 ## Quickstart
 
@@ -204,9 +206,12 @@ tabdat> run analysis.td
 - `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
   Parquet. Existing files require `replace`.
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
-  `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`; `predict` writes
-  fitted values (`xb`) or residuals into a new active-dataset column using the latest regression
-  model in session state.
+  `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
+- `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
+  latest `regress`/`cfregress` model state, and supports `pr` (plus `xb`) after `logit`/`probit`.
+- `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
+  `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
+  boundary (`survival::survreg` via `rpy2`).
 - `estat` currently provides:
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
   - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state
