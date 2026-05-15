@@ -931,7 +931,7 @@ class DuckDBBackend:
     dataset: DatasetInfo,
     *,
     target_variable: str,
-    values: Sequence[float],
+    values: Sequence[float | None],
     command_name: str,
   ) -> DatasetInfo:
     column_types = {column.name: column.data_type for column in dataset.columns}
@@ -954,7 +954,10 @@ class DuckDBBackend:
       )
       self._connection.executemany(
         f"insert into {value_table} values (?, ?)",
-        tuple((index + 1, float(value)) for index, value in enumerate(values)),
+        tuple(
+          (index + 1, (None if value is None else float(value)))
+          for index, value in enumerate(values)
+        ),
       )
       self._replace_active(
         f"""

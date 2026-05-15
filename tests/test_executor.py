@@ -287,6 +287,40 @@ def _write_tobit_parquet(path: Path) -> None:
   )
 
 
+def _write_binary_missing_predictor_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0),
+        (0, null, 1.0),
+        (1, 30.0, 2.0),
+        (1, 34.0, 3.0)
+    ) as binary_data(y, x, z)
+    """,
+  )
+
+
+def _write_tobit_internal_name_collision_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 18.0, 1.0),
+        (0.0, 22.0, 1.0),
+        (1.5, 25.0, 2.0),
+        (2.0, 30.0, 2.0),
+        (4.0, 34.0, 3.0),
+        (8.0, 38.0, 3.0),
+        (10.0, 42.0, 4.0),
+        (10.0, 45.0, 4.0)
+    ) as tobit_data(y, tabdat_left, tabdat_right)
+    """,
+  )
+
+
 def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -706,6 +740,23 @@ def test_phase_15_predict_supports_binary_xb_and_pr(tmp_path: Path) -> None:
   ]
 
 
+def test_phase_15_predict_binary_preserves_missing_rows_as_null(tmp_path: Path) -> None:
+  path = tmp_path / "binary-missing.parquet"
+  _write_binary_missing_predictor_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(LogitCommand(outcome="y", predictors=("x", "z")))
+    executor.execute(PredictCommand(target_variable="pr_hat", kind="pr"))
+    preview = executor.execute(HeadCommand(limit=4))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("y", "x", "z", "pr_hat")
+  assert preview.rows[1][3] is None
+
+
 def test_phase_15_predict_reports_binary_routing_errors(
   tmp_path: Path,
   sample_parquet: Path,
@@ -780,6 +831,22 @@ def test_phase_15_tobit_supports_covariance_modes(tmp_path: Path) -> None:
   assert robust.covariance == "robust"
   assert isinstance(clustered, TobitRegressionResult)
   assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_15_tobit_handles_internal_name_collisions(tmp_path: Path) -> None:
+  path = tmp_path / "tobit-collision.parquet"
+  _write_tobit_internal_name_collision_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      TobitCommand(outcome="y", predictors=("tabdat_left", "tabdat_right"), lower_limit=0.0)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, TobitRegressionResult)
+  assert result.predictors == ("tabdat_left", "tabdat_right")
 
 
 def test_phase_15_tobit_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:

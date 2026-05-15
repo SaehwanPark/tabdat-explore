@@ -2181,8 +2181,8 @@ def _binary_predictions(
   predictor_count: int,
   include_intercept: bool,
   kind: Literal["xb", "pr"],
-) -> tuple[float, ...]:
-  row_values: list[float] = [math.nan for _ in rows]
+) -> tuple[float | None, ...]:
+  row_values: list[float | None] = [None for _ in rows]
   complete_indexes: list[int] = []
   complete_predictors: list[tuple[float, ...]] = []
   for row_index, row in enumerate(rows):
@@ -2218,7 +2218,8 @@ def _binary_predictions(
     if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
       raise ExecutionError("predict failed")
     for row_index, value in zip(complete_indexes, predicted, strict=True):
-      row_values[row_index] = float(value)
+      float_value = float(value)
+      row_values[row_index] = float_value if math.isfinite(float_value) else None
   return tuple(row_values)
 
 
@@ -2266,9 +2267,12 @@ def _fit_tobit_with_r(
       else:
         left_bounds.append(outcome)
         right_bounds.append(outcome)
-    left_name = "tabdat_left"
-    right_name = "tabdat_right"
-    cluster_name = "tabdat_cluster"
+    taken_names = set(predictor_names)
+    left_name = _unique_internal_name("tabdat_left", taken_names)
+    taken_names.add(left_name)
+    right_name = _unique_internal_name("tabdat_right", taken_names)
+    taken_names.add(right_name)
+    cluster_name = _unique_internal_name("tabdat_cluster", taken_names)
     frame_columns: dict[str, object] = {
       left_name: FloatVector(left_bounds),
       right_name: FloatVector(right_bounds),
@@ -2338,6 +2342,17 @@ def _fit_tobit_with_r(
     raise
   except Exception as exc:
     raise ExecutionError("tobit failed") from exc
+
+
+def _unique_internal_name(base: str, taken_names: set[str]) -> str:
+  if base not in taken_names:
+    return base
+  index = 2
+  while True:
+    candidate = f"{base}_{index}"
+    if candidate not in taken_names:
+      return candidate
+    index += 1
 
 
 def _regression_model(
