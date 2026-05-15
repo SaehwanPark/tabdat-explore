@@ -1,68 +1,66 @@
-# Phase 15 Slice 6 Command Contract
+# Phase 15 Slice 7 Command Contract
 
 ## Roadmap Phase
 
 - Phase 15 nonlinear estimation core
-  - Slice 6: bounded sample-selection estimator entrypoint (`heckman`)
+  - Slice 7: bounded general nonlinear-regression command semantics (`nl`)
 
-## `heckman`
+## `nl`
 
 ### Syntax
 
 ```stata
-heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]
+nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]
 ```
 
 ### Rules
 
 - Requires one active dataset.
-- Requires one outcome variable and one-or-more predictor variables.
-- Requires `selectdep(<var>)` with exactly one variable.
-- Requires `select(<vars>)` with one-or-more variables.
-- Requires numeric outcome, outcome predictors, selection dependent variable, and selection
-  predictors.
+- Requires one outcome variable.
+- Requires an assignment expression that can reference:
+  - data variables from the active dataset
+  - parameter names declared in `params(...)`
+- Requires `params(<params>)` with one-or-more unique parameter names.
+- Requires `start(<values>)` with numeric start values matching `params(...)` count.
 - Supports covariance modes:
   - nonrobust (default)
   - robust
-  - cluster(`<var>`)
-- `robust` and `cluster(<var>)` are mutually exclusive.
-- `noconstant` disables intercept inclusion.
-- Uses bounded R adapter (`sampleSelection`) via `rpy2`.
+- `noconstant` is accepted for command-surface consistency.
+- Uses bounded nonlinear least-squares fit over `scipy.optimize` with deterministic guards.
 - On successful fit, returns deterministic model output with:
-  - model identification (`heckman`, outcome, predictors, selection spec)
+  - model identification (`nl`, outcome, expression)
   - covariance label
   - observation count
-  - coefficient tables for:
-    - outcome equation
-    - selection equation
-  - each table columns: `Coef`, `Std Err`, `z`, `P>|z|`
+  - RSS
+  - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `heckman requires an active dataset; run use <path> first`
+  - `nl requires an active dataset; run use <path> first`
 - Invalid syntax/options:
   - parser errors consistent with existing command-family style
-- Sample-selection prerequisites:
+- Prerequisites:
   - unknown/missing variables and non-numeric variable errors consistent with existing estimators
   - empty complete-observation sample:
-    - `heckman requires at least one complete observation`
-  - clustered mode with incomplete cluster values:
-    - `heckman requires complete cluster values`
-- Backend/adapter fit failures:
-  - `heckman failed`
+    - `nl requires at least one complete observation`
+- Fit failures:
+  - `nl failed`
 
 ## State behavior
 
-- Running `heckman` clears incompatible prior estimation-family state.
+- Running `nl` clears incompatible prior estimation-family state.
 - Existing family boundaries remain:
   - `estat margins` remains tied to prior `logit`/`probit` model state.
   - existing `estat` linear/IV/panel/control-function behaviors remain unchanged.
+  - `predict <newvar>[, xb residuals]` is supported after `nl`.
 
 ## Acceptance Criteria
 
-- `heckman` parses and executes with required `selectdep(...)`, required `select(...)`, and covariance
-  modes.
-- deterministic typed and formatted output includes outcome and selection equations.
+- `nl` parses and executes with required `params(...)` and `start(...)`, and nonrobust/robust
+  covariance modes.
+- deterministic typed and formatted output includes expression metadata and coefficient rows.
+- `predict` supports `xb` and `residuals` after `nl`.
 - Focused parser/executor/CLI/shell coverage passes.
-- Existing `regress`/`logit`/`probit`/`tobit`/`ivregress`/`cfregress`/`xtreg` behavior remains stable.
+- Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`ivregress`/`cfregress`/`xtreg` behavior
+  remains stable.

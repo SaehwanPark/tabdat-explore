@@ -225,7 +225,8 @@ display formatting.
   `estat margins`,
   binary `predict` routing via `predict <newvar>[, xb residuals pr]`, and
   `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`, and
-  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`.
+  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`, and
+  `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
