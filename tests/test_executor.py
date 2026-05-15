@@ -978,6 +978,29 @@ def test_phase_15_heckman_supports_covariance_modes(tmp_path: Path) -> None:
   assert clustered.covariance == "cluster(cluster_id)"
 
 
+def test_phase_15_heckman_noconstant_labels_coefficients(tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_heckman_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+        include_intercept=False,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, HeckmanRegressionResult)
+  assert [estimate.name for estimate in result.outcome_coefficients] == ["x", "mills_lambda"]
+  assert [estimate.name for estimate in result.selection_coefficients] == ["z"]
+
+
 def test_phase_15_heckman_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
   path = tmp_path / "heckman.parquet"
   missing_cluster_path = tmp_path / "missing-cluster.parquet"

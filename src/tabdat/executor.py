@@ -2446,7 +2446,10 @@ def _fit_heckman_with_r(
   selection_names = (
     ("intercept", *selection_predictor_names) if include_intercept else selection_predictor_names
   )
-  outcome_names = ("intercept", *outcome_predictor_names, "mills_lambda")
+  outcome_base_names = (
+    ("intercept", *outcome_predictor_names) if include_intercept else outcome_predictor_names
+  )
+  outcome_names = (*outcome_base_names, "mills_lambda")
   selection_coefficients = _coefficient_estimates(selection_names, selection_fit)
   outcome_coefficients = _coefficient_estimates(outcome_names, outcome_fit)
   return covariance, outcome_coefficients, selection_coefficients
