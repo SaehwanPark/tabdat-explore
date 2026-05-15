@@ -35,12 +35,14 @@ def test_completer_suggests_command_names() -> None:
     completions = _completion_texts(TabdatCompleter(executor), "sum")
     reshape_completions = _completion_texts(TabdatCompleter(executor), "resh")
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
+    help_completions = _completion_texts(TabdatCompleter(executor), "hel")
   finally:
     executor.close()
 
   assert completions == ["summarize"]
   assert reshape_completions == ["reshape"]
   assert panel_completions == ["panel"]
+  assert help_completions == ["help"]
 
 
 def test_completer_omits_columns_before_dataset_load() -> None:
@@ -101,11 +103,23 @@ def test_completer_suggests_by_columns_and_child_commands(sample_parquet: Path) 
     executor.execute(UseCommand(sample_parquet))
     group_completions = _completion_texts(TabdatCompleter(executor), "by s")
     child_completions = _completion_texts(TabdatCompleter(executor), "by sex: sum")
+    help_child_completions = _completion_texts(TabdatCompleter(executor), "by sex: help")
   finally:
     executor.close()
 
   assert group_completions == ["sex"]
   assert child_completions == ["summarize"]
+  assert help_child_completions == []
+
+
+def test_completer_suggests_help_topics() -> None:
+  executor = Executor()
+  try:
+    completions = _completion_texts(TabdatCompleter(executor), "help summar")
+  finally:
+    executor.close()
+
+  assert completions == ["summarize"]
 
 
 def test_completer_suggests_by_child_commands_after_compact_colon(

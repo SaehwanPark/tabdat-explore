@@ -14,10 +14,12 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 
 from tabdat.executor import Executor
+from tabdat.help import available_help_topics
 from tabdat.models import DatasetInfo
 
 COMMAND_NAMES: tuple[str, ...] = (
   "use",
+  "help",
   "describe",
   "summarize",
   "codebook",
@@ -60,6 +62,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "exit",
   "quit",
 )
+_BY_CHILD_COMMAND_NAMES = tuple(name for name in COMMAND_NAMES if name != "help")
 
 _COLUMN_COMMANDS = {
   "summarize",
@@ -166,6 +169,10 @@ class TabdatCompleter(Completer):
       yield from _matching_completions(_SQL_SUGGESTIONS, word)
       return
 
+    if command_name in {"help", "?"}:
+      yield from _matching_completions(available_help_topics(), word)
+      return
+
     if command_name == "estat":
       yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
       return
@@ -208,7 +215,7 @@ class TabdatCompleter(Completer):
       return
 
     if _is_first_token(after_colon):
-      yield from _matching_completions(COMMAND_NAMES, word)
+      yield from _matching_completions(_BY_CHILD_COMMAND_NAMES, word)
       return
 
     child_name = after_colon.strip().split(maxsplit=1)[0].lower()
