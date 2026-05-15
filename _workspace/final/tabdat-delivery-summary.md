@@ -1,36 +1,36 @@
-# Phase 15 Slice 6 Delivery Summary
+# Phase 15 Slice 7 Delivery Summary
 
 ## Outcome
 
 Completed one bounded Phase 15 slice in one branch:
 
-- Slice 6: sample-selection Heckman estimator entrypoint
+- Slice 7: general nonlinear-regression command semantics (`nl`)
 
 ## Implemented
 
-- Added `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
-  parser and executor support.
-- Added bounded Heckman execution with deterministic covariance/guard behavior.
-- Added deterministic typed/formatted output for outcome and selection equations.
-- Updated parser/shell/executor/backend/formatter/tests/SDD/workspace artifacts.
+- Added `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`.
+- Added bounded nonlinear least-squares estimation with deterministic nonrobust/robust covariance
+  labels.
+- Added deterministic `predict <newvar>[, xb residuals]` routing after `nl`.
+- Updated parser/shell/executor/formatter/tests/SDD/workspace artifacts.
 
 ## Validation
 
+- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py -k "nl or nonlinear"`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
 - `uv run mypy`
 - `uv run pytest -q`
-- `uv run python integrated_testing/run_e2e.py`
 
 All commands passed.
 
 ## Residual Risk
 
-- Perfect-separation warnings may appear in small synthetic test data for the selection equation,
-  but they do not break deterministic command behavior or output contracts.
+- `nl` robust covariance is implemented as an HC1 sandwich over local Jacobian linearization.
+  This is intentional for a bounded v1 but may need expansion before clustered or advanced
+  nonlinear inference options.
 
 ## Suggested Follow-up
 
-- Continue Phase 15 with one bounded remaining slice from `SPEC.md`:
-  - general nonlinear-regression command semantics.
+- Begin Phase 16 specialized likelihood models.

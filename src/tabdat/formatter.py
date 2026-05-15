@@ -14,6 +14,7 @@ from tabdat.models import (
   IvRegressionResult,
   LoadResult,
   LogitRegressionResult,
+  NlRegressionResult,
   PanelResult,
   PlotResult,
   PreviewResult,
@@ -246,6 +247,28 @@ def format_result(result: Result) -> str:
         *_table(("Variable", "Coef", "Std Err", "z", "P>|z|"), selection_rows),
       ]
     )
+
+  if isinstance(result, NlRegressionResult):
+    header = [
+      f"Model: nl {result.outcome} = {result.expression}",
+      "Estimator: nl",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"RSS: {_format_number(result.residual_sum_of_squares)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Parameter", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
+    return "\n".join([*header, *body])
 
   if isinstance(result, IvRegressionResult):
     exogenous = " ".join(result.exogenous) if result.exogenous else "(none)"

@@ -1,4 +1,4 @@
-# Phase 15 Slice 6 QA Report
+# Phase 15 Slice 7 QA Report
 
 ## Status
 
@@ -7,17 +7,16 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `heckman` syntax/options and completion behavior match contract.
-- Contract -> executor/backend:
-  - `heckman` executes with required `selectdep(...)` and `select(...)`, covariance modes, and
-    deterministic guard behavior.
+  - `nl` syntax/options and completion behavior match contract.
+- Contract -> executor:
+  - `nl` executes with required `params(...)` and `start(...)`.
+  - nonrobust/robust covariance modes are deterministic.
+  - `predict` supports `xb` and `residuals` after `nl`.
 - Contract -> formatter/CLI:
-  - Heckman output formatting is deterministic and includes model/covariance and
-    outcome/selection-equation coefficient tables.
-  - CLI Heckman flows execute successfully.
+  - `nl` output formatting is deterministic and includes model/covariance/RSS/coefficient table.
+  - CLI nonlinear and predict flows execute successfully.
 - Regression boundaries:
-  - existing `regress`/`logit`/`probit`/`tobit`/`ivregress`/`cfregress`/`xtreg` behavior remains
-    stable.
+  - existing estimator families remain stable under full project checks.
 
 ## Blocking Issues
 
@@ -25,16 +24,12 @@ pass
 
 ## Validation Evidence
 
+- Focused nonlinear tests passed:
+  - `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py -k "nl or nonlinear"`
 - Full quality gates passed:
   - `uv run ruff check .`
   - `uv run ruff format --check .`
   - `uv run pyright`
   - `uv run mypy`
   - `uv run pytest -q`
-- Integrated E2E scenarios (`s1` through `s5`) passed:
-  - `uv run python integrated_testing/run_e2e.py`
 
-## Recommended Next Action
-
-Push `codex/tmp-phase15-slice6-heckman-sample-selection`, open one PR to `main`, and mark it ready
-for review.

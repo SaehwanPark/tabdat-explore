@@ -49,6 +49,8 @@ from tabdat.models import (
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
+  NlCommand,
+  NlRegressionResult,
   NumberExpression,
   PanelCommand,
   PanelMetadata,
@@ -357,6 +359,23 @@ def _write_missing_cluster_heckman_parquet(path: Path) -> None:
   )
 
 
+def _write_nl_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 2.718281828),
+        (2.0, 7.389056099),
+        (3.0, 20.08553692),
+        (4.0, 54.59815003),
+        (5.0, 148.4131591),
+        (null, 403.4287935)
+    ) as nl_data(x, y)
+    """,
+  )
+
+
 def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:
@@ -570,6 +589,189 @@ def test_phase_13_regress_supports_weighted_covariance_modes(tmp_path: Path) -> 
   assert wls_cluster.covariance == "cluster(cluster_id)"
   assert isinstance(gls_robust, RegressionResult)
   assert gls_robust.covariance == "robust"
+
+
+def test_phase_15_nl_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "nl.parquet"
+  _write_nl_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      NlCommand(
+        outcome="y",
+        expression=FunctionCallExpression(
+          name="exp",
+          arguments=(
+            BinaryExpression(
+              left=IdentifierExpression("a"),
+              operator="+",
+              right=BinaryExpression(
+                left=IdentifierExpression("b"),
+                operator="*",
+                right=IdentifierExpression("x"),
+              ),
+            ),
+          ),
+        ),
+        parameter_names=("a", "b"),
+        start_values=(0.5, 0.5),
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, NlRegressionResult)
+  assert result.outcome == "y"
+  assert result.covariance == "nonrobust"
+  assert result.observation_count == 5
+  assert [estimate.name for estimate in result.coefficients] == ["a", "b"]
+
+
+def test_phase_15_nl_supports_robust_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "nl.parquet"
+  _write_nl_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      NlCommand(
+        outcome="y",
+        expression=FunctionCallExpression(
+          name="exp",
+          arguments=(
+            BinaryExpression(
+              left=IdentifierExpression("a"),
+              operator="+",
+              right=BinaryExpression(
+                left=IdentifierExpression("b"),
+                operator="*",
+                right=IdentifierExpression("x"),
+              ),
+            ),
+          ),
+        ),
+        parameter_names=("a", "b"),
+        start_values=(0.5, 0.5),
+        robust=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, NlRegressionResult)
+  assert robust.covariance == "robust"
+
+
+def test_phase_15_nl_predict_supports_xb_and_residuals(tmp_path: Path) -> None:
+  path = tmp_path / "nl.parquet"
+  _write_nl_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      NlCommand(
+        outcome="y",
+        expression=FunctionCallExpression(
+          name="exp",
+          arguments=(
+            BinaryExpression(
+              left=IdentifierExpression("a"),
+              operator="+",
+              right=BinaryExpression(
+                left=IdentifierExpression("b"),
+                operator="*",
+                right=IdentifierExpression("x"),
+              ),
+            ),
+          ),
+        ),
+        parameter_names=("a", "b"),
+        start_values=(0.5, 0.5),
+      )
+    )
+    xb = executor.execute(PredictCommand(target_variable="y_hat", kind="xb"))
+    residuals = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(xb, TransformResult)
+  assert isinstance(residuals, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows[5][2] is None
+  assert preview.rows[5][3] is None
+
+
+def test_phase_15_nl_reports_prerequisite_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="nl requires an active dataset"):
+      executor.execute(
+        NlCommand(
+          outcome="y",
+          expression=IdentifierExpression("x"),
+          parameter_names=("a",),
+          start_values=(1.0,),
+        )
+      )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="nl unknown variable: y, x"):
+      executor.execute(
+        NlCommand(
+          outcome="y",
+          expression=BinaryExpression(
+            left=IdentifierExpression("a"),
+            operator="+",
+            right=IdentifierExpression("x"),
+          ),
+          parameter_names=("a",),
+          start_values=(1.0,),
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_15_nl_predict_supports_parameter_only_models(tmp_path: Path) -> None:
+  path = tmp_path / "nl-constant.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0),
+        (2.5),
+        (4.0)
+    ) as nl_data(y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      NlCommand(
+        outcome="y",
+        expression=IdentifierExpression("a"),
+        parameter_names=("a",),
+        start_values=(2.0,),
+      )
+    )
+    xb = executor.execute(PredictCommand(target_variable="y_hat", kind="xb"))
+    residuals = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(xb, TransformResult)
+  assert isinstance(residuals, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("y", "y_hat", "u_hat")
+  assert preview.rows == (
+    (1.0, pytest.approx(2.5), pytest.approx(-1.5)),
+    (2.5, pytest.approx(2.5), pytest.approx(0.0)),
+    (4.0, pytest.approx(2.5), pytest.approx(1.5)),
+  )
 
 
 def test_phase_15_logit_returns_typed_result(tmp_path: Path) -> None:
@@ -1141,7 +1343,9 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
   executor = Executor()
   try:
     executor.execute(UseCommand(sample_parquet))
-    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
+    with pytest.raises(
+      ExecutionError, match="predict requires a prior regress, cfregress, or nl model"
+    ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
     executor.close()
@@ -1498,7 +1702,9 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
         instruments=("z_inst",),
       )
     )
-    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
+    with pytest.raises(
+      ExecutionError, match="predict requires a prior regress, cfregress, or nl model"
+    ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
@@ -1999,7 +2205,9 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
         estimator="fe",
       )
     )
-    with pytest.raises(ExecutionError, match="predict requires a prior regress or cfregress model"):
+    with pytest.raises(
+      ExecutionError, match="predict requires a prior regress, cfregress, or nl model"
+    ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))

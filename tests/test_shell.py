@@ -188,6 +188,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     heckman_command = _completion_texts(completer, "heck")
     heckman_columns = _completion_texts(completer, "heckman c")
     heckman_options = _completion_texts(completer, "heckman cost age, ")
+    nl_command = _completion_texts(completer, "nl")
+    nl_columns = _completion_texts(completer, "nl c")
+    nl_options = _completion_texts(completer, "nl cost = a + b * age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -225,6 +228,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert heckman_command == ["heckman"]
   assert heckman_columns == ["cost"]
   assert heckman_options == ["selectdep(", "select(", "robust", "cluster(", "noconstant"]
+  assert nl_command == ["nl"]
+  assert nl_columns == ["cost"]
+  assert nl_options == ["params(", "start(", "robust", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]

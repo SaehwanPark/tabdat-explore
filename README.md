@@ -41,6 +41,8 @@ command line. The current CLI supports:
   `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`
 - sample-selection Heckman-style regression with
   `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
+- bounded nonlinear least-squares regression with
+  `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -211,7 +213,8 @@ tabdat> run analysis.td
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
-  latest `regress`/`cfregress` model state, and supports `pr` (plus `xb`) after `logit`/`probit`.
+  latest `regress`/`cfregress`/`nl` model state, and supports `pr` (plus `xb`) after
+  `logit`/`probit`.
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
   boundary (`survival::survreg` via `rpy2`).

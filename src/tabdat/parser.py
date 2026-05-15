@@ -33,6 +33,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  NlCommand,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -93,6 +94,7 @@ _EXECUTABLE_COMMANDS = {
   "probit",
   "tobit",
   "heckman",
+  "nl",
   "predict",
   "estat",
   "ivregress",
@@ -324,6 +326,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "heckman":
     return _parse_heckman(parts)
+
+  if parts.name == "nl":
+    return _parse_nl(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -962,6 +967,40 @@ def _parse_heckman(parts: _CommandParts) -> HeckmanCommand:
   )
 
 
+def _parse_nl(parts: _CommandParts) -> NlCommand:
+  if parts.condition is not None:
+    raise ParseError("nl expects syntax: nl <y> = <expr>, params(<params>) start(<values>)")
+  if len(parts.arguments) != 1 or parts.expression is None:
+    raise ParseError("nl expects syntax: nl <y> = <expr>, params(<params>) start(<values>)")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"params", "start", "robust", "noconstant"}
+  if unsupported:
+    raise ParseError(f"nl unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "nl", {"robust", "noconstant"})
+  params_values = _single_tuple_option(parts.options, "params", "nl")
+  if params_values is None:
+    raise ParseError("nl option params expects one-or-more parameter names")
+  if len(set(params_values)) != len(params_values):
+    raise ParseError("nl option params must not repeat parameter names")
+  start_values_raw = _single_tuple_option(parts.options, "start", "nl")
+  if start_values_raw is None:
+    raise ParseError("nl option start expects one-or-more numeric values")
+  try:
+    start_values = tuple(float(value) for value in start_values_raw)
+  except ValueError as exc:
+    raise ParseError("nl option start expects one-or-more numeric values") from exc
+  if len(start_values) != len(params_values):
+    raise ParseError("nl option start count must match params count")
+  return NlCommand(
+    outcome=parts.arguments[0],
+    expression=parts.expression,
+    parameter_names=params_values,
+    start_values=start_values,
+    robust="robust" in option_names,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
@@ -1420,13 +1459,33 @@ def _parenthesized_option_value(
       return float(numeric_text)
     except ValueError as exc:
       raise ParseError(f"option {option_name} expects a numeric value") from exc
+  if option_name == "start":
+    values: list[str] = []
+    index = 0
+    while index < len(tokens):
+      token = tokens[index]
+      if token.kind == "number":
+        values.append(token.text)
+        index += 1
+        continue
+      if (
+        token.kind == "symbol"
+        and token.text in {"-", "+"}
+        and index + 1 < len(tokens)
+        and tokens[index + 1].kind == "number"
+      ):
+        values.append(f"{token.text}{tokens[index + 1].text}")
+        index += 2
+        continue
+      raise ParseError(f"option {option_name} values must be numeric")
+    return tuple(values)
 
-  values: list[str] = []
+  identifier_values: list[str] = []
   for token in tokens:
     if token.kind != "identifier":
       raise ParseError(f"option {option_name} values must be identifiers")
-    values.append(token.text)
-  return tuple(values)
+    identifier_values.append(token.text)
+  return tuple(identifier_values)
 
 
 def _tokenize(text: str) -> tuple[_Token, ...]:

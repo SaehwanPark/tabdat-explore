@@ -6,6 +6,11 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the seventh Phase 15 nonlinear estimation core slice with
+  `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`,
+  bounded nonlinear least-squares estimation, deterministic nonrobust/robust covariance labels,
+  `predict` support (`xb` and `residuals`) after `nl`, and focused parser/executor/CLI/shell
+  coverage.
 - Added the sixth Phase 15 nonlinear estimation core slice with
   `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`,
   deterministic bounded sample-selection execution, and focused parser/executor/CLI/shell coverage.
