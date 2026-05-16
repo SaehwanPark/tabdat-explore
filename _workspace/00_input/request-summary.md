@@ -1,27 +1,29 @@
-# Phase 15 Slice 6 Request Summary
+# Phase 16 Slice 1 Request Summary
 
 ## User Goal
 
-Resume development from the latest merged checkpoint by implementing one bounded Phase 15 slice
-(sample selection / Heckman), with checkpoint commits, updated SDD artifacts, and a ready-for-review PR.
+Resume development from the latest merged checkpoint by moving from completed Phase 15 to the next
+phase with meaningful checkpoint commits, complete documentation (including in-app help), and a
+ready-for-review PR.
 
 ## Scope
 
-- Phase 15 Slice 6:
-  - add bounded sample-selection estimator entrypoint via Heckman
+- Phase 15 closeout consistency sync in SDD/docs.
+- Phase 16 Slice 1:
+  - add bounded Poisson count-model entrypoint
   - command surface:
-    - `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
+    - `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - post-estimation:
+    - `predict <newvar>[, xb residuals]` after `poisson`
+    - `estat gof` after `poisson`
 
 ## Constraints
 
-- Keep deterministic behavior and strict option validation, consistent with existing estimator families.
-- Use bounded `rpy2` integration for this slice (R `sampleSelection`) and map backend failures to a
-  deterministic public error.
-- Keep behavior deterministic and bounded to one PR with meaningful checkpoint commits.
-- Keep existing Phase 13/14/15 command behavior stable unless explicitly extended above.
+- Keep deterministic output and strict option validation.
+- Preserve existing model-family behavior unless explicitly extended above.
+- Keep implementation as one bounded PR with meaningful checkpoint commits.
 
 ## Non-goals
 
-- No broad nonlinear-regression command family in this PR.
-- No truncated-regression command family in this PR.
-- No `predict`/`estat` extension for sample-selection in this PR.
+- No negative-binomial, zero-inflated, hurdle, multinomial, or survival families.
+- No new `predict` option keyword additions (for example, no `mu`).

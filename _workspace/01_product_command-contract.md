@@ -1,66 +1,62 @@
-# Phase 15 Slice 7 Command Contract
+# Phase 16 Slice 1 Command Contract
 
 ## Roadmap Phase
 
-- Phase 15 nonlinear estimation core
-  - Slice 7: bounded general nonlinear-regression command semantics (`nl`)
+- Phase 16 specialized likelihood models
+  - Slice 1: bounded Poisson count-model semantics with minimal post-estimation support
 
-## `nl`
+## `poisson`
 
 ### Syntax
 
 ```stata
-nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]
+poisson <y> <xvars>[, robust cluster(<var>) noconstant]
 ```
 
 ### Rules
 
 - Requires one active dataset.
-- Requires one outcome variable.
-- Requires an assignment expression that can reference:
-  - data variables from the active dataset
-  - parameter names declared in `params(...)`
-- Requires `params(<params>)` with one-or-more unique parameter names.
-- Requires `start(<values>)` with numeric start values matching `params(...)` count.
+- Requires one outcome variable and one-or-more predictors.
+- Requires numeric outcome and predictor variables.
+- Outcome must be non-negative on complete observations.
 - Supports covariance modes:
   - nonrobust (default)
   - robust
-- `noconstant` is accepted for command-surface consistency.
-- Uses bounded nonlinear least-squares fit over `scipy.optimize` with deterministic guards.
-- On successful fit, returns deterministic model output with:
-  - model identification (`nl`, outcome, expression)
-  - covariance label
-  - observation count
-  - RSS
-  - coefficient table (`Coef`, `Std Err`, `z`, `P>|z|`)
+  - clustered via `cluster(<var>)`
+- `robust` and `cluster(...)` cannot be combined.
+
+## Post-estimation behavior
+
+- `predict <newvar>[, xb residuals]` is supported after successful `poisson`.
+- `estat gof` is supported after successful `poisson`.
+- Existing `predict ..., pr` remains binary-choice-only.
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `nl requires an active dataset; run use <path> first`
-- Invalid syntax/options:
-  - parser errors consistent with existing command-family style
-- Prerequisites:
-  - unknown/missing variables and non-numeric variable errors consistent with existing estimators
-  - empty complete-observation sample:
-    - `nl requires at least one complete observation`
+  - `poisson requires an active dataset; run use <path> first`
+- Missing variables/non-numeric variables:
+  - existing unknown-variable and numeric-type errors
+- Empty complete-observation sample:
+  - `poisson requires at least one complete observation`
+- Cluster mode with missing cluster values:
+  - `poisson requires complete cluster values`
+- Negative outcomes:
+  - `poisson outcome must be non-negative`
 - Fit failures:
-  - `nl failed`
+  - `poisson failed`
+- `estat gof` without prior `poisson` model:
+  - `estat gof requires a prior poisson model`
 
 ## State behavior
 
-- Running `nl` clears incompatible prior estimation-family state.
-- Existing family boundaries remain:
-  - `estat margins` remains tied to prior `logit`/`probit` model state.
-  - existing `estat` linear/IV/panel/control-function behaviors remain unchanged.
-  - `predict <newvar>[, xb residuals]` is supported after `nl`.
+- Running `poisson` clears incompatible prior estimation-family state.
+- Existing `estat` and `predict` boundaries for other families remain unchanged.
 
 ## Acceptance Criteria
 
-- `nl` parses and executes with required `params(...)` and `start(...)`, and nonrobust/robust
-  covariance modes.
-- deterministic typed and formatted output includes expression metadata and coefficient rows.
-- `predict` supports `xb` and `residuals` after `nl`.
-- Focused parser/executor/CLI/shell coverage passes.
-- Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`ivregress`/`cfregress`/`xtreg` behavior
-  remains stable.
+- `poisson` parses and executes with required arguments and supported covariance modes.
+- deterministic typed and formatted output includes coefficient rows and log-likelihood summary.
+- `predict` supports `xb` and `residuals` after `poisson`.
+- `estat gof` returns deterministic GOF rows after `poisson`.
+- focused parser/executor/CLI/shell/help coverage passes.

@@ -43,6 +43,8 @@ command line. The current CLI supports:
   `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
 - bounded nonlinear least-squares regression with
   `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`
+- Poisson count regression with
+  `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -53,7 +55,7 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals pr]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 

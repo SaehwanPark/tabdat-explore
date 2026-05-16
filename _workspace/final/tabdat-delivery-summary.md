@@ -1,36 +1,30 @@
-# Phase 15 Slice 7 Delivery Summary
+# Phase 16 Slice 1 Delivery Summary
 
 ## Outcome
 
-Completed one bounded Phase 15 slice in one branch:
+Completed one bounded Phase 16 slice in one branch:
 
-- Slice 7: general nonlinear-regression command semantics (`nl`)
+- Slice 1: Poisson count-model command semantics (`poisson`) with minimal post-estimation support
 
 ## Implemented
 
-- Added `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`.
-- Added bounded nonlinear least-squares estimation with deterministic nonrobust/robust covariance
-  labels.
-- Added deterministic `predict <newvar>[, xb residuals]` routing after `nl`.
+- Added `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`.
+- Added bounded Poisson estimation with deterministic nonrobust/robust/cluster covariance labels.
+- Added deterministic `predict <newvar>[, xb residuals]` routing after `poisson`.
+- Added deterministic `estat gof` diagnostics after `poisson`.
+- Added in-app `poisson` help and updated `predict`/`estat` help topics.
 - Updated parser/shell/executor/formatter/tests/SDD/workspace artifacts.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py -k "nl or nonlinear"`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
-- `uv run pyright`
-- `uv run mypy`
-- `uv run pytest -q`
-
-All commands passed.
+- focused Poisson/parser/shell/help/executor/CLI tests
+- full project checks: `ruff`, `pyright`, `mypy`, `pytest`
 
 ## Residual Risk
 
-- `nl` robust covariance is implemented as an HC1 sandwich over local Jacobian linearization.
-  This is intentional for a bounded v1 but may need expansion before clustered or advanced
-  nonlinear inference options.
+- Poisson GOF metrics are intentionally bounded to deterministic core outputs and may need expansion
+  before broader count-model families are introduced.
 
 ## Suggested Follow-up
 
-- Begin Phase 16 specialized likelihood models.
+- Phase 16 Slice 2: negative-binomial core with bounded overdispersion workflow.

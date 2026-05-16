@@ -279,6 +279,12 @@ and describe the active work with concise verification criteria.
   - bounded nonlinear least-squares execution with deterministic nonrobust/robust covariance labels
   - deterministic typed/formatted output and `predict <newvar>[, xb residuals]` routing after `nl`
   - focused parser, executor, CLI, and shell coverage
+- Implemented the first Phase 16 specialized likelihood-model slice:
+  - `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - bounded count-model execution with deterministic nonrobust/robust/cluster covariance labels
+  - deterministic `predict <newvar>[, xb residuals]` routing after `poisson`
+  - deterministic `estat gof` diagnostics after `poisson`
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
