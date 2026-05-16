@@ -12,3 +12,4 @@ How do I turn a fitted model into observation-level outputs?
 Examples:
 - `predict yhat, xb`
 - `predict p, pr`
+- `predict resid, residuals`

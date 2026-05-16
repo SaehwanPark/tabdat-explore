@@ -33,6 +33,7 @@ from tabdat.models import (
   NumberExpression,
   PanelCommand,
   ParsedCommand,
+  PoissonCommand,
   PredictCommand,
   ProbitCommand,
   RegressCommand,
@@ -521,6 +522,28 @@ def test_parse_phase_15_nl_command() -> None:
   )
 
 
+def test_parse_phase_16_poisson_command() -> None:
+  assert parse_command("poisson outcome x1 x2") == PoissonCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+  )
+  assert parse_command("poisson outcome x1, robust") == PoissonCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    robust=True,
+  )
+  assert parse_command("poisson outcome x1, cluster(group_id)") == PoissonCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("poisson outcome x1, noconstant") == PoissonCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -530,6 +553,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat hausman") == EstatCommand(subcommand="hausman")
   assert parse_command("estat endogenous") == EstatCommand(subcommand="endogenous")
   assert parse_command("estat margins") == EstatCommand(subcommand="margins")
+  assert parse_command("estat gof") == EstatCommand(subcommand="gof")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -874,6 +898,13 @@ def test_parse_exit_aliases() -> None:
     "nl y = a + b*x, params(a a) start(1 2)",
     "nl y = a + b*x if y > 0, params(a b) start(1 2)",
     "nl y = a + b*x, robust=true params(a b) start(1 2)",
+    "poisson",
+    "poisson y",
+    "poisson y x if y > 0",
+    "poisson y x, robust cluster(group)",
+    "poisson y x, cluster()",
+    "poisson y x, cluster(group firm)",
+    "poisson y x, robust=true",
     "estat",
     "estat vif extra",
     "estat, vif",

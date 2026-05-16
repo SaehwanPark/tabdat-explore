@@ -6,6 +6,7 @@ def test_help_topics_are_discoverable() -> None:
 
   assert "summarize" in topics
   assert "describe" in topics
+  assert "poisson" in topics
   assert "help" not in topics
 
 
