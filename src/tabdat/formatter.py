@@ -14,6 +14,7 @@ from tabdat.models import (
   IvRegressionResult,
   LoadResult,
   LogitRegressionResult,
+  NbregRegressionResult,
   NlRegressionResult,
   PanelResult,
   PlotResult,
@@ -275,6 +276,28 @@ def format_result(result: Result) -> str:
     header = [
       f"Model: poisson {result.outcome} on {' '.join(result.predictors)}",
       "Estimator: poisson",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"Log-likelihood: {_format_number(result.log_likelihood)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, NbregRegressionResult):
+    header = [
+      f"Model: nbreg {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: nbreg",
       f"Covariance: {result.covariance}",
       f"Observations: {result.observation_count}",
       f"Log-likelihood: {_format_number(result.log_likelihood)}",

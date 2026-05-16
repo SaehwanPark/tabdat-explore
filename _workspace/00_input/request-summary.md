@@ -1,4 +1,4 @@
-# Phase 16 Slice 1 Request Summary
+# Phase 16 Slice 2 Request Summary
 
 ## User Goal
 
@@ -8,14 +8,14 @@ ready-for-review PR.
 
 ## Scope
 
-- Phase 15 closeout consistency sync in SDD/docs.
-- Phase 16 Slice 1:
-  - add bounded Poisson count-model entrypoint
+- Resume from latest merged checkpoint on `main` (Phase 16 Slice 1 complete).
+- Phase 16 Slice 2:
+  - add bounded negative-binomial count-model entrypoint
   - command surface:
-    - `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
+    - `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`
   - post-estimation:
-    - `predict <newvar>[, xb residuals]` after `poisson`
-    - `estat gof` after `poisson`
+    - `predict <newvar>[, xb residuals]` after `nbreg`
+    - `estat gof` after `nbreg`
 
 ## Constraints
 
@@ -25,5 +25,5 @@ ready-for-review PR.
 
 ## Non-goals
 
-- No negative-binomial, zero-inflated, hurdle, multinomial, or survival families.
+- No zero-inflated, hurdle, multinomial, or survival families.
 - No new `predict` option keyword additions (for example, no `mu`).

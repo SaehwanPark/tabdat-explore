@@ -323,6 +323,15 @@ class PoissonCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class NbregCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
     "residuals",
@@ -422,6 +431,7 @@ Command = (
   | HeckmanCommand
   | NlCommand
   | PoissonCommand
+  | NbregCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -618,6 +628,17 @@ class PoissonRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class NbregRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  log_likelihood: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -716,6 +737,7 @@ Result = (
   | HeckmanRegressionResult
   | NlRegressionResult
   | PoissonRegressionResult
+  | NbregRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

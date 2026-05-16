@@ -1,16 +1,17 @@
-# Phase 16 Slice 1 Command Contract
+# Phase 16 Slice 2 Command Contract
 
 ## Roadmap Phase
 
 - Phase 16 specialized likelihood models
-  - Slice 1: bounded Poisson count-model semantics with minimal post-estimation support
+  - Slice 2: bounded negative-binomial count-model semantics with deterministic post-estimation
+    support
 
-## `poisson`
+## `nbreg`
 
 ### Syntax
 
 ```stata
-poisson <y> <xvars>[, robust cluster(<var>) noconstant]
+nbreg <y> <xvars>[, robust cluster(<var>) noconstant]
 ```
 
 ### Rules
@@ -27,36 +28,36 @@ poisson <y> <xvars>[, robust cluster(<var>) noconstant]
 
 ## Post-estimation behavior
 
-- `predict <newvar>[, xb residuals]` is supported after successful `poisson`.
-- `estat gof` is supported after successful `poisson`.
+- `predict <newvar>[, xb residuals]` is supported after successful `nbreg`.
+- `estat gof` is supported after successful `nbreg`.
 - Existing `predict ..., pr` remains binary-choice-only.
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `poisson requires an active dataset; run use <path> first`
+  - `nbreg requires an active dataset; run use <path> first`
 - Missing variables/non-numeric variables:
   - existing unknown-variable and numeric-type errors
 - Empty complete-observation sample:
-  - `poisson requires at least one complete observation`
+  - `nbreg requires at least one complete observation`
 - Cluster mode with missing cluster values:
-  - `poisson requires complete cluster values`
+  - `nbreg requires complete cluster values`
 - Negative outcomes:
-  - `poisson outcome must be non-negative`
+  - `nbreg outcome must be non-negative`
 - Fit failures:
-  - `poisson failed`
-- `estat gof` without prior `poisson` model:
-  - `estat gof requires a prior poisson model`
+  - `nbreg failed`
+- `estat gof` without prior `nbreg` model:
+  - `estat gof requires a prior nbreg model`
 
 ## State behavior
 
-- Running `poisson` clears incompatible prior estimation-family state.
+- Running `nbreg` clears incompatible prior estimation-family state.
 - Existing `estat` and `predict` boundaries for other families remain unchanged.
 
 ## Acceptance Criteria
 
-- `poisson` parses and executes with required arguments and supported covariance modes.
+- `nbreg` parses and executes with required arguments and supported covariance modes.
 - deterministic typed and formatted output includes coefficient rows and log-likelihood summary.
-- `predict` supports `xb` and `residuals` after `poisson`.
-- `estat gof` returns deterministic GOF rows after `poisson`.
+- `predict` supports `xb` and `residuals` after `nbreg`.
+- `estat gof` returns deterministic GOF rows after `nbreg`.
 - focused parser/executor/CLI/shell/help coverage passes.

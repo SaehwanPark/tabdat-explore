@@ -208,6 +208,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     poisson_command = _completion_texts(completer, "pois")
     poisson_columns = _completion_texts(completer, "poisson c")
     poisson_options = _completion_texts(completer, "poisson cost age, ")
+    nbreg_command = _completion_texts(completer, "nbr")
+    nbreg_columns = _completion_texts(completer, "nbreg c")
+    nbreg_options = _completion_texts(completer, "nbreg cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -252,6 +255,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert poisson_command == ["poisson"]
   assert poisson_columns == ["cost"]
   assert poisson_options == ["robust", "cluster(", "noconstant"]
+  assert nbreg_command == ["nbreg"]
+  assert nbreg_columns == ["cost"]
+  assert nbreg_options == ["robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]

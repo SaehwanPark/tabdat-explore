@@ -34,6 +34,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  NbregCommand,
   NlCommand,
   NumberExpression,
   PanelCommand,
@@ -98,6 +99,7 @@ _EXECUTABLE_COMMANDS = {
   "heckman",
   "nl",
   "poisson",
+  "nbreg",
   "predict",
   "estat",
   "ivregress",
@@ -349,6 +351,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "poisson":
     return _parse_poisson(parts)
+
+  if parts.name == "nbreg":
+    return _parse_nbreg(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -1041,6 +1046,32 @@ def _parse_poisson(parts: _CommandParts) -> PoissonCommand:
   if robust and cluster_variable is not None:
     raise ParseError("poisson cannot combine robust and cluster")
   return PoissonCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_nbreg(parts: _CommandParts) -> NbregCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("nbreg expects syntax: nbreg <y> <xvars>")
+  if len(parts.arguments) < 2:
+    raise ParseError("nbreg expects syntax: nbreg <y> <xvars>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"nbreg unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "nbreg", {"robust", "noconstant"})
+  cluster_values = _single_tuple_option(parts.options, "cluster", "nbreg")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("nbreg option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("nbreg cannot combine robust and cluster")
+  return NbregCommand(
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
     robust=robust,
