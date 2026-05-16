@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the third Phase 16 specialized likelihood-model slice with
+  `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]` and
+  `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,
+  deterministic nonrobust/robust/cluster covariance output, `predict <newvar>[, xb residuals]`
+  routing after `zip`/`zinb`, and `estat gof` post-estimation diagnostics with focused
+  parser/executor/CLI/shell/help coverage.
 - Added the second Phase 16 specialized likelihood-model slice with
   `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`, deterministic
   nonrobust/robust/cluster covariance output, `predict <newvar>[, xb residuals]` routing after

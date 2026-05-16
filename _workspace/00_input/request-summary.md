@@ -1,21 +1,22 @@
-# Phase 16 Slice 2 Request Summary
+# Phase 16 Slice 3 Request Summary
 
 ## User Goal
 
-Resume development from the latest merged checkpoint by moving from completed Phase 15 to the next
-phase with meaningful checkpoint commits, complete documentation (including in-app help), and a
-ready-for-review PR.
+Resume development from the latest merged checkpoint by moving from completed Phase 16 Slice 2 to
+the next phase slice with meaningful checkpoint commits, complete documentation (including in-app
+help), and a ready-for-review PR.
 
 ## Scope
 
-- Resume from latest merged checkpoint on `main` (Phase 16 Slice 1 complete).
-- Phase 16 Slice 2:
-  - add bounded negative-binomial count-model entrypoint
+- Resume from latest merged checkpoint on `main` (Phase 16 Slice 2 complete).
+- Phase 16 Slice 3:
+  - add bounded zero-inflated count-model entrypoints
   - command surface:
-    - `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`
+    - `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
+    - `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
   - post-estimation:
-    - `predict <newvar>[, xb residuals]` after `nbreg`
-    - `estat gof` after `nbreg`
+    - `predict <newvar>[, xb residuals]` after `zip` and `zinb`
+    - `estat gof` after `zip` and `zinb`
 
 ## Constraints
 
@@ -25,5 +26,5 @@ ready-for-review PR.
 
 ## Non-goals
 
-- No zero-inflated, hurdle, multinomial, or survival families.
+- No hurdle or finite-mixture model families.
 - No new `predict` option keyword additions (for example, no `mu`).

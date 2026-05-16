@@ -1,24 +1,31 @@
-# Phase 16 Slice 2 Command Contract
+# Phase 16 Slice 3 Command Contract
 
 ## Roadmap Phase
 
 - Phase 16 specialized likelihood models
-  - Slice 2: bounded negative-binomial count-model semantics with deterministic post-estimation
-    support
+  - Slice 3: bounded zero-inflated count-model semantics with deterministic post-estimation support
 
-## `nbreg`
+## `zip`
 
 ### Syntax
 
 ```stata
-nbreg <y> <xvars>[, robust cluster(<var>) noconstant]
+zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]
+```
+
+## `zinb`
+
+### Syntax
+
+```stata
+zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]
 ```
 
 ### Rules
 
 - Requires one active dataset.
-- Requires one outcome variable and one-or-more predictors.
-- Requires numeric outcome and predictor variables.
+- Requires one outcome variable, one-or-more count predictors, and one-or-more inflation predictors.
+- Requires numeric outcome, count predictors, and inflation predictors.
 - Outcome must be non-negative on complete observations.
 - Supports covariance modes:
   - nonrobust (default)
@@ -28,36 +35,43 @@ nbreg <y> <xvars>[, robust cluster(<var>) noconstant]
 
 ## Post-estimation behavior
 
-- `predict <newvar>[, xb residuals]` is supported after successful `nbreg`.
-- `estat gof` is supported after successful `nbreg`.
+- `predict <newvar>[, xb residuals]` is supported after successful `zip`.
+- `predict <newvar>[, xb residuals]` is supported after successful `zinb`.
+- `estat gof` is supported after successful `zip` or `zinb`.
 - Existing `predict ..., pr` remains binary-choice-only.
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `nbreg requires an active dataset; run use <path> first`
+  - `zip requires an active dataset; run use <path> first`
+  - `zinb requires an active dataset; run use <path> first`
 - Missing variables/non-numeric variables:
   - existing unknown-variable and numeric-type errors
 - Empty complete-observation sample:
-  - `nbreg requires at least one complete observation`
+  - `zip requires at least one complete observation`
+  - `zinb requires at least one complete observation`
 - Cluster mode with missing cluster values:
-  - `nbreg requires complete cluster values`
+  - `zip requires complete cluster values`
+  - `zinb requires complete cluster values`
 - Negative outcomes:
-  - `nbreg outcome must be non-negative`
+  - `zip outcome must be non-negative`
+  - `zinb outcome must be non-negative`
 - Fit failures:
-  - `nbreg failed`
-- `estat gof` without prior `nbreg` model:
-  - `estat gof requires a prior nbreg model`
+  - `zip failed`
+  - `zinb failed`
+- `estat gof` without prior ZIP/ZINB/Poisson/NB model:
+  - `estat gof requires a prior poisson, nbreg, zip, or zinb model`
 
 ## State behavior
 
-- Running `nbreg` clears incompatible prior estimation-family state.
+- Running `zip` or `zinb` clears incompatible prior estimation-family state.
 - Existing `estat` and `predict` boundaries for other families remain unchanged.
 
 ## Acceptance Criteria
 
-- `nbreg` parses and executes with required arguments and supported covariance modes.
+- `zip` and `zinb` parse and execute with required `inflate(...)` arguments and supported covariance
+  modes.
 - deterministic typed and formatted output includes coefficient rows and log-likelihood summary.
-- `predict` supports `xb` and `residuals` after `nbreg`.
-- `estat gof` returns deterministic GOF rows after `nbreg`.
+- `predict` supports `xb` and `residuals` after `zip` and `zinb`.
+- `estat gof` returns deterministic GOF rows after `zip` and `zinb`.
 - focused parser/executor/CLI/shell/help coverage passes.
