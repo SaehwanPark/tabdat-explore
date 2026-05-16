@@ -314,9 +314,26 @@ class NlCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PoissonCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
-    "residuals", "ovtest", "vif", "firststage", "overid", "hausman", "endogenous", "margins"
+    "residuals",
+    "ovtest",
+    "vif",
+    "firststage",
+    "overid",
+    "hausman",
+    "endogenous",
+    "margins",
+    "gof",
   ]
 
 
@@ -404,6 +421,7 @@ Command = (
   | TobitCommand
   | HeckmanCommand
   | NlCommand
+  | PoissonCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -589,6 +607,17 @@ class NlRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PoissonRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  log_likelihood: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -686,6 +715,7 @@ Result = (
   | TobitRegressionResult
   | HeckmanRegressionResult
   | NlRegressionResult
+  | PoissonRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

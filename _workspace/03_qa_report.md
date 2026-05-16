@@ -1,4 +1,4 @@
-# Phase 15 Slice 7 QA Report
+# Phase 16 Slice 1 QA Report
 
 ## Status
 
@@ -7,16 +7,17 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `nl` syntax/options and completion behavior match contract.
+  - `poisson` syntax/options and completion behavior match contract.
+  - `estat gof` parses and completes.
 - Contract -> executor:
-  - `nl` executes with required `params(...)` and `start(...)`.
-  - nonrobust/robust covariance modes are deterministic.
-  - `predict` supports `xb` and `residuals` after `nl`.
-- Contract -> formatter/CLI:
-  - `nl` output formatting is deterministic and includes model/covariance/RSS/coefficient table.
-  - CLI nonlinear and predict flows execute successfully.
+  - `poisson` executes with nonrobust/robust/cluster covariance modes.
+  - `predict` supports `xb` and `residuals` after `poisson`.
+  - `estat gof` executes after `poisson` and enforces prerequisites.
+- Contract -> formatter/CLI/help:
+  - Poisson CLI output and GOF table output are deterministic.
+  - in-app help topics include `poisson` and updated `predict`/`estat` examples.
 - Regression boundaries:
-  - existing estimator families remain stable under full project checks.
+  - existing estimator-family routing remains stable under focused and full checks.
 
 ## Blocking Issues
 
@@ -24,12 +25,5 @@ pass
 
 ## Validation Evidence
 
-- Focused nonlinear tests passed:
-  - `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py -k "nl or nonlinear"`
-- Full quality gates passed:
-  - `uv run ruff check .`
-  - `uv run ruff format --check .`
-  - `uv run pyright`
-  - `uv run mypy`
-  - `uv run pytest -q`
-
+- Focused Poisson checks passed.
+- Full quality gates passed (`ruff`, `pyright`, `mypy`, `pytest`).

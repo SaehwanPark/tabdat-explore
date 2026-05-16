@@ -655,6 +655,58 @@ def test_cli_runs_phase_15_nl_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_16_poisson_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "poisson.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (1, 22.0, 1.0, 'a'),
+        (1, 25.0, 2.0, 'b'),
+        (2, 30.0, 2.0, 'b'),
+        (3, 34.0, 3.0, 'c'),
+        (3, 38.0, 3.0, 'c'),
+        (4, 42.0, 4.0, 'd'),
+        (5, 45.0, 4.0, 'd')
+    ) as poisson_data(y, x, z, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "poisson y x z",
+      "-c",
+      "poisson y x z, robust",
+      "-c",
+      "poisson y x z, cluster(cluster_id)",
+      "-c",
+      "predict xb_hat, xb",
+      "-c",
+      "predict u_hat, residuals",
+      "-c",
+      "estat gof",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: poisson y on x z" in captured.out
+  assert "Estimator: poisson" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Predicted xb_hat: 8 rows, 5 columns" in captured.out
+  assert "Predicted u_hat: 8 rows, 6 columns" in captured.out
+  assert "log_likelihood" in captured.out
+  assert "deviance" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(
@@ -712,7 +764,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
 
   assert exit_code == 1
   assert "Loaded:" in captured.out
-  assert "Error: predict requires a prior regress, cfregress, or nl model" in captured.err
+  assert "Error: predict requires a prior regress, cfregress, nl, or poisson model" in captured.err
 
 
 def test_cli_runs_phase_13_estat_flow(tmp_path: Path, capsys) -> None:

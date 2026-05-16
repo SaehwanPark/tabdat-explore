@@ -12,6 +12,8 @@ How do I check fit, identification, or marginal effects after estimation?
 Examples:
 - `estat vif`
 - `estat residuals`
+- `estat margins`
+- `estat gof`
 
 Links:
 - `docs/microecometrics_topics.md`

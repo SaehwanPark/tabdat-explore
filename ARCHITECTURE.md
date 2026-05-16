@@ -5,8 +5,8 @@ linear econometrics with three `regress`/`predict`/`estat` slices, implemented t
 slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
 FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
 support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
-semantics), and delivered five bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
-binary `predict` routing, and `tobit`).
+semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
+binary `predict` routing, `tobit`, `heckman`, and `nl`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -67,6 +67,8 @@ Phase 15 parsing adds
 `logit|probit <y> <xvars>[, robust cluster(...) noconstant]`, `estat margins`,
 `predict <newvar>[, xb residuals pr]`, and
 `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(...) noconstant]`.
+Phase 16 parsing adds
+`poisson <y> <xvars>[, robust cluster(...) noconstant]` and `estat gof`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -100,6 +102,8 @@ binary-choice model state. `predict` now routes binary `xb` and `pr` outputs aft
 fits while preserving existing linear/control-function `predict` paths. Phase 15 also adds bounded
 Tobit estimation through an R adapter boundary (`survival::survreg` via `rpy2`) when Python-first
 direct support is insufficient.
+Phase 16 adds bounded Poisson count estimation through `statsmodels`, `predict` routing for
+`xb`/`residuals` after Poisson state, and `estat gof` post-estimation diagnostics.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -227,6 +231,9 @@ display formatting.
   `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`, and
   `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`, and
   `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`.
+- Phase 16 specialized likelihood models currently include
+  `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `predict <newvar>[, xb residuals]` after Poisson model state, and `estat gof`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.

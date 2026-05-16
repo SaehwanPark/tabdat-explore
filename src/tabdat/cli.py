@@ -54,8 +54,7 @@ class _RunStatus(Enum):
 
 
 class _PromptSession(Protocol):
-  def prompt(self, *args: Any, **kwargs: Any) -> str:
-    ...
+  def prompt(self, *args: Any, **kwargs: Any) -> str: ...
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -279,39 +279,36 @@ and describe the active work with concise verification criteria.
   - bounded nonlinear least-squares execution with deterministic nonrobust/robust covariance labels
   - deterministic typed/formatted output and `predict <newvar>[, xb residuals]` routing after `nl`
   - focused parser, executor, CLI, and shell coverage
+- Implemented the first Phase 16 specialized likelihood-model slice:
+  - `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
+  - bounded count-model execution with deterministic nonrobust/robust/cluster covariance labels
+  - deterministic `predict <newvar>[, xb residuals]` routing after `poisson`
+  - deterministic `estat gof` diagnostics after `poisson`
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
-- Feature: Phase 15 nonlinear estimation core
+- Feature: Phase 16 specialized likelihood models
   Status: Active
-  Started: 2026-05-14
-  Branch: codex/tmp-phase15-slice7-nl-general-nonlinear
+  Started: 2026-05-16
+  Branch: codex/tmp-phase16-slice1-poisson-gof
 
   Summary:
-  Continue from completed Phase 14 endogeneity/panel foundations with bounded Phase 15 nonlinear
-  slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`, and `nl`)
-  before extending to broader nonlinear workflows.
+  Continue from completed Phase 15 nonlinear foundations with a bounded first Phase 16 count-model
+  slice (`poisson`) plus deterministic post-estimation routing (`predict ..., xb|residuals`) and
+  `estat gof` before broader specialized-likelihood expansion.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
-  - `logit` parses and executes with nonrobust, robust, and clustered covariance modes
-  - `probit` parses and executes with nonrobust, robust, and clustered covariance modes
-  - `estat margins` executes after `logit` and `probit` with deterministic table output
-  - `predict ..., pr` executes after `logit` and `probit` with deterministic output
-  - `tobit` parses and executes with `ll(...)`, optional `ul(...)`, and supported covariance modes
-  - `heckman` parses and executes with required `selectdep(...)` and `select(...)` plus supported
-    covariance modes
-  - `nl` parses and executes with required `params(...)` and `start(...)` plus nonrobust/robust
-    covariance modes
-  - `predict ..., xb|residuals` executes after `nl` with deterministic output
-  - `logit` output includes deterministic pseudo R-squared and coefficient rows
-  - `probit` output includes deterministic pseudo R-squared and coefficient rows
-  - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`ivregress`/`cfregress`/`xtreg` command
-    behavior remains stable
+  - `poisson` parses and executes with nonrobust, robust, and clustered covariance modes
+  - `predict ..., xb|residuals` executes after `poisson` with deterministic output
+  - `estat gof` executes after `poisson` with deterministic table output
+  - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
+    command behavior remains stable
 
   Out of Scope:
-  - clustered covariance for `nl`
+  - negative-binomial and zero-inflated model families
 
 ## Future
 

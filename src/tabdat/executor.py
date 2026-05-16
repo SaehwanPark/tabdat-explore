@@ -70,6 +70,8 @@ from tabdat.models import (
   PanelMetadata,
   PanelResult,
   PlotResult,
+  PoissonCommand,
+  PoissonRegressionResult,
   PredictCommand,
   PreviewResult,
   ProbitCommand,
@@ -179,6 +181,14 @@ class _NlRegressionState:
   predictor_names: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _PoissonRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  include_intercept: bool
+  fitted_model: object
+
+
 @dataclass
 class _XtModelCache:
   fe: _XtRegressionState | None = None
@@ -194,6 +204,7 @@ class SessionState:
   regression: _RegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
   nl_regression: _NlRegressionState | None = None
+  poisson_regression: _PoissonRegressionState | None = None
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
@@ -387,6 +398,9 @@ class Executor:
 
     if isinstance(command, NlCommand):
       return self._execute_nl(command)
+
+    if isinstance(command, PoissonCommand):
+      return self._execute_poisson(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -655,6 +669,7 @@ class Executor:
     )
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -731,6 +746,7 @@ class Executor:
     )
     self.state.iv_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return LogitRegressionResult(
@@ -799,6 +815,7 @@ class Executor:
     )
     self.state.iv_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return ProbitRegressionResult(
@@ -879,6 +896,7 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
       fitted_model=fitted,
@@ -1002,6 +1020,7 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     (
       residual_estimate,
@@ -1124,6 +1143,7 @@ class Executor:
       expression=command.expression,
       predictor_names=predictor_names,
     )
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1134,6 +1154,71 @@ class Executor:
       parameter_names=command.parameter_names,
       observation_count=len(outcomes),
       residual_sum_of_squares=rss,
+      coefficients=coefficients,
+    )
+
+  def _execute_poisson(self, command: PoissonCommand) -> PoissonRegressionResult:
+    dataset = self._require_active_dataset("poisson")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("poisson", dataset, numeric_variables)
+    row_columns = [command.outcome, *command.predictors]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    outcomes, predictors, groups, missing_cluster_detected = _logit_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not outcomes:
+      raise ExecutionError("poisson requires at least one complete observation")
+    if any(outcome < 0 for outcome in outcomes):
+      raise ExecutionError("poisson outcome must be non-negative")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcomes, dtype=float)
+    covariance = "nonrobust"
+    model = sm.Poisson(outcome_array, design)
+    try:
+      if command.robust:
+        fitted = model.fit(disp=0, cov_type="HC1")
+        covariance = "robust"
+      elif command.cluster_variable is not None:
+        if groups is None or missing_cluster_detected:
+          raise ExecutionError("poisson requires complete cluster values")
+        fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
+        covariance = f"cluster({command.cluster_variable})"
+      else:
+        fitted = model.fit(disp=0)
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("poisson failed") from exc
+    parameter_names = (
+      ("intercept", *command.predictors) if command.include_intercept else command.predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = _PoissonRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      include_intercept=command.include_intercept,
+      fitted_model=fitted,
+    )
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return PoissonRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      log_likelihood=_to_float(getattr(fitted, "llf", None)),
       coefficients=coefficients,
     )
 
@@ -1250,7 +1335,40 @@ class Executor:
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
-    raise ExecutionError("predict requires a prior regress, cfregress, or nl model")
+    poisson_regression = self.state.poisson_regression
+    if poisson_regression is not None:
+      available_columns = {column.name for column in dataset.columns}
+      if any(name not in available_columns for name in poisson_regression.predictor_names):
+        raise ExecutionError("predict requires a prior poisson model with matching variables")
+      rows = self.backend.regression_rows(dataset, poisson_regression.predictor_names)
+      poisson_predictions = _poisson_predictions(
+        rows=rows,
+        fitted_model=poisson_regression.fitted_model,
+        predictor_count=len(poisson_regression.predictor_names),
+        include_intercept=poisson_regression.include_intercept,
+        kind="xb" if command.kind == "xb" else "mean",
+      )
+      if command.kind == "residuals":
+        outcomes = self.backend.regression_rows(dataset, (poisson_regression.outcome_variable,))
+        residuals: list[float | None] = []
+        for outcome_row, predicted_value in zip(outcomes, poisson_predictions, strict=True):
+          if predicted_value is None or len(outcome_row) != 1:
+            residuals.append(None)
+            continue
+          observed = _coerce_float(outcome_row[0])
+          if observed is None:
+            residuals.append(None)
+            continue
+          residuals.append(observed - predicted_value)
+        poisson_predictions = tuple(residuals)
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=poisson_predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    raise ExecutionError("predict requires a prior regress, cfregress, nl, or poisson model")
 
   def _execute_tobit(self, command: TobitCommand) -> TobitRegressionResult:
     if command.upper_limit is not None and command.lower_limit >= command.upper_limit:
@@ -1290,6 +1408,7 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1364,6 +1483,7 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1451,6 +1571,11 @@ class Executor:
         binary_regression.fitted_model,
         predictor_names=binary_regression.predictor_names,
       )
+    if command.subcommand == "gof":
+      poisson_regression = self.state.poisson_regression
+      if poisson_regression is None:
+        raise ExecutionError("estat gof requires a prior poisson model")
+      return _estat_poisson_gof_table(poisson_regression.fitted_model)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1550,6 +1675,7 @@ class Executor:
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
+    self.state.poisson_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     return XtRegressionResult(
@@ -1875,6 +2001,33 @@ def _estat_binary_margins_table(
       )
     )
   return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_poisson_gof_table(fitted_model: object) -> TableResult:
+  try:
+    llf = _to_float(getattr(fitted_model, "llf", None))
+    llnull = _to_float(getattr(fitted_model, "llnull", None))
+    if llf is not None and llnull is not None and llnull != 0:
+      pseudo_r2 = 1.0 - (llf / llnull)
+    else:
+      pseudo_r2 = None
+    resid_pearson = np.array(getattr(fitted_model, "resid_pearson", ()), dtype=float)
+    resid_deviance = np.array(getattr(fitted_model, "resid_deviance", ()), dtype=float)
+  except Exception as exc:
+    raise ExecutionError("estat gof failed for current model") from exc
+  if resid_pearson.ndim != 1 or resid_deviance.ndim != 1:
+    raise ExecutionError("estat gof failed for current model")
+  pearson_chi2 = float(np.dot(resid_pearson, resid_pearson)) if resid_pearson.size > 0 else None
+  deviance = float(np.dot(resid_deviance, resid_deviance)) if resid_deviance.size > 0 else None
+  rows = (
+    ("log_likelihood", llf),
+    ("log_likelihood_null", llnull),
+    ("pseudo_r_squared", pseudo_r2),
+    ("pearson_chi2", pearson_chi2),
+    ("deviance", deviance),
+    ("observation_count", _to_float(getattr(fitted_model, "nobs", None))),
+  )
+  return TableResult(headers=("Metric", "Value"), rows=rows)
 
 
 def _invoke_iv_test_stat(fitted_model: object, attribute_name: str) -> object | None:
@@ -2493,6 +2646,55 @@ def _binary_predictions(
   predictor_count: int,
   include_intercept: bool,
   kind: Literal["xb", "pr"],
+) -> tuple[float | None, ...]:
+  row_values: list[float | None] = [None for _ in rows]
+  complete_indexes: list[int] = []
+  complete_predictors: list[tuple[float, ...]] = []
+  for row_index, row in enumerate(rows):
+    if len(row) != predictor_count:
+      raise ExecutionError("predict failed")
+    if any(value is None for value in row):
+      continue
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw_value) for raw_value in row) if value is not None
+    )
+    if len(predictor_values) != predictor_count:
+      continue
+    if any(not math.isfinite(value) for value in predictor_values):
+      continue
+    complete_indexes.append(row_index)
+    complete_predictors.append(predictor_values)
+  if complete_predictors:
+    design = np.array(
+      _design_matrix(tuple(complete_predictors), include_intercept=include_intercept),
+      dtype=float,
+    )
+    try:
+      model = cast(Any, fitted_model).model
+      params = cast(Any, fitted_model).params
+      which = "linear" if kind == "xb" else "mean"
+      predicted = np.array(model.predict(params, design, which=which), dtype=float)
+    except Exception:
+      try:
+        linear = kind == "xb"
+        predicted = np.array(cast(Any, fitted_model).predict(design, linear=linear), dtype=float)
+      except Exception as exc:
+        raise ExecutionError("predict failed") from exc
+    if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
+      raise ExecutionError("predict failed")
+    for row_index, value in zip(complete_indexes, predicted, strict=True):
+      float_value = float(value)
+      row_values[row_index] = float_value if math.isfinite(float_value) else None
+  return tuple(row_values)
+
+
+def _poisson_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  fitted_model: object,
+  predictor_count: int,
+  include_intercept: bool,
+  kind: Literal["xb", "mean"],
 ) -> tuple[float | None, ...]:
   row_values: list[float | None] = [None for _ in rows]
   complete_indexes: list[int] = []

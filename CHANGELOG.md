@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 16 specialized likelihood-model slice with
+  `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`, deterministic nonrobust/robust/cluster
+  covariance output, `predict <newvar>[, xb residuals]` routing after `poisson`, and `estat gof`
+  post-estimation diagnostics with focused parser/executor/CLI/shell/help coverage.
 - Added the seventh Phase 15 nonlinear estimation core slice with
   `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`,
   bounded nonlinear least-squares estimation, deterministic nonrobust/robust covariance labels,
