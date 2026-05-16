@@ -332,6 +332,26 @@ class NbregCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ZipCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  inflate_predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ZinbCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  inflate_predictors: tuple[str, ...]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
     "residuals",
@@ -432,6 +452,8 @@ Command = (
   | NlCommand
   | PoissonCommand
   | NbregCommand
+  | ZipCommand
+  | ZinbCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -639,6 +661,30 @@ class NbregRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ZipRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  inflate_predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  log_likelihood: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ZinbRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  inflate_predictors: tuple[str, ...]
+  observation_count: int
+  include_intercept: bool
+  log_likelihood: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -738,6 +784,8 @@ Result = (
   | NlRegressionResult
   | PoissonRegressionResult
   | NbregRegressionResult
+  | ZipRegressionResult
+  | ZinbRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult

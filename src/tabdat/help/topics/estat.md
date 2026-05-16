@@ -15,6 +15,7 @@ Examples:
 - `estat margins`
 - `estat gof`
 - `nbreg claims age exposure` then `estat gof`
+- `zinb claims age exposure, inflate(exposure)` then `estat gof`
 
 Links:
 - `docs/microecometrics_topics.md`
