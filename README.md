@@ -58,9 +58,9 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered six bounded
-Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, and
-`heckman`).
+Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered seven bounded
+Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`,
+and `nl`).
 
 ## Quickstart
 

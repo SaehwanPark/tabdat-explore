@@ -5,8 +5,8 @@ linear econometrics with three `regress`/`predict`/`estat` slices, implemented t
 slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
 FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
 support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
-semantics), and delivered five bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
-binary `predict` routing, and `tobit`).
+semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
+binary `predict` routing, `tobit`, `heckman`, and `nl`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
