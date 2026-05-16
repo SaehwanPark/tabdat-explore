@@ -2012,7 +2012,7 @@ def _estat_poisson_gof_table(fitted_model: object) -> TableResult:
     else:
       pseudo_r2 = None
     resid_pearson = np.array(getattr(fitted_model, "resid_pearson", ()), dtype=float)
-    resid_deviance = np.array(getattr(fitted_model, "resid", ()), dtype=float)
+    resid_deviance = np.array(getattr(fitted_model, "resid_deviance", ()), dtype=float)
   except Exception as exc:
     raise ExecutionError("estat gof failed for current model") from exc
   if resid_pearson.ndim != 1 or resid_deviance.ndim != 1:
