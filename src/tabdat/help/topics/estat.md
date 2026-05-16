@@ -14,6 +14,7 @@ Examples:
 - `estat residuals`
 - `estat margins`
 - `estat gof`
+- `nbreg claims age exposure` then `estat gof`
 
 Links:
 - `docs/microecometrics_topics.md`

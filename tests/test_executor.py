@@ -49,6 +49,8 @@ from tabdat.models import (
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
+  NbregCommand,
+  NbregRegressionResult,
   NlCommand,
   NlRegressionResult,
   NumberExpression,
@@ -289,6 +291,25 @@ def _write_poisson_parquet(path: Path) -> None:
         (4, 42.0, 4.0, 'd'),
         (5, 45.0, 4.0, 'd')
     ) as poisson_data(y, x, z, cluster_id)
+    """,
+  )
+
+
+def _write_nbreg_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 'a'),
+        (1, 22.0, 1.0, 'a'),
+        (1, 25.0, 2.0, 'b'),
+        (2, 30.0, 2.0, 'b'),
+        (3, 34.0, 3.0, 'c'),
+        (3, 38.0, 3.0, 'c'),
+        (4, 42.0, 4.0, 'd'),
+        (5, 45.0, 4.0, 'd')
+    ) as nbreg_data(y, x, z, cluster_id)
     """,
   )
 
@@ -888,7 +909,102 @@ def test_phase_16_poisson_reports_prerequisite_errors(
     executor.execute(UseCommand(nonnegative_path))
     with pytest.raises(ExecutionError, match="poisson outcome must be non-negative"):
       executor.execute(PoissonCommand(outcome="y", predictors=("x",)))
-    with pytest.raises(ExecutionError, match="estat gof requires a prior poisson model"):
+    with pytest.raises(ExecutionError, match="estat gof requires a prior poisson or nbreg model"):
+      executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+
+def test_phase_16_nbreg_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "nbreg.parquet"
+  _write_nbreg_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(NbregCommand(outcome="y", predictors=("x", "z")))
+  finally:
+    executor.close()
+
+  assert isinstance(result, NbregRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x", "z")
+  assert result.observation_count == 8
+  assert result.log_likelihood is not None
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x", "z", "lnalpha"]
+
+
+def test_phase_16_nbreg_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "nbreg.parquet"
+  _write_nbreg_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(NbregCommand(outcome="y", predictors=("x",), robust=True))
+    clustered = executor.execute(
+      NbregCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id")
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, NbregRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, NbregRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_16_nbreg_predict_and_estat_gof(tmp_path: Path) -> None:
+  path = tmp_path / "nbreg.parquet"
+  _write_nbreg_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(NbregCommand(outcome="y", predictors=("x", "z")))
+    xb_predicted = executor.execute(PredictCommand(target_variable="xb_hat", kind="xb"))
+    resid_predicted = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    gof = executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+  assert isinstance(xb_predicted, TransformResult)
+  assert xb_predicted.message == "Predicted xb_hat"
+  assert isinstance(resid_predicted, TransformResult)
+  assert resid_predicted.message == "Predicted u_hat"
+  assert isinstance(gof, TableResult)
+  assert gof.headers == ("Metric", "Value")
+  assert any(row[0] == "log_likelihood" for row in gof.rows)
+  assert any(row[0] == "pearson_chi2" for row in gof.rows)
+  assert any(row[0] == "lnalpha" for row in gof.rows)
+
+
+def test_phase_16_nbreg_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  nonnegative_path = tmp_path / "negative-nbreg.parquet"
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
+  _write_sql_parquet(
+    nonnegative_path,
+    """
+    select * from (
+      values
+        (-1, 18.0),
+        (1, 22.0)
+    ) as nbreg_data(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="nbreg requires an active dataset"):
+      executor.execute(NbregCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="nbreg unknown variable: y, x"):
+      executor.execute(NbregCommand(outcome="y", predictors=("x",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="nbreg requires complete cluster values"):
+      executor.execute(NbregCommand(outcome="y", predictors=("x",), cluster_variable="cluster_id"))
+    executor.execute(UseCommand(nonnegative_path))
+    with pytest.raises(ExecutionError, match="nbreg outcome must be non-negative"):
+      executor.execute(NbregCommand(outcome="y", predictors=("x",)))
+    with pytest.raises(ExecutionError, match="estat gof requires a prior poisson or nbreg model"):
       executor.execute(EstatCommand(subcommand="gof"))
   finally:
     executor.close()
@@ -1464,7 +1580,8 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
   try:
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(
-      ExecutionError, match="predict requires a prior regress, cfregress, nl, or poisson model"
+      ExecutionError,
+      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
     ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
@@ -1823,7 +1940,8 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
       )
     )
     with pytest.raises(
-      ExecutionError, match="predict requires a prior regress, cfregress, nl, or poisson model"
+      ExecutionError,
+      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
@@ -2326,7 +2444,8 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
       )
     )
     with pytest.raises(
-      ExecutionError, match="predict requires a prior regress, cfregress, nl, or poisson model"
+      ExecutionError,
+      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):

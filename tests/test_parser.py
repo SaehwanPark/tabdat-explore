@@ -29,6 +29,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  NbregCommand,
   NlCommand,
   NumberExpression,
   PanelCommand,
@@ -544,6 +545,28 @@ def test_parse_phase_16_poisson_command() -> None:
   )
 
 
+def test_parse_phase_16_nbreg_command() -> None:
+  assert parse_command("nbreg outcome x1 x2") == NbregCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+  )
+  assert parse_command("nbreg outcome x1, robust") == NbregCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    robust=True,
+  )
+  assert parse_command("nbreg outcome x1, cluster(group_id)") == NbregCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("nbreg outcome x1, noconstant") == NbregCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -905,6 +928,13 @@ def test_parse_exit_aliases() -> None:
     "poisson y x, cluster()",
     "poisson y x, cluster(group firm)",
     "poisson y x, robust=true",
+    "nbreg",
+    "nbreg y",
+    "nbreg y x if y > 0",
+    "nbreg y x, robust cluster(group)",
+    "nbreg y x, cluster()",
+    "nbreg y x, cluster(group firm)",
+    "nbreg y x, robust=true",
     "estat",
     "estat vif extra",
     "estat, vif",

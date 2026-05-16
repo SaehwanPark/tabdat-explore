@@ -13,3 +13,4 @@ Examples:
 - `predict yhat, xb`
 - `predict p, pr`
 - `predict resid, residuals`
+- `nbreg claims age exposure` then `predict mu_hat, xb`

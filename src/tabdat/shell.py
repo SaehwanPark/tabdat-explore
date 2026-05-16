@@ -53,6 +53,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "heckman",
   "nl",
   "poisson",
+  "nbreg",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -88,6 +89,7 @@ _COLUMN_COMMANDS = {
   "heckman",
   "nl",
   "poisson",
+  "nbreg",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -105,6 +107,7 @@ _TOBIT_OPTIONS = ("ll(", "ul(", "robust", "cluster(", "noconstant")
 _HECKMAN_OPTIONS = ("selectdep(", "select(", "robust", "cluster(", "noconstant")
 _NL_OPTIONS = ("params(", "start(", "robust", "noconstant")
 _POISSON_OPTIONS = ("robust", "cluster(", "noconstant")
+_NBREG_OPTIONS = ("robust", "cluster(", "noconstant")
 _IVREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _XTREG_OPTIONS = ("fe", "re", "robust", "cluster(")
 _XTDATA_OPTIONS = ("within", "between")
@@ -198,6 +201,7 @@ class TabdatCompleter(Completer):
       "heckman",
       "nl",
       "poisson",
+      "nbreg",
       "ivregress",
       "xtreg",
       "xtdata",
@@ -302,6 +306,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_NL_OPTIONS, word)
   if command_name == "poisson":
     yield from _matching_completions(_POISSON_OPTIONS, word)
+  if command_name == "nbreg":
+    yield from _matching_completions(_NBREG_OPTIONS, word)
   if command_name == "ivregress":
     yield from _matching_completions(_IVREGRESS_OPTIONS, word)
   if command_name == "xtreg":
