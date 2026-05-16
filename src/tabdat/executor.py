@@ -1472,17 +1472,17 @@ class Executor:
       )
       if command.kind == "residuals":
         outcomes = self.backend.regression_rows(dataset, (nbreg_regression.outcome_variable,))
-        residuals: list[float | None] = []
+        nbreg_residuals: list[float | None] = []
         for outcome_row, predicted_value in zip(outcomes, nbreg_predictions, strict=True):
           if predicted_value is None or len(outcome_row) != 1:
-            residuals.append(None)
+            nbreg_residuals.append(None)
             continue
           observed = _coerce_float(outcome_row[0])
           if observed is None:
-            residuals.append(None)
+            nbreg_residuals.append(None)
             continue
-          residuals.append(observed - predicted_value)
-        nbreg_predictions = tuple(residuals)
+          nbreg_residuals.append(observed - predicted_value)
+        nbreg_predictions = tuple(nbreg_residuals)
       next_dataset = self.backend.add_numeric_column_from_values(
         dataset,
         target_variable=command.target_variable,
