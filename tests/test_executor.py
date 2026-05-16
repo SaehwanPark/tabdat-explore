@@ -92,6 +92,10 @@ from tabdat.models import (
   XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
+  ZinbCommand,
+  ZinbRegressionResult,
+  ZipCommand,
+  ZipRegressionResult,
 )
 
 
@@ -310,6 +314,25 @@ def _write_nbreg_parquet(path: Path) -> None:
         (4, 42.0, 4.0, 'd'),
         (5, 45.0, 4.0, 'd')
     ) as nbreg_data(y, x, z, cluster_id)
+    """,
+  )
+
+
+def _write_zero_inflated_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 1.0, 'a'),
+        (0, 20.0, 1.0, 2.0, 'a'),
+        (1, 25.0, 2.0, 1.0, 'b'),
+        (0, 28.0, 2.0, 2.0, 'b'),
+        (2, 31.0, 3.0, 1.0, 'c'),
+        (0, 35.0, 3.0, 2.0, 'c'),
+        (3, 40.0, 4.0, 1.0, 'd'),
+        (1, 45.0, 4.0, 2.0, 'd')
+    ) as zero_inflated_data(y, x, z, zi, cluster_id)
     """,
   )
 
@@ -909,7 +932,10 @@ def test_phase_16_poisson_reports_prerequisite_errors(
     executor.execute(UseCommand(nonnegative_path))
     with pytest.raises(ExecutionError, match="poisson outcome must be non-negative"):
       executor.execute(PoissonCommand(outcome="y", predictors=("x",)))
-    with pytest.raises(ExecutionError, match="estat gof requires a prior poisson or nbreg model"):
+    with pytest.raises(
+      ExecutionError,
+      match="estat gof requires a prior poisson, nbreg, zip, or zinb model",
+    ):
       executor.execute(EstatCommand(subcommand="gof"))
   finally:
     executor.close()
@@ -1004,7 +1030,236 @@ def test_phase_16_nbreg_reports_prerequisite_errors(sample_parquet: Path, tmp_pa
     executor.execute(UseCommand(nonnegative_path))
     with pytest.raises(ExecutionError, match="nbreg outcome must be non-negative"):
       executor.execute(NbregCommand(outcome="y", predictors=("x",)))
-    with pytest.raises(ExecutionError, match="estat gof requires a prior poisson or nbreg model"):
+    with pytest.raises(
+      ExecutionError,
+      match="estat gof requires a prior poisson, nbreg, zip, or zinb model",
+    ):
+      executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+
+def test_phase_16_zip_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "zip.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      ZipCommand(outcome="y", predictors=("x", "z"), inflate_predictors=("zi",))
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, ZipRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x", "z")
+  assert result.inflate_predictors == ("zi",)
+  assert result.observation_count == 8
+  assert result.log_likelihood is None or isinstance(result.log_likelihood, float)
+
+
+def test_phase_16_zip_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "zip.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      ZipCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",), robust=True)
+    )
+    clustered = executor.execute(
+      ZipCommand(
+        outcome="y",
+        predictors=("x",),
+        inflate_predictors=("zi",),
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, ZipRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, ZipRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_16_zip_predict_and_estat_gof(tmp_path: Path) -> None:
+  path = tmp_path / "zip.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(ZipCommand(outcome="y", predictors=("x", "z"), inflate_predictors=("zi",)))
+    xb_predicted = executor.execute(PredictCommand(target_variable="xb_hat", kind="xb"))
+    resid_predicted = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    gof = executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+  assert isinstance(xb_predicted, TransformResult)
+  assert xb_predicted.message == "Predicted xb_hat"
+  assert isinstance(resid_predicted, TransformResult)
+  assert resid_predicted.message == "Predicted u_hat"
+  assert isinstance(gof, TableResult)
+  assert gof.headers == ("Metric", "Value")
+  assert any(row[0] == "log_likelihood" for row in gof.rows)
+  assert any(row[0] == "pearson_chi2" for row in gof.rows)
+
+
+def test_phase_16_zip_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  nonnegative_path = tmp_path / "negative-zip.parquet"
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
+  _write_sql_parquet(
+    nonnegative_path,
+    """
+    select * from (
+      values
+        (-1, 18.0, 1.0),
+        (1, 22.0, 2.0)
+    ) as zip_data(y, x, zi)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="zip requires an active dataset"):
+      executor.execute(ZipCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="zip unknown variable: y, x, zi"):
+      executor.execute(ZipCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="zip requires complete cluster values"):
+      executor.execute(
+        ZipCommand(
+          outcome="y",
+          predictors=("x",),
+          inflate_predictors=("x",),
+          cluster_variable="cluster_id",
+        )
+      )
+    executor.execute(UseCommand(nonnegative_path))
+    with pytest.raises(ExecutionError, match="zip outcome must be non-negative"):
+      executor.execute(ZipCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    with pytest.raises(
+      ExecutionError,
+      match="estat gof requires a prior poisson, nbreg, zip, or zinb model",
+    ):
+      executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+
+def test_phase_16_zinb_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "zinb.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      ZinbCommand(outcome="y", predictors=("x", "z"), inflate_predictors=("zi",))
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, ZinbRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x", "z")
+  assert result.inflate_predictors == ("zi",)
+  assert result.observation_count == 8
+  assert result.log_likelihood is None or isinstance(result.log_likelihood, float)
+
+
+def test_phase_16_zinb_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "zinb.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      ZinbCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",), robust=True)
+    )
+    clustered = executor.execute(
+      ZinbCommand(
+        outcome="y",
+        predictors=("x",),
+        inflate_predictors=("zi",),
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, ZinbRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, ZinbRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_16_zinb_predict_and_estat_gof(tmp_path: Path) -> None:
+  path = tmp_path / "zinb.parquet"
+  _write_zero_inflated_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(ZinbCommand(outcome="y", predictors=("x", "z"), inflate_predictors=("zi",)))
+    xb_predicted = executor.execute(PredictCommand(target_variable="xb_hat", kind="xb"))
+    resid_predicted = executor.execute(PredictCommand(target_variable="u_hat", kind="residuals"))
+    gof = executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+  assert isinstance(xb_predicted, TransformResult)
+  assert xb_predicted.message == "Predicted xb_hat"
+  assert isinstance(resid_predicted, TransformResult)
+  assert resid_predicted.message == "Predicted u_hat"
+  assert isinstance(gof, TableResult)
+  assert gof.headers == ("Metric", "Value")
+  assert any(row[0] == "log_likelihood" for row in gof.rows)
+  assert any(row[0] == "lnalpha" for row in gof.rows)
+
+
+def test_phase_16_zinb_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  missing_cluster_path = tmp_path / "missing-cluster.parquet"
+  nonnegative_path = tmp_path / "negative-zinb.parquet"
+  _write_missing_cluster_logit_parquet(missing_cluster_path)
+  _write_sql_parquet(
+    nonnegative_path,
+    """
+    select * from (
+      values
+        (-1, 18.0, 1.0),
+        (1, 22.0, 2.0)
+    ) as zinb_data(y, x, zi)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="zinb requires an active dataset"):
+      executor.execute(ZinbCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="zinb unknown variable: y, x, zi"):
+      executor.execute(ZinbCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="zinb requires complete cluster values"):
+      executor.execute(
+        ZinbCommand(
+          outcome="y",
+          predictors=("x",),
+          inflate_predictors=("x",),
+          cluster_variable="cluster_id",
+        )
+      )
+    executor.execute(UseCommand(nonnegative_path))
+    with pytest.raises(ExecutionError, match="zinb outcome must be non-negative"):
+      executor.execute(ZinbCommand(outcome="y", predictors=("x",), inflate_predictors=("zi",)))
+    with pytest.raises(
+      ExecutionError,
+      match="estat gof requires a prior poisson, nbreg, zip, or zinb model",
+    ):
       executor.execute(EstatCommand(subcommand="gof"))
   finally:
     executor.close()
@@ -1581,7 +1836,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
+      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
     ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
@@ -1941,7 +2196,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     )
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
+      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
@@ -2445,7 +2700,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     )
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, or nbreg model",
+      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):

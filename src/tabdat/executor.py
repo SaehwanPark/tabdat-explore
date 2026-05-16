@@ -13,6 +13,7 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares
 from scipy.stats import chi2, norm
+from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
@@ -106,6 +107,10 @@ from tabdat.models import (
   XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
+  ZinbCommand,
+  ZinbRegressionResult,
+  ZipCommand,
+  ZipRegressionResult,
 )
 from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
 
@@ -199,6 +204,24 @@ class _NbregRegressionState:
   fitted_model: object
 
 
+@dataclass(frozen=True)
+class _ZipRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  inflate_predictor_names: tuple[str, ...]
+  include_intercept: bool
+  fitted_model: object
+
+
+@dataclass(frozen=True)
+class _ZinbRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  inflate_predictor_names: tuple[str, ...]
+  include_intercept: bool
+  fitted_model: object
+
+
 @dataclass
 class _XtModelCache:
   fe: _XtRegressionState | None = None
@@ -216,6 +239,8 @@ class SessionState:
   nl_regression: _NlRegressionState | None = None
   poisson_regression: _PoissonRegressionState | None = None
   nbreg_regression: _NbregRegressionState | None = None
+  zip_regression: _ZipRegressionState | None = None
+  zinb_regression: _ZinbRegressionState | None = None
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
@@ -415,6 +440,12 @@ class Executor:
 
     if isinstance(command, NbregCommand):
       return self._execute_nbreg(command)
+
+    if isinstance(command, ZipCommand):
+      return self._execute_zip(command)
+
+    if isinstance(command, ZinbCommand):
+      return self._execute_zinb(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -685,6 +716,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -763,6 +796,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return LogitRegressionResult(
@@ -833,6 +868,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return ProbitRegressionResult(
@@ -915,6 +952,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
       fitted_model=fitted,
@@ -1040,6 +1079,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     (
       residual_estimate,
@@ -1164,6 +1205,8 @@ class Executor:
     )
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1230,6 +1273,8 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1298,6 +1343,8 @@ class Executor:
       include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1305,6 +1352,182 @@ class Executor:
       covariance=covariance,
       outcome=command.outcome,
       predictors=command.predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      log_likelihood=_to_float(getattr(fitted, "llf", None)),
+      coefficients=coefficients,
+    )
+
+  def _execute_zip(self, command: ZipCommand) -> ZipRegressionResult:
+    dataset = self._require_active_dataset("zip")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.predictors,
+      *command.inflate_predictors,
+    )
+    _require_numeric_columns("zip", dataset, numeric_variables)
+    rows = self.backend.regression_rows(
+      dataset,
+      _zero_inflated_row_columns(
+        outcome=command.outcome,
+        predictors=command.predictors,
+        inflate_predictors=command.inflate_predictors,
+        cluster_variable=command.cluster_variable,
+      ),
+    )
+    outcomes, predictors, inflation_predictors, groups, missing_cluster_detected = (
+      _zero_inflated_sample(
+        rows=rows,
+        predictor_count=len(command.predictors),
+        inflate_predictor_count=len(command.inflate_predictors),
+        has_cluster=command.cluster_variable is not None,
+      )
+    )
+    if not outcomes:
+      raise ExecutionError("zip requires at least one complete observation")
+    if any(outcome < 0 for outcome in outcomes):
+      raise ExecutionError("zip outcome must be non-negative")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    inflation_design = np.array(
+      _design_matrix(inflation_predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcomes, dtype=float)
+    covariance = "nonrobust"
+    model = ZeroInflatedPoisson(
+      endog=outcome_array,
+      exog=design,
+      exog_infl=inflation_design,
+      inflation="logit",
+    )
+    try:
+      if command.robust:
+        fitted = model.fit(disp=0, cov_type="HC1")
+        covariance = "robust"
+      elif command.cluster_variable is not None:
+        if groups is None or missing_cluster_detected:
+          raise ExecutionError("zip requires complete cluster values")
+        fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
+        covariance = f"cluster({command.cluster_variable})"
+      else:
+        fitted = model.fit(disp=0)
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("zip failed") from exc
+    coefficients = _coefficient_estimates(_fitted_parameter_names(fitted), fitted)
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = _ZipRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      inflate_predictor_names=command.inflate_predictors,
+      include_intercept=command.include_intercept,
+      fitted_model=fitted,
+    )
+    self.state.zinb_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return ZipRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      inflate_predictors=command.inflate_predictors,
+      observation_count=len(outcomes),
+      include_intercept=command.include_intercept,
+      log_likelihood=_to_float(getattr(fitted, "llf", None)),
+      coefficients=coefficients,
+    )
+
+  def _execute_zinb(self, command: ZinbCommand) -> ZinbRegressionResult:
+    dataset = self._require_active_dataset("zinb")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.predictors,
+      *command.inflate_predictors,
+    )
+    _require_numeric_columns("zinb", dataset, numeric_variables)
+    rows = self.backend.regression_rows(
+      dataset,
+      _zero_inflated_row_columns(
+        outcome=command.outcome,
+        predictors=command.predictors,
+        inflate_predictors=command.inflate_predictors,
+        cluster_variable=command.cluster_variable,
+      ),
+    )
+    outcomes, predictors, inflation_predictors, groups, missing_cluster_detected = (
+      _zero_inflated_sample(
+        rows=rows,
+        predictor_count=len(command.predictors),
+        inflate_predictor_count=len(command.inflate_predictors),
+        has_cluster=command.cluster_variable is not None,
+      )
+    )
+    if not outcomes:
+      raise ExecutionError("zinb requires at least one complete observation")
+    if any(outcome < 0 for outcome in outcomes):
+      raise ExecutionError("zinb outcome must be non-negative")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    inflation_design = np.array(
+      _design_matrix(inflation_predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcomes, dtype=float)
+    covariance = "nonrobust"
+    model = ZeroInflatedNegativeBinomialP(
+      endog=outcome_array,
+      exog=design,
+      exog_infl=inflation_design,
+      inflation="logit",
+    )
+    try:
+      if command.robust:
+        fitted = model.fit(disp=0, cov_type="HC1")
+        covariance = "robust"
+      elif command.cluster_variable is not None:
+        if groups is None or missing_cluster_detected:
+          raise ExecutionError("zinb requires complete cluster values")
+        fitted = model.fit(disp=0, cov_type="cluster", cov_kwds={"groups": np.array(groups)})
+        covariance = f"cluster({command.cluster_variable})"
+      else:
+        fitted = model.fit(disp=0)
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("zinb failed") from exc
+    coefficients = _coefficient_estimates(_fitted_parameter_names(fitted), fitted)
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = _ZinbRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      inflate_predictor_names=command.inflate_predictors,
+      include_intercept=command.include_intercept,
+      fitted_model=fitted,
+    )
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return ZinbRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      inflate_predictors=command.inflate_predictors,
       observation_count=len(outcomes),
       include_intercept=command.include_intercept,
       log_likelihood=_to_float(getattr(fitted, "llf", None)),
@@ -1490,7 +1713,86 @@ class Executor:
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
-    raise ExecutionError("predict requires a prior regress, cfregress, nl, poisson, or nbreg model")
+    zip_regression = self.state.zip_regression
+    if zip_regression is not None:
+      available_columns = {column.name for column in dataset.columns}
+      required = (*zip_regression.predictor_names, *zip_regression.inflate_predictor_names)
+      if any(name not in available_columns for name in required):
+        raise ExecutionError("predict requires a prior zip model with matching variables")
+      rows = self.backend.regression_rows(dataset, zip_regression.predictor_names)
+      inflation_rows = self.backend.regression_rows(dataset, zip_regression.inflate_predictor_names)
+      zip_predictions = _zero_inflated_predictions(
+        rows=rows,
+        inflation_rows=inflation_rows,
+        fitted_model=zip_regression.fitted_model,
+        predictor_count=len(zip_regression.predictor_names),
+        inflate_predictor_count=len(zip_regression.inflate_predictor_names),
+        include_intercept=zip_regression.include_intercept,
+        kind="xb" if command.kind == "xb" else "mean",
+      )
+      if command.kind == "residuals":
+        outcomes = self.backend.regression_rows(dataset, (zip_regression.outcome_variable,))
+        zip_residuals: list[float | None] = []
+        for outcome_row, predicted_value in zip(outcomes, zip_predictions, strict=True):
+          if predicted_value is None or len(outcome_row) != 1:
+            zip_residuals.append(None)
+            continue
+          observed = _coerce_float(outcome_row[0])
+          if observed is None:
+            zip_residuals.append(None)
+            continue
+          zip_residuals.append(observed - predicted_value)
+        zip_predictions = tuple(zip_residuals)
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=zip_predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    zinb_regression = self.state.zinb_regression
+    if zinb_regression is not None:
+      available_columns = {column.name for column in dataset.columns}
+      required = (*zinb_regression.predictor_names, *zinb_regression.inflate_predictor_names)
+      if any(name not in available_columns for name in required):
+        raise ExecutionError("predict requires a prior zinb model with matching variables")
+      rows = self.backend.regression_rows(dataset, zinb_regression.predictor_names)
+      inflation_rows = self.backend.regression_rows(
+        dataset,
+        zinb_regression.inflate_predictor_names,
+      )
+      zinb_predictions = _zero_inflated_predictions(
+        rows=rows,
+        inflation_rows=inflation_rows,
+        fitted_model=zinb_regression.fitted_model,
+        predictor_count=len(zinb_regression.predictor_names),
+        inflate_predictor_count=len(zinb_regression.inflate_predictor_names),
+        include_intercept=zinb_regression.include_intercept,
+        kind="xb" if command.kind == "xb" else "mean",
+      )
+      if command.kind == "residuals":
+        outcomes = self.backend.regression_rows(dataset, (zinb_regression.outcome_variable,))
+        zinb_residuals: list[float | None] = []
+        for outcome_row, predicted_value in zip(outcomes, zinb_predictions, strict=True):
+          if predicted_value is None or len(outcome_row) != 1:
+            zinb_residuals.append(None)
+            continue
+          observed = _coerce_float(outcome_row[0])
+          if observed is None:
+            zinb_residuals.append(None)
+            continue
+          zinb_residuals.append(observed - predicted_value)
+        zinb_predictions = tuple(zinb_residuals)
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=zinb_predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    raise ExecutionError(
+      "predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model"
+    )
 
   def _execute_tobit(self, command: TobitCommand) -> TobitRegressionResult:
     if command.upper_limit is not None and command.lower_limit >= command.upper_limit:
@@ -1532,6 +1834,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1608,6 +1912,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1702,7 +2008,13 @@ class Executor:
       nbreg_regression = self.state.nbreg_regression
       if nbreg_regression is not None:
         return _estat_nbreg_gof_table(nbreg_regression.fitted_model)
-      raise ExecutionError("estat gof requires a prior poisson or nbreg model")
+      zip_regression = self.state.zip_regression
+      if zip_regression is not None:
+        return _estat_zip_gof_table(zip_regression.fitted_model)
+      zinb_regression = self.state.zinb_regression
+      if zinb_regression is not None:
+        return _estat_zinb_gof_table(zinb_regression.fitted_model)
+      raise ExecutionError("estat gof requires a prior poisson, nbreg, zip, or zinb model")
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -1804,6 +2116,8 @@ class Executor:
     self.state.nl_regression = None
     self.state.poisson_regression = None
     self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     return XtRegressionResult(
@@ -2181,6 +2495,59 @@ def _estat_nbreg_gof_table(fitted_model: object) -> TableResult:
     ("bic", _to_float(getattr(fitted_model, "bic", None))),
     ("lnalpha", _to_float(getattr(fitted_model, "lnalpha", None))),
     ("lnalpha_std_err", _to_float(getattr(fitted_model, "lnalpha_std_err", None))),
+    ("observation_count", _to_float(getattr(fitted_model, "nobs", None))),
+  )
+  return TableResult(headers=("Metric", "Value"), rows=rows)
+
+
+def _estat_zip_gof_table(fitted_model: object) -> TableResult:
+  try:
+    llf = _to_float(getattr(fitted_model, "llf", None))
+    llnull = _to_float(getattr(fitted_model, "llnull", None))
+    if llf is not None and llnull is not None and llnull != 0:
+      pseudo_r2 = 1.0 - (llf / llnull)
+    else:
+      pseudo_r2 = None
+    resid_pearson = np.array(getattr(fitted_model, "resid_pearson", ()), dtype=float)
+  except Exception as exc:
+    raise ExecutionError("estat gof failed for current model") from exc
+  if resid_pearson.ndim != 1:
+    raise ExecutionError("estat gof failed for current model")
+  pearson_chi2 = float(np.dot(resid_pearson, resid_pearson)) if resid_pearson.size > 0 else None
+  rows = (
+    ("log_likelihood", llf),
+    ("log_likelihood_null", llnull),
+    ("pseudo_r_squared", pseudo_r2),
+    ("pearson_chi2", pearson_chi2),
+    ("aic", _to_float(getattr(fitted_model, "aic", None))),
+    ("bic", _to_float(getattr(fitted_model, "bic", None))),
+    ("observation_count", _to_float(getattr(fitted_model, "nobs", None))),
+  )
+  return TableResult(headers=("Metric", "Value"), rows=rows)
+
+
+def _estat_zinb_gof_table(fitted_model: object) -> TableResult:
+  try:
+    llf = _to_float(getattr(fitted_model, "llf", None))
+    llnull = _to_float(getattr(fitted_model, "llnull", None))
+    if llf is not None and llnull is not None and llnull != 0:
+      pseudo_r2 = 1.0 - (llf / llnull)
+    else:
+      pseudo_r2 = None
+    resid_pearson = np.array(getattr(fitted_model, "resid_pearson", ()), dtype=float)
+  except Exception as exc:
+    raise ExecutionError("estat gof failed for current model") from exc
+  if resid_pearson.ndim != 1:
+    raise ExecutionError("estat gof failed for current model")
+  pearson_chi2 = float(np.dot(resid_pearson, resid_pearson)) if resid_pearson.size > 0 else None
+  rows = (
+    ("log_likelihood", llf),
+    ("log_likelihood_null", llnull),
+    ("pseudo_r_squared", pseudo_r2),
+    ("pearson_chi2", pearson_chi2),
+    ("aic", _to_float(getattr(fitted_model, "aic", None))),
+    ("bic", _to_float(getattr(fitted_model, "bic", None))),
+    ("lnalpha", _to_float(getattr(fitted_model, "lnalpha", None))),
     ("observation_count", _to_float(getattr(fitted_model, "nobs", None))),
   )
   return TableResult(headers=("Metric", "Value"), rows=rows)
@@ -2795,6 +3162,92 @@ def _data_frame(data: dict[str, object], id_name: str, time_name: str) -> Any:
   return frame.set_index([id_name, time_name])
 
 
+def _fitted_parameter_names(fitted_model: object) -> tuple[str, ...]:
+  raw_names = getattr(getattr(fitted_model, "model", None), "exog_names", None)
+  if isinstance(raw_names, list | tuple) and raw_names:
+    return tuple(str(name) for name in raw_names)
+  parameter_count = len(_parameter_vector(getattr(fitted_model, "params", None), "estimation"))
+  return tuple(f"param_{index}" for index in range(parameter_count))
+
+
+def _zero_inflated_row_columns(
+  *,
+  outcome: str,
+  predictors: tuple[str, ...],
+  inflate_predictors: tuple[str, ...],
+  cluster_variable: str | None,
+) -> tuple[str, ...]:
+  columns: list[str] = [outcome, *predictors, *inflate_predictors]
+  if cluster_variable is not None:
+    columns.append(cluster_variable)
+  return tuple(columns)
+
+
+def _zero_inflated_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  inflate_predictor_count: int,
+  has_cluster: bool,
+) -> tuple[
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[tuple[float, ...], ...],
+  tuple[object, ...] | None,
+  bool,
+]:
+  outcomes: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  inflation_predictors: list[tuple[float, ...]] = []
+  clusters: list[object] = []
+  missing_cluster_detected = False
+  row_width = 1 + predictor_count + inflate_predictor_count + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      continue
+    predictor_end = 1 + predictor_count
+    inflation_end = predictor_end + inflate_predictor_count
+    cluster_value = row[inflation_end] if has_cluster else None
+    if (
+      row[0] is None
+      or any(value is None for value in row[1:predictor_end])
+      or any(value is None for value in row[predictor_end:inflation_end])
+    ):
+      continue
+    if has_cluster and cluster_value is None:
+      missing_cluster_detected = True
+      continue
+    outcome = _coerce_float(row[0])
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw) for raw in row[1:predictor_end]) if value is not None
+    )
+    inflation_values = tuple(
+      value
+      for value in (_coerce_float(raw) for raw in row[predictor_end:inflation_end])
+      if value is not None
+    )
+    if outcome is None:
+      continue
+    if len(predictor_values) != predictor_count or len(inflation_values) != inflate_predictor_count:
+      continue
+    if not math.isfinite(outcome):
+      continue
+    if any(not math.isfinite(value) for value in (*predictor_values, *inflation_values)):
+      continue
+    outcomes.append(outcome)
+    predictors.append(predictor_values)
+    inflation_predictors.append(inflation_values)
+    if has_cluster:
+      clusters.append(cluster_value)
+  return (
+    tuple(outcomes),
+    tuple(predictors),
+    tuple(inflation_predictors),
+    tuple(clusters) if has_cluster else None,
+    missing_cluster_detected,
+  )
+
+
 def _binary_predictions(
   *,
   rows: tuple[tuple[object, ...], ...],
@@ -2932,6 +3385,75 @@ def _nbreg_predictions(
       try:
         linear = kind == "xb"
         predicted = np.array(cast(Any, fitted_model).predict(design, linear=linear), dtype=float)
+      except Exception as exc:
+        raise ExecutionError("predict failed") from exc
+    if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
+      raise ExecutionError("predict failed")
+    for row_index, value in zip(complete_indexes, predicted, strict=True):
+      float_value = float(value)
+      row_values[row_index] = float_value if math.isfinite(float_value) else None
+  return tuple(row_values)
+
+
+def _zero_inflated_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  inflation_rows: tuple[tuple[object, ...], ...],
+  fitted_model: object,
+  predictor_count: int,
+  inflate_predictor_count: int,
+  include_intercept: bool,
+  kind: Literal["xb", "mean"],
+) -> tuple[float | None, ...]:
+  if len(rows) != len(inflation_rows):
+    raise ExecutionError("predict failed")
+  row_values: list[float | None] = [None for _ in rows]
+  complete_indexes: list[int] = []
+  complete_predictors: list[tuple[float, ...]] = []
+  complete_inflation_predictors: list[tuple[float, ...]] = []
+  for row_index, (row, inflation_row) in enumerate(zip(rows, inflation_rows, strict=True)):
+    if len(row) != predictor_count or len(inflation_row) != inflate_predictor_count:
+      raise ExecutionError("predict failed")
+    if any(value is None for value in row) or any(value is None for value in inflation_row):
+      continue
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw_value) for raw_value in row) if value is not None
+    )
+    inflation_values = tuple(
+      value
+      for value in (_coerce_float(raw_value) for raw_value in inflation_row)
+      if value is not None
+    )
+    if len(predictor_values) != predictor_count or len(inflation_values) != inflate_predictor_count:
+      continue
+    if any(not math.isfinite(value) for value in (*predictor_values, *inflation_values)):
+      continue
+    complete_indexes.append(row_index)
+    complete_predictors.append(predictor_values)
+    complete_inflation_predictors.append(inflation_values)
+  if complete_predictors:
+    design = np.array(
+      _design_matrix(tuple(complete_predictors), include_intercept=include_intercept),
+      dtype=float,
+    )
+    inflate_design = np.array(
+      _design_matrix(tuple(complete_inflation_predictors), include_intercept=include_intercept),
+      dtype=float,
+    )
+    which = "linear" if kind == "xb" else "mean"
+    try:
+      model = cast(Any, fitted_model).model
+      params = cast(Any, fitted_model).params
+      predicted = np.array(
+        model.predict(params, exog=design, exog_infl=inflate_design, which=which),
+        dtype=float,
+      )
+    except Exception:
+      try:
+        predicted = np.array(
+          cast(Any, fitted_model).predict(exog=design, exog_infl=inflate_design, which=which),
+          dtype=float,
+        )
       except Exception as exc:
         raise ExecutionError("predict failed") from exc
     if predicted.ndim != 1 or len(predicted) != len(complete_indexes):

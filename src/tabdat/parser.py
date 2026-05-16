@@ -61,6 +61,8 @@ from tabdat.models import (
   UseCommand,
   XtDataCommand,
   XtRegCommand,
+  ZinbCommand,
+  ZipCommand,
 )
 from tabdat.monads import Err, Ok, Result, result, result_either
 
@@ -100,6 +102,8 @@ _EXECUTABLE_COMMANDS = {
   "nl",
   "poisson",
   "nbreg",
+  "zip",
+  "zinb",
   "predict",
   "estat",
   "ivregress",
@@ -354,6 +358,12 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "nbreg":
     return _parse_nbreg(parts)
+
+  if parts.name == "zip":
+    return _parse_zip(parts)
+
+  if parts.name == "zinb":
+    return _parse_zinb(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -1074,6 +1084,66 @@ def _parse_nbreg(parts: _CommandParts) -> NbregCommand:
   return NbregCommand(
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_zip(parts: _CommandParts) -> ZipCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("zip expects syntax: zip <y> <xvars>, inflate(<zvars>)")
+  if len(parts.arguments) < 2:
+    raise ParseError("zip expects syntax: zip <y> <xvars>, inflate(<zvars>)")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"inflate", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"zip unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "zip", {"robust", "noconstant"})
+  inflate_values = _single_tuple_option(parts.options, "inflate", "zip")
+  if inflate_values is None:
+    raise ParseError("zip option inflate expects one-or-more variables")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "zip")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("zip option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("zip cannot combine robust and cluster")
+  return ZipCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    inflate_predictors=inflate_values,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_zinb(parts: _CommandParts) -> ZinbCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("zinb expects syntax: zinb <y> <xvars>, inflate(<zvars>)")
+  if len(parts.arguments) < 2:
+    raise ParseError("zinb expects syntax: zinb <y> <xvars>, inflate(<zvars>)")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"inflate", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"zinb unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "zinb", {"robust", "noconstant"})
+  inflate_values = _single_tuple_option(parts.options, "inflate", "zinb")
+  if inflate_values is None:
+    raise ParseError("zinb option inflate expects one-or-more variables")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "zinb")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("zinb option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("zinb cannot combine robust and cluster")
+  return ZinbCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    inflate_predictors=inflate_values,
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,

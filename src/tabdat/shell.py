@@ -54,6 +54,8 @@ COMMAND_NAMES: tuple[str, ...] = (
   "nl",
   "poisson",
   "nbreg",
+  "zip",
+  "zinb",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -90,6 +92,8 @@ _COLUMN_COMMANDS = {
   "nl",
   "poisson",
   "nbreg",
+  "zip",
+  "zinb",
   "ivregress",
   "xtreg",
   "xtdata",
@@ -108,6 +112,8 @@ _HECKMAN_OPTIONS = ("selectdep(", "select(", "robust", "cluster(", "noconstant")
 _NL_OPTIONS = ("params(", "start(", "robust", "noconstant")
 _POISSON_OPTIONS = ("robust", "cluster(", "noconstant")
 _NBREG_OPTIONS = ("robust", "cluster(", "noconstant")
+_ZIP_OPTIONS = ("inflate(", "robust", "cluster(", "noconstant")
+_ZINB_OPTIONS = ("inflate(", "robust", "cluster(", "noconstant")
 _IVREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _XTREG_OPTIONS = ("fe", "re", "robust", "cluster(")
 _XTDATA_OPTIONS = ("within", "between")
@@ -202,6 +208,8 @@ class TabdatCompleter(Completer):
       "nl",
       "poisson",
       "nbreg",
+      "zip",
+      "zinb",
       "ivregress",
       "xtreg",
       "xtdata",
@@ -308,6 +316,10 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_POISSON_OPTIONS, word)
   if command_name == "nbreg":
     yield from _matching_completions(_NBREG_OPTIONS, word)
+  if command_name == "zip":
+    yield from _matching_completions(_ZIP_OPTIONS, word)
+  if command_name == "zinb":
+    yield from _matching_completions(_ZINB_OPTIONS, word)
   if command_name == "ivregress":
     yield from _matching_completions(_IVREGRESS_OPTIONS, word)
   if command_name == "xtreg":

@@ -8,6 +8,8 @@ def test_help_topics_are_discoverable() -> None:
   assert "describe" in topics
   assert "poisson" in topics
   assert "nbreg" in topics
+  assert "zip" in topics
+  assert "zinb" in topics
   assert "help" not in topics
 
 

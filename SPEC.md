@@ -291,33 +291,50 @@ and describe the active work with concise verification criteria.
   - deterministic `predict <newvar>[, xb residuals]` routing after `nbreg`
   - deterministic `estat gof` diagnostics after `nbreg`
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the third Phase 16 specialized likelihood-model slice:
+  - `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
+  - `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
+  - bounded zero-inflated count-model execution with deterministic nonrobust/robust/cluster
+    covariance labels
+  - deterministic `predict <newvar>[, xb residuals]` routing after `zip` and `zinb`
+  - deterministic `estat gof` diagnostics after `zip` and `zinb`
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
 - Feature: Phase 16 specialized likelihood models
   Status: Active
   Started: 2026-05-16
-  Branch: codex/tmp-phase16-slice2-nbreg-gof
+  Branch: codex/tmp-phase16-slice3-zip-zinb
 
   Summary:
-  Continue from completed Phase 15 nonlinear foundations with bounded first and second Phase 16
-  count-model slices (`poisson`, `nbreg`) plus deterministic post-estimation routing
-  (`predict ..., xb|residuals`) and `estat gof` before broader specialized-likelihood expansion.
+  Continue from completed Phase 15 nonlinear foundations with bounded first, second, and third
+  Phase 16 count-model slices (`poisson`, `nbreg`, `zip`, `zinb`) plus deterministic
+  post-estimation routing (`predict ..., xb|residuals`) and `estat gof` before
+  duration/survival expansion.
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
   - `poisson` parses and executes with nonrobust, robust, and clustered covariance modes
   - `nbreg` parses and executes with nonrobust, robust, and clustered covariance modes
+  - `zip` parses and executes with required `inflate(...)` plus nonrobust, robust, and clustered
+    covariance modes
+  - `zinb` parses and executes with required `inflate(...)` plus nonrobust, robust, and clustered
+    covariance modes
   - `predict ..., xb|residuals` executes after `poisson` with deterministic output
   - `predict ..., xb|residuals` executes after `nbreg` with deterministic output
+  - `predict ..., xb|residuals` executes after `zip` with deterministic output
+  - `predict ..., xb|residuals` executes after `zinb` with deterministic output
   - `estat gof` executes after `poisson` with deterministic table output
   - `estat gof` executes after `nbreg` with deterministic table output
+  - `estat gof` executes after `zip` with deterministic table output
+  - `estat gof` executes after `zinb` with deterministic table output
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
   Out of Scope:
-  - zero-inflated and hurdle model families
+  - hurdle and finite-mixture model families
 
 ## Future
 
@@ -346,8 +363,8 @@ and describe the active work with concise verification criteria.
   - add discrete-choice systems, count models, mixture/hurdle/zero-inflated models, and
     duration/survival models
   - remaining meaningful slice in this phase (one-sentence summary):
-    - add a bounded zero-inflated count-model workflow (parser, executor, predict/estat routing,
-      deterministic output/help/tests) before moving to duration/survival coverage
+    - add a bounded duration/survival workflow (parser, executor, deterministic output/help/tests)
+      before mixture/hurdle expansion
   - library strategy:
     - approach (1): `statsmodels` for multinomial/count/zero-inflated families and `lifelines` for
       duration/survival workflows

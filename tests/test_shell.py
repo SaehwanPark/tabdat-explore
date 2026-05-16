@@ -211,6 +211,12 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     nbreg_command = _completion_texts(completer, "nbr")
     nbreg_columns = _completion_texts(completer, "nbreg c")
     nbreg_options = _completion_texts(completer, "nbreg cost age, ")
+    zip_command = _completion_texts(completer, "zi")
+    zip_columns = _completion_texts(completer, "zip c")
+    zip_options = _completion_texts(completer, "zip cost age, ")
+    zinb_command = _completion_texts(completer, "zin")
+    zinb_columns = _completion_texts(completer, "zinb c")
+    zinb_options = _completion_texts(completer, "zinb cost age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -258,6 +264,12 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert nbreg_command == ["nbreg"]
   assert nbreg_columns == ["cost"]
   assert nbreg_options == ["robust", "cluster(", "noconstant"]
+  assert zip_command == ["zip", "zinb"]
+  assert zip_columns == ["cost"]
+  assert zip_options == ["inflate(", "robust", "cluster(", "noconstant"]
+  assert zinb_command == ["zinb"]
+  assert zinb_columns == ["cost"]
+  assert zinb_options == ["inflate(", "robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]
