@@ -27,6 +27,7 @@ from tabdat.models import (
   GenerateCommand,
   HeadCommand,
   HeckmanCommand,
+  HelpCommand,
   HistogramCommand,
   IdentifierExpression,
   IvRegressCommand,
@@ -142,8 +143,13 @@ def parse_command(text: str) -> Command:
   if not stripped:
     raise ParseError("empty command")
 
+  if stripped.startswith("?"):
+    return _parse_help(stripped[1:].strip())
+
   command_name = stripped.split(maxsplit=1)[0].lower()
 
+  if command_name == "help":
+    return _parse_help(stripped[4:].strip())
   if command_name == "use":
     return _parse_use(stripped)
   if command_name == "by":
@@ -154,6 +160,15 @@ def parse_command(text: str) -> Command:
     return _parse_run(stripped)
 
   return _parse_structured_command(stripped)
+
+
+def _parse_help(body: str) -> HelpCommand:
+  if not body:
+    return HelpCommand()
+  parts = body.split()
+  if len(parts) != 1:
+    raise ParseError("help expects at most one command name: help <command>")
+  return HelpCommand(topic=parts[0].lower())
 
 
 def _parse_structured_command(text: str) -> Command:
@@ -452,6 +467,8 @@ def _parse_by(text: str) -> ByCommand:
   command = parse_command(after.strip())
   if isinstance(command, ByCommand):
     raise ParseError("nested by commands are not supported")
+  if isinstance(command, HelpCommand):
+    raise ParseError("help is not supported inside by commands")
   return ByCommand(groups=groups, command=command)
 
 

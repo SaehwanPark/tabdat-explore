@@ -224,6 +224,11 @@ class RunCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class HelpCommand:
+  topic: str | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SetCommand:
   name: Literal["graph_format", "artifact_dir", "graph_open"]
   value: str
@@ -389,6 +394,7 @@ Command = (
   | ByCommand
   | ExitCommand
   | RunCommand
+  | HelpCommand
   | SetCommand
   | SaveCommand
   | ExportCommand

@@ -1646,3 +1646,85 @@ def test_cli_prints_phase_2_parse_errors(capsys) -> None:
   assert exit_code == 1
   assert captured.out == ""
   assert "Error: missing expression after if" in captured.err
+
+
+@pytest.mark.parametrize("command_text", ["help summarize", "? summarize"])
+def test_cli_prints_in_app_help_for_explicit_topic(command_text: str, capsys) -> None:
+  exit_code = main(["-c", command_text])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "How to invoke" in captured.out
+  assert "Examples" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_rejects_bare_help_outside_interactive_shell(capsys) -> None:
+  exit_code = main(["-c", "help"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert captured.out == ""
+  assert "help requires a command name outside the interactive shell" in captured.err
+
+
+def test_cli_shell_prompts_for_help_topic_then_prints_help(monkeypatch, capsys) -> None:
+  class HelpSession:
+    def __init__(self) -> None:
+      self.calls = 0
+
+    def prompt(self, prompt_text: str) -> str:
+      self.calls += 1
+      if self.calls == 1:
+        return "help"
+      if self.calls == 2:
+        return "1"
+      raise EOFError
+
+  session = HelpSession()
+  executor = Executor()
+  try:
+    monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: session)
+    exit_code = _run_shell(executor)
+  finally:
+    executor.close()
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert session.calls == 3
+  assert "Available help topics:" in captured.out
+  assert "How to invoke" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_shell_cancels_bare_help_without_printing_topic(monkeypatch, capsys) -> None:
+  class CancelHelpSession:
+    def __init__(self) -> None:
+      self.calls = 0
+
+    def prompt(self, prompt_text: str) -> str:
+      self.calls += 1
+      if self.calls == 1:
+        return "help"
+      if self.calls == 2:
+        return ""
+      raise EOFError
+
+  session = CancelHelpSession()
+  executor = Executor()
+  try:
+    monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: session)
+    exit_code = _run_shell(executor)
+  finally:
+    executor.close()
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert session.calls == 3
+  assert "Available help topics:" in captured.out
+  assert "How to invoke" not in captured.out
+  assert captured.err == ""

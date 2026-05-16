@@ -9,16 +9,19 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from enum import Enum, auto
 from pathlib import Path
+from typing import Any, Protocol
 
 from tabdat import __version__
 from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_result
+from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
   BarCommand,
   Command,
   ExitCommand,
+  HelpCommand,
   HistogramCommand,
   PlotResult,
   Result,
@@ -48,6 +51,11 @@ class _RunStatus(Enum):
   CONTINUE = auto()
   STOP = auto()
   ERROR = auto()
+
+
+class _PromptSession(Protocol):
+  def prompt(self, *args: Any, **kwargs: Any) -> str:
+    ...
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -87,6 +95,7 @@ def _run_commands(commands: Sequence[str], executor: Executor) -> int:
       command_text,
       executor,
       open_plots=False,
+      help_chooser=None,
       run_script=lambda path: _run_script_status(
         path,
         executor,
@@ -120,6 +129,7 @@ def _run_shell(executor: Executor) -> int:
       executor,
       open_plots=executor.state.config.graph_open,
       command_rewriter=_prepare_interactive_command,
+      help_chooser=lambda topics: _prompt_for_help_topic(session, topics),
       run_script=lambda path: _run_script_status(
         path,
         executor,
@@ -138,6 +148,7 @@ def _run_one(
   *,
   open_plots: bool,
   command_rewriter: Callable[[Command, Executor], Command] | None = None,
+  help_chooser: Callable[[tuple[str, ...]], str | None] | None = None,
   opener: Callable[[PlotResult], None] | None = None,
   run_script: Callable[[Path], _RunStatus] | None = None,
 ) -> _RunStatus:
@@ -146,6 +157,7 @@ def _run_one(
       command_text,
       executor,
       command_rewriter=command_rewriter,
+      help_chooser=help_chooser,
       run_script=run_script,
     )
   except TabDatError as exc:
@@ -165,11 +177,22 @@ def _execute_one(
   executor: Executor,
   *,
   command_rewriter: Callable[[Command, Executor], Command] | None,
+  help_chooser: Callable[[tuple[str, ...]], str | None] | None,
   run_script: Callable[[Path], _RunStatus] | None,
 ) -> tuple[_RunStatus, Result | None]:
   command = parse_command(command_text)
   if command_rewriter is not None:
     command = command_rewriter(command, executor)
+  if isinstance(command, HelpCommand):
+    topic = command.topic
+    if topic is None:
+      if help_chooser is None:
+        raise TabDatError("help requires a command name outside the interactive shell")
+      topic = help_chooser(available_help_topics())
+      if topic is None:
+        return _RunStatus.CONTINUE, None
+    _print_help_topic(topic)
+    return _RunStatus.CONTINUE, None
   if isinstance(command, ExitCommand):
     return _RunStatus.STOP, None
   if isinstance(command, RunCommand):
@@ -177,6 +200,54 @@ def _execute_one(
       raise TabDatError("run is only available from the CLI")
     return run_script(command.path), None
   return _RunStatus.CONTINUE, executor.execute(command)
+
+
+def _prompt_for_help_topic(session: _PromptSession, topics: tuple[str, ...]) -> str | None:
+  if not topics:
+    print("Error: no help topics are available", file=sys.stderr)
+    return None
+
+  print("Available help topics:")
+  for index, topic in enumerate(topics, start=1):
+    print(f"  {index}. {topic}")
+
+  while True:
+    try:
+      choice = session.prompt("help> ")
+    except KeyboardInterrupt:
+      print()
+      return None
+    except EOFError:
+      print()
+      return None
+
+    selected = _resolve_help_topic_choice(choice, topics)
+    if selected is not None:
+      return selected
+    if not choice.strip():
+      return None
+    print(f"Error: unknown help topic: {choice}", file=sys.stderr)
+
+
+def _resolve_help_topic_choice(choice: str, topics: tuple[str, ...]) -> str | None:
+  stripped = choice.strip().lower()
+  if not stripped:
+    return None
+  if stripped.isdigit():
+    index = int(stripped)
+    if 1 <= index <= len(topics):
+      return topics[index - 1]
+    return None
+  if stripped in topics:
+    return stripped
+  return None
+
+
+def _print_help_topic(topic: str) -> None:
+  try:
+    print(load_help_topic(topic))
+  except KeyError as exc:
+    raise TabDatError(f"unknown help topic: {topic}") from exc
 
 
 def _prepare_interactive_command(command: Command, executor: Executor) -> Command:
@@ -321,6 +392,7 @@ def _run_script_status(
         expanded_text,
         executor,
         command_rewriter=None,
+        help_chooser=None,
         run_script=run_nested,
       )
       if result is not None:
