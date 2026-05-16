@@ -760,6 +760,110 @@ def test_cli_runs_phase_16_nbreg_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_16_zip_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "zip.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 1.0, 'a'),
+        (0, 20.0, 1.0, 2.0, 'a'),
+        (1, 25.0, 2.0, 1.0, 'b'),
+        (0, 28.0, 2.0, 2.0, 'b'),
+        (2, 31.0, 3.0, 1.0, 'c'),
+        (0, 35.0, 3.0, 2.0, 'c'),
+        (3, 40.0, 4.0, 1.0, 'd'),
+        (1, 45.0, 4.0, 2.0, 'd')
+    ) as zip_data(y, x, z, zi, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "zip y x z, inflate(zi)",
+      "-c",
+      "zip y x z, inflate(zi) robust",
+      "-c",
+      "zip y x z, inflate(zi) cluster(cluster_id)",
+      "-c",
+      "predict xb_hat, xb",
+      "-c",
+      "predict u_hat, residuals",
+      "-c",
+      "estat gof",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: zip y on x z" in captured.out
+  assert "Estimator: zip" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Predicted xb_hat: 8 rows, 6 columns" in captured.out
+  assert "Predicted u_hat: 8 rows, 7 columns" in captured.out
+  assert "log_likelihood" in captured.out
+  assert "pearson_chi2" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_16_zinb_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "zinb.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0, 18.0, 1.0, 1.0, 'a'),
+        (0, 20.0, 1.0, 2.0, 'a'),
+        (1, 25.0, 2.0, 1.0, 'b'),
+        (0, 28.0, 2.0, 2.0, 'b'),
+        (2, 31.0, 3.0, 1.0, 'c'),
+        (0, 35.0, 3.0, 2.0, 'c'),
+        (3, 40.0, 4.0, 1.0, 'd'),
+        (1, 45.0, 4.0, 2.0, 'd')
+    ) as zinb_data(y, x, z, zi, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "zinb y x z, inflate(zi)",
+      "-c",
+      "zinb y x z, inflate(zi) robust",
+      "-c",
+      "zinb y x z, inflate(zi) cluster(cluster_id)",
+      "-c",
+      "predict xb_hat, xb",
+      "-c",
+      "predict u_hat, residuals",
+      "-c",
+      "estat gof",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: zinb y on x z" in captured.out
+  assert "Estimator: zinb" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert "Predicted xb_hat: 8 rows, 6 columns" in captured.out
+  assert "Predicted u_hat: 8 rows, 7 columns" in captured.out
+  assert "log_likelihood" in captured.out
+  assert "lnalpha" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(
@@ -818,7 +922,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, cfregress, nl, poisson, or nbreg model"
+    "Error: predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model"
     in captured.err
   )
 

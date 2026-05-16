@@ -55,6 +55,8 @@ from tabdat.models import (
   UseCommand,
   XtDataCommand,
   XtRegCommand,
+  ZinbCommand,
+  ZipCommand,
 )
 from tabdat.parser import parse_command, parse_expression
 
@@ -567,6 +569,58 @@ def test_parse_phase_16_nbreg_command() -> None:
   )
 
 
+def test_parse_phase_16_zip_command() -> None:
+  assert parse_command("zip outcome x1 x2, inflate(z1 z2)") == ZipCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+    inflate_predictors=("z1", "z2"),
+  )
+  assert parse_command("zip outcome x1, inflate(z1) robust") == ZipCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    robust=True,
+  )
+  assert parse_command("zip outcome x1, inflate(z1) cluster(group_id)") == ZipCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("zip outcome x1, inflate(z1) noconstant") == ZipCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_16_zinb_command() -> None:
+  assert parse_command("zinb outcome x1 x2, inflate(z1 z2)") == ZinbCommand(
+    outcome="outcome",
+    predictors=("x1", "x2"),
+    inflate_predictors=("z1", "z2"),
+  )
+  assert parse_command("zinb outcome x1, inflate(z1) robust") == ZinbCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    robust=True,
+  )
+  assert parse_command("zinb outcome x1, inflate(z1) cluster(group_id)") == ZinbCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    cluster_variable="group_id",
+  )
+  assert parse_command("zinb outcome x1, inflate(z1) noconstant") == ZinbCommand(
+    outcome="outcome",
+    predictors=("x1",),
+    inflate_predictors=("z1",),
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -935,6 +989,24 @@ def test_parse_exit_aliases() -> None:
     "nbreg y x, cluster()",
     "nbreg y x, cluster(group firm)",
     "nbreg y x, robust=true",
+    "zip",
+    "zip y",
+    "zip y x",
+    "zip y x if y > 0, inflate(z)",
+    "zip y x, inflate()",
+    "zip y x, robust cluster(group) inflate(z)",
+    "zip y x, cluster() inflate(z)",
+    "zip y x, cluster(group firm) inflate(z)",
+    "zip y x, robust=true inflate(z)",
+    "zinb",
+    "zinb y",
+    "zinb y x",
+    "zinb y x if y > 0, inflate(z)",
+    "zinb y x, inflate()",
+    "zinb y x, robust cluster(group) inflate(z)",
+    "zinb y x, cluster() inflate(z)",
+    "zinb y x, cluster(group firm) inflate(z)",
+    "zinb y x, robust=true inflate(z)",
     "estat",
     "estat vif extra",
     "estat, vif",
