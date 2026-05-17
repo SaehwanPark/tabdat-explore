@@ -2,7 +2,7 @@
 
 import hashlib
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Literal, SupportsFloat, cast
@@ -1849,23 +1849,21 @@ class Executor:
     if command.cluster_variable is not None and (groups is None or missing_cluster_detected):
       raise ExecutionError("streg requires complete cluster values")
     try:
-      coefficients = _fit_streg_parametric(
+      covariance, coefficients = _fit_streg_parametric(
         times=times,
         failures=failures,
         predictors=predictors,
         predictor_names=command.predictors,
         include_intercept=command.include_intercept,
         distribution=command.distribution,
+        robust=command.robust,
+        cluster_values=groups,
+        cluster_variable=command.cluster_variable,
       )
     except ExecutionError:
       raise
     except Exception as exc:
       raise ExecutionError("streg failed") from exc
-    covariance = "nonrobust"
-    if command.robust:
-      covariance = "robust"
-    if command.cluster_variable is not None:
-      covariance = f"cluster({command.cluster_variable})"
     self.state.regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
@@ -3713,6 +3711,7 @@ def _fit_tobit_with_r(
       lower_limit=lower_limit,
       upper_limit=upper_limit,
       robust=robust,
+      cluster_values=cluster_values,
       cluster_variable=cluster_variable,
     )
   try:
@@ -3726,6 +3725,7 @@ def _fit_tobit_with_r(
         lower_limit=lower_limit,
         upper_limit=upper_limit,
         robust=robust,
+        cluster_values=cluster_values,
         cluster_variable=cluster_variable,
       )
     survival = packages.importr("survival")
@@ -3833,6 +3833,7 @@ def _fit_tobit_with_r(
         lower_limit=lower_limit,
         upper_limit=upper_limit,
         robust=robust,
+        cluster_values=cluster_values,
         cluster_variable=cluster_variable,
       )
     except ExecutionError:
@@ -3848,12 +3849,13 @@ def _fit_tobit_parametric(
   lower_limit: float,
   upper_limit: float | None,
   robust: bool,
+  cluster_values: tuple[object, ...] | None,
   cluster_variable: str | None,
 ) -> tuple[str, tuple[CoefficientEstimate, ...]]:
   design = np.array(_design_matrix(predictors, include_intercept=include_intercept), dtype=float)
   outcome_array = np.array(outcomes, dtype=float)
 
-  def objective(params: np.ndarray) -> float:
+  def observation_log_likelihood(params: np.ndarray) -> np.ndarray:
     beta = params[:-1]
     log_sigma = params[-1]
     sigma = math.exp(float(np.clip(log_sigma, -10.0, 10.0)))
@@ -3877,7 +3879,10 @@ def _fit_tobit_parametric(
       assert upper_limit is not None
       right_z = (upper_limit - mu[right_mask]) / sigma
       log_likelihood[right_mask] = np.log(np.maximum(1.0 - norm.cdf(right_z), 1e-12))
-    return float(-np.sum(log_likelihood))
+    return log_likelihood
+
+  def objective(params: np.ndarray) -> float:
+    return float(-np.sum(observation_log_likelihood(params)))
 
   initial = np.zeros(design.shape[1] + 1, dtype=float)
   result = minimize(objective, initial, method="BFGS")
@@ -3885,11 +3890,15 @@ def _fit_tobit_parametric(
     result = minimize(objective, initial, method="L-BFGS-B")
   if not result.success:
     raise ExecutionError("tobit failed")
-  hess_inv = result.hess_inv
-  if hasattr(hess_inv, "todense"):
-    cov = np.array(hess_inv.todense(), dtype=float)
-  else:
-    cov = np.array(hess_inv, dtype=float)
+  hess_inv = _inverse_hessian_matrix(result.hess_inv)
+  cov = hess_inv
+  if robust or cluster_values is not None:
+    cov = _sandwich_covariance(
+      params=np.array(result.x, dtype=float),
+      observation_log_likelihood=observation_log_likelihood,
+      inverse_hessian=hess_inv,
+      cluster_values=cluster_values,
+    )
   beta = np.array(result.x[:-1], dtype=float)
   se = np.sqrt(np.maximum(np.diag(cov[: design.shape[1], : design.shape[1]]), 0.0))
   names = ("intercept", *predictor_names) if include_intercept else predictor_names
@@ -3922,9 +3931,59 @@ def _fit_tobit_parametric(
   covariance = "nonrobust"
   if robust:
     covariance = "robust"
-  if cluster_variable is not None:
+  if cluster_values is not None and cluster_variable is not None:
     covariance = f"cluster({cluster_variable})"
   return covariance, tuple(coefficients)
+
+
+def _inverse_hessian_matrix(hess_inv: object) -> np.ndarray:
+  if hasattr(hess_inv, "todense"):
+    return np.array(cast(Any, hess_inv).todense(), dtype=float)
+  return np.array(cast(Any, hess_inv), dtype=float)
+
+
+def _sandwich_covariance(
+  *,
+  params: np.ndarray,
+  observation_log_likelihood: Callable[[np.ndarray], np.ndarray],
+  inverse_hessian: np.ndarray,
+  cluster_values: tuple[object, ...] | None,
+) -> np.ndarray:
+  score = _score_matrix(params=params, observation_log_likelihood=observation_log_likelihood)
+  if cluster_values is None:
+    meat = score.T @ score
+  else:
+    if len(cluster_values) != score.shape[0]:
+      raise ExecutionError("model failed")
+    grouped_scores: dict[str, np.ndarray] = {}
+    for index, group_value in enumerate(cluster_values):
+      key = str(group_value)
+      current = grouped_scores.get(key)
+      if current is None:
+        grouped_scores[key] = score[index].copy()
+      else:
+        grouped_scores[key] = current + score[index]
+    grouped = np.vstack(tuple(grouped_scores.values()))
+    meat = grouped.T @ grouped
+  return np.asarray(inverse_hessian @ meat @ inverse_hessian, dtype=float)
+
+
+def _score_matrix(
+  *,
+  params: np.ndarray,
+  observation_log_likelihood: Callable[[np.ndarray], np.ndarray],
+  epsilon: float = 1e-6,
+) -> np.ndarray:
+  score_columns: list[np.ndarray] = []
+  for param_index in range(len(params)):
+    forward = np.array(params, copy=True)
+    backward = np.array(params, copy=True)
+    forward[param_index] += epsilon
+    backward[param_index] -= epsilon
+    forward_ll = observation_log_likelihood(forward)
+    backward_ll = observation_log_likelihood(backward)
+    score_columns.append((forward_ll - backward_ll) / (2.0 * epsilon))
+  return np.asarray(np.column_stack(score_columns), dtype=float)
 
 
 def _fit_streg_parametric(
@@ -3935,24 +3994,32 @@ def _fit_streg_parametric(
   predictor_names: tuple[str, ...],
   include_intercept: bool,
   distribution: Literal["weibull", "exponential"],
-) -> tuple[CoefficientEstimate, ...]:
+  robust: bool,
+  cluster_values: tuple[object, ...] | None,
+  cluster_variable: str | None,
+) -> tuple[str, tuple[CoefficientEstimate, ...]]:
   design = np.array(_design_matrix(predictors, include_intercept=include_intercept), dtype=float)
   time_array = np.array(times, dtype=float)
   failure_array = np.array(failures, dtype=float)
 
-  def objective(params: np.ndarray) -> float:
+  def observation_log_likelihood(params: np.ndarray) -> np.ndarray:
     linear = design @ params[: design.shape[1]]
     rate = np.exp(np.clip(linear, -30.0, 30.0))
     if distribution == "exponential":
       log_likelihood = failure_array * np.log(np.maximum(rate, 1e-12)) - (rate * time_array)
-      return float(-np.sum(log_likelihood))
+      return np.asarray(log_likelihood, dtype=float)
     log_shape = params[-1]
     shape = math.exp(float(np.clip(log_shape, -10.0, 10.0)))
     log_time = np.log(np.maximum(time_array, 1e-12))
-    log_likelihood = failure_array * (
-      math.log(shape) + np.log(np.maximum(rate, 1e-12)) + ((shape - 1.0) * log_time)
-    ) - (rate * np.power(time_array, shape))
-    return float(-np.sum(log_likelihood))
+    return np.asarray(
+      failure_array
+      * (math.log(shape) + np.log(np.maximum(rate, 1e-12)) + ((shape - 1.0) * log_time))
+      - (rate * np.power(time_array, shape)),
+      dtype=float,
+    )
+
+  def objective(params: np.ndarray) -> float:
+    return float(-np.sum(observation_log_likelihood(params)))
 
   initial = np.zeros(design.shape[1] + (0 if distribution == "exponential" else 1), dtype=float)
   result = minimize(objective, initial, method="BFGS")
@@ -3965,11 +4032,15 @@ def _fit_streg_parametric(
     coefficient_values = fitted
   else:
     coefficient_values = fitted[: design.shape[1]]
-  hess_inv = result.hess_inv
-  if hasattr(hess_inv, "todense"):
-    cov = np.array(hess_inv.todense(), dtype=float)
-  else:
-    cov = np.array(hess_inv, dtype=float)
+  hess_inv = _inverse_hessian_matrix(result.hess_inv)
+  cov = hess_inv
+  if robust or cluster_values is not None:
+    cov = _sandwich_covariance(
+      params=np.array(result.x, dtype=float),
+      observation_log_likelihood=observation_log_likelihood,
+      inverse_hessian=hess_inv,
+      cluster_values=cluster_values,
+    )
   coefficient_cov = cov[: design.shape[1], : design.shape[1]]
   standard_errors = np.sqrt(np.maximum(np.diag(coefficient_cov), 0.0))
   estimates: list[CoefficientEstimate] = []
@@ -4001,7 +4072,12 @@ def _fit_streg_parametric(
         p_value=p_value,
       )
     )
-  return tuple(estimates)
+  covariance = "nonrobust"
+  if robust:
+    covariance = "robust"
+  if cluster_values is not None and cluster_variable is not None:
+    covariance = f"cluster({cluster_variable})"
+  return covariance, tuple(estimates)
 
 
 def _unique_internal_name(base: str, taken_names: set[str]) -> str:

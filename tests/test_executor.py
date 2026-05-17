@@ -1319,6 +1319,14 @@ def test_phase_16_streg_supports_covariance_modes(tmp_path: Path) -> None:
   executor = Executor()
   try:
     executor.execute(UseCommand(path))
+    baseline = executor.execute(
+      StregCommand(
+        time_variable="time",
+        predictors=("age",),
+        failure_variable="died",
+        distribution="exponential",
+      )
+    )
     robust = executor.execute(
       StregCommand(
         time_variable="time",
@@ -1340,10 +1348,13 @@ def test_phase_16_streg_supports_covariance_modes(tmp_path: Path) -> None:
   finally:
     executor.close()
 
+  assert isinstance(baseline, StregRegressionResult)
   assert isinstance(robust, StregRegressionResult)
   assert robust.covariance == "robust"
   assert isinstance(clustered, StregRegressionResult)
   assert clustered.covariance == "cluster(cluster_id)"
+  assert robust.coefficients[0].standard_error != baseline.coefficients[0].standard_error
+  assert clustered.coefficients[0].standard_error != baseline.coefficients[0].standard_error
 
 
 def test_phase_16_streg_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
