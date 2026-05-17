@@ -11,6 +11,7 @@ def test_help_topics_are_discoverable() -> None:
   assert "zip" in topics
   assert "zinb" in topics
   assert "streg" in topics
+  assert "qreg" in topics
   assert "help" not in topics
 
 

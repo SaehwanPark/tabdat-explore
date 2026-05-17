@@ -258,6 +258,15 @@ class RegressCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class QregCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  quantile: float = 0.5
+  robust: bool = False
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class LogitCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -456,6 +465,7 @@ Command = (
   | SaveCommand
   | ExportCommand
   | RegressCommand
+  | QregCommand
   | LogitCommand
   | ProbitCommand
   | TobitCommand
@@ -589,6 +599,18 @@ class RegressionResult:
   r_squared: float | None
   adjusted_r_squared: float | None
   root_mse: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class QregRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  quantile: float
+  observation_count: int
+  include_intercept: bool
+  pseudo_r_squared: float | None
   coefficients: tuple[CoefficientEstimate, ...]
 
 
@@ -801,6 +823,7 @@ Result = (
   | PreviewResult
   | TransformResult
   | RegressionResult
+  | QregRegressionResult
   | LogitRegressionResult
   | ProbitRegressionResult
   | TobitRegressionResult

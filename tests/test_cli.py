@@ -352,6 +352,53 @@ def test_cli_runs_phase_13_regress_and_predict_flow(sample_parquet: Path, capsys
   assert captured.err == ""
 
 
+def test_cli_runs_phase_17_qreg_predict_and_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "qreg.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 'a'),
+        (2.0, 14.0, 'a'),
+        (3.0, 16.5, 'b'),
+        (4.0, 19.0, 'b'),
+        (5.0, 21.0, 'c'),
+        (6.0, 23.5, 'c')
+    ) as qreg_data(x, y, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "qreg y x, quantile(0.25)",
+      "-c",
+      "qreg y x, robust",
+      "-c",
+      "predict qhat",
+      "-c",
+      "predict qresid, residuals",
+      "-c",
+      "estat residuals",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: qreg y on x" in captured.out
+  assert "Estimator: qreg" in captured.out
+  assert "Quantile: 0.25" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Predicted qhat: 6 rows, 4 columns" in captured.out
+  assert "Predicted qresid: 6 rows, 5 columns" in captured.out
+  assert "studentized_std_dev" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_15_logit_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "logit.parquet"
   _write_sql_parquet(
@@ -966,8 +1013,8 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model"
-    in captured.err
+    "Error: predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, "
+    "or zinb model" in captured.err
   )
 
 

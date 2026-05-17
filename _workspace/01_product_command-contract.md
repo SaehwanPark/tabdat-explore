@@ -1,77 +1,61 @@
-# Phase 16 Slice 3 Command Contract
+# Phase 17 Slice 1 Command Contract
 
 ## Roadmap Phase
 
-- Phase 16 specialized likelihood models
-  - Slice 3: bounded zero-inflated count-model semantics with deterministic post-estimation support
+- Phase 17 advanced empirical methods
+  - Slice 1: bounded quantile-regression semantics (`qreg`) with deterministic post-estimation
+    support
 
-## `zip`
-
-### Syntax
-
-```stata
-zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]
-```
-
-## `zinb`
+## `qreg`
 
 ### Syntax
 
 ```stata
-zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]
+qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]
 ```
 
 ### Rules
 
 - Requires one active dataset.
-- Requires one outcome variable, one-or-more count predictors, and one-or-more inflation predictors.
-- Requires numeric outcome, count predictors, and inflation predictors.
-- Outcome must be non-negative on complete observations.
+- Requires one outcome variable and one-or-more predictor variables.
+- Requires numeric outcome and predictors.
 - Supports covariance modes:
   - nonrobust (default)
   - robust
-  - clustered via `cluster(<var>)`
-- `robust` and `cluster(...)` cannot be combined.
+- `quantile(...)` must be strictly between 0 and 1.
+- `noconstant` removes the intercept term.
 
 ## Post-estimation behavior
 
-- `predict <newvar>[, xb residuals]` is supported after successful `zip`.
-- `predict <newvar>[, xb residuals]` is supported after successful `zinb`.
-- `estat gof` is supported after successful `zip` or `zinb`.
-- Existing `predict ..., pr` remains binary-choice-only.
+- `predict <newvar>[, xb residuals]` is supported after successful `qreg`.
+- `predict ..., pr` remains binary-choice-only.
+- `estat residuals` is supported after successful `qreg`.
+- `estat ovtest` and `estat vif` remain regress-only diagnostics.
 
 ## Error/guard behavior
 
 - No active dataset:
-  - `zip requires an active dataset; run use <path> first`
-  - `zinb requires an active dataset; run use <path> first`
+  - `qreg requires an active dataset; run use <path> first`
 - Missing variables/non-numeric variables:
   - existing unknown-variable and numeric-type errors
 - Empty complete-observation sample:
-  - `zip requires at least one complete observation`
-  - `zinb requires at least one complete observation`
-- Cluster mode with missing cluster values:
-  - `zip requires complete cluster values`
-  - `zinb requires complete cluster values`
-- Negative outcomes:
-  - `zip outcome must be non-negative`
-  - `zinb outcome must be non-negative`
+  - `qreg requires at least one complete observation`
+- Quantile range violations:
+  - `qreg option quantile must be between 0 and 1`
 - Fit failures:
-  - `zip failed`
-  - `zinb failed`
-- `estat gof` without prior ZIP/ZINB/Poisson/NB model:
-  - `estat gof requires a prior poisson, nbreg, zip, or zinb model`
+  - `qreg failed`
+- `estat residuals` without prior regress/qreg:
+  - `estat residuals requires a prior regress or qreg model`
 
 ## State behavior
 
-- Running `zip` or `zinb` clears incompatible prior estimation-family state.
-- Existing `estat` and `predict` boundaries for other families remain unchanged.
+- Running `qreg` clears incompatible prior estimation-family state.
+- Existing `predict` and `estat` boundaries for other families remain unchanged.
 
 ## Acceptance Criteria
 
-- `zip` and `zinb` parse and execute with required `inflate(...)` arguments and supported covariance
-  modes.
-- deterministic typed and formatted output includes coefficient rows and log-likelihood summary.
-- `predict` supports `xb` and `residuals` after `zip` and `zinb`.
-- `estat gof` returns deterministic GOF rows after `zip` and `zinb`.
+- `qreg` parses and executes with supported options and strict quantile validation.
+- deterministic typed and formatted output includes quantile metadata and coefficient rows.
+- `predict` supports `xb` and `residuals` after `qreg`.
+- `estat residuals` returns deterministic residual summary rows after `qreg`.
 - focused parser/executor/CLI/shell/help coverage passes.

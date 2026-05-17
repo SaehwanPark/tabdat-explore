@@ -37,6 +37,7 @@ from tabdat.models import (
   PoissonCommand,
   PredictCommand,
   ProbitCommand,
+  QregCommand,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -374,6 +375,28 @@ def test_parse_phase_13_regress_command() -> None:
     estimator="gls",
     weight_variable="sigma",
     robust=True,
+  )
+
+
+def test_parse_phase_17_qreg_command() -> None:
+  assert parse_command("qreg cost age bmi") == QregCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("qreg cost age, quantile(0.25)") == QregCommand(
+    outcome="cost",
+    predictors=("age",),
+    quantile=0.25,
+  )
+  assert parse_command("qreg cost age, robust") == QregCommand(
+    outcome="cost",
+    predictors=("age",),
+    robust=True,
+  )
+  assert parse_command("qreg cost age, noconstant") == QregCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
   )
 
 
@@ -1009,6 +1032,15 @@ def test_parse_exit_aliases() -> None:
     "poisson y x, cluster()",
     "poisson y x, cluster(group firm)",
     "poisson y x, robust=true",
+    "qreg",
+    "qreg y",
+    "qreg y x if y > 0",
+    "qreg y x, cluster(group)",
+    "qreg y x, quantile()",
+    "qreg y x, quantile(0)",
+    "qreg y x, quantile(1)",
+    "qreg y x, quantile(1.2)",
+    "qreg y x, robust=true",
     "nbreg",
     "nbreg y",
     "nbreg y x if y > 0",
