@@ -313,19 +313,25 @@ and describe the active work with concise verification criteria.
   - deterministic `estat residuals` diagnostics after `qreg` while preserving `ovtest`/`vif`
     as regress-only diagnostics
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the second Phase 17 advanced empirical-methods slice:
+  - `did <y> [controls], treat(<var>) post(<var>) [robust]` with required prior
+    `panel <id_var> <time_var>`
+  - bounded two-way fixed-effects execution through `linearmodels.PanelOLS` with deterministic
+    nonrobust/robust covariance labels
+  - deterministic `predict <newvar>[, xb]` routing after `did`
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
 - Feature: Phase 17 advanced empirical methods
   Status: Active
   Started: 2026-05-17
-  Branch: codex/tmp-phase17-slice1-qreg-predict-estat-residuals
+  Branch: codex/tmp-phase17-slice2-did-predict-xb
 
   Summary:
-  Continue from completed Phase 16 specialized-likelihood foundations with a bounded first
-  Phase 17 slice: quantile-regression workflow (`qreg`) with deterministic estimation output,
-  post-estimation prediction routing (`predict ..., xb|residuals`), and residual diagnostics
-  (`estat residuals`).
+  Continue from completed Phase 16 specialized-likelihood foundations with bounded Phase 17
+  slices for quantile and causal workflows: quantile regression (`qreg`) and a panel-metadata
+  DID starter (`did`) with deterministic post-estimation prediction routing (`predict ..., xb`).
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
@@ -334,11 +340,13 @@ and describe the active work with concise verification criteria.
   - `qreg` executes with deterministic nonrobust and robust covariance modes
   - `predict ..., xb|residuals` executes after `qreg` with deterministic output
   - `estat residuals` executes after `qreg` with deterministic table output
+  - `did` parses and executes with deterministic nonrobust/robust covariance modes
+  - `predict ..., xb` executes after `did` with deterministic output
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
   Out of Scope:
-  - panel-GMM and causal-inference method families
+  - panel-GMM command families and advanced causal diagnostics/extensions
 
 ## Future
 
@@ -378,7 +386,7 @@ and describe the active work with concise verification criteria.
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
   - remaining meaningful slice in this phase (one-sentence summary):
-    - add bounded dynamic-panel and causal-method command families after the initial qreg slice
+    - add bounded dynamic-panel command families and expand causal diagnostics beyond the DID starter
   - library strategy:
     - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
       semiparametric building blocks

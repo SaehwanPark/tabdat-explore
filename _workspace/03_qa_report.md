@@ -1,4 +1,4 @@
-# Phase 17 Slice 1 QA Report
+# Phase 17 Slice 2 QA Report
 
 ## Status
 
@@ -7,14 +7,13 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `qreg` syntax/options and completion behavior match the command contract.
+  - `did` syntax/options and completion behavior match the command contract.
 - Contract -> executor:
-  - `qreg` executes with nonrobust/robust covariance modes and quantile guards.
-  - `predict` supports `xb` and `residuals` after `qreg`.
-  - `estat residuals` executes after `qreg` and preserves regress-only `ovtest`/`vif` boundaries.
+  - `did` executes with nonrobust/robust covariance modes and panel/binary guards.
+  - `predict` supports `xb` after `did` and rejects unsupported `did` prediction kinds.
 - Contract -> formatter/CLI/help:
-  - qreg CLI output and residual diagnostics output are deterministic.
-  - in-app help topics include `qreg` and updated `predict`/`estat` examples.
+  - DID CLI output and prediction output are deterministic.
+  - in-app help topics include `did` and updated `predict` examples.
 - Regression boundaries:
   - existing estimator-family routing remains stable under focused and full checks.
 
@@ -24,5 +23,5 @@ pass
 
 ## Validation Evidence
 
-- Focused qreg checks passed.
+- Focused `did` checks passed.
 - Full quality gates passed (`ruff`, `pyright`, `mypy`, `pytest`, integrated E2E harness).
