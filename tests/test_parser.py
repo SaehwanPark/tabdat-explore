@@ -47,6 +47,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SqlCommand,
+  StregCommand,
   StringExpression,
   SummarizeCommand,
   TabulateCommand,
@@ -621,6 +622,32 @@ def test_parse_phase_16_zinb_command() -> None:
   )
 
 
+def test_parse_phase_16_streg_command() -> None:
+  assert parse_command("streg time age income, failure(died) dist(weibull)") == StregCommand(
+    time_variable="time",
+    predictors=("age", "income"),
+    failure_variable="died",
+    distribution="weibull",
+  )
+  assert parse_command("streg time age, failure(died) dist(exponential) robust") == StregCommand(
+    time_variable="time",
+    predictors=("age",),
+    failure_variable="died",
+    distribution="exponential",
+    robust=True,
+  )
+  assert parse_command(
+    "streg time age, failure(died) dist(weibull) cluster(group_id) noconstant"
+  ) == StregCommand(
+    time_variable="time",
+    predictors=("age",),
+    failure_variable="died",
+    distribution="weibull",
+    cluster_variable="group_id",
+    include_intercept=False,
+  )
+
+
 def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat residuals") == EstatCommand(subcommand="residuals")
   assert parse_command("estat ovtest") == EstatCommand(subcommand="ovtest")
@@ -1007,6 +1034,18 @@ def test_parse_exit_aliases() -> None:
     "zinb y x, cluster() inflate(z)",
     "zinb y x, cluster(group firm) inflate(z)",
     "zinb y x, robust=true inflate(z)",
+    "streg",
+    "streg time",
+    "streg time age",
+    "streg time age if time > 0, failure(event) dist(weibull)",
+    "streg time age, failure() dist(weibull)",
+    "streg time age, failure(event event2) dist(weibull)",
+    "streg time age, failure(event) dist()",
+    "streg time age, failure(event) dist(loglogistic)",
+    "streg time age, failure(event) dist(weibull) robust cluster(group)",
+    "streg time age, failure(event) dist(weibull) cluster()",
+    "streg time age, failure(event) dist(weibull) cluster(group firm)",
+    "streg time age, failure(event) dist(weibull) robust=true",
     "estat",
     "estat vif extra",
     "estat, vif",

@@ -79,6 +79,8 @@ from tabdat.models import (
   SetResult,
   SqlCommand,
   SqlCreateResult,
+  StregCommand,
+  StregRegressionResult,
   StringExpression,
   SummarizeCommand,
   SummarizeResult,
@@ -437,6 +439,25 @@ def _write_nl_parquet(path: Path) -> None:
         (5.0, 148.4131591),
         (null, 403.4287935)
     ) as nl_data(x, y)
+    """,
+  )
+
+
+def _write_streg_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 30.0, 1.0, 'a'),
+        (2.0, 0.0, 35.0, 1.0, 'a'),
+        (3.0, 1.0, 40.0, 2.0, 'b'),
+        (4.0, 1.0, 28.0, 2.0, 'b'),
+        (5.0, 0.0, 50.0, 3.0, 'c'),
+        (6.0, 1.0, 45.0, 3.0, 'c'),
+        (7.0, 0.0, 33.0, 4.0, 'd'),
+        (8.0, 1.0, 38.0, 4.0, 'd')
+    ) as streg_data(time, died, age, income, cluster_id)
     """,
   )
 
@@ -1261,6 +1282,139 @@ def test_phase_16_zinb_reports_prerequisite_errors(sample_parquet: Path, tmp_pat
       match="estat gof requires a prior poisson, nbreg, zip, or zinb model",
     ):
       executor.execute(EstatCommand(subcommand="gof"))
+  finally:
+    executor.close()
+
+
+def test_phase_16_streg_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "streg.parquet"
+  _write_streg_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      StregCommand(
+        time_variable="time",
+        predictors=("age", "income"),
+        failure_variable="died",
+        distribution="weibull",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, StregRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.time_variable == "time"
+  assert result.predictors == ("age", "income")
+  assert result.failure_variable == "died"
+  assert result.distribution == "weibull"
+  assert result.observation_count == 8
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "age", "income"]
+
+
+def test_phase_16_streg_supports_covariance_modes(tmp_path: Path) -> None:
+  path = tmp_path / "streg.parquet"
+  _write_streg_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    robust = executor.execute(
+      StregCommand(
+        time_variable="time",
+        predictors=("age",),
+        failure_variable="died",
+        distribution="exponential",
+        robust=True,
+      )
+    )
+    clustered = executor.execute(
+      StregCommand(
+        time_variable="time",
+        predictors=("age",),
+        failure_variable="died",
+        distribution="weibull",
+        cluster_variable="cluster_id",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(robust, StregRegressionResult)
+  assert robust.covariance == "robust"
+  assert isinstance(clustered, StregRegressionResult)
+  assert clustered.covariance == "cluster(cluster_id)"
+
+
+def test_phase_16_streg_reports_prerequisite_errors(sample_parquet: Path, tmp_path: Path) -> None:
+  bad_event_path = tmp_path / "streg_bad_event.parquet"
+  missing_cluster_path = tmp_path / "streg_missing_cluster.parquet"
+  _write_sql_parquet(
+    bad_event_path,
+    """
+    select * from (
+      values
+        (1.0, 2.0, 30.0),
+        (2.0, 1.0, 35.0)
+    ) as streg_data(time, died, age)
+    """,
+  )
+  _write_sql_parquet(
+    missing_cluster_path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 30.0, 'a'),
+        (2.0, 0.0, 35.0, null),
+        (3.0, 1.0, 40.0, 'b')
+    ) as streg_data(time, died, age, cluster_id)
+    """,
+  )
+  executor = Executor()
+  try:
+    with pytest.raises(NoActiveDatasetError, match="streg requires an active dataset"):
+      executor.execute(
+        StregCommand(
+          time_variable="time",
+          predictors=("age",),
+          failure_variable="died",
+          distribution="weibull",
+        )
+      )
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(UnknownVariableError, match="streg unknown variable: time, died"):
+      executor.execute(
+        StregCommand(
+          time_variable="time",
+          predictors=("age",),
+          failure_variable="died",
+          distribution="weibull",
+        )
+      )
+    executor.execute(UseCommand(bad_event_path))
+    with pytest.raises(
+      ExecutionError,
+      match="streg failure variable must be binary with values 0 and 1",
+    ):
+      executor.execute(
+        StregCommand(
+          time_variable="time",
+          predictors=("age",),
+          failure_variable="died",
+          distribution="weibull",
+        )
+      )
+    executor.execute(UseCommand(missing_cluster_path))
+    with pytest.raises(ExecutionError, match="streg requires complete cluster values"):
+      executor.execute(
+        StregCommand(
+          time_variable="time",
+          predictors=("age",),
+          failure_variable="died",
+          distribution="weibull",
+          cluster_variable="cluster_id",
+        )
+      )
   finally:
     executor.close()
 

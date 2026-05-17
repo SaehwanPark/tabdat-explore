@@ -217,6 +217,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     zinb_command = _completion_texts(completer, "zin")
     zinb_columns = _completion_texts(completer, "zinb c")
     zinb_options = _completion_texts(completer, "zinb cost age, ")
+    streg_command = _completion_texts(completer, "str")
+    streg_columns = _completion_texts(completer, "streg c")
+    streg_options = _completion_texts(completer, "streg time age, ")
     ivregress_command = _completion_texts(completer, "ivr")
     ivregress_columns = _completion_texts(completer, "ivregress 2sls c")
     ivregress_gmm_columns = _completion_texts(completer, "ivregress gmm c")
@@ -270,6 +273,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert zinb_command == ["zinb"]
   assert zinb_columns == ["cost"]
   assert zinb_options == ["inflate(", "robust", "cluster(", "noconstant"]
+  assert streg_command == ["streg"]
+  assert streg_columns == ["cost"]
+  assert streg_options == ["failure(", "dist(", "robust", "cluster(", "noconstant"]
   assert ivregress_command == ["ivregress"]
   assert ivregress_columns == ["cost"]
   assert ivregress_gmm_columns == ["cost"]

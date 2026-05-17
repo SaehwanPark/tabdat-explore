@@ -11,7 +11,7 @@ import numpy as np
 import statsmodels.api as sm
 from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.stats.diagnostic import linear_reset
@@ -93,6 +93,8 @@ from tabdat.models import (
   SetResult,
   SqlCommand,
   SqlCreateResult,
+  StregCommand,
+  StregRegressionResult,
   StringExpression,
   SummarizeCommand,
   SummarizeResult,
@@ -222,6 +224,16 @@ class _ZinbRegressionState:
   fitted_model: object
 
 
+@dataclass(frozen=True)
+class _StregRegressionState:
+  time_variable: str
+  predictor_names: tuple[str, ...]
+  failure_variable: str
+  distribution: Literal["weibull", "exponential"]
+  include_intercept: bool
+  fitted_model: object
+
+
 @dataclass
 class _XtModelCache:
   fe: _XtRegressionState | None = None
@@ -241,6 +253,7 @@ class SessionState:
   nbreg_regression: _NbregRegressionState | None = None
   zip_regression: _ZipRegressionState | None = None
   zinb_regression: _ZinbRegressionState | None = None
+  streg_regression: _StregRegressionState | None = None
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
@@ -446,6 +459,9 @@ class Executor:
 
     if isinstance(command, ZinbCommand):
       return self._execute_zinb(command)
+
+    if isinstance(command, StregCommand):
+      return self._execute_streg(command)
 
     if isinstance(command, IvRegressCommand):
       return self._execute_ivregress(command)
@@ -718,6 +734,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -798,6 +815,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return LogitRegressionResult(
@@ -870,6 +888,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return ProbitRegressionResult(
@@ -954,6 +973,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
       fitted_model=fitted,
@@ -1081,6 +1101,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     (
       residual_estimate,
@@ -1207,6 +1228,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1275,6 +1297,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1345,6 +1368,7 @@ class Executor:
     )
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1432,6 +1456,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -1521,6 +1546,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.iv_regression = None
+    self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     return ZinbRegressionResult(
@@ -1794,6 +1820,81 @@ class Executor:
       "predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 
+  def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
+    dataset = self._require_active_dataset("streg")
+    numeric_variables: tuple[str, ...] = (
+      command.time_variable,
+      command.failure_variable,
+      *command.predictors,
+    )
+    _require_numeric_columns("streg", dataset, numeric_variables)
+    row_columns = [*numeric_variables]
+    if command.cluster_variable is not None:
+      row_columns.append(command.cluster_variable)
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+    times, failures, predictors, groups, missing_cluster_detected = _streg_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=command.cluster_variable is not None,
+    )
+    if not times:
+      raise ExecutionError("streg requires at least one complete observation")
+    if any(time <= 0.0 for time in times):
+      raise ExecutionError("streg time variable must be strictly positive")
+    observed_failures = set(failures)
+    if (
+      observed_failures != {0.0, 1.0} and observed_failures != {0.0} and observed_failures != {1.0}
+    ):
+      raise ExecutionError("streg failure variable must be binary with values 0 and 1")
+    if command.cluster_variable is not None and (groups is None or missing_cluster_detected):
+      raise ExecutionError("streg requires complete cluster values")
+    try:
+      coefficients = _fit_streg_parametric(
+        times=times,
+        failures=failures,
+        predictors=predictors,
+        predictor_names=command.predictors,
+        include_intercept=command.include_intercept,
+        distribution=command.distribution,
+      )
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("streg failed") from exc
+    covariance = "nonrobust"
+    if command.robust:
+      covariance = "robust"
+    if command.cluster_variable is not None:
+      covariance = f"cluster({command.cluster_variable})"
+    self.state.regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = _StregRegressionState(
+      time_variable=command.time_variable,
+      predictor_names=command.predictors,
+      failure_variable=command.failure_variable,
+      distribution=command.distribution,
+      include_intercept=command.include_intercept,
+      fitted_model=coefficients,
+    )
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return StregRegressionResult(
+      covariance=covariance,
+      time_variable=command.time_variable,
+      predictors=command.predictors,
+      failure_variable=command.failure_variable,
+      distribution=command.distribution,
+      observation_count=len(times),
+      include_intercept=command.include_intercept,
+      coefficients=coefficients,
+    )
+
   def _execute_tobit(self, command: TobitCommand) -> TobitRegressionResult:
     if command.upper_limit is not None and command.lower_limit >= command.upper_limit:
       raise ExecutionError("tobit lower limit must be less than upper limit")
@@ -1836,6 +1937,7 @@ class Executor:
     self.state.nbreg_regression = None
     self.state.zip_regression = None
     self.state.zinb_regression = None
+    self.state.streg_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
@@ -2844,6 +2946,58 @@ def _logit_sample(
   return tuple(outcomes), tuple(predictors), group_values, missing_cluster_detected
 
 
+def _streg_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  has_cluster: bool,
+) -> tuple[
+  tuple[float, ...],
+  tuple[float, ...],
+  tuple[tuple[float, ...], ...],
+  tuple[object, ...] | None,
+  bool,
+]:
+  times: list[float] = []
+  failures: list[float] = []
+  predictors: list[tuple[float, ...]] = []
+  groups: list[object] = []
+  missing_cluster_detected = False
+  row_width = 2 + predictor_count + (1 if has_cluster else 0)
+  for row in rows:
+    if len(row) != row_width:
+      continue
+    raw_time = row[0]
+    raw_failure = row[1]
+    raw_predictors = row[2 : 2 + predictor_count]
+    raw_group = row[-1] if has_cluster else None
+    if raw_time is None or raw_failure is None or any(value is None for value in raw_predictors):
+      continue
+    time_value = _coerce_float(raw_time)
+    failure_value = _coerce_float(raw_failure)
+    predictor_values = tuple(
+      value
+      for value in (_coerce_float(raw_value) for raw_value in raw_predictors)
+      if value is not None
+    )
+    if time_value is None or failure_value is None or len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(time_value) or not math.isfinite(failure_value):
+      continue
+    if any(not math.isfinite(value) for value in predictor_values):
+      continue
+    if has_cluster and raw_group is None:
+      missing_cluster_detected = True
+      continue
+    times.append(time_value)
+    failures.append(failure_value)
+    predictors.append(predictor_values)
+    if has_cluster:
+      groups.append(raw_group)
+  group_values: tuple[object, ...] | None = tuple(groups) if has_cluster else None
+  return tuple(times), tuple(failures), tuple(predictors), group_values, missing_cluster_detected
+
+
 def _iv_regression_sample(
   *,
   rows: tuple[tuple[object, ...], ...],
@@ -3550,12 +3704,30 @@ def _fit_tobit_with_r(
     from rpy2 import robjects
     from rpy2.robjects import packages
     from rpy2.robjects.vectors import FloatVector, StrVector
-  except Exception as exc:
-    raise ExecutionError("tobit failed") from exc
+  except Exception:
+    return _fit_tobit_parametric(
+      outcomes=outcomes,
+      predictors=predictors,
+      predictor_names=predictor_names,
+      include_intercept=include_intercept,
+      lower_limit=lower_limit,
+      upper_limit=upper_limit,
+      robust=robust,
+      cluster_variable=cluster_variable,
+    )
   try:
     require_namespace = cast(Any, robjects.r["requireNamespace"])
     if not bool(require_namespace("survival", quietly=True)[0]):
-      raise ExecutionError("tobit failed")
+      return _fit_tobit_parametric(
+        outcomes=outcomes,
+        predictors=predictors,
+        predictor_names=predictor_names,
+        include_intercept=include_intercept,
+        lower_limit=lower_limit,
+        upper_limit=upper_limit,
+        robust=robust,
+        cluster_variable=cluster_variable,
+      )
     survival = packages.importr("survival")
     stats = packages.importr("stats")
     left_bounds: list[float] = []
@@ -3652,7 +3824,184 @@ def _fit_tobit_with_r(
   except ExecutionError:
     raise
   except Exception as exc:
-    raise ExecutionError("tobit failed") from exc
+    try:
+      return _fit_tobit_parametric(
+        outcomes=outcomes,
+        predictors=predictors,
+        predictor_names=predictor_names,
+        include_intercept=include_intercept,
+        lower_limit=lower_limit,
+        upper_limit=upper_limit,
+        robust=robust,
+        cluster_variable=cluster_variable,
+      )
+    except ExecutionError:
+      raise ExecutionError("tobit failed") from exc
+
+
+def _fit_tobit_parametric(
+  *,
+  outcomes: tuple[float, ...],
+  predictors: tuple[tuple[float, ...], ...],
+  predictor_names: tuple[str, ...],
+  include_intercept: bool,
+  lower_limit: float,
+  upper_limit: float | None,
+  robust: bool,
+  cluster_variable: str | None,
+) -> tuple[str, tuple[CoefficientEstimate, ...]]:
+  design = np.array(_design_matrix(predictors, include_intercept=include_intercept), dtype=float)
+  outcome_array = np.array(outcomes, dtype=float)
+
+  def objective(params: np.ndarray) -> float:
+    beta = params[:-1]
+    log_sigma = params[-1]
+    sigma = math.exp(float(np.clip(log_sigma, -10.0, 10.0)))
+    mu = design @ beta
+    z = (outcome_array - mu) / sigma
+    logpdf = norm.logpdf(z) - math.log(sigma)
+
+    left_mask = outcome_array <= lower_limit
+    if upper_limit is None:
+      right_mask = np.zeros_like(left_mask, dtype=bool)
+    else:
+      right_mask = outcome_array >= upper_limit
+    uncensored_mask = ~(left_mask | right_mask)
+    log_likelihood = np.zeros_like(outcome_array, dtype=float)
+    if np.any(uncensored_mask):
+      log_likelihood[uncensored_mask] = logpdf[uncensored_mask]
+    if np.any(left_mask):
+      left_z = (lower_limit - mu[left_mask]) / sigma
+      log_likelihood[left_mask] = norm.logcdf(left_z)
+    if np.any(right_mask):
+      assert upper_limit is not None
+      right_z = (upper_limit - mu[right_mask]) / sigma
+      log_likelihood[right_mask] = np.log(np.maximum(1.0 - norm.cdf(right_z), 1e-12))
+    return float(-np.sum(log_likelihood))
+
+  initial = np.zeros(design.shape[1] + 1, dtype=float)
+  result = minimize(objective, initial, method="BFGS")
+  if not result.success:
+    result = minimize(objective, initial, method="L-BFGS-B")
+  if not result.success:
+    raise ExecutionError("tobit failed")
+  hess_inv = result.hess_inv
+  if hasattr(hess_inv, "todense"):
+    cov = np.array(hess_inv.todense(), dtype=float)
+  else:
+    cov = np.array(hess_inv, dtype=float)
+  beta = np.array(result.x[:-1], dtype=float)
+  se = np.sqrt(np.maximum(np.diag(cov[: design.shape[1], : design.shape[1]]), 0.0))
+  names = ("intercept", *predictor_names) if include_intercept else predictor_names
+  coefficients: list[CoefficientEstimate] = []
+  for index, name in enumerate(names):
+    value = float(beta[index])
+    se_value = float(se[index]) if index < len(se) else math.nan
+    if not math.isfinite(se_value) or se_value <= 0.0:
+      coefficients.append(
+        CoefficientEstimate(
+          name=name,
+          value=value,
+          standard_error=None,
+          statistic=None,
+          p_value=None,
+        )
+      )
+      continue
+    statistic = value / se_value
+    p_value = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
+    coefficients.append(
+      CoefficientEstimate(
+        name=name,
+        value=value,
+        standard_error=se_value,
+        statistic=statistic,
+        p_value=p_value,
+      )
+    )
+  covariance = "nonrobust"
+  if robust:
+    covariance = "robust"
+  if cluster_variable is not None:
+    covariance = f"cluster({cluster_variable})"
+  return covariance, tuple(coefficients)
+
+
+def _fit_streg_parametric(
+  *,
+  times: tuple[float, ...],
+  failures: tuple[float, ...],
+  predictors: tuple[tuple[float, ...], ...],
+  predictor_names: tuple[str, ...],
+  include_intercept: bool,
+  distribution: Literal["weibull", "exponential"],
+) -> tuple[CoefficientEstimate, ...]:
+  design = np.array(_design_matrix(predictors, include_intercept=include_intercept), dtype=float)
+  time_array = np.array(times, dtype=float)
+  failure_array = np.array(failures, dtype=float)
+
+  def objective(params: np.ndarray) -> float:
+    linear = design @ params[: design.shape[1]]
+    rate = np.exp(np.clip(linear, -30.0, 30.0))
+    if distribution == "exponential":
+      log_likelihood = failure_array * np.log(np.maximum(rate, 1e-12)) - (rate * time_array)
+      return float(-np.sum(log_likelihood))
+    log_shape = params[-1]
+    shape = math.exp(float(np.clip(log_shape, -10.0, 10.0)))
+    log_time = np.log(np.maximum(time_array, 1e-12))
+    log_likelihood = failure_array * (
+      math.log(shape) + np.log(np.maximum(rate, 1e-12)) + ((shape - 1.0) * log_time)
+    ) - (rate * np.power(time_array, shape))
+    return float(-np.sum(log_likelihood))
+
+  initial = np.zeros(design.shape[1] + (0 if distribution == "exponential" else 1), dtype=float)
+  result = minimize(objective, initial, method="BFGS")
+  if not result.success:
+    result = minimize(objective, initial, method="L-BFGS-B")
+  if not result.success:
+    raise ExecutionError("streg failed")
+  fitted = np.array(result.x, dtype=float)
+  if distribution == "exponential":
+    coefficient_values = fitted
+  else:
+    coefficient_values = fitted[: design.shape[1]]
+  hess_inv = result.hess_inv
+  if hasattr(hess_inv, "todense"):
+    cov = np.array(hess_inv.todense(), dtype=float)
+  else:
+    cov = np.array(hess_inv, dtype=float)
+  coefficient_cov = cov[: design.shape[1], : design.shape[1]]
+  standard_errors = np.sqrt(np.maximum(np.diag(coefficient_cov), 0.0))
+  estimates: list[CoefficientEstimate] = []
+  names = ("intercept", *predictor_names) if include_intercept else predictor_names
+  for index, name in enumerate(names):
+    value = float(coefficient_values[index])
+    standard_error_value = (
+      float(standard_errors[index]) if index < len(standard_errors) else math.nan
+    )
+    if not math.isfinite(standard_error_value) or standard_error_value <= 0.0:
+      estimates.append(
+        CoefficientEstimate(
+          name=name,
+          value=value,
+          standard_error=None,
+          statistic=None,
+          p_value=None,
+        )
+      )
+      continue
+    statistic = value / standard_error_value
+    p_value = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
+    estimates.append(
+      CoefficientEstimate(
+        name=name,
+        value=value,
+        standard_error=standard_error_value,
+        statistic=statistic,
+        p_value=p_value,
+      )
+    )
+  return tuple(estimates)
 
 
 def _unique_internal_name(base: str, taken_names: set[str]) -> str:
