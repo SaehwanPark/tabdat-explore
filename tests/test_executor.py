@@ -2627,6 +2627,40 @@ def test_phase_14_xtreg_requires_panel_metadata(tmp_path: Path) -> None:
     executor.close()
 
 
+def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
+  path = tmp_path / "did.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(
+      DidCommand(
+        outcome="wage",
+        controls=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+      )
+    )
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exposure",),
+        estimator="fe",
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match=(
+        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "or zinb model"
+      ),
+    ):
+      executor.execute(PredictCommand(target_variable="pred_after_xtreg"))
+  finally:
+    executor.close()
+
+
 def test_phase_14_xtdata_within_between_transforms(tmp_path: Path) -> None:
   path = tmp_path / "panel-regression.parquet"
   _write_panel_regression_parquet(path)

@@ -2408,6 +2408,7 @@ class Executor:
     self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
+    self.state.did_regression = None
     return XtRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
