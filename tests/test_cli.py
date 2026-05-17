@@ -864,6 +864,50 @@ def test_cli_runs_phase_16_zinb_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_16_streg_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "streg.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 30.0, 1.0, 'a'),
+        (2.0, 0.0, 35.0, 1.0, 'a'),
+        (3.0, 1.0, 40.0, 2.0, 'b'),
+        (4.0, 1.0, 28.0, 2.0, 'b'),
+        (5.0, 0.0, 50.0, 3.0, 'c'),
+        (6.0, 1.0, 45.0, 3.0, 'c'),
+        (7.0, 0.0, 33.0, 4.0, 'd'),
+        (8.0, 1.0, 38.0, 4.0, 'd')
+    ) as streg_data(time, died, age, income, cluster_id)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "streg time age income, failure(died) dist(weibull)",
+      "-c",
+      "streg time age income, failure(died) dist(exponential) robust",
+      "-c",
+      "streg time age income, failure(died) dist(weibull) cluster(cluster_id)",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: streg time on age income" in captured.out
+  assert "Estimator: streg" in captured.out
+  assert "Distribution: weibull" in captured.out
+  assert "Distribution: exponential" in captured.out
+  assert "Covariance: nonrobust" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Covariance: cluster(cluster_id)" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_13_weighted_regress_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "weighted.parquet"
   _write_sql_parquet(

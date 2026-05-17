@@ -52,6 +52,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SqlCommand,
+  StregCommand,
   StringExpression,
   SummarizeCommand,
   TabulateCommand,
@@ -104,6 +105,7 @@ _EXECUTABLE_COMMANDS = {
   "nbreg",
   "zip",
   "zinb",
+  "streg",
   "predict",
   "estat",
   "ivregress",
@@ -364,6 +366,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "zinb":
     return _parse_zinb(parts)
+
+  if parts.name == "streg":
+    return _parse_streg(parts)
 
   if parts.name == "predict":
     return _parse_predict(parts)
@@ -1144,6 +1149,43 @@ def _parse_zinb(parts: _CommandParts) -> ZinbCommand:
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
     inflate_predictors=inflate_values,
+    robust=robust,
+    cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_streg(parts: _CommandParts) -> StregCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("streg expects syntax: streg <time_var> <xvars>, failure(<event>) dist(...)")
+  if len(parts.arguments) < 2:
+    raise ParseError("streg expects syntax: streg <time_var> <xvars>, failure(<event>) dist(...)")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"failure", "dist", "robust", "cluster", "noconstant"}
+  if unsupported:
+    raise ParseError(f"streg unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "streg", {"robust", "noconstant"})
+  failure_values = _single_tuple_option(parts.options, "failure", "streg")
+  if failure_values is None or len(failure_values) != 1:
+    raise ParseError("streg option failure expects one variable")
+  dist_values = _single_tuple_option(parts.options, "dist", "streg")
+  if dist_values is None or len(dist_values) != 1:
+    raise ParseError("streg option dist expects one value")
+  distribution = dist_values[0].lower()
+  if distribution not in {"weibull", "exponential"}:
+    raise ParseError("streg option dist must be weibull or exponential")
+  cluster_values = _single_tuple_option(parts.options, "cluster", "streg")
+  if cluster_values is not None and len(cluster_values) != 1:
+    raise ParseError("streg option cluster expects one variable")
+  robust = "robust" in option_names
+  cluster_variable = cluster_values[0] if cluster_values is not None else None
+  if robust and cluster_variable is not None:
+    raise ParseError("streg cannot combine robust and cluster")
+  return StregCommand(
+    time_variable=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    failure_variable=failure_values[0],
+    distribution=cast(Literal["weibull", "exponential"], distribution),
     robust=robust,
     cluster_variable=cluster_variable,
     include_intercept="noconstant" not in option_names,

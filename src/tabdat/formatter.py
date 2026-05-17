@@ -26,6 +26,7 @@ from tabdat.models import (
   SaveResult,
   SetResult,
   SqlCreateResult,
+  StregRegressionResult,
   SummarizeResult,
   TableResult,
   TobitRegressionResult,
@@ -349,6 +350,29 @@ def format_result(result: Result) -> str:
       f"Covariance: {result.covariance}",
       f"Observations: {result.observation_count}",
       f"Log-likelihood: {_format_number(result.log_likelihood)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, StregRegressionResult):
+    header = [
+      f"Model: streg {result.time_variable} on {' '.join(result.predictors)}",
+      "Estimator: streg",
+      f"Failure: {result.failure_variable}",
+      f"Distribution: {result.distribution}",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
       "",
     ]
     coefficient_rows = (

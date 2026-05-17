@@ -299,19 +299,26 @@ and describe the active work with concise verification criteria.
   - deterministic `predict <newvar>[, xb residuals]` routing after `zip` and `zinb`
   - deterministic `estat gof` diagnostics after `zip` and `zinb`
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the fourth Phase 16 specialized likelihood-model slice:
+  - `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+    [robust cluster(<var>) noconstant]`
+  - bounded parametric duration/survival execution with deterministic nonrobust/robust/cluster
+    covariance labels
+  - deterministic typed/formatted output plus focused parser, executor, CLI, shell, and help
+    coverage
 
 ## Present
 
 - Feature: Phase 16 specialized likelihood models
   Status: Active
   Started: 2026-05-16
-  Branch: codex/tmp-phase16-slice3-zip-zinb
+  Branch: codex/tmp-phase16-slice4-streg-survival
 
   Summary:
-  Continue from completed Phase 15 nonlinear foundations with bounded first, second, and third
-  Phase 16 count-model slices (`poisson`, `nbreg`, `zip`, `zinb`) plus deterministic
-  post-estimation routing (`predict ..., xb|residuals`) and `estat gof` before
-  duration/survival expansion.
+  Continue from completed Phase 15 nonlinear foundations with bounded first through fourth
+  Phase 16 slices: count-model workflows (`poisson`, `nbreg`, `zip`, `zinb`) with deterministic
+  post-estimation routing (`predict ..., xb|residuals`) and `estat gof`, plus the first bounded
+  duration/survival workflow (`streg`).
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
@@ -330,6 +337,8 @@ and describe the active work with concise verification criteria.
   - `estat gof` executes after `nbreg` with deterministic table output
   - `estat gof` executes after `zip` with deterministic table output
   - `estat gof` executes after `zinb` with deterministic table output
+  - `streg` parses and executes with required `failure(...)` and `dist(...)` plus nonrobust,
+    robust, and clustered covariance modes
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
@@ -363,8 +372,7 @@ and describe the active work with concise verification criteria.
   - add discrete-choice systems, count models, mixture/hurdle/zero-inflated models, and
     duration/survival models
   - remaining meaningful slice in this phase (one-sentence summary):
-    - add a bounded duration/survival workflow (parser, executor, deterministic output/help/tests)
-      before mixture/hurdle expansion
+    - none
   - library strategy:
     - approach (1): `statsmodels` for multinomial/count/zero-inflated families and `lifelines` for
       duration/survival workflows

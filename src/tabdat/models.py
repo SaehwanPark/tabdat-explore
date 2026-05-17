@@ -352,6 +352,17 @@ class ZinbCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class StregCommand:
+  time_variable: str
+  predictors: tuple[str, ...]
+  failure_variable: str
+  distribution: Literal["weibull", "exponential"]
+  robust: bool = False
+  cluster_variable: str | None = None
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class EstatCommand:
   subcommand: Literal[
     "residuals",
@@ -454,6 +465,7 @@ Command = (
   | NbregCommand
   | ZipCommand
   | ZinbCommand
+  | StregCommand
   | PredictCommand
   | EstatCommand
   | IvRegressCommand
@@ -685,6 +697,18 @@ class ZinbRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class StregRegressionResult:
+  covariance: str
+  time_variable: str
+  predictors: tuple[str, ...]
+  failure_variable: str
+  distribution: Literal["weibull", "exponential"]
+  observation_count: int
+  include_intercept: bool
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class IvRegressionResult:
   estimator: Literal["2sls", "gmm"]
   covariance: str
@@ -786,6 +810,7 @@ Result = (
   | NbregRegressionResult
   | ZipRegressionResult
   | ZinbRegressionResult
+  | StregRegressionResult
   | IvRegressionResult
   | XtRegressionResult
   | CfRegressionResult
