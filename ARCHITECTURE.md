@@ -6,8 +6,8 @@ slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` af
 FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
 support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
 semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
-binary `predict` routing, `tobit`, `heckman`, and `nl`), plus three bounded Phase 16 count-model
-slices (`poisson`, `nbreg`, `zip`, and `zinb`).
+binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase 16 slices
+(`poisson`, `nbreg`, `zip`, `zinb`, and `streg`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -72,7 +72,9 @@ Phase 16 parsing adds
 `poisson <y> <xvars>[, robust cluster(...) noconstant]`,
 `nbreg <y> <xvars>[, robust cluster(...) noconstant]`,
 `zip <y> <xvars>, inflate(<zvars>) [robust cluster(...) noconstant]`,
-`zinb <y> <xvars>, inflate(<zvars>) [robust cluster(...) noconstant]`, and `estat gof`.
+`zinb <y> <xvars>, inflate(<zvars>) [robust cluster(...) noconstant]`,
+`streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+[robust cluster(...) noconstant]`, and `estat gof`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -108,7 +110,8 @@ Tobit estimation through an R adapter boundary (`survival::survreg` via `rpy2`) 
 direct support is insufficient.
 Phase 16 adds bounded Poisson, negative-binomial, and zero-inflated count estimation through
 `statsmodels`, `predict` routing for `xb`/`residuals` after Poisson/NB/ZI states, and `estat gof`
-post-estimation diagnostics.
+post-estimation diagnostics, plus bounded parametric duration/survival `streg` estimation through a
+local MLE path (`weibull|exponential`) with deterministic covariance labeling.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -241,6 +244,8 @@ display formatting.
   `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`,
   `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,
   `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,
+  `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+  [robust cluster(<var>) noconstant]`,
   `predict <newvar>[, xb residuals]` after Poisson/NB/ZI model state, and `estat gof`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.

@@ -6,6 +6,11 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 16 specialized likelihood-model slice with
+  `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+  [robust cluster(<var>) noconstant]`, bounded parametric duration/survival execution,
+  deterministic nonrobust/robust/cluster covariance output, and focused
+  parser/executor/CLI/shell/help coverage.
 - Added the third Phase 16 specialized likelihood-model slice with
   `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]` and
   `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,

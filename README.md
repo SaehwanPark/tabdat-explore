@@ -51,6 +51,8 @@ command line. The current CLI supports:
   `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
 - zero-inflated negative-binomial count regression with
   `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
+- bounded parametric survival regression with
+  `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential) [robust cluster(<var>) noconstant]`
 - instrumental-variables regression with
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
 - control-function regression with
@@ -68,7 +70,8 @@ command line. The current CLI supports:
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
 Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered seven bounded
 Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`,
-and `nl`), plus three bounded Phase 16 count-model slices (`poisson`, `nbreg`, `zip`, and `zinb`).
+and `nl`), plus four bounded Phase 16 slices: count-model workflows (`poisson`, `nbreg`, `zip`,
+`zinb`) and the first duration/survival workflow (`streg`).
 
 ## Quickstart
 
