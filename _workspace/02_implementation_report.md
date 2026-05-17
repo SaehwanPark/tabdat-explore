@@ -1,47 +1,45 @@
-# Phase 16 Slice 3 Implementation Report
+# Phase 17 Slice 1 Implementation Report
 
 ## Scope
 
-Implemented one bounded Phase 16 slice on branch
-`codex/tmp-phase16-slice3-zip-zinb`:
+Implemented one bounded Phase 17 slice on branch
+`codex/tmp-phase17-slice1-qreg-predict-estat-residuals`:
 
-- Slice 3: bounded zero-inflated count-model semantics (`zip`, `zinb`) with deterministic
-  post-estimation support
+- Slice 1: bounded quantile-regression semantics (`qreg`) with deterministic post-estimation
+  support
 
 ## What Changed
 
 ### Parser and shell command surface
 
-- Added `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`.
-- Added `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`.
-- Reused existing `estat gof` parser surface with ZIP/ZINB executor routing.
-- Added shell completion support for ZIP/ZINB options and column suggestions.
+- Added `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`.
+- Added strict `quantile(...)` numeric parsing and range validation.
+- Added shell completion support for `qreg` command/options and column suggestions.
 
 ### Executor and formatter behavior
 
-- Added bounded ZIP/ZINB execution with deterministic covariance labels:
-  - `nonrobust` (default)
-  - `robust`
-  - `cluster(<var>)`
-- Added deterministic non-negative outcome guard and complete-case sampling.
-- Added deterministic ZIP/ZINB output formatting with coefficient table and log-likelihood.
-- Added `predict <newvar>[, xb residuals]` routing after successful `zip` and `zinb`.
-- Added `estat gof` diagnostics after successful `zip` and `zinb`.
+- Added bounded `qreg` execution through `statsmodels.QuantReg` with deterministic covariance
+  labels (`nonrobust`/`robust`).
+- Added deterministic quantile-regression output formatting.
+- Added `predict <newvar>[, xb residuals]` routing after successful `qreg`.
+- Added `estat residuals` compatibility after successful `qreg` while preserving regress-only
+  `ovtest`/`vif` routing.
 
 ### State behavior
 
-- `zip` and `zinb` clear incompatible prior estimation-family state.
+- `qreg` clears incompatible prior estimation-family state.
 - Existing model-family routing behavior remains intact.
 
 ### Help and docs
 
-- Added in-app `zip` and `zinb` help topics.
-- Updated `predict` and `estat` in-app help topics.
+- Added in-app `qreg` help topic.
+- Updated `predict` and `estat` help topics with `qreg` examples.
 - Updated SDD/docs (`SPEC.md`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`).
+- Updated `_workspace` handoff artifacts for Phase 17 continuation.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_help.py tests/test_executor.py tests/test_cli.py -k "zip or zinb or gof or predict"`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py tests/test_help.py -k "qreg or quantile or predict or estat"`
 - `uv run ruff check .`
 - `uv run ruff format --check .`
 - `uv run pyright`
