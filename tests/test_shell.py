@@ -236,6 +236,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     cfregress_command = _completion_texts(completer, "cfr")
     cfregress_columns = _completion_texts(completer, "cfregress c")
     cfregress_options = _completion_texts(completer, "cfregress cost age, ")
+    did_command = _completion_texts(completer, "di")
+    did_columns = _completion_texts(completer, "did c")
+    did_options = _completion_texts(completer, "did cost age, ")
     predict_command = _completion_texts(completer, "pred")
     predict_options = _completion_texts(completer, "predict cost_hat, ")
     estat_command = _completion_texts(completer, "est")
@@ -295,6 +298,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert cfregress_command == ["cfregress"]
   assert cfregress_columns == ["cost"]
   assert cfregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]
+  assert did_command == ["did"]
+  assert did_columns == ["cost"]
+  assert did_options == ["treat(", "post(", "robust"]
   assert predict_command == ["predict"]
   assert predict_options == ["xb", "residuals", "pr"]
   assert estat_command == ["estat"]

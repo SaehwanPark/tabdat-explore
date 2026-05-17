@@ -9,6 +9,7 @@ from tabdat.models import (
   CodebookResult,
   CountResult,
   DescribeResult,
+  DidRegressionResult,
   ExportResult,
   HeckmanRegressionResult,
   IvRegressionResult,
@@ -448,6 +449,31 @@ def format_result(result: Result) -> str:
       f"R-squared (within): {_format_number(result.r_squared_within)}",
       f"R-squared (between): {_format_number(result.r_squared_between)}",
       f"R-squared (overall): {_format_number(result.r_squared_overall)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, DidRegressionResult):
+    controls = " ".join(result.controls) if result.controls else "(none)"
+    header = [
+      (
+        f"Model: did {result.outcome} on {controls} "
+        f"(treat={result.treatment_variable}, post={result.post_variable})"
+      ),
+      "Estimator: did_twfe",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
       "",
     ]
     coefficient_rows = (

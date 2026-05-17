@@ -14,5 +14,6 @@ Examples:
 - `predict p, pr`
 - `predict resid, residuals`
 - `qreg claims age exposure` then `predict qhat, xb`
+- `did claims age exposure, treat(treated) post(post)` then `predict did_hat, xb`
 - `nbreg claims age exposure` then `predict mu_hat, xb`
 - `zip claims age exposure, inflate(exposure)` then `predict mu_hat, residuals`

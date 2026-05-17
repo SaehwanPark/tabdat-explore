@@ -18,6 +18,7 @@ from tabdat.models import (
   CommandOption,
   CountCommand,
   DescribeCommand,
+  DidCommand,
   DropCommand,
   EstatCommand,
   ExitCommand,
@@ -113,6 +114,7 @@ _EXECUTABLE_COMMANDS = {
   "ivregress",
   "xtreg",
   "xtdata",
+  "did",
   "cfregress",
   "exit",
   "quit",
@@ -389,6 +391,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "xtdata":
     return _parse_xtdata(parts)
+
+  if parts.name == "did":
+    return _parse_did(parts)
 
   if parts.name == "cfregress":
     return _parse_cfregress(parts)
@@ -1358,6 +1363,41 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
     raise ParseError("xtdata requires exactly one of within or between")
   transform: Literal["within", "between"] = "within" if has_within else "between"
   return XtDataCommand(variables=parts.arguments, transform=transform)
+
+
+def _parse_did(parts: _CommandParts) -> DidCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("did expects syntax: did <y> [controls], treat(<var>) post(<var>)")
+  if not parts.arguments:
+    raise ParseError("did expects syntax: did <y> [controls], treat(<var>) post(<var>)")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"treat", "post", "robust"}
+  if unsupported:
+    raise ParseError(f"did unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "did", {"robust"})
+  treat_values = _single_tuple_option(parts.options, "treat", "did")
+  if treat_values is None or len(treat_values) != 1:
+    raise ParseError("did option treat expects one variable")
+  post_values = _single_tuple_option(parts.options, "post", "did")
+  if post_values is None or len(post_values) != 1:
+    raise ParseError("did option post expects one variable")
+  treatment_variable = treat_values[0]
+  post_variable = post_values[0]
+  if treatment_variable == post_variable:
+    raise ParseError("did treatment and post variables must be distinct")
+  outcome = parts.arguments[0]
+  controls = parts.arguments[1:]
+  if treatment_variable == outcome or post_variable == outcome:
+    raise ParseError("did treatment and post variables must differ from outcome")
+  if treatment_variable in controls or post_variable in controls:
+    raise ParseError("did treatment and post variables must not appear in controls")
+  return DidCommand(
+    outcome=outcome,
+    controls=controls,
+    treatment_variable=treatment_variable,
+    post_variable=post_variable,
+    robust="robust" in option_names,
+  )
 
 
 def _parse_cfregress(parts: _CommandParts) -> CfRegressCommand:

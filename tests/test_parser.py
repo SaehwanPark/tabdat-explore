@@ -14,6 +14,7 @@ from tabdat.models import (
   CommandOption,
   CountCommand,
   DescribeCommand,
+  DidCommand,
   DropCommand,
   EstatCommand,
   ExitCommand,
@@ -782,6 +783,22 @@ def test_parse_phase_14_cfregress_command() -> None:
   )
 
 
+def test_parse_phase_17_did_command() -> None:
+  assert parse_command("did wage exper tenure, treat(treated) post(post)") == DidCommand(
+    outcome="wage",
+    controls=("exper", "tenure"),
+    treatment_variable="treated",
+    post_variable="post",
+  )
+  assert parse_command("did wage, treat(treated) post(post) robust") == DidCommand(
+    outcome="wage",
+    controls=(),
+    treatment_variable="treated",
+    post_variable="post",
+    robust=True,
+  )
+
+
 def test_parse_phase_6_visualization_commands() -> None:
   assert parse_command("histogram age") == HistogramCommand(variable="age")
   assert parse_command("histogram age, bins=20 saving(figures/age.svg) noopen") == (
@@ -1120,6 +1137,16 @@ def test_parse_exit_aliases() -> None:
     "cfregress y x, endog(z) iv(w) robust cluster(g)",
     "cfregress y z, endog(z) iv(w)",
     "cfregress y x, endog(z) iv(w) robust=true",
+    "did",
+    "did y",
+    "did y x",
+    "did y x, treat(t) post(p) robust=true",
+    "did y x, treat() post(p)",
+    "did y x, treat(t p) post(p)",
+    "did y x, treat(t) post()",
+    "did y x, treat(t) post(p q)",
+    "did y x, robust",
+    "did y x, treat(t) post(p) cluster(g)",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",
