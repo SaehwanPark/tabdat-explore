@@ -66,6 +66,8 @@ from tabdat.models import (
   PreviewResult,
   ProbitCommand,
   ProbitRegressionResult,
+  QregCommand,
+  QregRegressionResult,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -675,6 +677,60 @@ def test_phase_13_regress_supports_weighted_covariance_modes(tmp_path: Path) -> 
   assert wls_cluster.covariance == "cluster(cluster_id)"
   assert isinstance(gls_robust, RegressionResult)
   assert gls_robust.covariance == "robust"
+
+
+def test_phase_17_qreg_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(QregCommand(outcome="y", predictors=("x",)))
+  finally:
+    executor.close()
+
+  assert isinstance(result, QregRegressionResult)
+  assert result.covariance == "nonrobust"
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.quantile == pytest.approx(0.5)
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+
+
+def test_phase_17_qreg_supports_robust_quantile_predict_and_estat(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      QregCommand(
+        outcome="y",
+        predictors=("x",),
+        quantile=0.25,
+        robust=True,
+      )
+    )
+    predicted = executor.execute(PredictCommand(target_variable="qhat", kind="xb"))
+    residuals = executor.execute(PredictCommand(target_variable="qresid", kind="residuals"))
+    stats = executor.execute(EstatCommand(subcommand="residuals"))
+    preview = executor.execute(HeadCommand(1))
+  finally:
+    executor.close()
+
+  assert isinstance(result, QregRegressionResult)
+  assert result.covariance == "robust"
+  assert result.quantile == pytest.approx(0.25)
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted qhat"
+  assert isinstance(residuals, TransformResult)
+  assert residuals.message == "Predicted qresid"
+  assert isinstance(stats, TableResult)
+  assert stats.headers == ("Metric", "Value")
+  assert stats.rows[0][0] == "count"
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("x", "y", "cluster_id", "weight", "sigma", "qhat", "qresid")
 
 
 def test_phase_15_nl_returns_typed_result(tmp_path: Path) -> None:
@@ -2001,7 +2057,9 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
+      match=(
+        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+      ),
     ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
@@ -2092,6 +2150,11 @@ def test_phase_13_estat_requires_prior_regression(sample_parquet: Path) -> None:
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
       executor.execute(EstatCommand(subcommand="ovtest"))
+    with pytest.raises(
+      ExecutionError,
+      match="estat residuals requires a prior regress or qreg model",
+    ):
+      executor.execute(EstatCommand(subcommand="residuals"))
   finally:
     executor.close()
 
@@ -2361,7 +2424,9 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     )
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
+      match=(
+        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+      ),
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
@@ -2865,7 +2930,9 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     )
     with pytest.raises(
       ExecutionError,
-      match="predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model",
+      match=(
+        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+      ),
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):

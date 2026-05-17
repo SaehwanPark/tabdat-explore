@@ -42,6 +42,7 @@ from tabdat.models import (
   PoissonCommand,
   PredictCommand,
   ProbitCommand,
+  QregCommand,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -96,6 +97,7 @@ _EXECUTABLE_COMMANDS = {
   "save",
   "export",
   "regress",
+  "qreg",
   "logit",
   "probit",
   "tobit",
@@ -339,6 +341,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "regress":
     return _parse_regress(parts)
+
+  if parts.name == "qreg":
+    return _parse_qreg(parts)
 
   if parts.name == "logit":
     return _parse_logit(parts)
@@ -863,6 +868,30 @@ def _parse_regress(parts: _CommandParts) -> RegressCommand:
     weight_variable=weight_variable,
     robust=robust,
     cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_qreg(parts: _CommandParts) -> QregCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("qreg expects syntax: qreg <y> <xvars>")
+  if len(parts.arguments) < 2:
+    raise ParseError("qreg expects syntax: qreg <y> <xvars>")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"quantile", "robust", "noconstant"}
+  if unsupported:
+    raise ParseError(f"qreg unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "qreg", {"robust", "noconstant"})
+  quantile = _single_float_option(parts.options, "quantile", "qreg")
+  if quantile is None:
+    quantile = 0.5
+  if quantile <= 0.0 or quantile >= 1.0:
+    raise ParseError("qreg option quantile must be between 0 and 1")
+  return QregCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    quantile=quantile,
+    robust="robust" in option_names,
     include_intercept="noconstant" not in option_names,
   )
 
@@ -1653,7 +1682,7 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"ll", "ul"}:
+  if option_name in {"ll", "ul", "quantile"}:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)

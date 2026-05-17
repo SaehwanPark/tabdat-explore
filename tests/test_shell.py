@@ -190,6 +190,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     regress_command = _completion_texts(completer, "regr")
     regress_columns = _completion_texts(completer, "regress c")
     regress_options = _completion_texts(completer, "regress cost age, ")
+    qreg_command = _completion_texts(completer, "qre")
+    qreg_columns = _completion_texts(completer, "qreg c")
+    qreg_options = _completion_texts(completer, "qreg cost age, ")
     logit_command = _completion_texts(completer, "log")
     logit_columns = _completion_texts(completer, "logit c")
     logit_options = _completion_texts(completer, "logit cost age, ")
@@ -246,6 +249,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert regress_command == ["regress"]
   assert regress_columns == ["cost"]
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
+  assert qreg_command == ["qreg"]
+  assert qreg_columns == ["cost"]
+  assert qreg_options == ["quantile(", "robust", "noconstant"]
   assert logit_command == ["logit"]
   assert logit_columns == ["cost"]
   assert logit_options == ["robust", "cluster(", "noconstant"]

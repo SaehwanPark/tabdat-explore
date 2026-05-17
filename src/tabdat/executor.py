@@ -79,6 +79,8 @@ from tabdat.models import (
   PreviewResult,
   ProbitCommand,
   ProbitRegressionResult,
+  QregCommand,
+  QregRegressionResult,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -123,6 +125,14 @@ class _RegressionState:
   predictor_names: tuple[str, ...]
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
+  include_intercept: bool
+  fitted_model: object
+
+
+@dataclass(frozen=True)
+class _QregRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
   include_intercept: bool
   fitted_model: object
 
@@ -247,6 +257,7 @@ class SessionState:
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
+  qreg_regression: _QregRegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
   nl_regression: _NlRegressionState | None = None
   poisson_regression: _PoissonRegressionState | None = None
@@ -432,6 +443,9 @@ class Executor:
 
     if isinstance(command, RegressCommand):
       return self._execute_regress(command)
+
+    if isinstance(command, QregCommand):
+      return self._execute_qreg(command)
 
     if isinstance(command, LogitCommand):
       return self._execute_logit(command)
@@ -728,6 +742,7 @@ class Executor:
       include_intercept=command.include_intercept,
       fitted_model=fitted,
     )
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -752,6 +767,68 @@ class Executor:
         residuals=getattr(fitted, "resid", None),
         parameter_count=len(parameter_names),
       ),
+      coefficients=coefficients,
+    )
+
+  def _execute_qreg(self, command: QregCommand) -> QregRegressionResult:
+    dataset = self._require_active_dataset("qreg")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("qreg", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("qreg requires at least one complete observation")
+    design = np.array(
+      _design_matrix(predictors, include_intercept=command.include_intercept),
+      dtype=float,
+    )
+    outcome_array = np.array(outcome, dtype=float)
+    model = sm.QuantReg(outcome_array, design)
+    covariance = "nonrobust"
+    vcov = "iid"
+    if command.robust:
+      covariance = "robust"
+      vcov = "robust"
+    try:
+      fitted = model.fit(q=command.quantile, vcov=vcov)
+    except Exception as exc:
+      raise ExecutionError("qreg failed") from exc
+    parameter_names = (
+      ("intercept", *command.predictors) if command.include_intercept else command.predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    self.state.regression = None
+    self.state.qreg_regression = None
+    self.state.qreg_regression = _QregRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      include_intercept=command.include_intercept,
+      fitted_model=fitted,
+    )
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    return QregRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      quantile=command.quantile,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      pseudo_r_squared=_to_float(getattr(fitted, "prsquared", None)),
       coefficients=coefficients,
     )
 
@@ -802,6 +879,7 @@ class Executor:
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = _BinaryRegressionState(
       family="logit",
       outcome_variable=command.outcome,
@@ -875,6 +953,7 @@ class Executor:
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = _BinaryRegressionState(
       family="probit",
       outcome_variable=command.outcome,
@@ -967,6 +1046,7 @@ class Executor:
     parameter_names = _iv_parameter_names(command)
     coefficients = _iv_coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1095,6 +1175,7 @@ class Executor:
       else tuple(estimate.value for estimate in coefficients)
     )
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1215,6 +1296,7 @@ class Executor:
     )
     rss = float(np.dot(residuals, residuals))
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = _NlRegressionState(
       outcome_variable=command.outcome,
@@ -1286,6 +1368,7 @@ class Executor:
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = _PoissonRegressionState(
@@ -1357,6 +1440,7 @@ class Executor:
     )
     coefficients = _coefficient_estimates(parameter_names, fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1444,6 +1528,7 @@ class Executor:
       raise ExecutionError("zip failed") from exc
     coefficients = _coefficient_estimates(_fitted_parameter_names(fitted), fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1533,6 +1618,7 @@ class Executor:
       raise ExecutionError("zinb failed") from exc
     coefficients = _coefficient_estimates(_fitted_parameter_names(fitted), fitted)
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1613,6 +1699,38 @@ class Executor:
         intercept=regression.intercept,
         outcome_variable=regression.outcome_variable,
         kind=command.kind,
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    qreg_regression = self.state.qreg_regression
+    if qreg_regression is not None:
+      available_columns = {column.name for column in dataset.columns}
+      if any(name not in available_columns for name in qreg_regression.predictor_names):
+        raise ExecutionError("predict requires a prior qreg model with matching variables")
+      rows = self.backend.regression_rows(dataset, qreg_regression.predictor_names)
+      qreg_predictions = _qreg_predictions(
+        rows=rows,
+        fitted_model=qreg_regression.fitted_model,
+        predictor_count=len(qreg_regression.predictor_names),
+        include_intercept=qreg_regression.include_intercept,
+      )
+      if command.kind == "residuals":
+        outcomes = self.backend.regression_rows(dataset, (qreg_regression.outcome_variable,))
+        qreg_residuals: list[float | None] = []
+        for outcome_row, predicted_value in zip(outcomes, qreg_predictions, strict=True):
+          if predicted_value is None or len(outcome_row) != 1:
+            qreg_residuals.append(None)
+            continue
+          observed = _coerce_float(outcome_row[0])
+          if observed is None:
+            qreg_residuals.append(None)
+            continue
+          qreg_residuals.append(observed - predicted_value)
+        qreg_predictions = tuple(qreg_residuals)
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=qreg_predictions,
+        command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     cf_regression = self.state.cf_regression
@@ -1817,7 +1935,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, cfregress, nl, poisson, nbreg, zip, or zinb model"
+      "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 
   def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
@@ -1865,6 +1983,7 @@ class Executor:
     except Exception as exc:
       raise ExecutionError("streg failed") from exc
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1929,6 +2048,7 @@ class Executor:
     except Exception as exc:
       raise ExecutionError("tobit failed") from exc
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -2008,6 +2128,7 @@ class Executor:
     except Exception as exc:
       raise ExecutionError("heckman failed") from exc
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -2033,9 +2154,12 @@ class Executor:
     dataset = self._require_active_dataset("estat")
     if command.subcommand == "residuals":
       regression = self.state.regression
-      if regression is None:
-        raise ExecutionError("estat requires a prior regress model")
-      return _estat_residuals_table(regression.fitted_model)
+      if regression is not None:
+        return _estat_residuals_table(regression.fitted_model)
+      qreg_regression = self.state.qreg_regression
+      if qreg_regression is not None:
+        return _estat_residuals_table(qreg_regression.fitted_model)
+      raise ExecutionError("estat residuals requires a prior regress or qreg model")
     if command.subcommand == "ovtest":
       regression = self.state.regression
       if regression is None:
@@ -2212,6 +2336,7 @@ class Executor:
     else:
       self.state.xt_regressions.re = state
     self.state.regression = None
+    self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -3441,6 +3566,47 @@ def _binary_predictions(
         predicted = np.array(cast(Any, fitted_model).predict(design, linear=linear), dtype=float)
       except Exception as exc:
         raise ExecutionError("predict failed") from exc
+    if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
+      raise ExecutionError("predict failed")
+    for row_index, value in zip(complete_indexes, predicted, strict=True):
+      float_value = float(value)
+      row_values[row_index] = float_value if math.isfinite(float_value) else None
+  return tuple(row_values)
+
+
+def _qreg_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  fitted_model: object,
+  predictor_count: int,
+  include_intercept: bool,
+) -> tuple[float | None, ...]:
+  row_values: list[float | None] = [None for _ in rows]
+  complete_indexes: list[int] = []
+  complete_predictors: list[tuple[float, ...]] = []
+  for row_index, row in enumerate(rows):
+    if len(row) != predictor_count:
+      raise ExecutionError("predict failed")
+    if any(value is None for value in row):
+      continue
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw_value) for raw_value in row) if value is not None
+    )
+    if len(predictor_values) != predictor_count:
+      continue
+    if any(not math.isfinite(value) for value in predictor_values):
+      continue
+    complete_indexes.append(row_index)
+    complete_predictors.append(predictor_values)
+  if complete_predictors:
+    design = np.array(
+      _design_matrix(tuple(complete_predictors), include_intercept=include_intercept),
+      dtype=float,
+    )
+    try:
+      predicted = np.array(cast(Any, fitted_model).predict(design), dtype=float)
+    except Exception as exc:
+      raise ExecutionError("predict failed") from exc
     if predicted.ndim != 1 or len(predicted) != len(complete_indexes):
       raise ExecutionError("predict failed")
     for row_index, value in zip(complete_indexes, predicted, strict=True):

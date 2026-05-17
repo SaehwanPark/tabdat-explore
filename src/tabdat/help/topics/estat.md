@@ -12,6 +12,7 @@ How do I check fit, identification, or marginal effects after estimation?
 Examples:
 - `estat vif`
 - `estat residuals`
+- `qreg claims age exposure` then `estat residuals`
 - `estat margins`
 - `estat gof`
 - `nbreg claims age exposure` then `estat gof`
