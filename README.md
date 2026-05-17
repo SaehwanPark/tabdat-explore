@@ -35,6 +35,8 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - quantile regression with
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
+- bounded panel-metadata DID with
+  `did <y> [controls], treat(<var>) post(<var>) [robust]` after `panel <id_var> <time_var>`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
@@ -226,8 +228,8 @@ tabdat> run analysis.td
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
-  latest `regress`/`qreg`/`cfregress`/`nl` model state, and supports `pr` (plus `xb`) after
-  `logit`/`probit`.
+  latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, and supports
+  `pr` (plus `xb`) after `logit`/`probit`.
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
   boundary (`survival::survreg` via `rpy2`).

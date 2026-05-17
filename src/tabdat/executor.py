@@ -44,6 +44,8 @@ from tabdat.models import (
   DatasetInfo,
   DescribeCommand,
   DescribeResult,
+  DidCommand,
+  DidRegressionResult,
   DropCommand,
   EstatCommand,
   ExitCommand,
@@ -182,6 +184,15 @@ class _XtRegressionState:
 
 
 @dataclass(frozen=True)
+class _DidRegressionState:
+  outcome_variable: str
+  control_names: tuple[str, ...]
+  treatment_variable: str
+  post_variable: str
+  fitted_model: object
+
+
+@dataclass(frozen=True)
 class _BinaryRegressionState:
   family: Literal["logit", "probit"]
   outcome_variable: str
@@ -268,6 +279,7 @@ class SessionState:
   iv_regression: _IvRegressionState | None = None
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
+  did_regression: _DidRegressionState | None = None
 
 
 class Executor:
@@ -488,6 +500,9 @@ class Executor:
 
     if isinstance(command, XtDataCommand):
       return self._execute_xtdata(command)
+
+    if isinstance(command, DidCommand):
+      return self._execute_did(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -753,6 +768,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return RegressionResult(
       outcome=command.outcome,
       predictors=command.predictors,
@@ -821,6 +837,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return QregRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -896,6 +913,7 @@ class Executor:
     self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return LogitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -970,6 +988,7 @@ class Executor:
     self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return ProbitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1060,6 +1079,7 @@ class Executor:
     )
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return IvRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
@@ -1229,6 +1249,7 @@ class Executor:
       residual_df=residual_df,
     )
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return CfRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1314,6 +1335,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return NlRegressionResult(
       covariance=covariance_label,
       outcome=command.outcome,
@@ -1384,6 +1406,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return PoissonRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1456,6 +1479,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return NbregRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1545,6 +1569,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return ZipRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1635,6 +1660,7 @@ class Executor:
     self.state.streg_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return ZinbRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1730,6 +1756,39 @@ class Executor:
         dataset,
         target_variable=command.target_variable,
         values=qreg_predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    did_regression = self.state.did_regression
+    if did_regression is not None:
+      if command.kind != "xb":
+        raise ExecutionError("predict only supports xb after did")
+      panel_metadata = dataset.panel_metadata
+      if panel_metadata is None:
+        raise ExecutionError("predict requires a prior did model with matching variables")
+      required_columns = (
+        panel_metadata.id_variable,
+        panel_metadata.time_variable,
+        did_regression.outcome_variable,
+        *did_regression.control_names,
+        did_regression.treatment_variable,
+        did_regression.post_variable,
+      )
+      available_columns = {column.name for column in dataset.columns}
+      if any(name not in available_columns for name in required_columns):
+        raise ExecutionError("predict requires a prior did model with matching variables")
+      rows = self.backend.regression_rows(dataset, required_columns)
+      predictions = _did_predictions(
+        rows=rows,
+        id_variable=panel_metadata.id_variable,
+        time_variable=panel_metadata.time_variable,
+        control_names=did_regression.control_names,
+        fitted_model=did_regression.fitted_model,
+      )
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predictions,
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
@@ -1935,7 +1994,8 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+      "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+      "or zinb model"
     )
 
   def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
@@ -2001,6 +2061,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return StregRegressionResult(
       covariance=covariance,
       time_variable=command.time_variable,
@@ -2059,6 +2120,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return TobitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -2138,6 +2200,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
     return HeckmanRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -2345,6 +2408,7 @@ class Executor:
     self.state.zinb_regression = None
     self.state.iv_regression = None
     self.state.cf_regression = None
+    self.state.did_regression = None
     return XtRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
@@ -2380,6 +2444,111 @@ class Executor:
     )
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Applied xtdata {command.transform} transform", next_dataset)
+
+  def _execute_did(self, command: DidCommand) -> DidRegressionResult:
+    dataset = self._require_active_dataset("did")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("did requires panel metadata; run panel <id_var> <time_var> first")
+    variables: tuple[str, ...] = (
+      panel_metadata.id_variable,
+      panel_metadata.time_variable,
+      command.outcome,
+      *command.controls,
+      command.treatment_variable,
+      command.post_variable,
+    )
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    missing = tuple(variable for variable in variables if variable not in column_types)
+    if missing:
+      raise UnknownVariableError(f"did unknown variable: {', '.join(missing)}")
+    _require_numeric_columns(
+      "did",
+      dataset,
+      (command.outcome, *command.controls, command.treatment_variable, command.post_variable),
+    )
+    rows = self.backend.regression_rows(dataset, variables)
+    panel = _xt_panel_sample(
+      rows=rows,
+      predictor_count=len(command.controls) + 2,
+      has_cluster=False,
+    )
+    if panel is None:
+      raise ExecutionError("did requires at least one complete observation")
+    outcomes, predictors, entity_ids, time_ids, _ = panel
+    treatment_index = len(command.controls)
+    post_index = treatment_index + 1
+    treatment_values = tuple(row[treatment_index] for row in predictors)
+    post_values = tuple(row[post_index] for row in predictors)
+    allowed = {0.0, 1.0}
+    if set(treatment_values) - allowed or set(post_values) - allowed:
+      raise ExecutionError("did treatment and post variables must be binary with values 0 and 1")
+    frame_data: dict[str, object] = {
+      panel_metadata.id_variable: entity_ids,
+      panel_metadata.time_variable: time_ids,
+      command.outcome: outcomes,
+    }
+    for index, control in enumerate(command.controls):
+      frame_data[control] = tuple(row[index] for row in predictors)
+    interaction_name = "__tabdat_did_interaction"
+    frame_data[interaction_name] = tuple(
+      treat * post for treat, post in zip(treatment_values, post_values, strict=True)
+    )
+    model_frame = _data_frame(frame_data, panel_metadata.id_variable, panel_metadata.time_variable)
+    outcome_series = model_frame[command.outcome]
+    predictor_names = [*command.controls, interaction_name]
+    predictor_frame = model_frame[predictor_names]
+    cov_type = "robust" if command.robust else "unadjusted"
+    covariance_label = "robust" if command.robust else "nonrobust"
+    try:
+      fitted = PanelOLS(
+        outcome_series,
+        predictor_frame,
+        entity_effects=True,
+        time_effects=True,
+      ).fit(cov_type=cov_type)
+    except Exception as exc:
+      raise ExecutionError("did failed") from exc
+    fitted_names = (*command.controls, interaction_name)
+    raw_coefficients = _panel_coefficient_estimates(fitted_names, fitted)
+    coefficients = tuple(
+      CoefficientEstimate(
+        name="did_interaction" if estimate.name == interaction_name else estimate.name,
+        value=estimate.value,
+        standard_error=estimate.standard_error,
+        statistic=estimate.statistic,
+        p_value=estimate.p_value,
+      )
+      for estimate in raw_coefficients
+    )
+    self.state.regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = _DidRegressionState(
+      outcome_variable=command.outcome,
+      control_names=command.controls,
+      treatment_variable=command.treatment_variable,
+      post_variable=command.post_variable,
+      fitted_model=fitted,
+    )
+    return DidRegressionResult(
+      covariance=covariance_label,
+      outcome=command.outcome,
+      controls=command.controls,
+      treatment_variable=command.treatment_variable,
+      post_variable=command.post_variable,
+      observation_count=len(outcomes),
+      coefficients=coefficients,
+    )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
     if self.state.active_dataset is None:
@@ -3366,6 +3535,86 @@ def _xt_sample_fingerprint(
       digest.update(f"{predictor:.17g}".encode())
     digest.update(b"\x1e")
   return digest.hexdigest()
+
+
+def _did_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  id_variable: str,
+  time_variable: str,
+  control_names: tuple[str, ...],
+  fitted_model: object,
+) -> tuple[float | None, ...]:
+  entity_ids: list[object] = []
+  time_ids: list[object] = []
+  controls: list[tuple[float, ...] | None] = []
+  treatment_values: list[float] = []
+  post_values: list[float] = []
+  row_width = 3 + len(control_names) + 2
+  for row in rows:
+    if len(row) != row_width:
+      return tuple(None for _ in rows)
+    entity_id = row[0]
+    time_id = row[1]
+    control_start = 3
+    control_end = control_start + len(control_names)
+    treatment_raw = row[control_end]
+    post_raw = row[control_end + 1]
+    if entity_id is None or time_id is None:
+      entity_ids.append(entity_id)
+      time_ids.append(time_id)
+      controls.append(None)
+      treatment_values.append(float("nan"))
+      post_values.append(float("nan"))
+      continue
+    control_row: list[float] = []
+    invalid = False
+    for raw in row[control_start:control_end]:
+      numeric = _coerce_float(raw)
+      if numeric is None:
+        invalid = True
+        break
+      control_row.append(numeric)
+    treatment = _coerce_float(treatment_raw)
+    post = _coerce_float(post_raw)
+    if invalid or treatment is None or post is None:
+      entity_ids.append(entity_id)
+      time_ids.append(time_id)
+      controls.append(None)
+      treatment_values.append(float("nan"))
+      post_values.append(float("nan"))
+      continue
+    entity_ids.append(entity_id)
+    time_ids.append(time_id)
+    controls.append(tuple(control_row))
+    treatment_values.append(treatment)
+    post_values.append(post)
+
+  interaction_name = "__tabdat_did_interaction"
+  frame_data: dict[str, object] = {
+    id_variable: entity_ids,
+    time_variable: time_ids,
+  }
+  for index, control in enumerate(control_names):
+    frame_data[control] = tuple(
+      row[index] if row is not None and index < len(row) else np.nan for row in controls
+    )
+  frame_data[interaction_name] = tuple(
+    treat * post if math.isfinite(treat) and math.isfinite(post) else np.nan
+    for treat, post in zip(treatment_values, post_values, strict=True)
+  )
+  model_frame = _data_frame(frame_data, id_variable, time_variable)
+  try:
+    prediction_frame = model_frame[[*control_names, interaction_name]]
+    predicted = cast(Any, fitted_model).predict(exog=prediction_frame)
+    predicted_values = predicted.to_numpy().reshape(-1)
+  except Exception:
+    return tuple(None for _ in rows)
+  values: list[float | None] = []
+  for value in predicted_values:
+    numeric = _to_float_allow_inf(value)
+    values.append(numeric)
+  return tuple(values)
 
 
 def _panel_coefficient_estimates(

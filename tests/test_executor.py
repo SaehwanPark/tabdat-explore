@@ -31,6 +31,8 @@ from tabdat.models import (
   CountResult,
   DescribeCommand,
   DescribeResult,
+  DidCommand,
+  DidRegressionResult,
   DropCommand,
   EstatCommand,
   ExportCommand,
@@ -231,6 +233,25 @@ def _write_panel_regression_parquet(path: Path) -> None:
         (3, 2021, 10.0, 2.0, 2.0, 'c'),
         (3, 2022, 11.0, 3.0, 1.0, 'c')
     ) as panel_data(firm_id, year, wage, exper, tenure, cluster_id)
+    """,
+  )
+
+
+def _write_did_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.2, 0, 0, 1.1),
+        (1, 2021, 11.0, 0, 1, 0.8),
+        (2, 2020, 9.8, 0, 0, 1.0),
+        (2, 2021, 10.7, 0, 1, 1.2),
+        (3, 2020, 10.1, 1, 0, 0.9),
+        (3, 2021, 12.8, 1, 1, 1.3),
+        (4, 2020, 9.9, 1, 0, 1.0),
+        (4, 2021, 12.6, 1, 1, 1.1)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
     """,
   )
 
@@ -2058,7 +2079,8 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "or zinb model"
       ),
     ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
@@ -2425,7 +2447,8 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "or zinb model"
       ),
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
@@ -2604,6 +2627,40 @@ def test_phase_14_xtreg_requires_panel_metadata(tmp_path: Path) -> None:
     executor.close()
 
 
+def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
+  path = tmp_path / "did.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(
+      DidCommand(
+        outcome="wage",
+        controls=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+      )
+    )
+    executor.execute(
+      XtRegCommand(
+        outcome="wage",
+        predictors=("exposure",),
+        estimator="fe",
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match=(
+        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "or zinb model"
+      ),
+    ):
+      executor.execute(PredictCommand(target_variable="pred_after_xtreg"))
+  finally:
+    executor.close()
+
+
 def test_phase_14_xtdata_within_between_transforms(tmp_path: Path) -> None:
   path = tmp_path / "panel-regression.parquet"
   _write_panel_regression_parquet(path)
@@ -2723,6 +2780,96 @@ def test_phase_14_estat_endogenous_after_cfregress(tmp_path: Path) -> None:
   assert endogenous.rows[9][0] == "control_function_residual"
   assert endogenous.rows[9][1] == "df"
   assert isinstance(endogenous.rows[9][2], (float, str))
+
+
+def test_phase_17_did_returns_typed_result_and_predicts_xb(tmp_path: Path) -> None:
+  path = tmp_path / "did.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(
+      DidCommand(
+        outcome="wage",
+        controls=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        robust=True,
+      )
+    )
+    predicted = executor.execute(PredictCommand(target_variable="did_xb", kind="xb"))
+    preview = executor.execute(HeadCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(result, DidRegressionResult)
+  assert result.covariance == "robust"
+  assert result.outcome == "wage"
+  assert result.controls == ("exposure",)
+  assert result.treatment_variable == "treated"
+  assert result.post_variable == "post"
+  assert result.observation_count == 8
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted did_xb"
+  assert isinstance(preview, PreviewResult)
+  assert "did_xb" in preview.columns
+
+
+def test_phase_17_did_requires_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "did.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="did requires panel metadata; run panel <id_var> <time_var> first",
+    ):
+      executor.execute(
+        DidCommand(
+          outcome="wage",
+          controls=("exposure",),
+          treatment_variable="treated",
+          post_variable="post",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_17_did_requires_binary_treatment_and_post(tmp_path: Path) -> None:
+  path = tmp_path / "did-nonbinary.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 0, 0, 1.0),
+        (1, 2021, 11.0, 2, 1, 1.1),
+        (2, 2020, 9.5, 0, 0, 0.9),
+        (2, 2021, 10.8, 1, 1, 1.0)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    with pytest.raises(
+      ExecutionError,
+      match="did treatment and post variables must be binary with values 0 and 1",
+    ):
+      executor.execute(
+        DidCommand(
+          outcome="wage",
+          controls=("exposure",),
+          treatment_variable="treated",
+          post_variable="post",
+        )
+      )
+  finally:
+    executor.close()
 
 
 def test_phase_14_estat_endogenous_uses_residual_inclusion_slot_with_name_collision(
@@ -2931,7 +3078,8 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, or zinb model"
+        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "or zinb model"
       ),
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))

@@ -1013,7 +1013,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, qreg, cfregress, nl, poisson, nbreg, zip, "
+    "Error: predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
     "or zinb model" in captured.err
   )
 
@@ -1322,6 +1322,50 @@ def test_cli_runs_phase_14_xtdata_flow(tmp_path: Path, capsys) -> None:
   assert "Applied xtdata between transform: 6 rows, 8 columns" in captured.out
   assert "wage_within" in captured.out
   assert "wage_between" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_17_did_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "did.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.2, 0, 0, 1.1),
+        (1, 2021, 11.0, 0, 1, 0.8),
+        (2, 2020, 9.8, 0, 0, 1.0),
+        (2, 2021, 10.7, 0, 1, 1.2),
+        (3, 2020, 10.1, 1, 0, 0.9),
+        (3, 2021, 12.8, 1, 1, 1.3),
+        (4, 2020, 9.9, 1, 0, 1.0),
+        (4, 2021, 12.6, 1, 1, 1.1)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "did wage exposure, treat(treated) post(post) robust",
+      "-c",
+      "predict did_xb",
+      "-c",
+      "head 2",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: did wage on exposure (treat=treated, post=post)" in captured.out
+  assert "Estimator: did_twfe" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert "Predicted did_xb: 8 rows, 7 columns" in captured.out
+  assert "did_xb" in captured.out
   assert captured.err == ""
 
 

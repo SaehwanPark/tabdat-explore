@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the second Phase 17 advanced empirical-methods slice with
+  `did <y> [controls], treat(<var>) post(<var>) [robust]`, required prior panel metadata
+  (`panel <id_var> <time_var>`), bounded two-way fixed-effects execution through
+  `linearmodels.PanelOLS`, deterministic nonrobust/robust covariance output, and focused
+  parser/executor/CLI/shell/help coverage.
+- Added deterministic `predict <newvar>[, xb]` routing after `did`.
 - Added the first Phase 17 advanced empirical-methods slice with
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`, deterministic
   nonrobust/robust covariance output, `predict <newvar>[, xb residuals]` routing after `qreg`,
@@ -204,6 +210,7 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed `predict` prerequisite diagnostics to include `did` model-state routing.
 - Changed `predict` prerequisite diagnostics to include `qreg` model-state routing while preserving
   existing binary-choice and count-model boundaries.
 - Changed `predict` routing so binary-model state (`logit`/`probit`) now supports `xb` and `pr`,
