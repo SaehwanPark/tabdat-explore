@@ -33,6 +33,8 @@ command line. The current CLI supports:
 - Parquet persistence with `save` and `export`
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
+- quantile regression with
+  `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
@@ -224,7 +226,7 @@ tabdat> run analysis.td
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
-  latest `regress`/`cfregress`/`nl` model state, and supports `pr` (plus `xb`) after
+  latest `regress`/`qreg`/`cfregress`/`nl` model state, and supports `pr` (plus `xb`) after
   `logit`/`probit`.
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
@@ -234,6 +236,7 @@ tabdat> run analysis.td
   deterministic outcome/selection equation output.
 - `estat` currently provides:
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
+  - quantile residual diagnostics (`residuals`) over the latest `qreg` state
   - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state
   - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
   - control-function endogenous diagnostics (`endogenous`) over the latest `cfregress` state

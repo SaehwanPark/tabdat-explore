@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the first Phase 17 advanced empirical-methods slice with
+  `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`, deterministic
+  nonrobust/robust covariance output, `predict <newvar>[, xb residuals]` routing after `qreg`,
+  `estat residuals` diagnostics after `qreg`, and focused parser/executor/CLI/shell/help coverage.
 - Added the fourth Phase 16 specialized likelihood-model slice with
   `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
   [robust cluster(<var>) noconstant]`, bounded parametric duration/survival execution,
@@ -200,6 +204,8 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed `predict` prerequisite diagnostics to include `qreg` model-state routing while preserving
+  existing binary-choice and count-model boundaries.
 - Changed `predict` routing so binary-model state (`logit`/`probit`) now supports `xb` and `pr`,
   while preserving existing linear/control-function prediction behavior and keeping binary
   residual prediction out of scope.

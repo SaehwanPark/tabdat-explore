@@ -306,44 +306,39 @@ and describe the active work with concise verification criteria.
     covariance labels
   - deterministic typed/formatted output plus focused parser, executor, CLI, shell, and help
     coverage
+- Implemented the first Phase 17 advanced empirical-methods slice:
+  - `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
+  - bounded quantile-regression execution with deterministic nonrobust/robust covariance labels
+  - deterministic `predict <newvar>[, xb residuals]` routing after `qreg`
+  - deterministic `estat residuals` diagnostics after `qreg` while preserving `ovtest`/`vif`
+    as regress-only diagnostics
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
-- Feature: Phase 16 specialized likelihood models
+- Feature: Phase 17 advanced empirical methods
   Status: Active
-  Started: 2026-05-16
-  Branch: codex/tmp-phase16-slice4-streg-survival
+  Started: 2026-05-17
+  Branch: codex/tmp-phase17-slice1-qreg-predict-estat-residuals
 
   Summary:
-  Continue from completed Phase 15 nonlinear foundations with bounded first through fourth
-  Phase 16 slices: count-model workflows (`poisson`, `nbreg`, `zip`, `zinb`) with deterministic
-  post-estimation routing (`predict ..., xb|residuals`) and `estat gof`, plus the first bounded
-  duration/survival workflow (`streg`).
+  Continue from completed Phase 16 specialized-likelihood foundations with a bounded first
+  Phase 17 slice: quantile-regression workflow (`qreg`) with deterministic estimation output,
+  post-estimation prediction routing (`predict ..., xb|residuals`), and residual diagnostics
+  (`estat residuals`).
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
   - Integrated E2E scenarios `s1` through `s5` pass
-  - `poisson` parses and executes with nonrobust, robust, and clustered covariance modes
-  - `nbreg` parses and executes with nonrobust, robust, and clustered covariance modes
-  - `zip` parses and executes with required `inflate(...)` plus nonrobust, robust, and clustered
-    covariance modes
-  - `zinb` parses and executes with required `inflate(...)` plus nonrobust, robust, and clustered
-    covariance modes
-  - `predict ..., xb|residuals` executes after `poisson` with deterministic output
-  - `predict ..., xb|residuals` executes after `nbreg` with deterministic output
-  - `predict ..., xb|residuals` executes after `zip` with deterministic output
-  - `predict ..., xb|residuals` executes after `zinb` with deterministic output
-  - `estat gof` executes after `poisson` with deterministic table output
-  - `estat gof` executes after `nbreg` with deterministic table output
-  - `estat gof` executes after `zip` with deterministic table output
-  - `estat gof` executes after `zinb` with deterministic table output
-  - `streg` parses and executes with required `failure(...)` and `dist(...)` plus nonrobust,
-    robust, and clustered covariance modes
+  - `qreg` parses and executes with default median quantile plus explicit `quantile(...)`
+  - `qreg` executes with deterministic nonrobust and robust covariance modes
+  - `predict ..., xb|residuals` executes after `qreg` with deterministic output
+  - `estat residuals` executes after `qreg` with deterministic table output
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
   Out of Scope:
-  - hurdle and finite-mixture model families
+  - panel-GMM and causal-inference method families
 
 ## Future
 
@@ -382,6 +377,8 @@ and describe the active work with concise verification criteria.
 - Phase 17 advanced empirical methods:
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
+  - remaining meaningful slice in this phase (one-sentence summary):
+    - add bounded dynamic-panel and causal-method command families after the initial qreg slice
   - library strategy:
     - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
       semiparametric building blocks
