@@ -1,4 +1,4 @@
-# Phase 17 Slice 3 QA Report
+# Phase 17 Slice 4 QA Report
 
 ## Status
 
@@ -7,23 +7,22 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `xtabond` syntax/options and completion behavior match the command contract.
-  - `estat did` parses and is discoverable through shell suggestions.
+  - `xtabond` option surface and guard behavior match the Slice 4 command contract.
+  - shell completion advertises new `xtabond` options.
 - Contract -> executor:
-  - `xtabond` executes with nonrobust/robust covariance modes and panel/sample guards.
-  - fallback runtime path activates when Python fit is forced to fail.
-  - `estat did` executes after `did` and rejects missing `did` state.
+  - `xtabond` executes with lag/instrument options and retains bounded dynamic-panel guards.
+  - `estat did` now includes deterministic expanded DID diagnostics after `did`.
 - Contract -> formatter/CLI/help:
-  - `xtabond` and `estat did` CLI output are deterministic and typed.
-  - in-app help topics include `xtabond` and updated `estat` examples.
+  - existing deterministic CLI output behavior remains stable.
+  - in-app help reflects `xtabond` option expansion and richer `estat did` behavior.
 - Regression boundaries:
-  - existing estimator-family routing remains stable under focused and full checks.
+  - existing estimator-family `predict`/`estat` routing remains stable under focused tests.
 
 ## Blocking Issues
 
-- None found in validation.
+- None found in focused validation.
 
 ## Validation Evidence
 
-- Focused `xtabond`/`estat did` checks passed.
-- Full quality gates passed (`ruff`, `pyright`, `mypy`, `pytest`, integrated E2E harness).
+- Focused parser/shell/executor/CLI/help checks for `xtabond` and `estat did` passed.
+- Full quality and integrated E2E checks recorded in final delivery summary.

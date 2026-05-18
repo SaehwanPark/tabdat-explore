@@ -1,16 +1,16 @@
-# Phase 17 Slice 3 Command Contract
+# Phase 17 Slice 4 Command Contract
 
 ## Roadmap Phase
 
 - Phase 17 advanced empirical methods
-  - Slice 3: bounded dynamic-panel starter (`xtabond`) plus DID post-estimation diagnostics
+  - Slice 4: bounded dynamic-panel option expansion (`xtabond`) plus richer DID diagnostics
 
 ## `xtabond`
 
 ### Syntax
 
 ```stata
-xtabond <y> [xvars] [, robust]
+xtabond <y> [xvars] [, robust lags(#) instlag(#)]
 ```
 
 ### Rules
@@ -22,6 +22,10 @@ xtabond <y> [xvars] [, robust]
 - Supports covariance modes:
   - nonrobust (default)
   - robust
+- Supports lag options:
+  - `lags(#)` where `# >= 1`
+  - `instlag(#)` where `# >= 2`
+  - `instlag(#)` must be strictly greater than `lags(#)`.
 
 ## `estat did`
 
@@ -35,7 +39,8 @@ estat did
 
 - Requires one active dataset.
 - Requires prior successful `did` model state.
-- Returns deterministic interaction-diagnostic rows for the DID interaction term.
+- Returns deterministic interaction diagnostics plus deterministic DID cell counts/means and raw
+  diff-in-diff contrasts.
 
 ## Error/guard behavior
 
@@ -43,6 +48,10 @@ estat did
   - `xtabond requires panel metadata; run panel <id_var> <time_var> first`
 - Empty complete-observation dynamic sample:
   - `xtabond requires at least one complete observation`
+- Invalid lag options:
+  - `xtabond option lags must be at least 1`
+  - `xtabond option instlag must be at least 2`
+  - `xtabond option instlag must be greater than option lags`
 - Missing variables/non-numeric variables:
   - existing unknown-variable and numeric-type errors
 - Fit failures:
@@ -57,7 +66,7 @@ estat did
 
 ## Acceptance Criteria
 
-- `xtabond` parses and executes with optional predictors and optional `robust`.
-- deterministic typed/formatted output includes dynamic-panel coefficient rows.
-- `estat did` parses and executes after `did` with deterministic table output.
-- focused parser/executor/CLI/shell/help coverage passes.
+- `xtabond` parses and executes with optional predictors plus `robust`, `lags(#)`, and `instlag(#)`.
+- Deterministic typed/formatted output includes dynamic-panel coefficient rows with lag-aware naming.
+- `estat did` parses and executes after `did` with deterministic expanded table output.
+- Focused parser/executor/CLI/shell/help coverage passes.

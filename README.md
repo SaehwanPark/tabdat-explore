@@ -38,7 +38,7 @@ command line. The current CLI supports:
 - bounded panel-metadata DID with
   `did <y> [controls], treat(<var>) post(<var>) [robust]` after `panel <id_var> <time_var>`
 - bounded dynamic-panel GMM starter with
-  `xtabond <y> [xvars] [, robust]` after `panel <id_var> <time_var>`
+  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` after `panel <id_var> <time_var>`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
@@ -259,8 +259,8 @@ tabdat> run analysis.td
 - `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and
   appends deterministic `<var>_within` or `<var>_between` columns.
 - `xtabond` currently provides a bounded dynamic-panel AR(1) GMM starter with nonrobust/robust
-  covariance modes. The Python IV-GMM path is primary; an R-backed fallback path is available when
-  Python fitting fails.
+  covariance modes plus `lags(#)` and `instlag(#)` controls. The Python IV-GMM path is primary;
+  an R-backed fallback path is available when Python fitting fails.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

@@ -325,20 +325,27 @@ and describe the active work with concise verification criteria.
   - bounded dynamic-panel AR(1) GMM starter with Python-first IVGMM execution and R fallback
   - deterministic `estat did` diagnostics after `did`
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the fourth Phase 17 advanced empirical-methods slice:
+  - `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` with strict lag/instrument guards
+  - bounded dynamic-panel execution now supports configurable lag depth and instrument lag starts
+    while preserving Python-first IVGMM execution and R fallback behavior
+  - expanded deterministic `estat did` diagnostics with DID cell counts, cell means, and raw
+    diff-in-diff contrasts in addition to interaction coefficient metrics
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
 - Feature: Phase 17 advanced empirical methods
   Status: Active
   Started: 2026-05-17
-  Branch: codex/tmp-phase17-slice3-xtabond-estat-did
+  Branch: codex/tmp-phase17-slice4-xtabond-lags-instlag-did-diagnostics
 
   Summary:
   Continue from completed Phase 16 specialized-likelihood foundations with bounded Phase 17
   slices for quantile, causal, and dynamic-panel workflows: quantile regression (`qreg`), a
   panel-metadata DID starter (`did`) with deterministic post-estimation prediction routing
-  (`predict ..., xb`), plus bounded dynamic-panel starter execution (`xtabond`) and
-  DID post-estimation diagnostics (`estat did`).
+  (`predict ..., xb`), plus bounded dynamic-panel execution (`xtabond`) with lag/instrument
+  controls and richer DID post-estimation diagnostics (`estat did`).
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
@@ -349,13 +356,16 @@ and describe the active work with concise verification criteria.
   - `estat residuals` executes after `qreg` with deterministic table output
   - `did` parses and executes with deterministic nonrobust/robust covariance modes
   - `predict ..., xb` executes after `did` with deterministic output
-  - `xtabond` parses and executes with deterministic nonrobust/robust covariance modes
-  - `estat did` executes after `did` with deterministic table output
+  - `xtabond` parses and executes with deterministic nonrobust/robust covariance modes plus
+    `lags(#)`/`instlag(#)` options
+  - `estat did` executes after `did` with deterministic interaction metrics, cell counts, cell
+    means, and raw DID contrasts
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
   Out of Scope:
-  - broader panel-GMM option surfaces, system-GMM, and advanced causal diagnostics/extensions
+  - system-GMM, broader panel-GMM model families, and advanced causal estimators beyond bounded
+    TWFE + diagnostics
 
 ## Future
 
@@ -395,7 +405,8 @@ and describe the active work with concise verification criteria.
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
   - remaining meaningful slice in this phase (one-sentence summary):
-    - expand bounded dynamic-panel controls/options and add richer causal diagnostics beyond `estat did`
+    - extend bounded dynamic-panel and DID starters toward broader semiparametric/nonparametric and
+      causal workflows while preserving deterministic command contracts
   - library strategy:
     - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
       semiparametric building blocks
