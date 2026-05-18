@@ -15,7 +15,7 @@ from tabdat.errors import (
   UnknownTableError,
   UnknownVariableError,
 )
-from tabdat.executor import Executor
+from tabdat.executor import Executor, _xtabond_sample
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -2927,6 +2927,22 @@ def test_phase_17_xtabond_r_fallback_runs_when_python_fit_fails(
 
   assert isinstance(result, XtAbondRegressionResult)
   assert result.covariance == "nonrobust"
+
+
+def test_phase_17_xtabond_sample_orders_numeric_time_values() -> None:
+  rows: tuple[tuple[object, ...], ...] = (
+    (1, 1, 10.0, 0.0),
+    (1, 10, 16.0, 2.0),
+    (1, 2, 12.0, 1.0),
+  )
+  sample = _xtabond_sample(rows=rows, predictor_count=1)
+
+  assert sample is not None
+  dependent, exogenous, endogenous, instruments = sample
+  assert dependent == (4.0,)
+  assert exogenous == ((1.0,),)
+  assert endogenous == (2.0,)
+  assert instruments == ((10.0,),)
 
 
 def test_phase_17_did_requires_panel_metadata(tmp_path: Path) -> None:

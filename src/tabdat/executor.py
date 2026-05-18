@@ -2499,10 +2499,10 @@ class Executor:
       )
     except ExecutionError:
       fit = _fit_xtabond_r_fallback(
-        dependent=dependent,
-        exogenous=exogenous,
-        endogenous=endogenous,
-        instruments=instruments,
+        rows=rows,
+        predictor_count=len(command.predictors),
+        panel_id_name=panel_metadata.id_variable,
+        panel_time_name=panel_metadata.time_variable,
         outcome_name=command.outcome,
         predictor_names=command.predictors,
         cov_label=covariance_label,
@@ -3682,7 +3682,7 @@ def _xtabond_sample(
   endogenous: list[float] = []
   instruments: list[tuple[float, ...]] = []
   for entity_rows in grouped.values():
-    entity_rows.sort(key=lambda item: repr(item[0]))
+    entity_rows.sort(key=lambda item: _xtabond_time_sort_key(item[0]))
     if len(entity_rows) < 3:
       continue
     for index in range(2, len(entity_rows)):
@@ -3714,6 +3714,13 @@ def _xtabond_sample(
   )
 
 
+def _xtabond_time_sort_key(value: object) -> tuple[int, object]:
+  numeric = _coerce_float(value)
+  if numeric is not None and math.isfinite(numeric):
+    return (0, numeric)
+  return (1, repr(value))
+
+
 def _fit_xtabond_python(
   *,
   dependent: tuple[float, ...],
@@ -3743,10 +3750,10 @@ def _fit_xtabond_python(
 
 def _fit_xtabond_r_fallback(
   *,
-  dependent: tuple[float, ...],
-  exogenous: tuple[tuple[float, ...], ...] | None,
-  endogenous: tuple[float, ...],
-  instruments: tuple[tuple[float, ...], ...],
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  panel_id_name: str,
+  panel_time_name: str,
   outcome_name: str,
   predictor_names: tuple[str, ...],
   cov_label: str,
@@ -3767,44 +3774,79 @@ def _fit_xtabond_r_fallback(
     if not bool(require_namespace("plm", quietly=True)[0]):
       raise ExecutionError("xtabond failed")
     stats = packages.importr("stats")
-    _ = packages.importr("plm")
-    if not instruments or len(instruments[0]) < 1:
+    plm = packages.importr("plm")
+    row_width = 3 + predictor_count
+    id_values: list[str] = []
+    time_values: list[str] = []
+    outcome_values: list[float] = []
+    predictor_values: dict[str, list[float]] = {name: [] for name in predictor_names}
+    for row in rows:
+      if len(row) != row_width:
+        continue
+      entity_id = row[0]
+      time_id = row[1]
+      outcome = _coerce_float(row[2])
+      if entity_id is None or time_id is None or outcome is None or not math.isfinite(outcome):
+        continue
+      current_predictors: list[float] = []
+      invalid = False
+      for raw in row[3:]:
+        numeric = _coerce_float(raw)
+        if numeric is None or not math.isfinite(numeric):
+          invalid = True
+          break
+        current_predictors.append(numeric)
+      if invalid:
+        continue
+      id_values.append(str(entity_id))
+      time_values.append(str(time_id))
+      outcome_values.append(outcome)
+      for name, value in zip(predictor_names, current_predictors, strict=True):
+        predictor_values[name].append(value)
+    if len(outcome_values) < 3:
       raise ExecutionError("xtabond failed")
     column_data: dict[str, object] = {
-      "dep": FloatVector(dependent),
-      "endog": FloatVector(endogenous),
+      panel_id_name: StrVector(tuple(id_values)),
+      panel_time_name: StrVector(tuple(time_values)),
+      outcome_name: FloatVector(tuple(outcome_values)),
     }
-    for index, name in enumerate(predictor_names):
-      values = tuple(row[index] for row in exogenous) if exogenous is not None else ()
-      column_data[name] = FloatVector(values)
+    for name in predictor_names:
+      column_data[name] = FloatVector(tuple(predictor_values[name]))
     frame = robjects.DataFrame(column_data)
-    regressors = ["endog", *predictor_names]
-    rhs = " + ".join(regressors)
-    formula = stats.as_formula(f"dep ~ {rhs}")
-    fit = stats.lm(formula, data=frame)
-    summary_fn = cast(Any, robjects.r["summary"])
-    rownames_fn = cast(Any, robjects.r["rownames"])
-    summary = summary_fn(fit)
-    coefficient_table = summary.rx2("coefficients")
-    coef_table = np.array(coefficient_table, dtype=float)
-    coef_names = tuple(str(name) for name in rownames_fn(coefficient_table))
+    pdata_frame = plm.pdata_frame(frame, index=StrVector((panel_id_name, panel_time_name)))
+    regressors_rhs = " + ".join((f"lag({outcome_name}, 1)", *predictor_names))
+    instrument_rhs = " + ".join((f"lag({outcome_name}, 2:99)", *predictor_names))
+    formula = stats.as_formula(f"{outcome_name} ~ {regressors_rhs} | {instrument_rhs}")
+    fit = plm.pgmm(
+      formula,
+      data=pdata_frame,
+      model="onestep",
+      transformation="d",
+    )
+    coef_fn = cast(Any, robjects.r["coef"])
+    vcov_fn = cast(Any, robjects.r["vcov"])
+    names_fn = cast(Any, robjects.r["names"])
+    coef_values = np.array(coef_fn(fit), dtype=float).reshape(-1)
+    vcov_matrix = np.array(vcov_fn(fit), dtype=float)
+    coef_names = tuple(str(name) for name in names_fn(coef_fn(fit)))
+    std_errors = np.sqrt(np.diag(vcov_matrix))
     by_name: dict[str, CoefficientEstimate] = {}
     for index, name in enumerate(coef_names):
-      value = float(coef_table[index, 0])
-      std_error = float(coef_table[index, 1])
-      statistic = float(coef_table[index, 2])
-      p_value = float(coef_table[index, 3])
+      value = float(coef_values[index])
+      std_error = float(std_errors[index])
+      statistic = value / std_error if math.isfinite(std_error) and std_error > 0.0 else None
       by_name[name] = CoefficientEstimate(
         name=name,
         value=value,
         standard_error=std_error if math.isfinite(std_error) else None,
-        statistic=statistic if math.isfinite(statistic) else None,
-        p_value=p_value if math.isfinite(p_value) else None,
+        statistic=statistic if isinstance(statistic, float) and math.isfinite(statistic) else None,
+        p_value=None,
       )
     ordered: list[CoefficientEstimate] = []
     lag_name = f"L1.{outcome_name}"
+    lag_r_name = f"lag({outcome_name}, 1)"
     for name in (*predictor_names, lag_name):
-      candidate = by_name.get(name, by_name.get("endog" if name == lag_name else name))
+      candidate = by_name.get(name, by_name.get(lag_r_name if name == lag_name else name))
       if candidate is None:
         continue
       ordered.append(
