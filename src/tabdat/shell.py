@@ -61,6 +61,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "ivregress",
   "xtreg",
   "xtdata",
+  "xtabond",
   "did",
   "cfregress",
   "predict",
@@ -102,6 +103,7 @@ _COLUMN_COMMANDS = {
   "ivregress",
   "xtreg",
   "xtdata",
+  "xtabond",
   "did",
   "cfregress",
 }
@@ -125,6 +127,7 @@ _STREG_OPTIONS = ("failure(", "dist(", "robust", "cluster(", "noconstant")
 _IVREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _XTREG_OPTIONS = ("fe", "re", "robust", "cluster(")
 _XTDATA_OPTIONS = ("within", "between")
+_XTABOND_OPTIONS = ("robust",)
 _DID_OPTIONS = ("treat(", "post(", "robust")
 _CFREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _PREDICT_OPTIONS = ("xb", "residuals", "pr")
@@ -138,6 +141,7 @@ _ESTAT_SUBCOMMANDS = (
   "endogenous",
   "margins",
   "gof",
+  "did",
 )
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
@@ -224,6 +228,7 @@ class TabdatCompleter(Completer):
       "ivregress",
       "xtreg",
       "xtdata",
+      "xtabond",
       "did",
       "cfregress",
       "predict",
@@ -342,6 +347,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_XTREG_OPTIONS, word)
   if command_name == "xtdata":
     yield from _matching_completions(_XTDATA_OPTIONS, word)
+  if command_name == "xtabond":
+    yield from _matching_completions(_XTABOND_OPTIONS, word)
   if command_name == "did":
     yield from _matching_completions(_DID_OPTIONS, word)
   if command_name == "cfregress":

@@ -233,6 +233,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     xtdata_command = _completion_texts(completer, "xtd")
     xtdata_columns = _completion_texts(completer, "xtdata c")
     xtdata_options = _completion_texts(completer, "xtdata cost age, ")
+    xtabond_command = _completion_texts(completer, "xta")
+    xtabond_columns = _completion_texts(completer, "xtabond c")
+    xtabond_options = _completion_texts(completer, "xtabond cost age, ")
     cfregress_command = _completion_texts(completer, "cfr")
     cfregress_columns = _completion_texts(completer, "cfregress c")
     cfregress_options = _completion_texts(completer, "cfregress cost age, ")
@@ -295,6 +298,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert xtdata_command == ["xtdata"]
   assert xtdata_columns == ["cost"]
   assert xtdata_options == ["within", "between"]
+  assert xtabond_command == ["xtabond"]
+  assert xtabond_columns == ["cost"]
+  assert xtabond_options == ["robust"]
   assert cfregress_command == ["cfregress"]
   assert cfregress_columns == ["cost"]
   assert cfregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]

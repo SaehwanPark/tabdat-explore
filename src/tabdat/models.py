@@ -383,6 +383,7 @@ class EstatCommand:
     "endogenous",
     "margins",
     "gof",
+    "did",
   ]
 
 
@@ -411,6 +412,13 @@ class XtRegCommand:
 class XtDataCommand:
   variables: tuple[str, ...]
   transform: Literal["within", "between"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtAbondCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -490,6 +498,7 @@ Command = (
   | IvRegressCommand
   | XtRegCommand
   | XtDataCommand
+  | XtAbondCommand
   | DidCommand
   | CfRegressCommand
   | ParsedCommand
@@ -779,6 +788,16 @@ class DidRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtAbondRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  coefficient_count: int
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class CfRegressionResult:
   covariance: str
   outcome: str
@@ -857,6 +876,7 @@ Result = (
   | StregRegressionResult
   | IvRegressionResult
   | XtRegressionResult
+  | XtAbondRegressionResult
   | DidRegressionResult
   | CfRegressionResult
   | PanelResult

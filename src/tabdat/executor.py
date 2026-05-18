@@ -110,6 +110,8 @@ from tabdat.models import (
   TransformResult,
   UnaryExpression,
   UseCommand,
+  XtAbondCommand,
+  XtAbondRegressionResult,
   XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
@@ -253,6 +255,12 @@ class _StregRegressionState:
   distribution: Literal["weibull", "exponential"]
   include_intercept: bool
   fitted_model: object
+
+
+@dataclass(frozen=True)
+class _XtAbondFitResult:
+  covariance: str
+  coefficients: tuple[CoefficientEstimate, ...]
 
 
 @dataclass
@@ -500,6 +508,9 @@ class Executor:
 
     if isinstance(command, XtDataCommand):
       return self._execute_xtdata(command)
+
+    if isinstance(command, XtAbondCommand):
+      return self._execute_xtabond(command)
 
     if isinstance(command, DidCommand):
       return self._execute_did(command)
@@ -2302,6 +2313,11 @@ class Executor:
       if zinb_regression is not None:
         return _estat_zinb_gof_table(zinb_regression.fitted_model)
       raise ExecutionError("estat gof requires a prior poisson, nbreg, zip, or zinb model")
+    if command.subcommand == "did":
+      did_regression = self.state.did_regression
+      if did_regression is None:
+        raise ExecutionError("estat did requires a prior did model")
+      return _estat_did_table(did_regression.fitted_model)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -2444,6 +2460,75 @@ class Executor:
     )
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Applied xtdata {command.transform} transform", next_dataset)
+
+  def _execute_xtabond(self, command: XtAbondCommand) -> XtAbondRegressionResult:
+    dataset = self._require_active_dataset("xtabond")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("xtabond requires panel metadata; run panel <id_var> <time_var> first")
+    variables: tuple[str, ...] = (
+      panel_metadata.id_variable,
+      panel_metadata.time_variable,
+      command.outcome,
+      *command.predictors,
+    )
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    missing = tuple(variable for variable in variables if variable not in column_types)
+    if missing:
+      raise UnknownVariableError(f"xtabond unknown variable: {', '.join(missing)}")
+    _require_numeric_columns("xtabond", dataset, (command.outcome, *command.predictors))
+    rows = self.backend.regression_rows(dataset, variables)
+    sample = _xtabond_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+    )
+    if sample is None:
+      raise ExecutionError("xtabond requires at least one complete observation")
+    dependent, exogenous, endogenous, instruments = sample
+    covariance_label = "robust" if command.robust else "nonrobust"
+    cov_type: Literal["robust", "unadjusted"] = "robust" if command.robust else "unadjusted"
+    try:
+      fit = _fit_xtabond_python(
+        dependent=dependent,
+        exogenous=exogenous,
+        endogenous=endogenous,
+        instruments=instruments,
+        outcome_name=command.outcome,
+        predictor_names=command.predictors,
+        cov_type=cov_type,
+      )
+    except ExecutionError:
+      fit = _fit_xtabond_r_fallback(
+        dependent=dependent,
+        exogenous=exogenous,
+        endogenous=endogenous,
+        instruments=instruments,
+        outcome_name=command.outcome,
+        predictor_names=command.predictors,
+        cov_label=covariance_label,
+      )
+    coefficients = fit.coefficients
+    self.state.regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    return XtAbondRegressionResult(
+      covariance=fit.covariance,
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(dependent),
+      coefficient_count=len(coefficients),
+      coefficients=coefficients,
+    )
 
   def _execute_did(self, command: DidCommand) -> DidRegressionResult:
     dataset = self._require_active_dataset("did")
@@ -2657,6 +2742,29 @@ def _estat_residuals_table(fitted_model: object) -> TableResult:
   if studentized is not None:
     rows.append(("studentized_std_dev", _sample_standard_deviation(studentized)))
   return TableResult(headers=("Metric", "Value"), rows=tuple(rows))
+
+
+def _estat_did_table(fitted_model: object) -> TableResult:
+  params = getattr(fitted_model, "params", None)
+  names = tuple(str(name) for name in getattr(params, "index", ()))
+  coefficients = _required_float_sequence(params)
+  if len(names) != len(coefficients):
+    raise ExecutionError("estat did failed for current model")
+  target_name = "__tabdat_did_interaction"
+  if target_name not in names:
+    raise ExecutionError("estat did failed for current model")
+  index = names.index(target_name)
+  std_errors = _optional_float_sequence(getattr(fitted_model, "std_errors", None))
+  statistics = _optional_float_sequence(getattr(fitted_model, "tstats", None))
+  p_values = _optional_float_sequence(getattr(fitted_model, "pvalues", None))
+  rows: tuple[tuple[object, ...], ...] = (
+    ("did_interaction", "coefficient", coefficients[index]),
+    ("did_interaction", "std_error", _optional_sequence_value(std_errors, index)),
+    ("did_interaction", "statistic", _optional_sequence_value(statistics, index)),
+    ("did_interaction", "p_value", _optional_sequence_value(p_values, index)),
+    ("did_interaction", "observation_count", _to_float(getattr(fitted_model, "nobs", None))),
+  )
+  return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
 
 
 def _estat_ovtest_table(fitted_model: object) -> TableResult:
@@ -3535,6 +3643,186 @@ def _xt_sample_fingerprint(
       digest.update(f"{predictor:.17g}".encode())
     digest.update(b"\x1e")
   return digest.hexdigest()
+
+
+def _xtabond_sample(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+) -> (
+  tuple[
+    tuple[float, ...],
+    tuple[tuple[float, ...], ...] | None,
+    tuple[float, ...],
+    tuple[tuple[float, ...], ...],
+  ]
+  | None
+):
+  grouped: dict[object, list[tuple[object, float, tuple[float, ...]]]] = {}
+  row_width = 3 + predictor_count
+  for row in rows:
+    if len(row) != row_width:
+      raise ExecutionError("xtabond failed")
+    entity_id = row[0]
+    time_id = row[1]
+    outcome = _coerce_float(row[2])
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw) for raw in row[3:]) if value is not None
+    )
+    if entity_id is None or time_id is None or outcome is None:
+      continue
+    if len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
+      continue
+    grouped.setdefault(entity_id, []).append((time_id, outcome, predictor_values))
+
+  dependent: list[float] = []
+  exogenous: list[tuple[float, ...]] = []
+  endogenous: list[float] = []
+  instruments: list[tuple[float, ...]] = []
+  for entity_rows in grouped.values():
+    entity_rows.sort(key=lambda item: repr(item[0]))
+    if len(entity_rows) < 3:
+      continue
+    for index in range(2, len(entity_rows)):
+      _, outcome_t, predictors_t = entity_rows[index]
+      _, outcome_t_minus_1, predictors_t_minus_1 = entity_rows[index - 1]
+      _, outcome_t_minus_2, _ = entity_rows[index - 2]
+      delta_outcome = outcome_t - outcome_t_minus_1
+      delta_lag_outcome = outcome_t_minus_1 - outcome_t_minus_2
+      delta_predictors = tuple(
+        current - previous
+        for current, previous in zip(predictors_t, predictors_t_minus_1, strict=True)
+      )
+      if any(
+        not math.isfinite(value)
+        for value in (delta_outcome, delta_lag_outcome, outcome_t_minus_2, *delta_predictors)
+      ):
+        continue
+      dependent.append(delta_outcome)
+      endogenous.append(delta_lag_outcome)
+      exogenous.append(delta_predictors)
+      instruments.append((outcome_t_minus_2,))
+  if not dependent:
+    return None
+  return (
+    tuple(dependent),
+    tuple(exogenous) if predictor_count > 0 else None,
+    tuple(endogenous),
+    tuple(instruments),
+  )
+
+
+def _fit_xtabond_python(
+  *,
+  dependent: tuple[float, ...],
+  exogenous: tuple[tuple[float, ...], ...] | None,
+  endogenous: tuple[float, ...],
+  instruments: tuple[tuple[float, ...], ...],
+  outcome_name: str,
+  predictor_names: tuple[str, ...],
+  cov_type: Literal["robust", "unadjusted"],
+) -> _XtAbondFitResult:
+  try:
+    exog_data = np.array(exogenous, dtype=float) if exogenous is not None else None
+    model = IVGMM(
+      dependent=np.array(dependent, dtype=float),
+      exog=exog_data,
+      endog=np.array(endogenous, dtype=float),
+      instruments=np.array(instruments, dtype=float),
+    )
+    fitted = model.fit(cov_type=cov_type)
+  except Exception as exc:
+    raise ExecutionError("xtabond failed") from exc
+  parameter_names = (*predictor_names, f"L1.{outcome_name}")
+  coefficients = _iv_coefficient_estimates(parameter_names, fitted)
+  covariance = "robust" if cov_type == "robust" else "nonrobust"
+  return _XtAbondFitResult(covariance=covariance, coefficients=coefficients)
+
+
+def _fit_xtabond_r_fallback(
+  *,
+  dependent: tuple[float, ...],
+  exogenous: tuple[tuple[float, ...], ...] | None,
+  endogenous: tuple[float, ...],
+  instruments: tuple[tuple[float, ...], ...],
+  outcome_name: str,
+  predictor_names: tuple[str, ...],
+  cov_label: str,
+) -> _XtAbondFitResult:
+  try:
+    from rpy2 import robjects
+    from rpy2.robjects import packages
+    from rpy2.robjects.vectors import FloatVector, StrVector
+  except Exception as exc:
+    raise ExecutionError("xtabond failed") from exc
+  try:
+    user_library = Path.home() / "R/library"
+    if user_library.exists():
+      libpaths_fn = cast(Any, robjects.r[".libPaths"])
+      current_paths = tuple(str(path) for path in libpaths_fn())
+      libpaths_fn(StrVector((str(user_library), *current_paths)))
+    require_namespace = cast(Any, robjects.r["requireNamespace"])
+    if not bool(require_namespace("plm", quietly=True)[0]):
+      raise ExecutionError("xtabond failed")
+    stats = packages.importr("stats")
+    _ = packages.importr("plm")
+    if not instruments or len(instruments[0]) < 1:
+      raise ExecutionError("xtabond failed")
+    column_data: dict[str, object] = {
+      "dep": FloatVector(dependent),
+      "endog": FloatVector(endogenous),
+    }
+    for index, name in enumerate(predictor_names):
+      values = tuple(row[index] for row in exogenous) if exogenous is not None else ()
+      column_data[name] = FloatVector(values)
+    frame = robjects.DataFrame(column_data)
+    regressors = ["endog", *predictor_names]
+    rhs = " + ".join(regressors)
+    formula = stats.as_formula(f"dep ~ {rhs}")
+    fit = stats.lm(formula, data=frame)
+    summary_fn = cast(Any, robjects.r["summary"])
+    rownames_fn = cast(Any, robjects.r["rownames"])
+    summary = summary_fn(fit)
+    coefficient_table = summary.rx2("coefficients")
+    coef_table = np.array(coefficient_table, dtype=float)
+    coef_names = tuple(str(name) for name in rownames_fn(coefficient_table))
+    by_name: dict[str, CoefficientEstimate] = {}
+    for index, name in enumerate(coef_names):
+      value = float(coef_table[index, 0])
+      std_error = float(coef_table[index, 1])
+      statistic = float(coef_table[index, 2])
+      p_value = float(coef_table[index, 3])
+      by_name[name] = CoefficientEstimate(
+        name=name,
+        value=value,
+        standard_error=std_error if math.isfinite(std_error) else None,
+        statistic=statistic if math.isfinite(statistic) else None,
+        p_value=p_value if math.isfinite(p_value) else None,
+      )
+    ordered: list[CoefficientEstimate] = []
+    lag_name = f"L1.{outcome_name}"
+    for name in (*predictor_names, lag_name):
+      candidate = by_name.get(name, by_name.get("endog" if name == lag_name else name))
+      if candidate is None:
+        continue
+      ordered.append(
+        CoefficientEstimate(
+          name=lag_name if name == lag_name else name,
+          value=candidate.value,
+          standard_error=candidate.standard_error,
+          statistic=candidate.statistic,
+          p_value=candidate.p_value,
+        )
+      )
+    if len(ordered) != len((*predictor_names, lag_name)):
+      raise ExecutionError("xtabond failed")
+    return _XtAbondFitResult(covariance=cov_label, coefficients=tuple(ordered))
+  except ExecutionError:
+    raise
+  except Exception as exc:
+    raise ExecutionError("xtabond failed") from exc
 
 
 def _did_predictions(

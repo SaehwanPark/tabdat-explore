@@ -1352,6 +1352,8 @@ def test_cli_runs_phase_17_did_predict_flow(tmp_path: Path, capsys) -> None:
       "-c",
       "did wage exposure, treat(treated) post(post) robust",
       "-c",
+      "estat did",
+      "-c",
       "predict did_xb",
       "-c",
       "head 2",
@@ -1364,8 +1366,46 @@ def test_cli_runs_phase_17_did_predict_flow(tmp_path: Path, capsys) -> None:
   assert "Model: did wage on exposure (treat=treated, post=post)" in captured.out
   assert "Estimator: did_twfe" in captured.out
   assert "Covariance: robust" in captured.out
+  assert "did_interaction  coefficient" in captured.out
   assert "Predicted did_xb: 8 rows, 7 columns" in captured.out
   assert "did_xb" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_17_xtabond_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "xtabond.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 13.0, 2.0),
+        (1, 2022, 15.0, 4.0),
+        (2, 2020, 7.0, 0.0),
+        (2, 2021, 9.0, 1.0),
+        (2, 2022, 12.0, 1.5),
+        (3, 2020, 20.0, 3.0),
+        (3, 2021, 19.0, 2.0),
+        (3, 2022, 21.0, 3.0)
+    ) as panel_data(firm_id, year, wage, exper)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "xtabond wage exper, robust",
+    ],
+  )
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  assert "Model: xtabond wage on exper" in captured.out
+  assert "Estimator: xtabond_ar1_gmm" in captured.out
+  assert "Covariance: robust" in captured.out
   assert captured.err == ""
 
 
