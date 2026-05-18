@@ -1,16 +1,16 @@
-# Phase 17 Slice 2 Command Contract
+# Phase 17 Slice 3 Command Contract
 
 ## Roadmap Phase
 
 - Phase 17 advanced empirical methods
-  - Slice 2: bounded DID causal starter with deterministic prediction support
+  - Slice 3: bounded dynamic-panel starter (`xtabond`) plus DID post-estimation diagnostics
 
-## `did`
+## `xtabond`
 
 ### Syntax
 
 ```stata
-did <y> [controls], treat(<var>) post(<var>) [robust]
+xtabond <y> [xvars] [, robust]
 ```
 
 ### Rules
@@ -18,39 +18,46 @@ did <y> [controls], treat(<var>) post(<var>) [robust]
 - Requires one active dataset.
 - Requires prior panel metadata via `panel <id_var> <time_var>`.
 - Requires one outcome variable.
-- Optional controls are numeric and may be empty.
-- `treat(...)` and `post(...)` each require exactly one variable.
-- Treatment and post variables must be numeric binary values (`0`/`1`).
+- Optional predictors are numeric and may be empty.
 - Supports covariance modes:
   - nonrobust (default)
   - robust
 
-## Post-estimation behavior
+## `estat did`
 
-- `predict <newvar>[, xb]` is supported after successful `did`.
-- `predict ..., residuals` and `predict ..., pr` are not supported after `did`.
+### Syntax
+
+```stata
+estat did
+```
+
+### Rules
+
+- Requires one active dataset.
+- Requires prior successful `did` model state.
+- Returns deterministic interaction-diagnostic rows for the DID interaction term.
 
 ## Error/guard behavior
 
-- Missing panel metadata:
-  - `did requires panel metadata; run panel <id_var> <time_var> first`
-- Non-binary treatment/post inputs:
-  - `did treatment and post variables must be binary with values 0 and 1`
+- Missing panel metadata for `xtabond`:
+  - `xtabond requires panel metadata; run panel <id_var> <time_var> first`
+- Empty complete-observation dynamic sample:
+  - `xtabond requires at least one complete observation`
 - Missing variables/non-numeric variables:
   - existing unknown-variable and numeric-type errors
-- Empty complete-observation sample:
-  - `did requires at least one complete observation`
 - Fit failures:
-  - `did failed`
+  - `xtabond failed`
+- Missing DID state for `estat did`:
+  - `estat did requires a prior did model`
 
 ## State behavior
 
-- Running `did` clears incompatible prior estimation-family state.
+- Running `xtabond` clears incompatible prior estimation-family state.
 - Existing `predict` and `estat` boundaries for other families remain unchanged.
 
 ## Acceptance Criteria
 
-- `did` parses and executes with required `treat(...)` and `post(...)` plus optional `robust`.
-- deterministic typed and formatted output includes DID interaction coefficient rows.
-- `predict` supports `xb` after `did`.
+- `xtabond` parses and executes with optional predictors and optional `robust`.
+- deterministic typed/formatted output includes dynamic-panel coefficient rows.
+- `estat did` parses and executes after `did` with deterministic table output.
 - focused parser/executor/CLI/shell/help coverage passes.
