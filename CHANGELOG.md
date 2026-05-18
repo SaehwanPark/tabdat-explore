@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the third Phase 17 advanced empirical-methods slice with
+  `xtabond <y> [xvars] [, robust]`, required prior panel metadata
+  (`panel <id_var> <time_var>`), bounded dynamic-panel AR(1) GMM starter execution through
+  Python-first `linearmodels.iv.IVGMM` plus R fallback, deterministic nonrobust/robust covariance
+  output, and focused parser/executor/CLI/shell/help coverage.
+- Added deterministic `estat did` diagnostics after successful `did`.
 - Added the second Phase 17 advanced empirical-methods slice with
   `did <y> [controls], treat(<var>) post(<var>) [robust]`, required prior panel metadata
   (`panel <id_var> <time_var>`), bounded two-way fixed-effects execution through

@@ -15,7 +15,7 @@ from tabdat.errors import (
   UnknownTableError,
   UnknownVariableError,
 )
-from tabdat.executor import Executor
+from tabdat.executor import Executor, _xtabond_sample
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -95,6 +95,8 @@ from tabdat.models import (
   TobitRegressionResult,
   TransformResult,
   UseCommand,
+  XtAbondCommand,
+  XtAbondRegressionResult,
   XtDataCommand,
   XtRegCommand,
   XtRegressionResult,
@@ -252,6 +254,41 @@ def _write_did_parquet(path: Path) -> None:
         (4, 2020, 9.9, 1, 0, 1.0),
         (4, 2021, 12.6, 1, 1, 1.1)
     ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+
+
+def _write_xtabond_short_panel_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 11.0, 2.0),
+        (2, 2020, 9.0, 0.5),
+        (2, 2021, 10.0, 1.5)
+    ) as panel_data(firm_id, year, wage, exposure)
+    """,
+  )
+
+
+def _write_xtabond_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 13.0, 2.0),
+        (1, 2022, 15.0, 4.0),
+        (2, 2020, 7.0, 0.0),
+        (2, 2021, 9.0, 1.0),
+        (2, 2022, 12.0, 1.5),
+        (3, 2020, 20.0, 3.0),
+        (3, 2021, 19.0, 2.0),
+        (3, 2022, 21.0, 3.0)
+    ) as panel_data(firm_id, year, wage, exper)
     """,
   )
 
@@ -2816,6 +2853,98 @@ def test_phase_17_did_returns_typed_result_and_predicts_xb(tmp_path: Path) -> No
   assert "did_xb" in preview.columns
 
 
+def test_phase_17_xtabond_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(
+      XtAbondCommand(
+        outcome="wage",
+        predictors=("exper",),
+        robust=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, XtAbondRegressionResult)
+  assert result.covariance == "robust"
+  assert result.outcome == "wage"
+  assert result.predictors == ("exper",)
+  assert result.observation_count > 0
+  assert result.coefficient_count == 2
+  assert len(result.coefficients) == 2
+
+
+def test_phase_17_xtabond_requires_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="xtabond requires panel metadata; run panel <id_var> <time_var> first",
+    ):
+      executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",)))
+  finally:
+    executor.close()
+
+
+def test_phase_17_xtabond_requires_complete_dynamic_panel_sample(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-short.parquet"
+  _write_xtabond_short_panel_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    with pytest.raises(ExecutionError, match="xtabond requires at least one complete observation"):
+      executor.execute(XtAbondCommand(outcome="wage", predictors=("exposure",)))
+  finally:
+    executor.close()
+
+
+def test_phase_17_xtabond_r_fallback_runs_when_python_fit_fails(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  path = tmp_path / "xtabond.parquet"
+  _write_xtabond_parquet(path)
+  monkeypatch.setattr(
+    "tabdat.executor._fit_xtabond_python",
+    lambda **_: (_ for _ in ()).throw(ExecutionError("xtabond failed")),
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",)))
+  finally:
+    executor.close()
+
+  assert isinstance(result, XtAbondRegressionResult)
+  assert result.covariance == "nonrobust"
+
+
+def test_phase_17_xtabond_sample_orders_numeric_time_values() -> None:
+  rows: tuple[tuple[object, ...], ...] = (
+    (1, 1, 10.0, 0.0),
+    (1, 10, 16.0, 2.0),
+    (1, 2, 12.0, 1.0),
+  )
+  sample = _xtabond_sample(rows=rows, predictor_count=1)
+
+  assert sample is not None
+  dependent, exogenous, endogenous, instruments = sample
+  assert dependent == (4.0,)
+  assert exogenous == ((1.0,),)
+  assert endogenous == (2.0,)
+  assert instruments == ((10.0,),)
+
+
 def test_phase_17_did_requires_panel_metadata(tmp_path: Path) -> None:
   path = tmp_path / "did.parquet"
   _write_did_parquet(path)
@@ -2868,6 +2997,41 @@ def test_phase_17_did_requires_binary_treatment_and_post(tmp_path: Path) -> None
           post_variable="post",
         )
       )
+  finally:
+    executor.close()
+
+
+def test_phase_17_estat_did_reports_interaction_diagnostics(tmp_path: Path) -> None:
+  path = tmp_path / "did.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(
+      DidCommand(
+        outcome="wage",
+        controls=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+      )
+    )
+    result = executor.execute(EstatCommand(subcommand="did"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("Test", "Metric", "Value")
+  assert result.rows[0][0] == "did_interaction"
+  assert result.rows[0][1] == "coefficient"
+
+
+def test_phase_17_estat_did_requires_prior_did(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="estat did requires a prior did model"):
+      executor.execute(EstatCommand(subcommand="did"))
   finally:
     executor.close()
 

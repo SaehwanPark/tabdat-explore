@@ -62,6 +62,7 @@ from tabdat.models import (
   TobitCommand,
   UnaryExpression,
   UseCommand,
+  XtAbondCommand,
   XtDataCommand,
   XtRegCommand,
   ZinbCommand,
@@ -114,6 +115,7 @@ _EXECUTABLE_COMMANDS = {
   "ivregress",
   "xtreg",
   "xtdata",
+  "xtabond",
   "did",
   "cfregress",
   "exit",
@@ -391,6 +393,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "xtdata":
     return _parse_xtdata(parts)
+
+  if parts.name == "xtabond":
+    return _parse_xtabond(parts)
 
   if parts.name == "did":
     return _parse_did(parts)
@@ -1229,7 +1234,7 @@ def _parse_streg(parts: _CommandParts) -> StregCommand:
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
-    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof>"
+    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did>"
   )
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(expected_estat_syntax)
@@ -1246,10 +1251,11 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "endogenous",
     "margins",
     "gof",
+    "did",
   }:
     raise ParseError(
       "estat subcommand must be residuals, ovtest, vif, firststage, "
-      "overid, hausman, endogenous, margins, or gof"
+      "overid, hausman, endogenous, margins, gof, or did"
     )
   return EstatCommand(
     subcommand=cast(
@@ -1263,6 +1269,7 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
         "endogenous",
         "margins",
         "gof",
+        "did",
       ],
       subcommand,
     )
@@ -1363,6 +1370,23 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
     raise ParseError("xtdata requires exactly one of within or between")
   transform: Literal["within", "between"] = "within" if has_within else "between"
   return XtDataCommand(variables=parts.arguments, transform=transform)
+
+
+def _parse_xtabond(parts: _CommandParts) -> XtAbondCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust]")
+  if len(parts.arguments) < 1:
+    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust]")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"robust"}
+  if unsupported:
+    raise ParseError(f"xtabond unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "xtabond", {"robust"})
+  return XtAbondCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    robust="robust" in option_names,
+  )
 
 
 def _parse_did(parts: _CommandParts) -> DidCommand:

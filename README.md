@@ -37,6 +37,8 @@ command line. The current CLI supports:
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
 - bounded panel-metadata DID with
   `did <y> [controls], treat(<var>) post(<var>) [robust]` after `panel <id_var> <time_var>`
+- bounded dynamic-panel GMM starter with
+  `xtabond <y> [xvars] [, robust]` after `panel <id_var> <time_var>`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
@@ -67,7 +69,7 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals pr]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
@@ -245,6 +247,7 @@ tabdat> run analysis.td
     with deterministic residual-inclusion metrics:
     `test`, `estimate`, `std_error`, `statistic`, `p_value`, `ci_level`, `ci_lower`, `ci_upper`,
     `distribution`, and `df`
+  - DID post-estimation interaction diagnostics (`did`) over the latest `did` state
 - `ivregress` currently provides Python-first IV/2SLS and IV-GMM paths via `linearmodels` with
   `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
 - `estat endogenous` after `ivregress` is currently scoped to prior `ivregress 2sls` fits and
@@ -255,6 +258,9 @@ tabdat> run analysis.td
   `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
 - `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and
   appends deterministic `<var>_within` or `<var>_between` columns.
+- `xtabond` currently provides a bounded dynamic-panel AR(1) GMM starter with nonrobust/robust
+  covariance modes. The Python IV-GMM path is primary; an R-backed fallback path is available when
+  Python fitting fails.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

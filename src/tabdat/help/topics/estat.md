@@ -17,6 +17,7 @@ Examples:
 - `estat gof`
 - `nbreg claims age exposure` then `estat gof`
 - `zinb claims age exposure, inflate(exposure)` then `estat gof`
+- `did claims age exposure, treat(treated) post(post)` then `estat did`
 
 Links:
 - `docs/microecometrics_topics.md`

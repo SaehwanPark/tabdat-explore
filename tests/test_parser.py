@@ -56,6 +56,7 @@ from tabdat.models import (
   TailCommand,
   TobitCommand,
   UseCommand,
+  XtAbondCommand,
   XtDataCommand,
   XtRegCommand,
   ZinbCommand,
@@ -682,6 +683,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat endogenous") == EstatCommand(subcommand="endogenous")
   assert parse_command("estat margins") == EstatCommand(subcommand="margins")
   assert parse_command("estat gof") == EstatCommand(subcommand="gof")
+  assert parse_command("estat did") == EstatCommand(subcommand="did")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -752,6 +754,18 @@ def test_parse_phase_14_xtdata_command() -> None:
   assert parse_command("xtdata wage, between") == XtDataCommand(
     variables=("wage",),
     transform="between",
+  )
+
+
+def test_parse_phase_17_xtabond_command() -> None:
+  assert parse_command("xtabond wage") == XtAbondCommand(
+    outcome="wage",
+    predictors=(),
+  )
+  assert parse_command("xtabond wage exposure, robust") == XtAbondCommand(
+    outcome="wage",
+    predictors=("exposure",),
+    robust=True,
   )
 
 
@@ -1128,6 +1142,10 @@ def test_parse_exit_aliases() -> None:
     "xtdata wage, detail",
     "xtdata wage, within=true",
     "xtdata wage if year > 2020, within",
+    "xtabond",
+    "xtabond y if year > 2020",
+    "xtabond y, robust=true",
+    "xtabond y, cluster(firm_id)",
     "cfregress",
     "cfregress y x",
     "cfregress y x, endog(z)",

@@ -1,31 +1,33 @@
-# Phase 17 Slice 2 Delivery Summary
+# Phase 17 Slice 3 Delivery Summary
 
 ## Outcome
 
 Completed one bounded Phase 17 slice in one branch:
 
-- Slice 2: DID causal starter command semantics (`did`) with deterministic post-estimation prediction support
+- Slice 3: dynamic-panel starter command semantics (`xtabond`) plus DID post-estimation diagnostics (`estat did`)
 
 ## Implemented
 
-- Added `did <y> [controls], treat(<var>) post(<var>) [robust]`.
-- Added bounded two-way fixed-effects DID estimation through `linearmodels.PanelOLS`.
-- Added deterministic nonrobust/robust covariance labeling and typed formatter output.
-- Added deterministic `predict <newvar>[, xb]` routing after `did`.
+- Added `xtabond <y> [xvars] [, robust]` with required `panel` metadata.
+- Added bounded dynamic-panel AR(1) GMM starter execution with deterministic covariance labels.
+- Added Python-first `linearmodels.iv.IVGMM` fitting plus R-backed runtime fallback path.
+- Added deterministic `estat did` routing after successful `did`.
 - Preserved existing estimator-family `predict`/`estat` boundaries outside this slice.
-- Added in-app `did` help and updated `predict` help examples.
+- Added in-app `xtabond` help and updated `estat` help examples.
 - Updated parser/shell/executor/formatter/tests/SDD/workspace artifacts.
 
 ## Validation
 
-- focused did/parser/shell/help/executor/CLI tests
+- focused xtabond/parser/shell/help/executor/CLI tests
 - full project checks: `ruff`, `pyright`, `mypy`, `pytest`
 - integrated public-dataset E2E harness
 
 ## Residual Risk
 
-- DID covariance coverage remains intentionally bounded to nonrobust/robust in this slice.
+- `xtabond` remains intentionally bounded to minimal AR(1) semantics without lag-depth options.
+- R fallback currently uses a bounded runtime path and should be revisited when broader dynamic-panel
+  command contracts are added.
 
 ## Suggested Follow-up
 
-- Phase 17 Slice 3: bounded dynamic-panel command semantics and/or DID diagnostics expansion.
+- Phase 17 Slice 4: bounded `xtabond` lag/instrument option surface and richer DID diagnostics.
