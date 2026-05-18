@@ -8,7 +8,7 @@ support after `cfregress`, plus `estat firststage` after `cfregress` and expande
 semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
 binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase 16 slices
 (`poisson`, `nbreg`, `zip`, `zinb`, and `streg`), plus two bounded Phase 17 slices (`qreg` and
-`did`).
+`did`), plus a third bounded Phase 17 slice (`xtabond` + `estat did`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -78,7 +78,8 @@ Phase 16 parsing adds
 [robust cluster(...) noconstant]`, and `estat gof`.
 Phase 17 parsing adds
 `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]` and
-`did <y> [controls], treat(<var>) post(<var>) [robust]`.
+`did <y> [controls], treat(<var>) post(<var>) [robust]`, plus
+`xtabond <y> [xvars] [, robust]` and `estat did`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -119,7 +120,9 @@ local MLE path (`weibull|exponential`) with deterministic covariance labeling.
 Phase 17 adds bounded quantile-regression execution through `statsmodels` (`qreg`), plus
 `predict` routing for `xb`/`residuals` and `estat residuals` diagnostics after `qreg`. Phase 17
 also adds a bounded causal starter through two-way fixed-effects DID execution (`did`) with
-required panel metadata and deterministic `predict ... , xb` routing.
+required panel metadata and deterministic `predict ... , xb` routing. The latest Phase 17 slice
+adds bounded `xtabond` dynamic-panel execution (Python-first with R fallback) and `estat did`
+post-estimation diagnostics.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -259,7 +262,8 @@ display formatting.
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`,
   `predict <newvar>[, xb residuals]` after `qreg` model state, `estat residuals` after `qreg`, and
   `did <y> [controls], treat(<var>) post(<var>) [robust]` with
-  `predict <newvar>[, xb]` after `did` model state.
+  `predict <newvar>[, xb]` after `did` model state, plus
+  `xtabond <y> [xvars] [, robust]` and `estat did`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.

@@ -320,18 +320,25 @@ and describe the active work with concise verification criteria.
     nonrobust/robust covariance labels
   - deterministic `predict <newvar>[, xb]` routing after `did`
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the third Phase 17 advanced empirical-methods slice:
+  - `xtabond <y> [xvars] [, robust]` with required prior `panel <id_var> <time_var>`
+  - bounded dynamic-panel AR(1) GMM starter with Python-first IVGMM execution and R fallback
+  - deterministic `estat did` diagnostics after `did`
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
 - Feature: Phase 17 advanced empirical methods
   Status: Active
   Started: 2026-05-17
-  Branch: codex/tmp-phase17-slice2-did-predict-xb
+  Branch: codex/tmp-phase17-slice3-xtabond-estat-did
 
   Summary:
   Continue from completed Phase 16 specialized-likelihood foundations with bounded Phase 17
-  slices for quantile and causal workflows: quantile regression (`qreg`) and a panel-metadata
-  DID starter (`did`) with deterministic post-estimation prediction routing (`predict ..., xb`).
+  slices for quantile, causal, and dynamic-panel workflows: quantile regression (`qreg`), a
+  panel-metadata DID starter (`did`) with deterministic post-estimation prediction routing
+  (`predict ..., xb`), plus bounded dynamic-panel starter execution (`xtabond`) and
+  DID post-estimation diagnostics (`estat did`).
 
   Verification:
   - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
@@ -342,11 +349,13 @@ and describe the active work with concise verification criteria.
   - `estat residuals` executes after `qreg` with deterministic table output
   - `did` parses and executes with deterministic nonrobust/robust covariance modes
   - `predict ..., xb` executes after `did` with deterministic output
+  - `xtabond` parses and executes with deterministic nonrobust/robust covariance modes
+  - `estat did` executes after `did` with deterministic table output
   - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
     command behavior remains stable
 
   Out of Scope:
-  - panel-GMM command families and advanced causal diagnostics/extensions
+  - broader panel-GMM option surfaces, system-GMM, and advanced causal diagnostics/extensions
 
 ## Future
 
@@ -386,7 +395,7 @@ and describe the active work with concise verification criteria.
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
   - remaining meaningful slice in this phase (one-sentence summary):
-    - add bounded dynamic-panel command families and expand causal diagnostics beyond the DID starter
+    - expand bounded dynamic-panel controls/options and add richer causal diagnostics beyond `estat did`
   - library strategy:
     - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
       semiparametric building blocks
