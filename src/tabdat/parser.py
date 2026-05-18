@@ -1374,18 +1374,26 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
 
 def _parse_xtabond(parts: _CommandParts) -> XtAbondCommand:
   if parts.condition is not None or parts.expression is not None:
-    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust]")
+    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust lags(#) instlag(#)]")
   if len(parts.arguments) < 1:
-    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust]")
+    raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust lags(#) instlag(#)]")
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"robust"}
+  unsupported = option_names - {"robust", "lags", "instlag"}
   if unsupported:
     raise ParseError(f"xtabond unsupported option: {', '.join(sorted(unsupported))}")
   _require_flag_options(parts.options, "xtabond", {"robust"})
+  lag_depth = _single_integer_option(parts.options, "lags", "xtabond", minimum=1)
+  instrument_lag_start = _single_integer_option(parts.options, "instlag", "xtabond", minimum=2)
+  resolved_lag_depth = lag_depth if lag_depth is not None else 1
+  resolved_instlag = instrument_lag_start if instrument_lag_start is not None else 2
+  if resolved_instlag <= resolved_lag_depth:
+    raise ParseError("xtabond option instlag must be greater than option lags")
   return XtAbondCommand(
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
     robust="robust" in option_names,
+    lag_depth=resolved_lag_depth,
+    instrument_lag_start=resolved_instlag,
   )
 
 
@@ -1476,11 +1484,27 @@ def _single_integer_option(
   if len(matched) > 1:
     raise ParseError(f"{command_name} option {name} may only be supplied once")
   value = matched[0].value
-  if isinstance(value, bool) or not isinstance(value, int):
+  parsed_value: int
+  if isinstance(value, tuple):
+    if len(value) != 1:
+      raise ParseError(f"{command_name} option {name} expects one integer value")
+    item = value[0]
+    if not item.isascii() or not item.isdigit():
+      raise ParseError(f"{command_name} option {name} expects an integer value")
+    parsed_value = int(item)
+  elif isinstance(value, bool):
     raise ParseError(f"{command_name} option {name} expects an integer value")
-  if value < minimum:
+  elif isinstance(value, float):
+    if not value.is_integer():
+      raise ParseError(f"{command_name} option {name} expects an integer value")
+    parsed_value = int(value)
+  elif not isinstance(value, int):
+    raise ParseError(f"{command_name} option {name} expects an integer value")
+  else:
+    parsed_value = value
+  if parsed_value < minimum:
     raise ParseError(f"{command_name} option {name} must be at least {minimum}")
-  return value
+  return parsed_value
 
 
 def _single_float_option(
@@ -1746,7 +1770,7 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"ll", "ul", "quantile"}:
+  if option_name in {"ll", "ul", "quantile", "lags", "instlag"}:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)

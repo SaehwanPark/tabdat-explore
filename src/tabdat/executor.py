@@ -191,6 +191,14 @@ class _DidRegressionState:
   control_names: tuple[str, ...]
   treatment_variable: str
   post_variable: str
+  control_mean_treated_post: float | None
+  control_mean_treated_pre: float | None
+  control_mean_untreated_post: float | None
+  control_mean_untreated_pre: float | None
+  count_treated_post: int
+  count_treated_pre: int
+  count_untreated_post: int
+  count_untreated_pre: int
   fitted_model: object
 
 
@@ -2317,7 +2325,7 @@ class Executor:
       did_regression = self.state.did_regression
       if did_regression is None:
         raise ExecutionError("estat did requires a prior did model")
-      return _estat_did_table(did_regression.fitted_model)
+      return _estat_did_table(did_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -2481,6 +2489,8 @@ class Executor:
     sample = _xtabond_sample(
       rows=rows,
       predictor_count=len(command.predictors),
+      lag_depth=command.lag_depth,
+      instrument_lag_start=command.instrument_lag_start,
     )
     if sample is None:
       raise ExecutionError("xtabond requires at least one complete observation")
@@ -2496,6 +2506,7 @@ class Executor:
         outcome_name=command.outcome,
         predictor_names=command.predictors,
         cov_type=cov_type,
+        lag_depth=command.lag_depth,
       )
     except ExecutionError:
       fit = _fit_xtabond_r_fallback(
@@ -2506,6 +2517,8 @@ class Executor:
         outcome_name=command.outcome,
         predictor_names=command.predictors,
         cov_label=covariance_label,
+        lag_depth=command.lag_depth,
+        instrument_lag_start=command.instrument_lag_start,
       )
     coefficients = fit.coefficients
     self.state.regression = None
@@ -2606,6 +2619,20 @@ class Executor:
       )
       for estimate in raw_coefficients
     )
+    treated_post: list[float] = []
+    treated_pre: list[float] = []
+    untreated_post: list[float] = []
+    untreated_pre: list[float] = []
+    for outcome, treat, post in zip(outcomes, treatment_values, post_values, strict=True):
+      if treat == 1.0 and post == 1.0:
+        treated_post.append(outcome)
+      elif treat == 1.0 and post == 0.0:
+        treated_pre.append(outcome)
+      elif treat == 0.0 and post == 1.0:
+        untreated_post.append(outcome)
+      elif treat == 0.0 and post == 0.0:
+        untreated_pre.append(outcome)
+
     self.state.regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
@@ -2623,6 +2650,14 @@ class Executor:
       control_names=command.controls,
       treatment_variable=command.treatment_variable,
       post_variable=command.post_variable,
+      control_mean_treated_post=_mean(tuple(treated_post)) if treated_post else None,
+      control_mean_treated_pre=_mean(tuple(treated_pre)) if treated_pre else None,
+      control_mean_untreated_post=_mean(tuple(untreated_post)) if untreated_post else None,
+      control_mean_untreated_pre=_mean(tuple(untreated_pre)) if untreated_pre else None,
+      count_treated_post=len(treated_post),
+      count_treated_pre=len(treated_pre),
+      count_untreated_post=len(untreated_post),
+      count_untreated_pre=len(untreated_pre),
       fitted_model=fitted,
     )
     return DidRegressionResult(
@@ -2744,7 +2779,8 @@ def _estat_residuals_table(fitted_model: object) -> TableResult:
   return TableResult(headers=("Metric", "Value"), rows=tuple(rows))
 
 
-def _estat_did_table(fitted_model: object) -> TableResult:
+def _estat_did_table(did_regression: _DidRegressionState) -> TableResult:
+  fitted_model = did_regression.fitted_model
   params = getattr(fitted_model, "params", None)
   names = tuple(str(name) for name in getattr(params, "index", ()))
   coefficients = _required_float_sequence(params)
@@ -2757,12 +2793,32 @@ def _estat_did_table(fitted_model: object) -> TableResult:
   std_errors = _optional_float_sequence(getattr(fitted_model, "std_errors", None))
   statistics = _optional_float_sequence(getattr(fitted_model, "tstats", None))
   p_values = _optional_float_sequence(getattr(fitted_model, "pvalues", None))
+  treated_diff = _difference_or_none(
+    did_regression.control_mean_treated_post,
+    did_regression.control_mean_treated_pre,
+  )
+  untreated_diff = _difference_or_none(
+    did_regression.control_mean_untreated_post,
+    did_regression.control_mean_untreated_pre,
+  )
+  raw_diff_in_diff = _difference_or_none(treated_diff, untreated_diff)
   rows: tuple[tuple[object, ...], ...] = (
     ("did_interaction", "coefficient", coefficients[index]),
     ("did_interaction", "std_error", _optional_sequence_value(std_errors, index)),
     ("did_interaction", "statistic", _optional_sequence_value(statistics, index)),
     ("did_interaction", "p_value", _optional_sequence_value(p_values, index)),
     ("did_interaction", "observation_count", _to_float(getattr(fitted_model, "nobs", None))),
+    ("did_interaction", "treated_post_count", float(did_regression.count_treated_post)),
+    ("did_interaction", "treated_pre_count", float(did_regression.count_treated_pre)),
+    ("did_interaction", "untreated_post_count", float(did_regression.count_untreated_post)),
+    ("did_interaction", "untreated_pre_count", float(did_regression.count_untreated_pre)),
+    ("did_interaction", "treated_post_mean", did_regression.control_mean_treated_post),
+    ("did_interaction", "treated_pre_mean", did_regression.control_mean_treated_pre),
+    ("did_interaction", "untreated_post_mean", did_regression.control_mean_untreated_post),
+    ("did_interaction", "untreated_pre_mean", did_regression.control_mean_untreated_pre),
+    ("did_interaction", "treated_change", treated_diff),
+    ("did_interaction", "untreated_change", untreated_diff),
+    ("did_interaction", "raw_diff_in_diff", raw_diff_in_diff),
   )
   return TableResult(headers=("Test", "Metric", "Value"), rows=rows)
 
@@ -3208,6 +3264,12 @@ def _mean(values: tuple[float, ...]) -> float:
   return math.fsum(values) / len(values)
 
 
+def _difference_or_none(left: float | None, right: float | None) -> float | None:
+  if left is None or right is None:
+    return None
+  return left - right
+
+
 def _sample_standard_deviation(values: tuple[float, ...]) -> float | None:
   if len(values) < 2:
     return None
@@ -3649,6 +3711,8 @@ def _xtabond_sample(
   *,
   rows: tuple[tuple[object, ...], ...],
   predictor_count: int,
+  lag_depth: int,
+  instrument_lag_start: int,
 ) -> (
   tuple[
     tuple[float, ...],
@@ -3681,29 +3745,34 @@ def _xtabond_sample(
   exogenous: list[tuple[float, ...]] = []
   endogenous: list[float] = []
   instruments: list[tuple[float, ...]] = []
+  minimum_row_count = max(lag_depth + 2, instrument_lag_start + 1)
+  instrument_offset = instrument_lag_start
+  lag_offset = lag_depth
   for entity_rows in grouped.values():
     entity_rows.sort(key=lambda item: _xtabond_time_sort_key(item[0]))
-    if len(entity_rows) < 3:
+    if len(entity_rows) < minimum_row_count:
       continue
-    for index in range(2, len(entity_rows)):
+    for index in range(minimum_row_count - 1, len(entity_rows)):
       _, outcome_t, predictors_t = entity_rows[index]
       _, outcome_t_minus_1, predictors_t_minus_1 = entity_rows[index - 1]
-      _, outcome_t_minus_2, _ = entity_rows[index - 2]
+      _, outcome_t_minus_lag, _ = entity_rows[index - lag_offset]
+      _, outcome_t_minus_lag_prev, _ = entity_rows[index - lag_offset - 1]
+      _, outcome_t_minus_inst, _ = entity_rows[index - instrument_offset]
       delta_outcome = outcome_t - outcome_t_minus_1
-      delta_lag_outcome = outcome_t_minus_1 - outcome_t_minus_2
+      delta_lag_outcome = outcome_t_minus_lag - outcome_t_minus_lag_prev
       delta_predictors = tuple(
         current - previous
         for current, previous in zip(predictors_t, predictors_t_minus_1, strict=True)
       )
       if any(
         not math.isfinite(value)
-        for value in (delta_outcome, delta_lag_outcome, outcome_t_minus_2, *delta_predictors)
+        for value in (delta_outcome, delta_lag_outcome, outcome_t_minus_inst, *delta_predictors)
       ):
         continue
       dependent.append(delta_outcome)
       endogenous.append(delta_lag_outcome)
       exogenous.append(delta_predictors)
-      instruments.append((outcome_t_minus_2,))
+      instruments.append((outcome_t_minus_inst,))
   if not dependent:
     return None
   return (
@@ -3730,6 +3799,7 @@ def _fit_xtabond_python(
   outcome_name: str,
   predictor_names: tuple[str, ...],
   cov_type: Literal["robust", "unadjusted"],
+  lag_depth: int,
 ) -> _XtAbondFitResult:
   try:
     exog_data = np.array(exogenous, dtype=float) if exogenous is not None else None
@@ -3742,7 +3812,7 @@ def _fit_xtabond_python(
     fitted = model.fit(cov_type=cov_type)
   except Exception as exc:
     raise ExecutionError("xtabond failed") from exc
-  parameter_names = (*predictor_names, f"L1.{outcome_name}")
+  parameter_names = (*predictor_names, f"L{lag_depth}.{outcome_name}")
   coefficients = _iv_coefficient_estimates(parameter_names, fitted)
   covariance = "robust" if cov_type == "robust" else "nonrobust"
   return _XtAbondFitResult(covariance=covariance, coefficients=coefficients)
@@ -3757,6 +3827,8 @@ def _fit_xtabond_r_fallback(
   outcome_name: str,
   predictor_names: tuple[str, ...],
   cov_label: str,
+  lag_depth: int,
+  instrument_lag_start: int,
 ) -> _XtAbondFitResult:
   try:
     from rpy2 import robjects
@@ -3814,8 +3886,9 @@ def _fit_xtabond_r_fallback(
       column_data[name] = FloatVector(tuple(predictor_values[name]))
     frame = robjects.DataFrame(column_data)
     pdata_frame = plm.pdata_frame(frame, index=StrVector((panel_id_name, panel_time_name)))
-    regressors_rhs = " + ".join((f"lag({outcome_name}, 1)", *predictor_names))
-    instrument_rhs = " + ".join((f"lag({outcome_name}, 2:99)", *predictor_names))
+    regressors_rhs = " + ".join((f"lag({outcome_name}, {lag_depth})", *predictor_names))
+    instrument_term = f"lag({outcome_name}, {instrument_lag_start}:99)"
+    instrument_rhs = " + ".join((instrument_term, *predictor_names))
     formula = stats.as_formula(f"{outcome_name} ~ {regressors_rhs} | {instrument_rhs}")
     fit = plm.pgmm(
       formula,
@@ -3843,8 +3916,8 @@ def _fit_xtabond_r_fallback(
         p_value=None,
       )
     ordered: list[CoefficientEstimate] = []
-    lag_name = f"L1.{outcome_name}"
-    lag_r_name = f"lag({outcome_name}, 1)"
+    lag_name = f"L{lag_depth}.{outcome_name}"
+    lag_r_name = f"lag({outcome_name}, {lag_depth})"
     for name in (*predictor_names, lag_name):
       candidate = by_name.get(name, by_name.get(lag_r_name if name == lag_name else name))
       if candidate is None:

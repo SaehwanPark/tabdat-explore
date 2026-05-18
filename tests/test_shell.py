@@ -300,7 +300,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert xtdata_options == ["within", "between"]
   assert xtabond_command == ["xtabond"]
   assert xtabond_columns == ["cost"]
-  assert xtabond_options == ["robust"]
+  assert xtabond_options == ["robust", "lags(", "instlag("]
   assert cfregress_command == ["cfregress"]
   assert cfregress_columns == ["cost"]
   assert cfregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]

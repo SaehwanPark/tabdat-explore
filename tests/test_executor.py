@@ -2879,6 +2879,48 @@ def test_phase_17_xtabond_returns_typed_result(tmp_path: Path) -> None:
   assert len(result.coefficients) == 2
 
 
+def test_phase_17_xtabond_supports_lag_and_instrument_options(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-lagged.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2019, 9.0, 0.5),
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 13.0, 2.0),
+        (1, 2022, 15.0, 4.0),
+        (2, 2019, 6.0, 0.0),
+        (2, 2020, 7.0, 0.0),
+        (2, 2021, 9.0, 1.0),
+        (2, 2022, 12.0, 1.5),
+        (3, 2019, 18.0, 2.5),
+        (3, 2020, 20.0, 3.0),
+        (3, 2021, 19.0, 2.0),
+        (3, 2022, 21.0, 3.0)
+    ) as panel_data(firm_id, year, wage, exper)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(
+      XtAbondCommand(
+        outcome="wage",
+        predictors=("exper",),
+        lag_depth=2,
+        instrument_lag_start=3,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, XtAbondRegressionResult)
+  assert result.coefficient_count == 2
+  assert result.coefficients[-1].name == "L2.wage"
+
+
 def test_phase_17_xtabond_requires_panel_metadata(tmp_path: Path) -> None:
   path = tmp_path / "xtabond.parquet"
   _write_xtabond_parquet(path)
@@ -2935,7 +2977,12 @@ def test_phase_17_xtabond_sample_orders_numeric_time_values() -> None:
     (1, 10, 16.0, 2.0),
     (1, 2, 12.0, 1.0),
   )
-  sample = _xtabond_sample(rows=rows, predictor_count=1)
+  sample = _xtabond_sample(
+    rows=rows,
+    predictor_count=1,
+    lag_depth=1,
+    instrument_lag_start=2,
+  )
 
   assert sample is not None
   dependent, exogenous, endogenous, instruments = sample
@@ -3022,8 +3069,14 @@ def test_phase_17_estat_did_reports_interaction_diagnostics(tmp_path: Path) -> N
 
   assert isinstance(result, TableResult)
   assert result.headers == ("Test", "Metric", "Value")
+  observed = {str(row[1]): row[2] for row in result.rows}
   assert result.rows[0][0] == "did_interaction"
-  assert result.rows[0][1] == "coefficient"
+  assert observed["coefficient"] is not None
+  assert observed["treated_post_count"] == 2.0
+  assert observed["treated_pre_count"] == 2.0
+  assert observed["untreated_post_count"] == 2.0
+  assert observed["untreated_pre_count"] == 2.0
+  assert isinstance(observed["raw_diff_in_diff"], float)
 
 
 def test_phase_17_estat_did_requires_prior_did(sample_parquet: Path) -> None:
