@@ -767,6 +767,12 @@ def test_parse_phase_17_xtabond_command() -> None:
     predictors=("exposure",),
     robust=True,
   )
+  assert parse_command("xtabond wage exposure, lags(2) instlag(3)") == XtAbondCommand(
+    outcome="wage",
+    predictors=("exposure",),
+    lag_depth=2,
+    instrument_lag_start=3,
+  )
 
 
 def test_parse_phase_14_cfregress_command() -> None:
@@ -1146,6 +1152,9 @@ def test_parse_exit_aliases() -> None:
     "xtabond y if year > 2020",
     "xtabond y, robust=true",
     "xtabond y, cluster(firm_id)",
+    "xtabond y, lags(0)",
+    "xtabond y, instlag(1)",
+    "xtabond y, lags(2) instlag(2)",
     "cfregress",
     "cfregress y x",
     "cfregress y x, endog(z)",

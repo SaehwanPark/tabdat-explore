@@ -419,6 +419,8 @@ class XtAbondCommand:
   outcome: str
   predictors: tuple[str, ...]
   robust: bool = False
+  lag_depth: int = 1
+  instrument_lag_start: int = 2
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

@@ -19,5 +19,8 @@ Examples:
 - `zinb claims age exposure, inflate(exposure)` then `estat gof`
 - `did claims age exposure, treat(treated) post(post)` then `estat did`
 
+`estat did` reports interaction estimate diagnostics plus deterministic DID cell counts, means,
+and raw diff-in-diff contrasts.
+
 Links:
 - `docs/microecometrics_topics.md`

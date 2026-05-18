@@ -1,53 +1,44 @@
-# Phase 17 Slice 3 Implementation Report
+# Phase 17 Slice 4 Implementation Report
 
 ## Scope
 
 Implemented one bounded Phase 17 slice on branch
-`codex/tmp-phase17-slice3-xtabond-estat-did`:
+`codex/tmp-phase17-slice4-xtabond-lags-instlag-did-diagnostics`:
 
-- Slice 3: bounded dynamic-panel starter (`xtabond`) plus DID post-estimation diagnostics (`estat did`)
+- Slice 4: bounded `xtabond` lag/instrument option expansion plus richer `estat did` diagnostics.
 
 ## What Changed
 
 ### Parser and shell command surface
 
-- Added `xtabond <y> [xvars] [, robust]`.
-- Added strict option parsing and validation for `xtabond` (`robust` only).
-- Added `estat did` subcommand parsing and validation.
-- Added shell completion support for `xtabond` command/options and `estat did` suggestions.
+- Expanded `xtabond` syntax to `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`.
+- Added strict parser guards for `lags(#)`, `instlag(#)`, and `instlag > lags`.
+- Extended shell option completions for `xtabond` (`robust`, `lags(`, `instlag(`).
 
 ### Executor and formatter behavior
 
-- Added bounded `xtabond` execution with required panel metadata and dynamic complete-sample guards.
-- Added Python-first dynamic-panel fitting path using `linearmodels.iv.IVGMM`.
-- Added R fallback runtime path gated by `plm` availability.
-- Added deterministic covariance labels (`nonrobust`/`robust`) and typed `xtabond` formatter output.
-- Added deterministic `estat did` table output after successful `did`.
-
-### State behavior
-
-- `xtabond` clears incompatible prior estimation-family state.
-- Existing estimator-family routing behavior remains intact.
+- Extended `_xtabond_sample` and fit wiring to support configurable lag depth and instrument lag start.
+- Preserved Python-first IVGMM fitting with R fallback and lag-aware lag-coefficient naming.
+- Expanded `estat did` deterministic output with DID cell counts, cell means, treated/untreated
+  changes, and raw diff-in-diff contrasts.
+- Kept existing estimator-family state invalidation boundaries intact.
 
 ### Help and docs
 
-- Added in-app `xtabond` help topic.
-- Updated in-app `estat` help topic examples with `estat did` usage.
+- Updated in-app `xtabond` and `estat` help topics for new option/diagnostic behavior.
 - Updated SDD/docs (`SPEC.md`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`).
-- Updated `_workspace` handoff artifacts for Phase 17 continuation.
-
-## Validation
-
-- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_help.py -k "xtabond or did"`
-- `uv run pytest tests/test_executor.py tests/test_cli.py -k "xtabond or estat_did or phase_17_did"`
-- `uv run ruff format .`
-- `uv run ruff check .`
-- `uv run pyright`
-- `uv run mypy`
-- `uv run pytest -q`
-- `uv run python integrated_testing/run_e2e.py`
+- Updated `_workspace` handoff artifacts for Phase 17 Slice 4.
 
 ## Environment Notes
 
-- Installed `plm` to user R library path (`~/R/library`) and wired fallback runtime lookup to include
-  that path in `.libPaths()` during fallback execution.
+- Installed required R package `plm` (plus dependencies) so R fallback validation can run locally.
+
+## Validation
+
+- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py tests/test_help.py -k "xtabond or estat_did or phase_17_did or help_topics_cover_all_current_commands"`
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run pyright`
+- `uv run mypy`
+- `uv run pytest`
+- `uv run python integrated_testing/run_e2e.py`

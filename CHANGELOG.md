@@ -6,6 +6,13 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 17 advanced empirical-methods slice with
+  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, strict lag-depth/instrument-lag validation,
+  bounded configurable dynamic-panel execution over Python-first `linearmodels.iv.IVGMM` with R
+  fallback retained, and focused parser/executor/CLI/shell/help coverage.
+- Added expanded deterministic `estat did` diagnostics after successful `did`, including DID cell
+  counts, cell means, treated/untreated changes, and raw diff-in-diff contrasts in addition to
+  interaction-coefficient metrics.
 - Added the third Phase 17 advanced empirical-methods slice with
   `xtabond <y> [xvars] [, robust]`, required prior panel metadata
   (`panel <id_var> <time_var>`), bounded dynamic-panel AR(1) GMM starter execution through
