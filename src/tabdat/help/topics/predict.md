@@ -17,3 +17,5 @@ Examples:
 - `did claims age exposure, treat(treated) post(post)` then `predict did_hat, xb`
 - `nbreg claims age exposure` then `predict mu_hat, xb`
 - `zip claims age exposure, inflate(exposure)` then `predict mu_hat, residuals`
+- `xtabond wage exposure` then `predict dxb, xb`
+- `xtabond wage exposure` then `predict dresid, residuals`

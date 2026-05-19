@@ -269,6 +269,17 @@ class _StregRegressionState:
 class _XtAbondFitResult:
   covariance: str
   coefficients: tuple[CoefficientEstimate, ...]
+  fitted_model: object
+
+
+@dataclass(frozen=True)
+class _XtAbondRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  panel_metadata: PanelMetadata
+  lag_depth: int
+  instrument_lag_start: int
+  fitted_model: object
 
 
 @dataclass
@@ -296,6 +307,7 @@ class SessionState:
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
   did_regression: _DidRegressionState | None = None
+  xtabond_regression: _XtAbondRegressionState | None = None
 
 
 class Executor:
@@ -707,6 +719,9 @@ class Executor:
     return PanelResult(action="set", metadata=metadata)
 
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
+    active = self.state.active_dataset
+    if active is not None and dataset.panel_metadata is None and active.panel_metadata is not None:
+      dataset = replace(dataset, panel_metadata=active.panel_metadata)
     self._set_active_dataset(dataset)
     return TransformResult(message, dataset)
 
@@ -788,6 +803,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return RegressionResult(
       outcome=command.outcome,
       predictors=command.predictors,
@@ -857,6 +873,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return QregRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -933,6 +950,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return LogitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1008,6 +1026,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return ProbitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1099,6 +1118,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return IvRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
@@ -1269,6 +1289,7 @@ class Executor:
     )
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return CfRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1355,6 +1376,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return NlRegressionResult(
       covariance=covariance_label,
       outcome=command.outcome,
@@ -1426,6 +1448,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return PoissonRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1499,6 +1522,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return NbregRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1589,6 +1613,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return ZipRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1680,6 +1705,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return ZinbRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -1694,6 +1720,9 @@ class Executor:
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
     if command.kind == "pr":
+      xtabond_regression = self.state.xtabond_regression
+      if xtabond_regression is not None and self.state.binary_regression is None:
+        raise ExecutionError("predict option pr is not available after xtabond")
       binary_regression = self.state.binary_regression
       if binary_regression is None:
         raise ExecutionError("predict option pr requires a prior logit or probit model")
@@ -2012,9 +2041,44 @@ class Executor:
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    xtabond_regression = self.state.xtabond_regression
+    if xtabond_regression is not None:
+      panel_metadata = dataset.panel_metadata
+      required_columns = (
+        xtabond_regression.panel_metadata.id_variable,
+        xtabond_regression.panel_metadata.time_variable,
+        xtabond_regression.outcome_variable,
+        *xtabond_regression.predictor_names,
+      )
+      available_columns = {column.name for column in dataset.columns}
+      expected = xtabond_regression.panel_metadata
+      if (
+        panel_metadata is None
+        or panel_metadata.id_variable != expected.id_variable
+        or panel_metadata.time_variable != expected.time_variable
+      ):
+        raise ExecutionError("predict requires a prior xtabond model with matching panel metadata")
+      if any(name not in available_columns for name in required_columns):
+        raise ExecutionError("predict requires a prior xtabond model with matching variables")
+      rows = self.backend.regression_rows(dataset, required_columns)
+      predictions = _xtabond_predictions(
+        rows=rows,
+        predictor_count=len(xtabond_regression.predictor_names),
+        lag_depth=xtabond_regression.lag_depth,
+        instrument_lag_start=xtabond_regression.instrument_lag_start,
+        fitted_model=xtabond_regression.fitted_model,
+        kind=command.kind,
+      )
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
       "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
-      "or zinb model"
+      "zinb, or xtabond model"
     )
 
   def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
@@ -2081,6 +2145,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return StregRegressionResult(
       covariance=covariance,
       time_variable=command.time_variable,
@@ -2140,6 +2205,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return TobitRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -2220,6 +2286,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return HeckmanRegressionResult(
       covariance=covariance,
       outcome=command.outcome,
@@ -2266,9 +2333,12 @@ class Executor:
       raise ExecutionError("estat firststage requires a prior ivregress model")
     if command.subcommand == "overid":
       iv_regression = self.state.iv_regression
-      if iv_regression is None:
-        raise ExecutionError("estat overid requires a prior ivregress model")
-      return _estat_iv_overid_table(iv_regression.fitted_model)
+      if iv_regression is not None:
+        return _estat_iv_overid_table(iv_regression.fitted_model)
+      xtabond_regression = self.state.xtabond_regression
+      if xtabond_regression is not None:
+        return _estat_iv_overid_table(xtabond_regression.fitted_model)
+      raise ExecutionError("estat overid requires a prior ivregress or xtabond model")
     if command.subcommand == "hausman":
       fe_state = self.state.xt_regressions.fe
       re_state = self.state.xt_regressions.re
@@ -2433,6 +2503,7 @@ class Executor:
     self.state.iv_regression = None
     self.state.cf_regression = None
     self.state.did_regression = None
+    self.state.xtabond_regression = None
     return XtRegressionResult(
       estimator=command.estimator,
       covariance=cov_label,
@@ -2534,6 +2605,14 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.xtabond_regression = _XtAbondRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      panel_metadata=panel_metadata,
+      lag_depth=command.lag_depth,
+      instrument_lag_start=command.instrument_lag_start,
+      fitted_model=fit.fitted_model,
+    )
     return XtAbondRegressionResult(
       covariance=fit.covariance,
       outcome=command.outcome,
@@ -3815,7 +3894,7 @@ def _fit_xtabond_python(
   parameter_names = (*predictor_names, f"L{lag_depth}.{outcome_name}")
   coefficients = _iv_coefficient_estimates(parameter_names, fitted)
   covariance = "robust" if cov_type == "robust" else "nonrobust"
-  return _XtAbondFitResult(covariance=covariance, coefficients=coefficients)
+  return _XtAbondFitResult(covariance=covariance, coefficients=coefficients, fitted_model=fitted)
 
 
 def _fit_xtabond_r_fallback(
@@ -3933,7 +4012,11 @@ def _fit_xtabond_r_fallback(
       )
     if len(ordered) != len((*predictor_names, lag_name)):
       raise ExecutionError("xtabond failed")
-    return _XtAbondFitResult(covariance=cov_label, coefficients=tuple(ordered))
+    return _XtAbondFitResult(
+      covariance=cov_label,
+      coefficients=tuple(ordered),
+      fitted_model=fit,
+    )
   except ExecutionError:
     raise
   except Exception as exc:
@@ -4018,6 +4101,95 @@ def _did_predictions(
     numeric = _to_float_allow_inf(value)
     values.append(numeric)
   return tuple(values)
+
+
+def _xtabond_predictions(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  predictor_count: int,
+  lag_depth: int,
+  instrument_lag_start: int,
+  fitted_model: object,
+  kind: Literal["xb", "residuals", "pr"],
+) -> tuple[float | None, ...]:
+  if kind == "pr":
+    raise ExecutionError("predict option pr is not available after xtabond")
+  predictions: list[float | None] = [None for _ in rows]
+  grouped: dict[object, list[tuple[int, object, float, tuple[float, ...]]]] = {}
+  row_width = 3 + predictor_count
+  for row_index, row in enumerate(rows):
+    if len(row) != row_width:
+      return tuple(None for _ in rows)
+    entity_id = row[0]
+    time_id = row[1]
+    outcome = _coerce_float(row[2])
+    predictor_values = tuple(
+      value for value in (_coerce_float(raw) for raw in row[3:]) if value is not None
+    )
+    if entity_id is None or time_id is None or outcome is None:
+      continue
+    if len(predictor_values) != predictor_count:
+      continue
+    if not math.isfinite(outcome) or any(not math.isfinite(value) for value in predictor_values):
+      continue
+    grouped.setdefault(entity_id, []).append((row_index, time_id, outcome, predictor_values))
+
+  sample_indexes: list[int] = []
+  observed_deltas: list[float] = []
+  exogenous: list[tuple[float, ...]] = []
+  endogenous: list[float] = []
+  minimum_row_count = max(lag_depth + 2, instrument_lag_start + 1)
+  for entity_rows in grouped.values():
+    entity_rows.sort(key=lambda item: _xtabond_time_sort_key(item[1]))
+    if len(entity_rows) < minimum_row_count:
+      continue
+    for index in range(minimum_row_count - 1, len(entity_rows)):
+      row_index, _, outcome_t, predictors_t = entity_rows[index]
+      _, _, outcome_t_minus_1, predictors_t_minus_1 = entity_rows[index - 1]
+      _, _, outcome_t_minus_lag, _ = entity_rows[index - lag_depth]
+      _, _, outcome_t_minus_lag_prev, _ = entity_rows[index - lag_depth - 1]
+      delta_outcome = outcome_t - outcome_t_minus_1
+      delta_lag_outcome = outcome_t_minus_lag - outcome_t_minus_lag_prev
+      delta_predictors = tuple(
+        current - previous
+        for current, previous in zip(predictors_t, predictors_t_minus_1, strict=True)
+      )
+      if any(
+        not math.isfinite(value) for value in (delta_outcome, delta_lag_outcome, *delta_predictors)
+      ):
+        continue
+      sample_indexes.append(row_index)
+      observed_deltas.append(delta_outcome)
+      exogenous.append(delta_predictors)
+      endogenous.append(delta_lag_outcome)
+
+  if not sample_indexes:
+    return tuple(predictions)
+  try:
+    exog_matrix = np.array(exogenous, dtype=float) if predictor_count > 0 else None
+    endog_matrix = np.array(endogenous, dtype=float).reshape(-1, 1)
+    predicted_raw = cast(Any, fitted_model).predict(exog=exog_matrix, endog=endog_matrix)
+    to_numpy = getattr(predicted_raw, "to_numpy", None)
+    if callable(to_numpy):
+      predicted_array = np.array(to_numpy(), dtype=float).reshape(-1)
+      predicted_values = tuple(float(value) for value in predicted_array)
+    else:
+      predicted_values = _required_float_sequence(predicted_raw)
+  except Exception as exc:
+    raise ExecutionError("predict failed") from exc
+  if len(predicted_values) != len(sample_indexes):
+    raise ExecutionError("predict failed")
+  for sample_index, predicted_value, observed_value in zip(
+    sample_indexes,
+    predicted_values,
+    observed_deltas,
+    strict=True,
+  ):
+    if not math.isfinite(predicted_value):
+      predictions[sample_index] = None
+      continue
+    predictions[sample_index] = predicted_value if kind == "xb" else observed_value - predicted_value
+  return tuple(predictions)
 
 
 def _panel_coefficient_estimates(

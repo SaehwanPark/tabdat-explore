@@ -2971,6 +2971,78 @@ def test_phase_17_xtabond_r_fallback_runs_when_python_fit_fails(
   assert result.covariance == "nonrobust"
 
 
+def test_phase_17_estat_overid_supports_xtabond(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-overid.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",), robust=True))
+    result = executor.execute(EstatCommand(subcommand="overid"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("Test", "Metric", "Value")
+  assert any(row[0] == "gmm_j" for row in result.rows)
+
+
+def test_phase_17_predict_supports_xtabond_xb_and_residuals(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-predict.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",), robust=True))
+    xb = executor.execute(PredictCommand(target_variable="xtabond_xb", kind="xb"))
+    resid = executor.execute(PredictCommand(target_variable="xtabond_resid", kind="residuals"))
+    preview = executor.execute(HeadCommand(8))
+  finally:
+    executor.close()
+
+  assert isinstance(xb, TransformResult)
+  assert xb.message == "Predicted xtabond_xb"
+  assert isinstance(resid, TransformResult)
+  assert resid.message == "Predicted xtabond_resid"
+  assert isinstance(preview, PreviewResult)
+  assert "xtabond_xb" in preview.columns
+  assert "xtabond_resid" in preview.columns
+
+
+def test_phase_17_predict_xtabond_requires_matching_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-metadata.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",)))
+    executor.execute(PanelCommand(action="clear"))
+    with pytest.raises(
+      ExecutionError,
+      match="predict requires a prior xtabond model with matching panel metadata",
+    ):
+      executor.execute(PredictCommand(target_variable="xtabond_xb", kind="xb"))
+  finally:
+    executor.close()
+
+
+def test_phase_17_predict_xtabond_rejects_pr(tmp_path: Path) -> None:
+  path = tmp_path / "xtabond-pr.parquet"
+  _write_xtabond_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(XtAbondCommand(outcome="wage", predictors=("exper",)))
+    with pytest.raises(ExecutionError, match="predict option pr is not available after xtabond"):
+      executor.execute(PredictCommand(target_variable="xtabond_pr", kind="pr"))
+  finally:
+    executor.close()
+
+
 def test_phase_17_xtabond_sample_orders_numeric_time_values() -> None:
   rows: tuple[tuple[object, ...], ...] = (
     (1, 1, 10.0, 0.0),
