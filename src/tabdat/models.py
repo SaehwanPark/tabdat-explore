@@ -415,12 +415,27 @@ class XtDataCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtLogitCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  robust: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class XtAbondCommand:
   outcome: str
   predictors: tuple[str, ...]
   robust: bool = False
   lag_depth: int = 1
   instrument_lag_start: int = 2
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class LowessCommand:
+  outcome: str
+  predictor: str
+  target_variable: str
+  bandwidth: float = 0.6666666666666666
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -500,7 +515,9 @@ Command = (
   | IvRegressCommand
   | XtRegCommand
   | XtDataCommand
+  | XtLogitCommand
   | XtAbondCommand
+  | LowessCommand
   | DidCommand
   | CfRegressCommand
   | ParsedCommand
@@ -779,6 +796,15 @@ class XtRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class XtLogitRegressionResult:
+  covariance: str
+  outcome: str
+  predictors: tuple[str, ...]
+  observation_count: int
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class DidRegressionResult:
   covariance: str
   outcome: str
@@ -878,6 +904,7 @@ Result = (
   | StregRegressionResult
   | IvRegressionResult
   | XtRegressionResult
+  | XtLogitRegressionResult
   | XtAbondRegressionResult
   | DidRegressionResult
   | CfRegressionResult

@@ -233,9 +233,15 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     xtdata_command = _completion_texts(completer, "xtd")
     xtdata_columns = _completion_texts(completer, "xtdata c")
     xtdata_options = _completion_texts(completer, "xtdata cost age, ")
+    xtlogit_command = _completion_texts(completer, "xtl")
+    xtlogit_columns = _completion_texts(completer, "xtlogit c")
+    xtlogit_options = _completion_texts(completer, "xtlogit cost age, ")
     xtabond_command = _completion_texts(completer, "xta")
     xtabond_columns = _completion_texts(completer, "xtabond c")
     xtabond_options = _completion_texts(completer, "xtabond cost age, ")
+    lowess_command = _completion_texts(completer, "low")
+    lowess_columns = _completion_texts(completer, "lowess c")
+    lowess_options = _completion_texts(completer, "lowess cost age, ")
     cfregress_command = _completion_texts(completer, "cfr")
     cfregress_columns = _completion_texts(completer, "cfregress c")
     cfregress_options = _completion_texts(completer, "cfregress cost age, ")
@@ -298,9 +304,15 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert xtdata_command == ["xtdata"]
   assert xtdata_columns == ["cost"]
   assert xtdata_options == ["within", "between"]
+  assert xtlogit_command == ["xtlogit"]
+  assert xtlogit_columns == ["cost"]
+  assert xtlogit_options == ["fe", "robust"]
   assert xtabond_command == ["xtabond"]
   assert xtabond_columns == ["cost"]
   assert xtabond_options == ["robust", "lags(", "instlag("]
+  assert lowess_command == ["lowess"]
+  assert lowess_columns == ["cost"]
+  assert lowess_options == ["gen(", "bandwidth="]
   assert cfregress_command == ["cfregress"]
   assert cfregress_columns == ["cost"]
   assert cfregress_options == ["endog(", "iv(", "robust", "cluster(", "noconstant"]

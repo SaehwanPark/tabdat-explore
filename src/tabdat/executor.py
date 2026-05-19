@@ -13,7 +13,9 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
+from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
+from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
@@ -66,6 +68,7 @@ from tabdat.models import (
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
+  LowessCommand,
   NbregCommand,
   NbregRegressionResult,
   NlCommand,
@@ -113,6 +116,8 @@ from tabdat.models import (
   XtAbondCommand,
   XtAbondRegressionResult,
   XtDataCommand,
+  XtLogitCommand,
+  XtLogitRegressionResult,
   XtRegCommand,
   XtRegressionResult,
   ZinbCommand,
@@ -529,8 +534,14 @@ class Executor:
     if isinstance(command, XtDataCommand):
       return self._execute_xtdata(command)
 
+    if isinstance(command, XtLogitCommand):
+      return self._execute_xtlogit(command)
+
     if isinstance(command, XtAbondCommand):
       return self._execute_xtabond(command)
+
+    if isinstance(command, LowessCommand):
+      return self._execute_lowess(command)
 
     if isinstance(command, DidCommand):
       return self._execute_did(command)
@@ -2540,6 +2551,65 @@ class Executor:
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Applied xtdata {command.transform} transform", next_dataset)
 
+  def _execute_xtlogit(self, command: XtLogitCommand) -> XtLogitRegressionResult:
+    dataset = self._require_active_dataset("xtlogit")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("xtlogit requires panel metadata; run panel <id_var> <time_var> first")
+    variables: tuple[str, ...] = (
+      panel_metadata.id_variable,
+      panel_metadata.time_variable,
+      command.outcome,
+      *command.predictors,
+    )
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    missing = tuple(variable for variable in variables if variable not in column_types)
+    if missing:
+      raise UnknownVariableError(f"xtlogit unknown variable: {', '.join(missing)}")
+    _require_numeric_columns("xtlogit", dataset, (command.outcome, *command.predictors))
+    rows = self.backend.regression_rows(dataset, variables)
+    panel = _xt_panel_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+    )
+    if panel is None:
+      raise ExecutionError("xtlogit requires at least one complete observation")
+    outcomes, predictors, entity_ids, _time_ids, _ = panel
+    allowed = {0.0, 1.0}
+    if set(outcomes) - allowed:
+      raise ExecutionError("xtlogit outcome must be binary with values 0 and 1")
+    try:
+      fitted = ConditionalLogit(
+        np.array(outcomes, dtype=float),
+        np.array(predictors, dtype=float),
+        groups=np.array(entity_ids),
+      ).fit(disp=0)
+    except Exception as exc:
+      raise ExecutionError("xtlogit failed") from exc
+    coefficients = _coefficient_estimates(command.predictors, fitted)
+    self.state.regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    return XtLogitRegressionResult(
+      covariance="robust" if command.robust else "nonrobust",
+      outcome=command.outcome,
+      predictors=command.predictors,
+      observation_count=len(outcomes),
+      coefficients=coefficients,
+    )
+
   def _execute_xtabond(self, command: XtAbondCommand) -> XtAbondRegressionResult:
     dataset = self._require_active_dataset("xtabond")
     panel_metadata = dataset.panel_metadata
@@ -2621,6 +2691,49 @@ class Executor:
       coefficient_count=len(coefficients),
       coefficients=coefficients,
     )
+
+  def _execute_lowess(self, command: LowessCommand) -> TransformResult:
+    dataset = self._require_active_dataset("lowess")
+    _require_numeric_columns("lowess", dataset, (command.outcome, command.predictor))
+    rows = self.backend.regression_rows(dataset, (command.outcome, command.predictor))
+    outcomes: list[float] = []
+    predictors: list[float] = []
+    sample_indexes: list[int] = []
+    predictions: list[float | None] = [None for _ in rows]
+    for row_index, row in enumerate(rows):
+      if len(row) != 2:
+        continue
+      outcome = _coerce_float(row[0])
+      predictor = _coerce_float(row[1])
+      if outcome is None or predictor is None:
+        continue
+      if not math.isfinite(outcome) or not math.isfinite(predictor):
+        continue
+      outcomes.append(outcome)
+      predictors.append(predictor)
+      sample_indexes.append(row_index)
+    if not outcomes:
+      raise ExecutionError("lowess requires at least one complete observation")
+    try:
+      fitted = statsmodels_lowess(
+        np.array(outcomes, dtype=float),
+        np.array(predictors, dtype=float),
+        frac=command.bandwidth,
+        return_sorted=False,
+      )
+    except Exception as exc:
+      raise ExecutionError("lowess failed") from exc
+    if len(fitted) != len(sample_indexes):
+      raise ExecutionError("lowess failed")
+    for row_index, value in zip(sample_indexes, fitted, strict=True):
+      predictions[row_index] = _to_float_allow_inf(value)
+    next_dataset = self.backend.add_numeric_column_from_values(
+      dataset,
+      target_variable=command.target_variable,
+      values=tuple(predictions),
+      command_name="lowess",
+    )
+    return self._record_transform(f"Generated {command.target_variable} with lowess", next_dataset)
 
   def _execute_did(self, command: DidCommand) -> DidRegressionResult:
     dataset = self._require_active_dataset("did")
