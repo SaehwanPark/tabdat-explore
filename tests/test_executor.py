@@ -2605,7 +2605,10 @@ def test_phase_14_estat_iv_requires_prior_ivregress(sample_parquet: Path) -> Non
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="estat firststage requires a prior ivregress model"):
       executor.execute(EstatCommand(subcommand="firststage"))
-    with pytest.raises(ExecutionError, match="estat overid requires a prior ivregress model"):
+    with pytest.raises(
+      ExecutionError,
+      match="estat overid requires a prior ivregress or xtabond model",
+    ):
       executor.execute(EstatCommand(subcommand="overid"))
   finally:
     executor.close()

@@ -730,9 +730,6 @@ class Executor:
     return PanelResult(action="set", metadata=metadata)
 
   def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
-    active = self.state.active_dataset
-    if active is not None and dataset.panel_metadata is None and active.panel_metadata is not None:
-      dataset = replace(dataset, panel_metadata=active.panel_metadata)
     self._set_active_dataset(dataset)
     return TransformResult(message, dataset)
 
@@ -2086,10 +2083,11 @@ class Executor:
         values=predictions,
         command_name="predict",
       )
+      next_dataset = _preserve_panel_metadata(dataset, next_dataset)
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
       "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
-      "zinb, or xtabond model"
+      "or zinb model"
     )
 
   def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
@@ -2584,7 +2582,7 @@ class Executor:
         np.array(outcomes, dtype=float),
         np.array(predictors, dtype=float),
         groups=np.array(entity_ids),
-      ).fit(disp=0)
+      ).fit(disp=False)
     except Exception as exc:
       raise ExecutionError("xtlogit failed") from exc
     coefficients = _coefficient_estimates(command.predictors, fitted)
@@ -4301,7 +4299,9 @@ def _xtabond_predictions(
     if not math.isfinite(predicted_value):
       predictions[sample_index] = None
       continue
-    predictions[sample_index] = predicted_value if kind == "xb" else observed_value - predicted_value
+    predictions[sample_index] = (
+      predicted_value if kind == "xb" else observed_value - predicted_value
+    )
   return tuple(predictions)
 
 

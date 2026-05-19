@@ -6,6 +6,19 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fifth Phase 17 advanced empirical-methods slice with deterministic `estat overid`
+  diagnostics after successful `xtabond`, deterministic `predict <newvar>[, xb residuals]` routing
+  after `xtabond`, strict panel/variable compatibility guards, and focused
+  parser/executor/CLI/shell/help coverage.
+- Added the sixth Phase 17 advanced empirical-methods slice with
+  `xtlogit <y> <xvars>, fe [robust]`, required prior panel metadata
+  (`panel <id_var> <time_var>`), bounded fixed-effects nonlinear-panel execution through
+  Python-first `statsmodels.discrete.conditional_models.ConditionalLogit`, deterministic output,
+  and focused parser/executor/CLI/shell/help coverage.
+- Added the seventh Phase 17 advanced empirical-methods slice with
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, bounded semiparametric/nonparametric
+  smoothing through Python-first `statsmodels.nonparametric.smoothers_lowess.lowess`,
+  deterministic transform output, and focused parser/executor/CLI/shell/help coverage.
 - Added the fourth Phase 17 advanced empirical-methods slice with
   `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, strict lag-depth/instrument-lag validation,
   bounded configurable dynamic-panel execution over Python-first `linearmodels.iv.IVGMM` with R

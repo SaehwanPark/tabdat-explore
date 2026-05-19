@@ -1,4 +1,4 @@
-# Phase 17 Slice 4 QA Report
+# Phase 17 Completion QA Report
 
 ## Status
 
@@ -7,16 +7,16 @@ pass
 ## Boundaries Checked
 
 - Contract -> parser/shell:
-  - `xtabond` option surface and guard behavior match the Slice 4 command contract.
-  - shell completion advertises new `xtabond` options.
+  - `xtlogit` and `lowess` syntax/options match contract and are discoverable in completions.
+  - `xtabond` extension commands route through existing command grammar consistently.
 - Contract -> executor:
-  - `xtabond` executes with lag/instrument options and retains bounded dynamic-panel guards.
-  - `estat did` now includes deterministic expanded DID diagnostics after `did`.
+  - `estat overid` after `xtabond` executes with deterministic table output.
+  - `predict ..., xb|residuals` after `xtabond` executes with strict guard behavior.
+  - `xtlogit` enforces panel metadata and binary-outcome prerequisites.
+  - `lowess` enforces numeric inputs plus bounded bandwidth and target-column rules.
 - Contract -> formatter/CLI/help:
-  - existing deterministic CLI output behavior remains stable.
-  - in-app help reflects `xtabond` option expansion and richer `estat did` behavior.
-- Regression boundaries:
-  - existing estimator-family `predict`/`estat` routing remains stable under focused tests.
+  - CLI output shape is deterministic for added/extended commands.
+  - In-app help topics cover new commands and changed post-estimation behavior.
 
 ## Blocking Issues
 
@@ -24,5 +24,5 @@ pass
 
 ## Validation Evidence
 
-- Focused parser/shell/executor/CLI/help checks for `xtabond` and `estat did` passed.
-- Full quality and integrated E2E checks recorded in final delivery summary.
+- Focused parser/executor/CLI/shell/help suites for `xtabond`, `xtlogit`, and `lowess` passed.
+- Full quality and integrated E2E validation recorded in final delivery summary.

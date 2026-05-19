@@ -1,44 +1,46 @@
-# Phase 17 Slice 4 Implementation Report
+# Phase 17 Completion Implementation Report
 
 ## Scope
 
-Implemented one bounded Phase 17 slice on branch
-`codex/tmp-phase17-slice4-xtabond-lags-instlag-did-diagnostics`:
+Implemented three bounded Phase 17 slices on branch `codex/tmp-phase17-complete-multislice`:
 
-- Slice 4: bounded `xtabond` lag/instrument option expansion plus richer `estat did` diagnostics.
+- Slice 5: `xtabond` post-estimation/prediction extension.
+- Slice 6: bounded nonlinear panel starter via `xtlogit`.
+- Slice 7: bounded semiparametric/nonparametric starter via `lowess`.
 
 ## What Changed
 
-### Parser and shell command surface
+### Slice 5: `xtabond` extension
 
-- Expanded `xtabond` syntax to `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`.
-- Added strict parser guards for `lags(#)`, `instlag(#)`, and `instlag > lags`.
-- Extended shell option completions for `xtabond` (`robust`, `lags(`, `instlag(`).
+- Added `xtabond` model-state tracking needed for post-estimation/prediction routing.
+- Enabled `estat overid` after successful `xtabond`.
+- Added `predict <newvar>[, xb residuals]` after `xtabond` with strict guards.
+- Preserved current model-family routing boundaries for existing commands.
 
-### Executor and formatter behavior
+### Slice 6: `xtlogit`
 
-- Extended `_xtabond_sample` and fit wiring to support configurable lag depth and instrument lag start.
-- Preserved Python-first IVGMM fitting with R fallback and lag-aware lag-coefficient naming.
-- Expanded `estat did` deterministic output with DID cell counts, cell means, treated/untreated
-  changes, and raw diff-in-diff contrasts.
-- Kept existing estimator-family state invalidation boundaries intact.
+- Added parser/model/shell support for `xtlogit <y> <xvars>, fe [robust]`.
+- Added bounded executor path using Python-first
+  `statsmodels.discrete.conditional_models.ConditionalLogit`.
+- Added deterministic formatter output and focused CLI coverage.
 
-### Help and docs
+### Slice 7: `lowess`
 
-- Updated in-app `xtabond` and `estat` help topics for new option/diagnostic behavior.
-- Updated SDD/docs (`SPEC.md`, `ARCHITECTURE.md`, `README.md`, `CHANGELOG.md`).
-- Updated `_workspace` handoff artifacts for Phase 17 Slice 4.
+- Added parser/model/shell support for
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
+- Added bounded executor transform path using Python-first
+  `statsmodels.nonparametric.smoothers_lowess.lowess`.
+- Added deterministic transform messaging and CLI coverage.
 
-## Environment Notes
+### Help + SDD/docs
 
-- Installed required R package `plm` (plus dependencies) so R fallback validation can run locally.
+- Added help topics for `xtlogit` and `lowess`.
+- Updated `xtabond`, `predict`, and `estat` help examples to reflect new behavior.
+- Updated SDD/docs (`SPEC.md`, `README.md`, `ARCHITECTURE.md`, `CHANGELOG.md`) and workspace
+  artifacts.
 
-## Validation
+## Validation Commands
 
-- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py tests/test_help.py -k "xtabond or estat_did or phase_17_did or help_topics_cover_all_current_commands"`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
-- `uv run pyright`
-- `uv run mypy`
-- `uv run pytest`
-- `uv run python integrated_testing/run_e2e.py`
+- `uv run pytest tests/test_executor.py tests/test_cli.py tests/test_help.py -k "xtabond or overid or help_topics_cover_all_current_commands"`
+- `uv run pytest tests/test_parser.py tests/test_shell.py tests/test_executor.py tests/test_cli.py tests/test_help.py -k "xtlogit or lowess or xtabond or overid"`
+- (final full-suite validation listed in delivery summary)

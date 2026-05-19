@@ -1,72 +1,56 @@
-# Phase 17 Slice 4 Command Contract
+# Phase 17 Completion Contract (Slices 5-7)
 
 ## Roadmap Phase
 
 - Phase 17 advanced empirical methods
-  - Slice 4: bounded dynamic-panel option expansion (`xtabond`) plus richer DID diagnostics
+  - Slice 5: `xtabond` post-estimation/prediction extension
+  - Slice 6: nonlinear panel starter (`xtlogit`)
+  - Slice 7: semiparametric/nonparametric starter (`lowess`)
 
-## `xtabond`
+## `xtabond` extensions
 
-### Syntax
+### Added behavior
 
-```stata
-xtabond <y> [xvars] [, robust lags(#) instlag(#)]
-```
+- `estat overid` executes after successful `xtabond`.
+- `predict <newvar>[, xb residuals]` executes after successful `xtabond`.
 
-### Rules
+### Guards
 
-- Requires one active dataset.
-- Requires prior panel metadata via `panel <id_var> <time_var>`.
-- Requires one outcome variable.
-- Optional predictors are numeric and may be empty.
-- Supports covariance modes:
-  - nonrobust (default)
-  - robust
-- Supports lag options:
-  - `lags(#)` where `# >= 1`
-  - `instlag(#)` where `# >= 2`
-  - `instlag(#)` must be strictly greater than `lags(#)`.
+- `predict` requires matching panel metadata and required model variables.
+- `predict ..., pr` is not available after `xtabond`.
 
-## `estat did`
+## `xtlogit`
 
 ### Syntax
 
 ```stata
-estat did
+xtlogit <y> <xvars>, fe [robust]
 ```
 
 ### Rules
 
-- Requires one active dataset.
-- Requires prior successful `did` model state.
-- Returns deterministic interaction diagnostics plus deterministic DID cell counts/means and raw
-  diff-in-diff contrasts.
+- Requires active dataset.
+- Requires prior `panel <id_var> <time_var>` metadata.
+- Outcome must be binary (`0`/`1`).
+- Bounded fixed-effects nonlinear-panel workflow.
 
-## Error/guard behavior
+## `lowess`
 
-- Missing panel metadata for `xtabond`:
-  - `xtabond requires panel metadata; run panel <id_var> <time_var> first`
-- Empty complete-observation dynamic sample:
-  - `xtabond requires at least one complete observation`
-- Invalid lag options:
-  - `xtabond option lags must be at least 1`
-  - `xtabond option instlag must be at least 2`
-  - `xtabond option instlag must be greater than option lags`
-- Missing variables/non-numeric variables:
-  - existing unknown-variable and numeric-type errors
-- Fit failures:
-  - `xtabond failed`
-- Missing DID state for `estat did`:
-  - `estat did requires a prior did model`
+### Syntax
 
-## State behavior
+```stata
+lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]
+```
 
-- Running `xtabond` clears incompatible prior estimation-family state.
-- Existing `predict` and `estat` boundaries for other families remain unchanged.
+### Rules
+
+- Requires active dataset.
+- Requires numeric `<y>` and `<x>`.
+- `gen(...)` required and must be a new column name.
+- `bandwidth` optional, default `2/3`, and must satisfy `0 < bandwidth < 1`.
 
 ## Acceptance Criteria
 
-- `xtabond` parses and executes with optional predictors plus `robust`, `lags(#)`, and `instlag(#)`.
-- Deterministic typed/formatted output includes dynamic-panel coefficient rows with lag-aware naming.
-- `estat did` parses and executes after `did` with deterministic expanded table output.
-- Focused parser/executor/CLI/shell/help coverage passes.
+- Focused parser/executor/CLI/shell/help tests pass for all new/extended behaviors.
+- Existing command-family behavior remains stable.
+- In-app help includes accurate topics for newly added commands and changed behavior.
