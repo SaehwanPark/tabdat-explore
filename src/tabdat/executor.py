@@ -2578,11 +2578,15 @@ class Executor:
     if set(outcomes) - allowed:
       raise ExecutionError("xtlogit outcome must be binary with values 0 and 1")
     try:
-      fitted = ConditionalLogit(
+      model = ConditionalLogit(
         np.array(outcomes, dtype=float),
         np.array(predictors, dtype=float),
         groups=np.array(entity_ids),
-      ).fit(disp=False)
+      )
+      if command.robust:
+        fitted = model.fit(disp=False, cov_type="robust")
+      else:
+        fitted = model.fit(disp=False)
     except Exception as exc:
       raise ExecutionError("xtlogit failed") from exc
     coefficients = _coefficient_estimates(command.predictors, fitted)
@@ -2731,6 +2735,7 @@ class Executor:
       values=tuple(predictions),
       command_name="lowess",
     )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform(f"Generated {command.target_variable} with lowess", next_dataset)
 
   def _execute_did(self, command: DidCommand) -> DidRegressionResult:

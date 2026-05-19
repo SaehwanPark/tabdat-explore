@@ -6,6 +6,7 @@ import duckdb
 import polars as pl
 import pytest
 
+import tabdat.executor as executor_module
 from tabdat.backend import resolve_parquet_source
 from tabdat.config import TabDatConfig
 from tabdat.errors import (
@@ -3110,6 +3111,50 @@ def test_phase_17_xtlogit_returns_typed_result(tmp_path: Path) -> None:
   assert result.observation_count > 0
 
 
+def test_phase_17_xtlogit_robust_passes_cov_type(
+  monkeypatch: pytest.MonkeyPatch,
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "xtlogit-robust.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 0, 0.3, 1.0),
+        (1, 2021, 1, 0.8, 1.2),
+        (2, 2020, 0, 0.2, 0.9),
+        (2, 2021, 1, 0.9, 1.3)
+    ) as panel_data(firm_id, year, promoted, training, tenure)
+    """,
+  )
+  seen_cov_type: dict[str, str | None] = {"value": None}
+  original_fit = executor_module.ConditionalLogit.fit
+
+  def _fit_with_capture(self: object, *args: object, **kwargs: object) -> object:
+    cov_type = kwargs.get("cov_type")
+    seen_cov_type["value"] = str(cov_type) if cov_type is not None else None
+    return original_fit(self, *args, **kwargs)
+
+  monkeypatch.setattr(executor_module.ConditionalLogit, "fit", _fit_with_capture)
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(
+      XtLogitCommand(
+        outcome="promoted",
+        predictors=("training", "tenure"),
+        robust=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert seen_cov_type["value"] == "robust"
+
+
 def test_phase_17_xtlogit_requires_panel_metadata(tmp_path: Path) -> None:
   path = tmp_path / "xtlogit-no-panel.parquet"
   _write_sql_parquet(
@@ -3168,6 +3213,40 @@ def test_phase_17_lowess_generates_column(tmp_path: Path) -> None:
   assert result.message == "Generated wage_lowess with lowess"
   assert isinstance(preview, PreviewResult)
   assert "wage_lowess" in preview.columns
+
+
+def test_phase_17_lowess_preserves_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "lowess-panel.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 1.0, 1.0),
+        (1, 2021, 2.0, 2.0),
+        (2, 2020, 3.0, 3.0),
+        (2, 2021, 4.0, 4.0)
+    ) as lowess_data(firm_id, year, wage, exper)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    executor.execute(
+      LowessCommand(
+        outcome="wage",
+        predictor="exper",
+        target_variable="wage_lowess",
+        bandwidth=0.5,
+      )
+    )
+    panel_report = executor.execute(PanelCommand(action="report"))
+  finally:
+    executor.close()
+
+  assert isinstance(panel_report, PanelResult)
+  assert panel_report.metadata == PanelMetadata(id_variable="firm_id", time_variable="year")
 
 
 def test_phase_17_did_requires_panel_metadata(tmp_path: Path) -> None:
