@@ -34,6 +34,7 @@ from tabdat.models import (
   TobitRegressionResult,
   TransformResult,
   XtAbondRegressionResult,
+  XtLogitRegressionResult,
   XtRegressionResult,
   ZinbRegressionResult,
   ZipRegressionResult,
@@ -463,6 +464,27 @@ def format_result(result: Result) -> str:
       for estimate in result.coefficients
     )
     body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, XtLogitRegressionResult):
+    header = [
+      f"Model: xtlogit {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: xtlogit_fe",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
     return "\n".join([*header, *body])
 
   if isinstance(result, XtAbondRegressionResult):

@@ -1409,6 +1409,126 @@ def test_cli_runs_phase_17_xtabond_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_17_xtabond_overid_and_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "xtabond-overid-predict.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 1.0),
+        (1, 2021, 13.0, 2.0),
+        (1, 2022, 15.0, 4.0),
+        (2, 2020, 7.0, 0.0),
+        (2, 2021, 9.0, 1.0),
+        (2, 2022, 12.0, 1.5),
+        (3, 2020, 20.0, 3.0),
+        (3, 2021, 19.0, 2.0),
+        (3, 2022, 21.0, 3.0)
+    ) as panel_data(firm_id, year, wage, exper)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "xtabond wage exper, robust",
+      "-c",
+      "estat overid",
+      "-c",
+      "predict xtabond_xb",
+      "-c",
+      "predict xtabond_resid, residuals",
+      "-c",
+      "head 8",
+    ],
+  )
+
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  assert "Estimator: xtabond_ar1_gmm" in captured.out
+  assert "gmm_j  statistic" in captured.out
+  assert "Predicted xtabond_xb: 9 rows, 5 columns" in captured.out
+  assert "Predicted xtabond_resid: 9 rows, 6 columns" in captured.out
+  assert "xtabond_xb" in captured.out
+  assert "xtabond_resid" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_17_xtlogit_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "xtlogit.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 0, 0.3, 1.0),
+        (1, 2021, 1, 0.8, 1.2),
+        (1, 2022, 1, 1.1, 1.4),
+        (2, 2020, 0, 0.2, 0.9),
+        (2, 2021, 0, 0.4, 1.0),
+        (2, 2022, 1, 0.9, 1.3),
+        (3, 2020, 0, 0.1, 0.8),
+        (3, 2021, 1, 0.9, 1.1),
+        (3, 2022, 1, 1.2, 1.5)
+    ) as panel_data(firm_id, year, promoted, training, tenure)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "xtlogit promoted training tenure, fe robust",
+    ],
+  )
+
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  assert "Model: xtlogit promoted on training tenure" in captured.out
+  assert "Estimator: xtlogit_fe" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_17_lowess_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "lowess.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0),
+        (2.0, 2.0),
+        (3.0, 3.0),
+        (4.0, 4.0),
+        (5.0, 5.0)
+    ) as lowess_data(wage, exper)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "lowess wage exper, gen(wage_lowess) bandwidth=0.5",
+      "-c",
+      "head 5",
+    ],
+  )
+
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  assert "Generated wage_lowess with lowess: 5 rows, 3 columns" in captured.out
+  assert "wage_lowess" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   plot_path = tmp_path / "age.svg"
   exit_code = main(

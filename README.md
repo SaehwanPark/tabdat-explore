@@ -39,6 +39,10 @@ command line. The current CLI supports:
   `did <y> [controls], treat(<var>) post(<var>) [robust]` after `panel <id_var> <time_var>`
 - bounded dynamic-panel GMM starter with
   `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` after `panel <id_var> <time_var>`
+- bounded nonlinear panel logit starter with
+  `xtlogit <y> <xvars>, fe [robust]` after `panel <id_var> <time_var>`
+- bounded nonparametric smoothing with
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`
 - binary-choice logistic regression with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
 - binary-choice probit regression with
@@ -74,10 +78,10 @@ command line. The current CLI supports:
   context-aware autocomplete
 
 The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate, completed thirteen Phase 14 slices, and delivered seven bounded
+Phase 12 estimation substrate, completed thirteen Phase 14 slices, delivered seven bounded
 Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`,
-and `nl`), plus four bounded Phase 16 slices: count-model workflows (`poisson`, `nbreg`, `zip`,
-`zinb`) and the first duration/survival workflow (`streg`).
+and `nl`), delivered four bounded Phase 16 slices (`poisson`, `nbreg`, `zip`, `zinb`, and `streg`),
+and completed bounded Phase 17 starter coverage (`qreg`, `did`, `xtabond`, `xtlogit`, and `lowess`).
 
 ## Quickstart
 
@@ -230,8 +234,8 @@ tabdat> run analysis.td
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
-  latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, and supports
-  `pr` (plus `xb`) after `logit`/`probit`.
+  latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, supports
+  `xb`/`residuals` after `xtabond`, and supports `pr` (plus `xb`) after `logit`/`probit`.
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
   boundary (`survival::survreg` via `rpy2`).
@@ -242,6 +246,7 @@ tabdat> run analysis.td
   - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
   - quantile residual diagnostics (`residuals`) over the latest `qreg` state
   - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state
+  - dynamic-panel overidentification diagnostics (`overid`) over the latest `xtabond` state
   - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
   - control-function endogenous diagnostics (`endogenous`) over the latest `cfregress` state
     with deterministic residual-inclusion metrics:
@@ -258,9 +263,14 @@ tabdat> run analysis.td
   `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
 - `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and
   appends deterministic `<var>_within` or `<var>_between` columns.
+- `xtlogit` currently provides a bounded fixed-effects nonlinear panel binary-choice workflow via
+  `xtlogit <y> <xvars>, fe [robust]`.
 - `xtabond` currently provides a bounded dynamic-panel AR(1) GMM starter with nonrobust/robust
-  covariance modes plus `lags(#)` and `instlag(#)` controls. The Python IV-GMM path is primary;
-  an R-backed fallback path is available when Python fitting fails.
+  covariance modes plus `lags(#)` and `instlag(#)` controls, plus `estat overid` and
+  `predict <newvar>[, xb residuals]`. The Python IV-GMM path is primary; an R-backed fallback path
+  is available when Python fitting fails.
+- `lowess` currently provides a bounded nonparametric smoothing transform workflow via
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
 - Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
   on the first error, and include file and line number diagnostics. `seed <integer>` records
   script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`

@@ -332,40 +332,46 @@ and describe the active work with concise verification criteria.
   - expanded deterministic `estat did` diagnostics with DID cell counts, cell means, and raw
     diff-in-diff contrasts in addition to interaction coefficient metrics
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the fifth Phase 17 advanced empirical-methods slice:
+  - deterministic `estat overid` diagnostics after successful `xtabond`
+  - deterministic `predict <newvar>[, xb residuals]` routing after successful `xtabond`
+  - strict prediction guards for panel-metadata and variable compatibility
+  - focused parser, executor, CLI, shell, and help coverage
+- Implemented the sixth Phase 17 advanced empirical-methods slice:
+  - `xtlogit <y> <xvars>, fe [robust]` with required prior `panel <id_var> <time_var>`
+  - bounded nonlinear panel fixed-effects binary-choice execution via Python-first
+    `statsmodels.discrete.conditional_models.ConditionalLogit`
+  - deterministic typed/formatted output with focused parser, executor, CLI, shell, and help
+    coverage
+- Implemented the seventh Phase 17 advanced empirical-methods slice:
+  - `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`
+  - bounded semiparametric/nonparametric smoothing workflow via Python-first
+    `statsmodels.nonparametric.smoothers_lowess.lowess`
+  - deterministic active-dataset transform output with focused parser, executor, CLI, shell, and
+    help coverage
 
 ## Present
 
-- Feature: Phase 17 advanced empirical methods
+- Feature: Phase 18 ecosystem and extension layer
   Status: Active
-  Started: 2026-05-17
-  Branch: codex/tmp-phase17-slice4-xtabond-lags-instlag-did-diagnostics
+  Started: 2026-05-19
+  Branch: codex/tmp-phase17-complete-multislice
 
   Summary:
-  Continue from completed Phase 16 specialized-likelihood foundations with bounded Phase 17
-  slices for quantile, causal, and dynamic-panel workflows: quantile regression (`qreg`), a
-  panel-metadata DID starter (`did`) with deterministic post-estimation prediction routing
-  (`predict ..., xb`), plus bounded dynamic-panel execution (`xtabond`) with lag/instrument
-  controls and richer DID post-estimation diagnostics (`estat did`).
+  Phase 17 coverage is now represented by bounded dynamic-panel (`xtabond`), nonlinear panel
+  (`xtlogit`), quantile/distributional (`qreg`), semiparametric/nonparametric (`lowess`), and
+  causal (`did`) workflows with deterministic command contracts and focused validation.
+  Active work shifts to Phase 18 extension/interface hardening without broad estimator expansion.
 
   Verification:
-  - Full quality checks pass (`ruff`, `pyright`, `mypy`, `pytest`)
-  - Integrated E2E scenarios `s1` through `s5` pass
-  - `qreg` parses and executes with default median quantile plus explicit `quantile(...)`
-  - `qreg` executes with deterministic nonrobust and robust covariance modes
-  - `predict ..., xb|residuals` executes after `qreg` with deterministic output
-  - `estat residuals` executes after `qreg` with deterministic table output
-  - `did` parses and executes with deterministic nonrobust/robust covariance modes
-  - `predict ..., xb` executes after `did` with deterministic output
-  - `xtabond` parses and executes with deterministic nonrobust/robust covariance modes plus
-    `lags(#)`/`instlag(#)` options
-  - `estat did` executes after `did` with deterministic interaction metrics, cell counts, cell
-    means, and raw DID contrasts
-  - Existing `regress`/`logit`/`probit`/`tobit`/`heckman`/`nl`/`ivregress`/`cfregress`/`xtreg`
-    command behavior remains stable
+  - Dynamic-panel workflows include `xtabond` with lag/instrument controls plus
+    `estat overid` and `predict ..., xb|residuals`
+  - Nonlinear panel workflow includes `xtlogit ..., fe [robust]`
+  - Semiparametric workflow includes `lowess ..., gen(...) [bandwidth=<0,1>]`
+  - In-app help topics cover the current command surface
 
   Out of Scope:
-  - system-GMM, broader panel-GMM model families, and advanced causal estimators beyond bounded
-    TWFE + diagnostics
+  - full plugin architecture and cross-process extension governance
 
 ## Future
 
@@ -405,8 +411,7 @@ and describe the active work with concise verification criteria.
   - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
     semiparametric/nonparametric methods, and causal-inference workflows
   - remaining meaningful slice in this phase (one-sentence summary):
-    - extend bounded dynamic-panel and DID starters toward broader semiparametric/nonparametric and
-      causal workflows while preserving deterministic command contracts
+    - none
   - library strategy:
     - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
       semiparametric building blocks
@@ -417,6 +422,9 @@ and describe the active work with concise verification criteria.
 - Phase 18 ecosystem and extension layer:
   - add a plugin system, broader remote connectors, and formalized R adapter governance once command
     and analytical result interfaces are stable
+  - remaining meaningful slice in this phase (one-sentence summary):
+    - add a minimal extension registry contract that hardens Python/R adapter boundaries without
+      widening the estimator command surface
   - library strategy:
     - approach (1): stabilize Python adapter layers for adopted libraries (`statsmodels`,
       `linearmodels`, `lifelines`, and related dependencies)

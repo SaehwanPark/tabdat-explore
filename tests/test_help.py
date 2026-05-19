@@ -15,6 +15,8 @@ def test_help_topics_are_discoverable() -> None:
   assert "qreg" in topics
   assert "did" in topics
   assert "xtabond" in topics
+  assert "xtlogit" in topics
+  assert "lowess" in topics
   assert "help" not in topics
 
 

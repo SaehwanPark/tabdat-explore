@@ -7,9 +7,9 @@ FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat 
 support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
 semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
 binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase 16 slices
-(`poisson`, `nbreg`, `zip`, `zinb`, and `streg`), plus two bounded Phase 17 slices (`qreg` and
-`did`), plus two additional bounded Phase 17 slices (`xtabond` + `estat did`, then
-`xtabond` lag/instrument controls + expanded `estat did` diagnostics).
+(`poisson`, `nbreg`, `zip`, `zinb`, and `streg`), plus seven bounded Phase 17 slices (`qreg`,
+`did`, `xtabond` + `estat did`, `xtabond` lag/instrument controls + expanded `estat did`
+diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -80,7 +80,8 @@ Phase 16 parsing adds
 Phase 17 parsing adds
 `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]` and
 `did <y> [controls], treat(<var>) post(<var>) [robust]`, plus
-`xtabond <y> [xvars] [, robust lags(#) instlag(#)]` and `estat did`.
+`xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, `xtlogit <y> <xvars>, fe [robust]`,
+`lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
 by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
@@ -123,8 +124,10 @@ Phase 17 adds bounded quantile-regression execution through `statsmodels` (`qreg
 also adds a bounded causal starter through two-way fixed-effects DID execution (`did`) with
 required panel metadata and deterministic `predict ... , xb` routing. The latest Phase 17 slices
 add bounded `xtabond` dynamic-panel execution (Python-first with R fallback), configurable lag and
-instrument options, and expanded `estat did` diagnostics with deterministic DID cell statistics and
-raw diff-in-diff contrasts.
+instrument options, expanded `estat did` diagnostics with deterministic DID cell statistics and raw
+diff-in-diff contrasts, deterministic `estat overid` and `predict ..., xb|residuals` after
+`xtabond`, bounded `xtlogit` fixed-effects nonlinear panel execution, and bounded `lowess`
+semiparametric/nonparametric smoothing transforms.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -265,7 +268,10 @@ display formatting.
   `predict <newvar>[, xb residuals]` after `qreg` model state, `estat residuals` after `qreg`, and
   `did <y> [controls], treat(<var>) post(<var>) [robust]` with
   `predict <newvar>[, xb]` after `did` model state, plus
-  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` and expanded `estat did`.
+  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` with expanded `estat did`,
+  `estat overid`, and `predict <newvar>[, xb residuals]`, plus
+  `xtlogit <y> <xvars>, fe [robust]`, and
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.

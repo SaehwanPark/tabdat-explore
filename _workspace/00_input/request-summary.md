@@ -1,28 +1,26 @@
-# Phase 17 Slice 4 Request Summary
+# Phase 17 Completion + Phase 18 Transition Request Summary
 
 ## User Goal
 
-Resume development from the latest merged checkpoint by continuing Phase 17 with one bounded
-combined slice that expands dynamic-panel controls and DID post-estimation diagnostics.
+Resume development from `main` by completing remaining meaningful work in the active phase,
+commit meaningful checkpoints, keep in-app help accurate for all implemented commands, and open a
+review-ready PR.
 
 ## Scope
 
-- Resume from latest checkpoint on `main` (Phase 17 Slice 3 complete).
-- Phase 17 Slice 4:
-  - expand bounded dynamic-panel starter semantics:
-    - `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`
-  - preserve required prior `panel <id_var> <time_var>` metadata
-  - expand DID post-estimation diagnostics:
-    - richer deterministic `estat did` rows after successful `did`
+- Start from synced `main` and develop in a temporary branch.
+- Complete Phase 17 with bounded slices that close missing coverage bullets.
+- If no meaningful Phase 17 slices remain, move Present to Phase 18.
+- Update SDD/docs and workspace handoff artifacts.
+- Open one non-draft PR ready for review.
 
 ## Constraints
 
-- Keep deterministic output and strict option/guard validation.
-- Preserve existing estimator-family boundaries outside explicit `xtabond` and `estat did` changes.
-- Keep implementation as one bounded PR with meaningful checkpoint commits.
+- Follow Phase 13+ approach priority (Python-first, then R via `rpy2`, then lower-level fallback).
+- Preserve deterministic command contracts and focused tests.
+- Keep help-topic coverage aligned with the current command surface.
 
 ## Non-goals
 
-- No system-GMM or broader dynamic-panel model families in this slice.
-- No new DID estimators beyond bounded TWFE starter and diagnostics expansion.
-- No `predict` support after `xtabond` in this slice.
+- Broad Phase 18 plugin architecture implementation.
+- Unbounded estimator-family expansion in one PR.

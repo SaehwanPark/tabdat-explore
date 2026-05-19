@@ -14,6 +14,9 @@ Examples:
 - `xtabond wage exposure`
 - `xtabond wage exposure, robust`
 - `xtabond wage exposure, lags(2) instlag(3)`
+- `estat overid`
+- `predict dxb, xb`
+- `predict dresid, residuals`
 
 Links:
 - `docs/microecometrics_topics.md`

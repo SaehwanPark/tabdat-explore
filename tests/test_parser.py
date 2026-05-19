@@ -30,6 +30,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  LowessCommand,
   NbregCommand,
   NlCommand,
   NumberExpression,
@@ -58,6 +59,7 @@ from tabdat.models import (
   UseCommand,
   XtAbondCommand,
   XtDataCommand,
+  XtLogitCommand,
   XtRegCommand,
   ZinbCommand,
   ZipCommand,
@@ -775,6 +777,33 @@ def test_parse_phase_17_xtabond_command() -> None:
   )
 
 
+def test_parse_phase_17_xtlogit_command() -> None:
+  assert parse_command("xtlogit promoted training tenure, fe") == XtLogitCommand(
+    outcome="promoted",
+    predictors=("training", "tenure"),
+  )
+  assert parse_command("xtlogit promoted training, fe robust") == XtLogitCommand(
+    outcome="promoted",
+    predictors=("training",),
+    robust=True,
+  )
+
+
+def test_parse_phase_17_lowess_command() -> None:
+  assert parse_command("lowess wage exper, gen(wage_lowess)") == LowessCommand(
+    outcome="wage",
+    predictor="exper",
+    target_variable="wage_lowess",
+    bandwidth=2.0 / 3.0,
+  )
+  assert parse_command("lowess wage exper, gen(wage_lowess) bandwidth=0.5") == LowessCommand(
+    outcome="wage",
+    predictor="exper",
+    target_variable="wage_lowess",
+    bandwidth=0.5,
+  )
+
+
 def test_parse_phase_14_cfregress_command() -> None:
   assert parse_command("cfregress cost age bmi, endog(hours) iv(distance policy)") == (
     CfRegressCommand(
@@ -1148,6 +1177,11 @@ def test_parse_exit_aliases() -> None:
     "xtdata wage, detail",
     "xtdata wage, within=true",
     "xtdata wage if year > 2020, within",
+    "xtlogit",
+    "xtlogit y x",
+    "xtlogit y x, fe re",
+    "xtlogit y x, robust",
+    "xtlogit y x, fe cluster(firm)",
     "xtabond",
     "xtabond y if year > 2020",
     "xtabond y, robust=true",
@@ -1155,6 +1189,13 @@ def test_parse_exit_aliases() -> None:
     "xtabond y, lags(0)",
     "xtabond y, instlag(1)",
     "xtabond y, lags(2) instlag(2)",
+    "lowess",
+    "lowess y",
+    "lowess y x",
+    "lowess y x, gen()",
+    "lowess y x, gen(y_hat) bandwidth=0",
+    "lowess y x, gen(y_hat) bandwidth=1",
+    "lowess y x, robust",
     "cfregress",
     "cfregress y x",
     "cfregress y x, endog(z)",

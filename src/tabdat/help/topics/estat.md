@@ -18,6 +18,7 @@ Examples:
 - `nbreg claims age exposure` then `estat gof`
 - `zinb claims age exposure, inflate(exposure)` then `estat gof`
 - `did claims age exposure, treat(treated) post(post)` then `estat did`
+- `xtabond wage exposure` then `estat overid`
 
 `estat did` reports interaction estimate diagnostics plus deterministic DID cell counts, means,
 and raw diff-in-diff contrasts.

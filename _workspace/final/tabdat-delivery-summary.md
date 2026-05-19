@@ -1,34 +1,32 @@
-# Phase 17 Slice 4 Delivery Summary
+# Phase 17 Completion Delivery Summary
 
 ## Outcome
 
-Completed one bounded Phase 17 slice in one branch:
+Completed bounded Phase 17 remaining coverage in one branch/PR scope:
 
-- Slice 4: bounded `xtabond` lag/instrument option expansion plus richer `estat did` diagnostics.
+- Slice 5: `xtabond` post-estimation/prediction extension.
+- Slice 6: nonlinear panel starter (`xtlogit`).
+- Slice 7: semiparametric/nonparametric starter (`lowess`).
 
 ## Implemented
 
-- Added `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` with strict lag/instrument validation.
-- Extended bounded dynamic-panel execution to support configurable lag depth and instrument lag
-  starts while preserving Python-first IVGMM and R fallback behavior.
-- Expanded deterministic `estat did` output with DID cell counts, cell means, treated/untreated
-  changes, and raw diff-in-diff contrast rows.
-- Preserved existing estimator-family `predict`/`estat` boundaries outside this slice.
-- Updated in-app help and SDD/workspace artifacts to reflect Slice 4 behavior.
+- Added `estat overid` and `predict <newvar>[, xb residuals]` support after successful `xtabond`.
+- Added `xtlogit <y> <xvars>, fe [robust]` with panel-metadata and binary-outcome guards.
+- Added `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]` transform workflow.
+- Added/updated in-app help topics to keep command help accurate.
+- Updated SDD/docs and moved active feature tracking from Phase 17 completion toward Phase 18.
 
 ## Validation
 
-- focused parser/shell/executor/CLI/help checks for `xtabond` and `estat did`
-- full project checks: `ruff`, `pyright`, `mypy`, `pytest`
-- integrated public-dataset E2E harness
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run pyright`
+- `uv run mypy`
+- `uv run pytest`
+- `uv run python integrated_testing/run_e2e.py`
 
 ## Residual Risk
 
-- `xtabond` remains intentionally bounded (single-equation differenced starter) despite optionized
-  lag/instrument controls.
-- advanced dynamic-panel families and broader causal estimator families remain future-slice work.
-
-## Suggested Follow-up
-
-- Phase 17 Slice 5: add one bounded semiparametric/nonparametric or causal extension with the same
-  deterministic contract discipline.
+- `xtlogit` remains intentionally bounded to fixed-effects starter behavior.
+- `lowess` is currently a transform-oriented nonparametric starter, not a full inference framework.
+- Phase 18 extension interfaces remain to be formalized in a later bounded slice.

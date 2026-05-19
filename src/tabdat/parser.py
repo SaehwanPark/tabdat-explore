@@ -35,6 +35,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LogitCommand,
+  LowessCommand,
   NbregCommand,
   NlCommand,
   NumberExpression,
@@ -64,6 +65,7 @@ from tabdat.models import (
   UseCommand,
   XtAbondCommand,
   XtDataCommand,
+  XtLogitCommand,
   XtRegCommand,
   ZinbCommand,
   ZipCommand,
@@ -115,7 +117,9 @@ _EXECUTABLE_COMMANDS = {
   "ivregress",
   "xtreg",
   "xtdata",
+  "xtlogit",
   "xtabond",
+  "lowess",
   "did",
   "cfregress",
   "exit",
@@ -394,8 +398,14 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
   if parts.name == "xtdata":
     return _parse_xtdata(parts)
 
+  if parts.name == "xtlogit":
+    return _parse_xtlogit(parts)
+
   if parts.name == "xtabond":
     return _parse_xtabond(parts)
+
+  if parts.name == "lowess":
+    return _parse_lowess(parts)
 
   if parts.name == "did":
     return _parse_did(parts)
@@ -1372,6 +1382,25 @@ def _parse_xtdata(parts: _CommandParts) -> XtDataCommand:
   return XtDataCommand(variables=parts.arguments, transform=transform)
 
 
+def _parse_xtlogit(parts: _CommandParts) -> XtLogitCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("xtlogit expects syntax: xtlogit <y> <xvars>, fe [robust]")
+  if len(parts.arguments) < 2:
+    raise ParseError("xtlogit expects syntax: xtlogit <y> <xvars>, fe [robust]")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"fe", "robust"}
+  if unsupported:
+    raise ParseError(f"xtlogit unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "xtlogit", {"fe", "robust"})
+  if "fe" not in option_names:
+    raise ParseError("xtlogit requires option fe")
+  return XtLogitCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    robust="robust" in option_names,
+  )
+
+
 def _parse_xtabond(parts: _CommandParts) -> XtAbondCommand:
   if parts.condition is not None or parts.expression is not None:
     raise ParseError("xtabond expects syntax: xtabond <y> [xvars] [, robust lags(#) instlag(#)]")
@@ -1394,6 +1423,30 @@ def _parse_xtabond(parts: _CommandParts) -> XtAbondCommand:
     robust="robust" in option_names,
     lag_depth=resolved_lag_depth,
     instrument_lag_start=resolved_instlag,
+  )
+
+
+def _parse_lowess(parts: _CommandParts) -> LowessCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("lowess expects syntax: lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]")
+  if len(parts.arguments) != 2:
+    raise ParseError("lowess expects syntax: lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"gen", "bandwidth"}
+  if unsupported:
+    raise ParseError(f"lowess unsupported option: {', '.join(sorted(unsupported))}")
+  gen_values = _single_tuple_option(parts.options, "gen", "lowess")
+  if gen_values is None or len(gen_values) != 1:
+    raise ParseError("lowess option gen expects one variable")
+  bandwidth = _single_float_option(parts.options, "bandwidth", "lowess")
+  resolved_bandwidth = float(bandwidth) if bandwidth is not None else (2.0 / 3.0)
+  if not (0.0 < resolved_bandwidth < 1.0):
+    raise ParseError("lowess option bandwidth must be between 0 and 1")
+  return LowessCommand(
+    outcome=parts.arguments[0],
+    predictor=parts.arguments[1],
+    target_variable=gen_values[0],
+    bandwidth=resolved_bandwidth,
   )
 
 
