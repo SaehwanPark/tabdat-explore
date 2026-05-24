@@ -349,6 +349,10 @@ and describe the active work with concise verification criteria.
     `statsmodels.nonparametric.smoothers_lowess.lowess`
   - deterministic active-dataset transform output with focused parser, executor, CLI, shell, and
     help coverage
+- Implemented the first Phase 18 ingestion slice:
+  - eager `use` now accepts local and HTTP/HTTPS Stata `.dta` files through `pandas.read_stata`
+  - `use ..., lazy` remains Parquet-only
+  - focused backend, fixture, and executor coverage
 
 ## Present
 

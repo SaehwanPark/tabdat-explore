@@ -136,8 +136,10 @@ prevent cross-family `estat` reuse.
 Owns data access and query execution. Parquet is the primary initial format. Eager loading creates
 a session-local active DuckDB table. Lazy loading creates a DuckDB `read_parquet(...)` scan view so
 load-time projection, filtering, grouping, and terminal query operations can be pushed into DuckDB.
-Local paths and `http://`, `https://`, or `s3://` Parquet URIs share this DuckDB loading boundary;
-remote credentials and non-Parquet remote formats are not part of the current contract.
+Local paths and `http://`, `https://`, or `s3://` Parquet URIs share this DuckDB loading boundary.
+Eager Stata `.dta` files are read through `pandas.read_stata(...)` and then staged into the active
+DuckDB table, including remote `http://` and `https://` sources. Lazy loading stays Parquet-only;
+remote credentials and broader remote connectors are not part of the current contract.
 Session transformations replace the active relation for later commands. The optional `polars`
 engine selector now has a bounded real execution slice for local Parquet paths: projection,
 row-filtering, and preview/count commands can stay in a Polars `LazyFrame` boundary while later

@@ -1,5 +1,11 @@
+import contextlib
+import http.server
 import math
+import socketserver
+import threading
+from collections.abc import Iterator
 from decimal import Decimal
+from functools import partial
 from pathlib import Path
 
 import duckdb
@@ -541,6 +547,21 @@ def test_use_loads_active_dataset(sample_parquet: Path) -> None:
   assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
 
 
+def test_use_loads_local_stata_dataset(sample_dta: Path) -> None:
+  executor = Executor()
+  try:
+    result = executor.execute(UseCommand(sample_dta))
+  finally:
+    executor.close()
+
+  assert isinstance(result, LoadResult)
+  assert result.dataset.row_count == 3
+  assert result.dataset.column_count == 4
+  assert result.dataset.execution_mode == "eager"
+  assert result.dataset.lazy_engine is None
+  assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
+
+
 @pytest.mark.parametrize("engine", ["duckdb", "polars"])
 def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> None:
   executor = Executor()
@@ -563,6 +584,16 @@ def test_resolve_remote_parquet_source() -> None:
 
   assert source.read_path == "https://example.com/data.parquet"
   assert source.display_path == "https://example.com/data.parquet"
+  assert source.format == "parquet"
+  assert source.is_remote is True
+
+
+def test_resolve_remote_stata_source() -> None:
+  source = resolve_parquet_source("https://example.com/data.dta")
+
+  assert source.read_path == "https://example.com/data.dta"
+  assert source.display_path == "https://example.com/data.dta"
+  assert source.format == "stata"
   assert source.is_remote is True
 
 
@@ -572,8 +603,13 @@ def test_resolve_remote_parquet_source_rejects_unsupported_scheme() -> None:
 
 
 def test_resolve_remote_parquet_source_rejects_non_parquet() -> None:
-  with pytest.raises(ExecutionError, match="use only supports .parquet files"):
+  with pytest.raises(ExecutionError, match="use only supports .parquet and .dta files"):
     resolve_parquet_source("https://example.com/data.csv")
+
+
+def test_resolve_remote_stata_source_rejects_unsupported_scheme() -> None:
+  with pytest.raises(ExecutionError, match="use remote Stata files support http and https URLs"):
+    resolve_parquet_source("ftp://example.com/data.dta")
 
 
 def test_failing_lazy_use_preserves_existing_active_dataset(
@@ -587,6 +623,55 @@ def test_failing_lazy_use_preserves_existing_active_dataset(
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(ExecutionError, match="use could not read Parquet file"):
       executor.execute(UseCommand(corrupt_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    result = executor.execute(CountCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, CountResult)
+  assert result.row_count == 3
+
+
+@contextlib.contextmanager
+def _serve_directory(directory: Path) -> Iterator[str]:
+  class _SilentHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
+      return
+
+  handler = partial(_SilentHandler, directory=str(directory))
+  with socketserver.TCPServer(("127.0.0.1", 0), handler) as httpd:
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+      yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    finally:
+      httpd.shutdown()
+      thread.join(timeout=2)
+
+
+def test_use_loads_remote_stata_dataset(sample_dta: Path) -> None:
+  executor = Executor()
+  try:
+    with _serve_directory(sample_dta.parent) as base_url:
+      result = executor.execute(UseCommand(f"{base_url}/{sample_dta.name}"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, LoadResult)
+  assert result.dataset.row_count == 3
+  assert [column.name for column in result.dataset.columns] == ["age", "bmi", "sex", "cost"]
+  assert result.dataset.execution_mode == "eager"
+  assert result.dataset.lazy_engine is None
+
+
+def test_failing_lazy_stata_use_preserves_existing_active_dataset(
+  sample_parquet: Path,
+  sample_dta: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    with pytest.raises(ExecutionError, match="use lazy mode only supports Parquet files"):
+      executor.execute(UseCommand(sample_dta, execution_mode="lazy", lazy_engine="duckdb"))
     result = executor.execute(CountCommand())
   finally:
     executor.close()

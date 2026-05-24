@@ -12,7 +12,7 @@ description: "a structured project document that captures the idea clearly and i
 This project proposes the development of a **command-line exploratory data analysis (EDA) tool** that combines:
 
 * **Stata-inspired command ergonomics**
-* **Modern data infrastructure (Parquet, Arrow, lazy execution)**
+* **Modern data infrastructure (Parquet, Arrow, Stata `.dta`, lazy execution)**
 * **Terminal-native user experience (autocomplete, syntax highlighting)**
 
 The goal is not to replicate legacy statistical software, but to **reimagine the command-driven workflow** for contemporary data environments.
@@ -80,6 +80,7 @@ Specifically, the tool aims to:
 Modern data workflows increasingly require:
 
 * Native support for **columnar formats (Parquet, Feather)**
+* Read support for **Stata `.dta` files**, including remote HTTP/HTTPS sources
 * Ability to work with **datasets larger than memory**
 * Integration with **data lake / object storage**
 * Faster iteration cycles for **EDA and validation**
@@ -129,6 +130,7 @@ This project addresses these needs directly.
 * Read/write:
 
   * Parquet (primary)
+  * Stata `.dta` (read)
   * CSV
   * Feather / Arrow
 * Lazy and eager loading modes
