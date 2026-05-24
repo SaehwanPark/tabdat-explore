@@ -340,6 +340,14 @@ class Executor:
     self.backend.close()
 
   def execute(self, command: Command) -> Result | None:
+    if isinstance(command, (
+      RegressCommand, QregCommand, LogitCommand, ProbitCommand, TobitCommand,
+      NlCommand, PoissonCommand, NbregCommand, ZipCommand, ZinbCommand,
+      StregCommand, IvRegressCommand, CfRegressCommand, XtRegCommand,
+      DidCommand, XtAbondCommand, XtLogitCommand
+    )):
+      self.state.heckman_regression = None
+
     if isinstance(command, UseCommand):
       return self._execute_use(command)
 
