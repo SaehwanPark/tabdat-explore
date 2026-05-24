@@ -8,7 +8,8 @@ This glossary defines the first small command surface for TabDat-Explore. It is 
 
 Load a dataset into the single active dataset slot.
 
-Phase 1 focus: load Parquet from a local path.
+Phase 1 focus: load Parquet or Stata `.dta` from a local path.
+HTTP/HTTPS `.dta` URLs are also supported; lazy mode stays Parquet-only.
 
 ### `describe`
 
