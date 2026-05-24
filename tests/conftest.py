@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import duckdb
+import pandas as pd
 import pytest
 
 
@@ -24,4 +25,19 @@ def sample_parquet(tmp_path: Path) -> Path:
     )
   finally:
     connection.close()
+  return path
+
+
+@pytest.fixture
+def sample_dta(tmp_path: Path) -> Path:
+  path = tmp_path / "patients.dta"
+  frame = pd.DataFrame(
+    {
+      "age": [30, 42, 54],
+      "bmi": [22.5, 25.0, 27.5],
+      "sex": ["F", "M", "F"],
+      "cost": [100.0, 150.0, None],
+    }
+  )
+  frame.to_stata(path, write_index=False)
   return path

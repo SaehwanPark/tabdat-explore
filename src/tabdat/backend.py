@@ -5,9 +5,11 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, cast
+from urllib.error import URLError
 from urllib.parse import urlparse
 
 import duckdb
+import pandas as pd
 import polars as pl
 from polars.exceptions import PolarsError
 from pydantic.dataclasses import dataclass
@@ -55,10 +57,12 @@ ACTIVE_VIEW = "active"
 NEXT_ACTIVE_TABLE = "__tabdat_next"
 NEXT_ACTIVE_VIEW = "__tabdat_next_view"
 REMOTE_PARQUET_SCHEMES = {"http", "https", "s3"}
+REMOTE_STATA_SCHEMES = {"http", "https"}
 
 
 @dataclass(frozen=True)
-class ParquetSource:
+class LoadSource:
+  format: Literal["parquet", "stata"]
   read_path: str
   display_path: Path | str
   is_remote: bool
@@ -83,10 +87,32 @@ class DuckDBBackend:
     execution_mode: Literal["eager", "lazy"] = "eager",
     lazy_engine: Literal["duckdb", "polars"] | None = None,
   ) -> DatasetInfo:
-    source = resolve_parquet_source(path)
+    source = resolve_load_source(path)
 
     try:
-      if execution_mode == "lazy" and lazy_engine == "polars":
+      if source.format == "stata":
+        if execution_mode == "lazy":
+          raise ExecutionError("use lazy mode only supports Parquet files")
+        frame = pd.read_stata(source.read_path)
+        stage_name = "__tabdat_stata_source"
+        self._connection.register(stage_name, frame)
+        try:
+          stage_identifier = _quote_identifier(stage_name)
+          self._connection.execute(
+            f"create or replace temp table {NEXT_ACTIVE_TABLE} as select * from {stage_identifier}"
+          )
+        finally:
+          self._connection.unregister(stage_name)
+        self._drop_active_relation()
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
+        )
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+        self._lazy_engine = None
+        self._active_storage = "table"
+        self._polars_lazy_frame = None
+        return self.active_dataset_info(source.display_path)
+      elif execution_mode == "lazy" and lazy_engine == "polars":
         if source.is_remote:
           raise ExecutionError("use lazy engine=polars only supports local Parquet paths")
         next_lazy_frame = pl.scan_parquet(str(source.display_path))
@@ -131,9 +157,11 @@ class DuckDBBackend:
         self._polars_lazy_frame = None
     except duckdb.Error as exc:
       self._drop_load_staging_relations()
-      raise ExecutionError(f"use could not read Parquet file: {source.read_path}") from exc
-    except (PolarsError, OSError) as exc:
-      raise ExecutionError(f"use could not read Parquet file: {source.read_path}") from exc
+      message = f"use could not read {source.format.title()} file: {source.read_path}"
+      raise ExecutionError(message) from exc
+    except (PolarsError, OSError, URLError, ValueError) as exc:
+      message = f"use could not read {source.format.title()} file: {source.read_path}"
+      raise ExecutionError(message) from exc
 
     return self.active_dataset_info(source.display_path)
 
@@ -1596,23 +1624,45 @@ def _polars_dtype_name(dtype: pl.DataType) -> str:
   return str(dtype).upper()
 
 
-def resolve_parquet_source(path: Path | str) -> ParquetSource:
+def resolve_parquet_source(path: Path | str) -> LoadSource:
+  return resolve_load_source(path)
+
+
+def resolve_load_source(path: Path | str) -> LoadSource:
   if isinstance(path, str) and "://" in path:
     parsed = urlparse(path)
-    if parsed.scheme not in REMOTE_PARQUET_SCHEMES:
-      raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
-    if not parsed.path.lower().endswith(".parquet"):
-      raise ExecutionError("use only supports .parquet files")
-    return ParquetSource(read_path=path, display_path=path, is_remote=True)
+    suffix = parsed.path.lower()
+    if suffix.endswith(".parquet"):
+      if parsed.scheme not in REMOTE_PARQUET_SCHEMES:
+        raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
+      return LoadSource(format="parquet", read_path=path, display_path=path, is_remote=True)
+    if suffix.endswith(".dta"):
+      if parsed.scheme not in REMOTE_STATA_SCHEMES:
+        raise ExecutionError("use remote Stata files support http and https URLs")
+      return LoadSource(format="stata", read_path=path, display_path=path, is_remote=True)
+    raise ExecutionError("use only supports .parquet and .dta files")
 
   normalized = Path(path).expanduser()
-  if normalized.suffix.lower() != ".parquet":
-    raise ExecutionError("use only supports .parquet files")
+  suffix = normalized.suffix.lower()
+  if suffix not in {".parquet", ".dta"}:
+    raise ExecutionError("use only supports .parquet and .dta files")
   if not normalized.exists():
     raise ExecutionError(f"use could not find file: {path}")
   if not normalized.is_file():
     raise ExecutionError(f"use expected a file path: {path}")
-  return ParquetSource(read_path=str(normalized), display_path=normalized, is_remote=False)
+  if suffix == ".parquet":
+    return LoadSource(
+      format="parquet",
+      read_path=str(normalized),
+      display_path=normalized,
+      is_remote=False,
+    )
+  return LoadSource(
+    format="stata",
+    read_path=str(normalized),
+    display_path=normalized,
+    is_remote=False,
+  )
 
 
 def _require_result_query(query: str) -> None:
