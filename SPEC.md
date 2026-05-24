@@ -349,29 +349,36 @@ and describe the active work with concise verification criteria.
     `statsmodels.nonparametric.smoothers_lowess.lowess`
   - deterministic active-dataset transform output with focused parser, executor, CLI, shell, and
     help coverage
-- Implemented the first Phase 18 ingestion slice:
+- Implemented the second Phase 18 ingestion slice:
   - eager `use` now accepts local and HTTP/HTTPS Stata `.dta` files through `pandas.read_stata`
   - `use ..., lazy` remains Parquet-only
   - focused backend, fixture, and executor coverage
+- Implemented the third Phase 18 advanced econometrics replication demo slice:
+  - added remote Stata URL loader bypass in `inspect_parquet` via custom User-Agent and tempfiles to resolve HTTP 403 Forbidden server blocks
+  - added support for linear prediction (`predict ..., xb|residuals`) after `heckman` selection estimation
+  - created three classic Stata-based advanced econometrics replication scripts under `demos/`: Heckman sample selection correction (`heckman_mroz.td`), Card returns to education IV/2SLS (`ivregress_card.td`), and NLSY wages panel Fixed/Random Effects with Hausman specification test (`panel_union.td`)
+  - added automated test suite `tests/test_demos.py` to verify demo parser and executor flows via the CLI
 
 ## Present
 
 - Feature: Phase 18 ecosystem and extension layer
   Status: Active
   Started: 2026-05-19
-  Branch: codex/tmp-phase17-complete-multislice
+  Branch: demos/econometrics-replication
 
   Summary:
   Phase 17 coverage is now represented by bounded dynamic-panel (`xtabond`), nonlinear panel
   (`xtlogit`), quantile/distributional (`qreg`), semiparametric/nonparametric (`lowess`), and
   causal (`did`) workflows with deterministic command contracts and focused validation.
-  Active work shifts to Phase 18 extension/interface hardening without broad estimator expansion.
+  Active work shifts to Phase 18 extension/interface hardening, remote loading robustness, and
+  real-data advanced econometrics replication.
 
   Verification:
   - Dynamic-panel workflows include `xtabond` with lag/instrument controls plus
     `estat overid` and `predict ..., xb|residuals`
   - Nonlinear panel workflow includes `xtlogit ..., fe [robust]`
   - Semiparametric workflow includes `lowess ..., gen(...) [bandwidth=<0,1>]`
+  - Automated replication test suite `tests/test_demos.py` successfully runs and validates Heckman, IV/2SLS, and Panel OLS/Hausman demo scripts on live remote datasets
   - In-app help topics cover the current command surface
 
   Out of Scope:
