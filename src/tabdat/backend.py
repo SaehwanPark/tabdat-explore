@@ -93,7 +93,28 @@ class DuckDBBackend:
       if source.format == "stata":
         if execution_mode == "lazy":
           raise ExecutionError("use lazy mode only supports Parquet files")
-        frame = pd.read_stata(source.read_path)
+        if source.is_remote:
+          import os
+          import urllib.request
+          try:
+            req = urllib.request.Request(
+              source.read_path,
+              headers={"User-Agent": "Mozilla/5.0"}
+            )
+            with urllib.request.urlopen(req) as response:
+              with tempfile.NamedTemporaryFile(suffix=".dta", delete=False) as tmp_file:
+                tmp_file.write(response.read())
+                temp_path = tmp_file.name
+            frame = pd.read_stata(temp_path)
+            try:
+              os.unlink(temp_path)
+            except OSError:
+              pass
+          except Exception as exc:
+            message = f"use could not read {source.format.title()} file: {source.read_path}"
+            raise ExecutionError(message) from exc
+        else:
+          frame = pd.read_stata(source.read_path)
         stage_name = "__tabdat_stata_source"
         self._connection.register(stage_name, frame)
         try:
