@@ -2109,7 +2109,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, heckman, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+      "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
       "or zinb model"
     )
 
