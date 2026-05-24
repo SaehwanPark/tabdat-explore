@@ -2103,6 +2103,27 @@ def test_phase_15_heckman_reports_prerequisite_errors(sample_parquet: Path, tmp_
     executor.close()
 
 
+def test_phase_15_heckman_predict_state_invalidation(tmp_path: Path) -> None:
+  path = tmp_path / "heckman.parquet"
+  _write_heckman_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      HeckmanCommand(
+        outcome="y",
+        predictors=("x",),
+        selection_dependent="s",
+        selection_predictors=("z",),
+      )
+    )
+    assert executor.state.heckman_regression is not None
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    assert executor.state.heckman_regression is None
+  finally:
+    executor.close()
+
+
 def test_phase_13_regress_rejects_non_positive_weight_or_sigma(tmp_path: Path) -> None:
   path = tmp_path / "invalid-weights.parquet"
   _write_invalid_weight_regression_parquet(path)

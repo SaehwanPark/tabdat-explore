@@ -139,6 +139,16 @@ class _RegressionState:
 
 
 @dataclass(frozen=True)
+class _HeckmanRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+  fitted_model: object
+
+
+@dataclass(frozen=True)
 class _QregRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
@@ -300,6 +310,7 @@ class SessionState:
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
+  heckman_regression: _HeckmanRegressionState | None = None
   qreg_regression: _QregRegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
   nl_regression: _NlRegressionState | None = None
@@ -329,6 +340,14 @@ class Executor:
     self.backend.close()
 
   def execute(self, command: Command) -> Result | None:
+    if isinstance(command, (
+      RegressCommand, QregCommand, LogitCommand, ProbitCommand, TobitCommand,
+      NlCommand, PoissonCommand, NbregCommand, ZipCommand, ZinbCommand,
+      StregCommand, IvRegressCommand, CfRegressCommand, XtRegCommand,
+      DidCommand, XtAbondCommand, XtLogitCommand
+    )):
+      self.state.heckman_regression = None
+
     if isinstance(command, UseCommand):
       return self._execute_use(command)
 
@@ -2085,6 +2104,18 @@ class Executor:
       )
       next_dataset = _preserve_panel_metadata(dataset, next_dataset)
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    heckman_regression = self.state.heckman_regression
+    if heckman_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=heckman_regression.predictor_names,
+        predictor_coefficients=heckman_regression.predictor_coefficients,
+        intercept=heckman_regression.intercept,
+        outcome_variable=heckman_regression.outcome_variable,
+        kind=command.kind,
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
       "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
       "or zinb model"
@@ -2283,6 +2314,17 @@ class Executor:
       raise
     except Exception as exc:
       raise ExecutionError("heckman failed") from exc
+    coeff_dict = {c.name: c.value for c in outcome_coefficients}
+    predictor_coeffs = tuple(coeff_dict.get(name, 0.0) for name in command.predictors)
+    intercept = coeff_dict.get("intercept", None)
+    self.state.heckman_regression = _HeckmanRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coeffs,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+      fitted_model=None,
+    )
     self.state.regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
