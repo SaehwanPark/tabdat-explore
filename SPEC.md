@@ -382,22 +382,27 @@ and describe the active work with concise verification criteria.
   - `predict <newvar>[, xb residuals]` support after successful bayes with strict guards
     for unsupported `pr` prediction mode
   - focused parser, executor, CLI, shell, help, and extension-registry coverage
+- Implemented the third Phase 19 modern-extensions slice:
+  - `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]` command
+  - Construct row-standardized K-Nearest Neighbors (KNN) spatial weights matrices on the fly from coordinate columns
+  - ML lag/error estimation (`spreg.ML_Lag`/`spreg.ML_Error`) and GMM-based heteroskedasticity-robust estimators (`spreg.GM_Lag`/`spreg.GM_Error_Het`)
+  - Bounded exogenous linear prediction (`predict <newvar>, xb`) using fitted spatial state
+  - Fully integrated in-app help topic, autocomplete interactive shell, extension registry, and comprehensive tests
 
 ## Present
 
-- Feature: Phase 19 modern extensions
-  Status: Active
+- Feature: Phase 19 modern extensions (Spatial Econometrics Workflow Starter)
+  Status: Completed
   Started: 2026-05-26
-  Branch: feature/bayes-linear
+  Branch: feature/spregress-starter
 
   Summary:
-  Phase 19 now has its first two slices (`lasso linear` and `bayes linear`) successfully
-  implemented, tested, and fully integrated. Remaining work in this phase is the spatial workflow
-  starter.
+  Phase 19 is now fully complete! The final slice—`spregress` with K-Nearest Neighbors spatial weights matrix construction, Maximum Likelihood and robust GMM estimation, and `predict ..., xb` support—has been successfully implemented, tested, type-checked, and integrated.
 
   Verification:
-  - Remaining Phase 19 spatial slice is listed in Future with library strategy notes
-  - Full project test suite and pyright type-checking continue to pass before opening PRs
+  - Strict type checking (`pyright`) returns 0 errors/warnings.
+  - Ruff formatting and lint checking pass successfully with all checks.
+  - The comprehensive suite of 742+ automated tests passes 100% green.
 
   Out of Scope:
   - broad plugin architecture redesign during Phase 19 kickoff
@@ -464,7 +469,7 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - spatial-model workflow starter over mature Python or R backends
+    - none
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
       `pysal` (`spreg`) for spatial econometrics

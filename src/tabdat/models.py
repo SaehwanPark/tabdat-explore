@@ -275,6 +275,16 @@ class BayesCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SpregressCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  model_type: Literal["lag", "error"]
+  coord_variables: tuple[str, str]
+  knn: int
+  robust: bool
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class QregCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -518,6 +528,7 @@ Command = (
   | RegressCommand
   | LassoCommand
   | BayesCommand
+  | SpregressCommand
   | QregCommand
   | LogitCommand
   | ProbitCommand
@@ -681,6 +692,21 @@ class BayesRegressionResult:
   include_intercept: bool
   r_squared: float | None
   coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class SpatialRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  model_type: Literal["lag", "error"]
+  coord_variables: tuple[str, str]
+  knn: int
+  robust: bool
+  observation_count: int
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+  spatial_coefficient: float
+  spatial_coefficient_name: str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -936,6 +962,7 @@ Result = (
   | RegressionResult
   | LassoRegressionResult
   | BayesRegressionResult
+  | SpatialRegressionResult
   | QregRegressionResult
   | LogitRegressionResult
   | ProbitRegressionResult

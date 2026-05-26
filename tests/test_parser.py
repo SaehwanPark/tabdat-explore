@@ -6,6 +6,7 @@ from tabdat.errors import ParseError
 from tabdat.models import (
   AppendCommand,
   BarCommand,
+  BayesCommand,
   BinaryExpression,
   ByCommand,
   CfRegressCommand,
@@ -29,7 +30,6 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
-  BayesCommand,
   LassoCommand,
   LogitCommand,
   LowessCommand,

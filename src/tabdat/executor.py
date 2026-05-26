@@ -9,11 +9,13 @@ from typing import Any, Literal, SupportsFloat, cast
 
 import numpy as np
 import statsmodels.api as sm
+from libpysal.weights import KNN
 from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
 from sklearn.linear_model import BayesianRidge, Lasso
+from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
@@ -35,6 +37,8 @@ from tabdat.models import (
   ActivateResult,
   AppendCommand,
   BarCommand,
+  BayesCommand,
+  BayesRegressionResult,
   BinaryExpression,
   ByCommand,
   CfRegressCommand,
@@ -67,8 +71,6 @@ from tabdat.models import (
   IvRegressionResult,
   JoinCommand,
   KeepCommand,
-  BayesCommand,
-  BayesRegressionResult,
   LassoCommand,
   LassoRegressionResult,
   LoadResult,
@@ -104,6 +106,8 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SetResult,
+  SpatialRegressionResult,
+  SpregressCommand,
   SqlCommand,
   SqlCreateResult,
   StregCommand,
@@ -160,6 +164,17 @@ class _BayesRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _SpatialRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+  spatial_coefficient: float
+  spatial_coefficient_name: str
 
 
 @dataclass(frozen=True)
@@ -350,6 +365,7 @@ class SessionState:
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
   did_regression: _DidRegressionState | None = None
   xtabond_regression: _XtAbondRegressionState | None = None
+  spatial_regression: _SpatialRegressionState | None = None
 
 
 class Executor:
@@ -389,11 +405,13 @@ class Executor:
         DidCommand,
         XtAbondCommand,
         XtLogitCommand,
+        SpregressCommand,
       ),
     ):
       self.state.lasso_regression = None
       self.state.bayes_regression = None
       self.state.heckman_regression = None
+      self.state.spatial_regression = None
 
     if isinstance(command, UseCommand):
       return self._execute_use(command)
@@ -560,6 +578,9 @@ class Executor:
 
     if isinstance(command, BayesCommand):
       return self._execute_bayes(command)
+
+    if isinstance(command, SpregressCommand):
+      return self._execute_spregress(command)
 
     if isinstance(command, QregCommand):
       return self._execute_qreg(command)
@@ -873,6 +894,7 @@ class Executor:
     )
     self.state.lasso_regression = None
     self.state.bayes_regression = None
+    self.state.spatial_regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
@@ -944,6 +966,7 @@ class Executor:
       include_intercept=command.include_intercept,
     )
     self.state.bayes_regression = None
+    self.state.spatial_regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
@@ -1010,6 +1033,7 @@ class Executor:
       include_intercept=command.include_intercept,
     )
     self.state.qreg_regression = None
+    self.state.spatial_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
     self.state.poisson_regression = None
@@ -1033,6 +1057,173 @@ class Executor:
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
       coefficients=coefficients,
+    )
+
+  def _execute_spregress(self, command: SpregressCommand) -> SpatialRegressionResult:
+    dataset = self._require_active_dataset("spregress")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      *command.predictors,
+      *command.coord_variables,
+    )
+    _require_numeric_columns("spregress", dataset, numeric_variables)
+
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+
+    outcomes: list[float] = []
+    predictors_list: list[tuple[float, ...]] = []
+    coords_list: list[tuple[float, float]] = []
+
+    for row in rows:
+      if len(row) != len(numeric_variables):
+        raise ExecutionError("spregress failed")
+      raw_outcome = row[0]
+      raw_predictors = row[1 : 1 + len(command.predictors)]
+      raw_lat = row[1 + len(command.predictors)]
+      raw_lon = row[2 + len(command.predictors)]
+
+      if (
+        raw_outcome is None
+        or any(val is None for val in raw_predictors)
+        or raw_lat is None
+        or raw_lon is None
+      ):
+        continue
+
+      outcome_val = _coerce_float(raw_outcome)
+      coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+      lat_val = _coerce_float(raw_lat)
+      lon_val = _coerce_float(raw_lon)
+
+      if (
+        outcome_val is None
+        or any(val is None for val in coerced_predictors)
+        or lat_val is None
+        or lon_val is None
+      ):
+        continue
+
+      predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+      outcomes.append(outcome_val)
+      predictors_list.append(predictor_vals)
+      coords_list.append((lat_val, lon_val))
+
+    if not outcomes:
+      raise ExecutionError("spregress requires at least one complete observation")
+
+    if len(outcomes) <= command.knn:
+      raise ExecutionError(
+        "spregress requires more complete observations than the number of "
+        f"neighbors (knn={command.knn})"
+      )
+
+    coords_arr = np.array(coords_list, dtype=float)
+    try:
+      w = KNN.from_array(coords_arr, k=command.knn)
+      w.transform = "r"
+    except Exception as exc:
+      raise ExecutionError("spregress weight matrix construction failed") from exc
+
+    design = np.array(predictors_list, dtype=float)
+    outcome_array = np.array(outcomes, dtype=float).reshape(-1, 1)
+
+    try:
+      if command.robust:
+        if command.model_type == "lag":
+          fitted = GM_Lag(outcome_array, design, w=w, robust="white")
+        else:
+          fitted = GM_Error_Het(outcome_array, design, w=w)
+      else:
+        if command.model_type == "lag":
+          fitted = ML_Lag(outcome_array, design, w=w)
+        else:
+          fitted = ML_Error(outcome_array, design, w=w)
+    except Exception as exc:
+      raise ExecutionError(f"spregress {command.model_type} estimation failed") from exc
+
+    fitted_any: Any = fitted
+
+    intercept = float(fitted_any.betas[0][0])
+    predictor_coefficients = tuple(float(val[0]) for val in fitted_any.betas[1:-1])
+    spatial_coef = float(fitted_any.betas[-1][0])
+    spatial_se = float(fitted_any.std_err[-1])
+    spatial_stat = float(fitted_any.z_stat[-1][0])
+    spatial_pval = float(fitted_any.z_stat[-1][1])
+
+    coef_estimates = [
+      CoefficientEstimate(
+        name=name,
+        value=float(fitted_any.betas[i + 1][0]),
+        standard_error=float(fitted_any.std_err[i + 1]),
+        statistic=float(fitted_any.z_stat[i + 1][0]),
+        p_value=float(fitted_any.z_stat[i + 1][1]),
+      )
+      for i, name in enumerate(command.predictors)
+    ]
+    coef_estimates.insert(
+      0,
+      CoefficientEstimate(
+        name="intercept",
+        value=intercept,
+        standard_error=float(fitted_any.std_err[0]),
+        statistic=float(fitted_any.z_stat[0][0]),
+        p_value=float(fitted_any.z_stat[0][1]),
+      ),
+    )
+
+    spatial_coef_name = "rho" if command.model_type == "lag" else "lambda"
+    coef_estimates.append(
+      CoefficientEstimate(
+        name=spatial_coef_name,
+        value=spatial_coef,
+        standard_error=spatial_se,
+        statistic=spatial_stat,
+        p_value=spatial_pval,
+      )
+    )
+
+    self.state.regression = None
+    self.state.lasso_regression = None
+    self.state.bayes_regression = None
+    self.state.spatial_regression = _SpatialRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=True,
+      spatial_coefficient=spatial_coef,
+      spatial_coefficient_name=spatial_coef_name,
+    )
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    self.state.heckman_regression = None
+
+    r_squared = float(fitted_any.pr2) if getattr(fitted_any, "pr2", None) is not None else None
+
+    return SpatialRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      model_type=command.model_type,
+      coord_variables=command.coord_variables,
+      knn=command.knn,
+      robust=command.robust,
+      observation_count=len(outcomes),
+      r_squared=r_squared,
+      coefficients=tuple(coef_estimates),
+      spatial_coefficient=spatial_coef,
+      spatial_coefficient_name=spatial_coef_name,
     )
 
   def _execute_qreg(self, command: QregCommand) -> QregRegressionResult:
@@ -2020,6 +2211,20 @@ class Executor:
         kind=command.kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    spatial_regression = self.state.spatial_regression
+    if spatial_regression is not None:
+      if command.kind != "xb":
+        raise ExecutionError("predict only supports xb after spregress")
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=spatial_regression.predictor_names,
+        predictor_coefficients=spatial_regression.predictor_coefficients,
+        intercept=spatial_regression.intercept,
+        outcome_variable=spatial_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     qreg_regression = self.state.qreg_regression
     if qreg_regression is not None:
       available_columns = {column.name for column in dataset.columns}
@@ -2335,8 +2540,8 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
-      "or zinb model"
+      "predict requires a prior regress, lasso, bayes, spregress, qreg, did, "
+      "cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 
   def _execute_streg(self, command: StregCommand) -> StregRegressionResult:
