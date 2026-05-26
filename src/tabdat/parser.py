@@ -159,27 +159,32 @@ class _CommandParts:
 
 
 def parse_command(text: str) -> Command:
+  command = _parse_command_result(text)
+  return result_either(command, _raise_parse_error, lambda parsed: parsed)
+
+
+def _parse_command_result(text: str) -> Result[Command, str]:
   stripped = text.strip()
   if not stripped:
-    raise ParseError("empty command")
+    return Err("empty command")
 
   if stripped.startswith("?"):
-    return _parse_help(stripped[1:].strip())
+    return _parse_help_result(stripped[1:].strip())
 
   command_name = stripped.split(maxsplit=1)[0].lower()
 
   if command_name == "help":
-    return _parse_help(stripped[4:].strip())
+    return _parse_help_result(stripped[4:].strip())
   if command_name == "use":
-    return _parse_use(stripped)
+    return _parse_use_result(stripped)
   if command_name == "by":
-    return _parse_by(stripped)
+    return _parse_by_result(stripped)
   if command_name == "sql":
-    return _parse_sql(stripped)
+    return _parse_sql_result(stripped)
   if command_name == "run":
-    return _parse_run(stripped)
+    return _parse_run_result(stripped)
 
-  return _parse_structured_command(stripped)
+  return _parse_structured_command_result(stripped)
 
 
 def _parse_help(body: str) -> HelpCommand:
@@ -191,9 +196,11 @@ def _parse_help(body: str) -> HelpCommand:
   return HelpCommand(topic=parts[0].lower())
 
 
-def _parse_structured_command(text: str) -> Command:
-  command = _parse_structured_command_result(text)
-  return result_either(command, _raise_parse_error, lambda parsed: parsed)
+def _parse_help_result(body: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_help(body))
+  except ParseError as exc:
+    return Err(str(exc))
 
 
 @result.block
@@ -229,6 +236,46 @@ def _tokenize_result(text: str) -> Result[tuple[_Token, ...], str]:
 
 def _raise_parse_error(message: str) -> NoReturn:
   raise ParseError(message)
+
+
+def _parse_use_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_use(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+@result.block
+def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
+  before, separator, after = text.partition(":")
+  if not separator:
+    return cast(Command, (yield Err("by expects syntax: by group_vars: command")))
+  groups = tuple(before.split()[1:])
+  if not groups:
+    return cast(Command, (yield Err("by expects at least one grouping variable")))
+  if not after.strip():
+    return cast(Command, (yield Err("by expects a command after :")))
+
+  command = yield _parse_command_result(after.strip())
+  if isinstance(command, ByCommand):
+    return cast(Command, (yield Err("nested by commands are not supported")))
+  if isinstance(command, HelpCommand):
+    return cast(Command, (yield Err("help is not supported inside by commands")))
+  return ByCommand(groups=groups, command=command)
+
+
+def _parse_sql_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_sql(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_run_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_run(text))
+  except ParseError as exc:
+    return Err(str(exc))
 
 
 def _build_command_from_parts(parts: _CommandParts) -> Command:
@@ -503,23 +550,6 @@ def _parse_use_options(option_text: str) -> dict[str, str | bool]:
       continue
     raise ParseError(f"unknown use option: {normalized}")
   return parsed
-
-
-def _parse_by(text: str) -> ByCommand:
-  before, separator, after = text.partition(":")
-  if not separator:
-    raise ParseError("by expects syntax: by group_vars: command")
-  groups = tuple(before.split()[1:])
-  if not groups:
-    raise ParseError("by expects at least one grouping variable")
-  if not after.strip():
-    raise ParseError("by expects a command after :")
-  command = parse_command(after.strip())
-  if isinstance(command, ByCommand):
-    raise ParseError("nested by commands are not supported")
-  if isinstance(command, HelpCommand):
-    raise ParseError("help is not supported inside by commands")
-  return ByCommand(groups=groups, command=command)
 
 
 def _parse_sql(text: str) -> SqlCommand:
