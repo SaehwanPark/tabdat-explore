@@ -13,6 +13,17 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 19 modern-extensions slice with
+  `ridge linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first `scikit-learn` `Ridge`
+  L2-penalized linear estimation, and
+  `elasticnet linear <y> <xvars>[, alpha(<num>) l1_ratio(<num>) noconstant]` via Python-first
+  `scikit-learn` `ElasticNet` combined L1/L2-penalized linear estimation, deterministic formatter
+  output, and focused parser/executor/CLI/shell/help/extension-registry coverage.
+- Added deterministic `predict <newvar>[, xb]` routing after `ridge` and `elasticnet` with strict
+  guards that reject `residuals` and `pr`.
+- Added typed extension-registry estimator metadata for `ridge`
+  (`python:sklearn.linear_model.Ridge`) and `elasticnet`
+  (`python:sklearn.linear_model.ElasticNet`) with focused registry tests.
 - Added the first Phase 19 modern-extensions slice with
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first
   `scikit-learn` L1-penalized linear estimation, deterministic formatter output, and focused
