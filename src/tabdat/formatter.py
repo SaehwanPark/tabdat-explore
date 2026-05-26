@@ -11,6 +11,7 @@ from tabdat.models import (
   CountResult,
   DescribeResult,
   DidRegressionResult,
+  ElasticnetRegressionResult,
   ExportResult,
   HeckmanRegressionResult,
   IvRegressionResult,
@@ -26,6 +27,7 @@ from tabdat.models import (
   ProbitRegressionResult,
   QregRegressionResult,
   RegressionResult,
+  RidgeRegressionResult,
   Result,
   SaveResult,
   SetResult,
@@ -149,6 +151,51 @@ def format_result(result: Result) -> str:
       f"Model: lasso linear {result.outcome} on {' '.join(result.predictors)}",
       "Estimator: lasso",
       f"Alpha: {_format_number(result.alpha)}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, RidgeRegressionResult):
+    header = [
+      f"Model: ridge linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: ridge",
+      f"Alpha: {_format_number(result.alpha)}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, ElasticnetRegressionResult):
+    header = [
+      f"Model: elasticnet linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: elasticnet",
+      f"Alpha: {_format_number(result.alpha)}",
+      f"L1 Ratio: {_format_number(result.l1_ratio)}",
       f"Observations: {result.observation_count}",
       f"R-squared: {_format_number(result.r_squared)}",
       "",
