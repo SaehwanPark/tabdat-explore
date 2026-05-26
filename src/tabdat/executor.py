@@ -14,7 +14,7 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
-from sklearn.linear_model import BayesianRidge, Lasso
+from sklearn.linear_model import BayesianRidge, ElasticNet, Lasso, Ridge
 from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
@@ -55,6 +55,8 @@ from tabdat.models import (
   DidCommand,
   DidRegressionResult,
   DropCommand,
+  ElasticnetCommand,
+  ElasticnetRegressionResult,
   EstatCommand,
   ExitCommand,
   ExportCommand,
@@ -100,6 +102,8 @@ from tabdat.models import (
   ReplaceCommand,
   ReshapeCommand,
   Result,
+  RidgeCommand,
+  RidgeRegressionResult,
   SaveCommand,
   SaveResult,
   ScatterCommand,
@@ -150,6 +154,24 @@ class _RegressionState:
 
 @dataclass(frozen=True)
 class _LassoRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _RidgeRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _ElasticnetRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
   predictor_coefficients: tuple[float, ...]
@@ -350,6 +372,8 @@ class SessionState:
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
   lasso_regression: _LassoRegressionState | None = None
+  ridge_regression: _RidgeRegressionState | None = None
+  elasticnet_regression: _ElasticnetRegressionState | None = None
   bayes_regression: _BayesRegressionState | None = None
   heckman_regression: _HeckmanRegressionState | None = None
   qreg_regression: _QregRegressionState | None = None
@@ -387,6 +411,8 @@ class Executor:
       (
         RegressCommand,
         LassoCommand,
+        RidgeCommand,
+        ElasticnetCommand,
         BayesCommand,
         QregCommand,
         LogitCommand,
@@ -409,6 +435,8 @@ class Executor:
       ),
     ):
       self.state.lasso_regression = None
+      self.state.ridge_regression = None
+      self.state.elasticnet_regression = None
       self.state.bayes_regression = None
       self.state.heckman_regression = None
       self.state.spatial_regression = None
@@ -575,6 +603,12 @@ class Executor:
 
     if isinstance(command, LassoCommand):
       return self._execute_lasso(command)
+
+    if isinstance(command, RidgeCommand):
+      return self._execute_ridge(command)
+
+    if isinstance(command, ElasticnetCommand):
+      return self._execute_elasticnet(command)
 
     if isinstance(command, BayesCommand):
       return self._execute_bayes(command)
@@ -965,6 +999,8 @@ class Executor:
       intercept=intercept,
       include_intercept=command.include_intercept,
     )
+    self.state.ridge_regression = None
+    self.state.elasticnet_regression = None
     self.state.bayes_regression = None
     self.state.spatial_regression = None
     self.state.qreg_regression = None
@@ -985,6 +1021,144 @@ class Executor:
       outcome=command.outcome,
       predictors=command.predictors,
       alpha=command.alpha,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+    )
+
+  def _execute_ridge(self, command: RidgeCommand) -> RidgeRegressionResult:
+    dataset = self._require_active_dataset("ridge")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("ridge", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("ridge requires at least one complete observation")
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+    try:
+      fitted = Ridge(
+        alpha=command.alpha,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("ridge failed") from exc
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+    self.state.regression = None
+    self.state.lasso_regression = None
+    self.state.ridge_regression = _RidgeRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+    self.state.elasticnet_regression = None
+    self.state.bayes_regression = None
+    self.state.spatial_regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    self.state.heckman_regression = None
+    return RidgeRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      alpha=command.alpha,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+    )
+
+  def _execute_elasticnet(self, command: ElasticnetCommand) -> ElasticnetRegressionResult:
+    dataset = self._require_active_dataset("elasticnet")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("elasticnet", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("elasticnet requires at least one complete observation")
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+    try:
+      fitted = ElasticNet(
+        alpha=command.alpha,
+        l1_ratio=command.l1_ratio,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("elasticnet failed") from exc
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+    self.state.regression = None
+    self.state.lasso_regression = None
+    self.state.ridge_regression = None
+    self.state.elasticnet_regression = _ElasticnetRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+    self.state.bayes_regression = None
+    self.state.spatial_regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    self.state.heckman_regression = None
+    return ElasticnetRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      alpha=command.alpha,
+      l1_ratio=command.l1_ratio,
       observation_count=len(outcome),
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
@@ -1025,6 +1199,8 @@ class Executor:
       coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
     self.state.regression = None
     self.state.lasso_regression = None
+    self.state.ridge_regression = None
+    self.state.elasticnet_regression = None
     self.state.bayes_regression = _BayesRegressionState(
       outcome_variable=command.outcome,
       predictor_names=command.predictors,
@@ -2128,9 +2304,15 @@ class Executor:
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
     lasso_regression = self.state.lasso_regression
+    ridge_regression = self.state.ridge_regression
+    elasticnet_regression = self.state.elasticnet_regression
     bayes_regression = self.state.bayes_regression
     if lasso_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after lasso")
+    if ridge_regression is not None and command.kind != "xb":
+      raise ExecutionError("predict only supports xb after ridge")
+    if elasticnet_regression is not None and command.kind != "xb":
+      raise ExecutionError("predict only supports xb after elasticnet")
     if bayes_regression is not None and command.kind not in ("xb", "residuals"):
       raise ExecutionError("predict only supports xb and residuals after bayes")
     if command.kind == "pr":
@@ -2197,6 +2379,28 @@ class Executor:
         predictor_coefficients=lasso_regression.predictor_coefficients,
         intercept=lasso_regression.intercept,
         outcome_variable=lasso_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if ridge_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=ridge_regression.predictor_names,
+        predictor_coefficients=ridge_regression.predictor_coefficients,
+        intercept=ridge_regression.intercept,
+        outcome_variable=ridge_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if elasticnet_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=elasticnet_regression.predictor_names,
+        predictor_coefficients=elasticnet_regression.predictor_coefficients,
+        intercept=elasticnet_regression.intercept,
+        outcome_variable=elasticnet_regression.outcome_variable,
         kind="xb",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
@@ -2540,7 +2744,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, lasso, bayes, spregress, qreg, did, "
+      "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, did, "
       "cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 

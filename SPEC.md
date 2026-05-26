@@ -388,21 +388,33 @@ and describe the active work with concise verification criteria.
   - ML lag/error estimation (`spreg.ML_Lag`/`spreg.ML_Error`) and GMM-based heteroskedasticity-robust estimators (`spreg.GM_Lag`/`spreg.GM_Error_Het`)
   - Bounded exogenous linear prediction (`predict <newvar>, xb`) using fitted spatial state
   - Fully integrated in-app help topic, autocomplete interactive shell, extension registry, and comprehensive tests
+- Implemented the fourth Phase 19 modern-extensions slice:
+  - `ridge linear <y> <xvars>[, alpha(<num>) noconstant]` bounded ML regularization via
+    Python-first `scikit-learn` `Ridge`
+  - `elasticnet linear <y> <xvars>[, alpha(<num>) l1_ratio(<num>) noconstant]` bounded ML
+    regularization via Python-first `scikit-learn` `ElasticNet`
+  - deterministic ridge/elasticnet result formatting and typed estimator adapter metadata
+  - `predict <newvar>[, xb]` support after successful ridge/elasticnet with strict guards
+    for unsupported `residuals`/`pr` modes
+  - focused parser, executor, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
-- Feature: Phase 19 modern extensions (Spatial Econometrics Workflow Starter)
-  Status: In Progress (Spatial Starter Complete)
+- Feature: Phase 19 modern extensions (Ridge & ElasticNet ML Regularization)
+  Status: Complete
   Started: 2026-05-26
-  Branch: feature/spregress-starter
+  Branch: feature/phase19-ridge-elasticnet
 
   Summary:
-  The initial slices for Phase 19 modern extensions—including `lasso linear`, `bayes linear`, and `spregress` (with K-Nearest Neighbors spatial weights matrix construction, Maximum Likelihood and robust GMM estimation, and `predict ..., xb` support)—have been successfully implemented, tested, type-checked, and integrated. Remaining ML, Bayesian, and spatial econometrics extension features are tracked for future slices.
+  The Phase 19 modern extensions now include `lasso linear`, `bayes linear`, `spregress`,
+  `ridge linear`, and `elasticnet linear`. Ridge and ElasticNet implement bounded ML
+  regularization via Python-first `scikit-learn` with deterministic result formatting,
+  typed estimator adapter metadata, and `predict ..., xb` support.
 
   Verification:
   - Strict type checking (`pyright`) returns 0 errors/warnings.
   - Ruff formatting and lint checking pass successfully with all checks.
-  - The comprehensive suite of 742+ automated tests passes 100% green.
+  - The comprehensive suite of 769 automated tests passes 100% green.
 
   Out of Scope:
   - broad plugin architecture redesign during Phase 19 kickoff
@@ -469,7 +481,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - ML regularization extensions: implement `ridge linear` and `elasticnet linear` command variants built on the `scikit-learn` backend (`Ridge`, `ElasticNet`).
     - ML cross-validation & hyperparameter tuning: implement cross-validation wrappers (e.g., `cvlasso`, `cvridge`, `cvelasticnet`) that automatically perform K-fold cross-validation to select optimal hyperparameters (like `alpha` or `l1_ratio`) using scikit-learn's CV estimators, outputting tuning reports to the artifact directory.
     - Post-selection inference & double/debiased machine learning (DML): implement post-selection inference utilities (such as running OLS on selected features) and support debiased/double machine learning for treatment effect estimation under high-dimensional controls.
     - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.

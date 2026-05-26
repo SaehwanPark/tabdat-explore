@@ -10,7 +10,9 @@ from pydantic.dataclasses import dataclass
 _MODEL_CONFIG = ConfigDict(strict=True, frozen=True)
 
 DataFormat = Literal["parquet", "stata"]
-EstimatorCommand = Literal["xtabond", "tobit", "heckman", "lasso", "bayes", "spregress"]
+EstimatorCommand = Literal[
+  "xtabond", "tobit", "heckman", "lasso", "ridge", "elasticnet", "bayes", "spregress"
+]
 
 
 @dataclass(config=_MODEL_CONFIG)
@@ -65,6 +67,14 @@ _ESTIMATOR_SPECS: tuple[EstimatorAdapterSpec, ...] = (
   EstimatorAdapterSpec(
     command="lasso",
     primary_backend="python:sklearn.linear_model.Lasso",
+  ),
+  EstimatorAdapterSpec(
+    command="ridge",
+    primary_backend="python:sklearn.linear_model.Ridge",
+  ),
+  EstimatorAdapterSpec(
+    command="elasticnet",
+    primary_backend="python:sklearn.linear_model.ElasticNet",
   ),
   EstimatorAdapterSpec(
     command="bayes",

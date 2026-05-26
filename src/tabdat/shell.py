@@ -48,6 +48,8 @@ COMMAND_NAMES: tuple[str, ...] = (
   "export",
   "regress",
   "lasso",
+  "ridge",
+  "elasticnet",
   "bayes",
   "qreg",
   "logit",

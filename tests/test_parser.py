@@ -17,6 +17,7 @@ from tabdat.models import (
   DescribeCommand,
   DidCommand,
   DropCommand,
+  ElasticnetCommand,
   EstatCommand,
   ExitCommand,
   ExportCommand,
@@ -46,6 +47,7 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
+  RidgeCommand,
   RunCommand,
   SaveCommand,
   ScatterCommand,
@@ -417,6 +419,43 @@ def test_parse_phase_19_lasso_command() -> None:
     alpha=0.25,
   )
   assert parse_command("lasso linear cost age, noconstant") == LassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_ridge_command() -> None:
+  assert parse_command("ridge linear cost age bmi") == RidgeCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("ridge linear cost age, alpha(0.25)") == RidgeCommand(
+    outcome="cost",
+    predictors=("age",),
+    alpha=0.25,
+  )
+  assert parse_command("ridge linear cost age, noconstant") == RidgeCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_elasticnet_command() -> None:
+  assert parse_command("elasticnet linear cost age bmi") == ElasticnetCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command(
+    "elasticnet linear cost age, alpha(0.25) l1_ratio(0.75)"
+  ) == ElasticnetCommand(
+    outcome="cost",
+    predictors=("age",),
+    alpha=0.25,
+    l1_ratio=0.75,
+  )
+  assert parse_command("elasticnet linear cost age, noconstant") == ElasticnetCommand(
     outcome="cost",
     predictors=("age",),
     include_intercept=False,
@@ -1158,6 +1197,25 @@ def test_parse_exit_aliases() -> None:
     "lasso linear y x, alpha()",
     "lasso linear y x, alpha(-1)",
     "lasso linear y x, robust",
+    "ridge",
+    "ridge linear",
+    "ridge linear y",
+    "ridge logistic y x",
+    "ridge linear y x if y > 0",
+    "ridge linear y x, alpha()",
+    "ridge linear y x, alpha(-1)",
+    "ridge linear y x, robust",
+    "elasticnet",
+    "elasticnet linear",
+    "elasticnet linear y",
+    "elasticnet logistic y x",
+    "elasticnet linear y x if y > 0",
+    "elasticnet linear y x, alpha()",
+    "elasticnet linear y x, alpha(-1)",
+    "elasticnet linear y x, l1_ratio()",
+    "elasticnet linear y x, l1_ratio(-0.5)",
+    "elasticnet linear y x, l1_ratio(1.5)",
+    "elasticnet linear y x, robust",
     "bayes",
     "bayes linear",
     "bayes linear y",
