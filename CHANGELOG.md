@@ -4,6 +4,12 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+### Changed
+
+- Moved `comp-builders` from the previous Git direct dependency to the published PyPI package,
+  expanded the local `tabdat.monads` boundary with async-result helpers, and centralized parser
+  `Result` flow while preserving public `ParseError` behavior.
+
 ### Added
 
 - Added the fourth Phase 18 ecosystem and extension-layer slice with a typed internal
