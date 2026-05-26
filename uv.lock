@@ -104,7 +104,11 @@ wheels = [
 [[package]]
 name = "comp-builders"
 version = "1.0.0"
-source = { git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9#16c5be2cf112469e24992281df1d6daf5a1eefa9" }
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f5/9d/01553d85bacd086146574ddfde6acd6a99669f17c9f94bc2afa6ae064be3/comp_builders-1.0.0.tar.gz", hash = "sha256:cdeb53e582c1ec36496ef404da4e285cbe1e14be9311c7ceed695fa678d56ce7", size = 1315801, upload-time = "2026-05-26T12:13:03.247Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/45/6f539b5661311b0d374780c71888433466a77068e8dae3357217c7daa920/comp_builders-1.0.0-py3-none-any.whl", hash = "sha256:95b0854d6893ada24a258d6b23a973550d439898784a5307703fe67cf560e6e0", size = 13860, upload-time = "2026-05-26T12:13:04.811Z" },
+]
 
 [[package]]
 name = "duckdb"
@@ -975,7 +979,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "altair", specifier = ">=6.1.0" },
-    { name = "comp-builders", git = "https://github.com/SaehwanPark/comp-builders.git?rev=16c5be2cf112469e24992281df1d6daf5a1eefa9" },
+    { name = "comp-builders", specifier = ">=1.0.0" },
     { name = "duckdb", specifier = ">=1.4.3" },
     { name = "linearmodels", specifier = ">=7.0" },
     { name = "pandas", specifier = ">=2.2.3" },

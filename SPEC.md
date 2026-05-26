@@ -363,24 +363,28 @@ and describe the active work with concise verification criteria.
   - centralized ingestion adapter capability metadata for local/remote format support and lazy-engine constraints
   - centralized estimator adapter backend metadata for Python-first and R-fallback execution boundaries
   - preserved command surface/output behavior while adding focused registry contract tests
+- Completed a Railroad-Oriented Programming dependency and parser checkpoint:
+  - moved `comp-builders` from the previous Git direct reference to the published PyPI package
+  - expanded the local `tabdat.monads` boundary to include async result helpers
+  - centralized parser `Result` flow so public `ParseError` conversion stays at the parser edge
+  - preserved existing command syntax and parser diagnostics
 
 ## Present
 
 - Feature: Phase 19 modern extensions
   Status: Active
   Started: 2026-05-26
-  Branch: temp/phase18-extension-registry-contract
+  Branch: TBD
 
   Summary:
   Phase 18 is now checkpointed with ingestion/estimator adapter contracts, remote-loading hardening,
-  and replication demos in place. Active work shifts to explicitly late-stage modern extensions.
+  and replication demos in place. Active work shifts to explicitly late-stage modern extensions:
+  machine-learning integration, Bayesian workflows, and spatial models.
 
   Verification:
-  - Internal extension registry covers ingestion adapters and estimator adapter backends
-  - Ingestion routing preserves current Parquet/Stata local/remote and lazy-engine constraints
-  - Estimator routing preserves current xtabond/tobit/heckman adapter execution boundaries
-  - Full project test suite passes with focused registry coverage
-  - In-app help topics cover the current command surface
+  - Remaining Phase 19 slices are listed in Future with library strategy notes
+  - New Phase 19 implementation branches define focused command contracts before code changes
+  - Full project test suite continues to pass before opening Phase 19 PRs
 
   Out of Scope:
   - broad plugin architecture redesign during Phase 19 kickoff
@@ -446,6 +450,10 @@ and describe the active work with concise verification criteria.
 - Phase 19 modern extensions:
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
+  - remaining meaningful slices in this phase:
+    - machine-learning integration over stable tabular command/result boundaries
+    - Bayesian workflow starter over mature Python or R backends
+    - spatial-model workflow starter over mature Python or R backends
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
       `pysal` (`spreg`) for spatial econometrics

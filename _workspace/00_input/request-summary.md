@@ -1,26 +1,30 @@
-# Phase 17 Completion + Phase 18 Transition Request Summary
+# ROP Dependency and Parser Refactor Request Summary
 
 ## User Goal
 
-Resume development from `main` by completing remaining meaningful work in the active phase,
-commit meaningful checkpoints, keep in-app help accurate for all implemented commands, and open a
-review-ready PR.
+Review and update Railroad-Oriented Programming usage in TabDat-Explore, migrate `comp-builders`
+from the previous Git direct dependency to the published PyPI package, make bounded parser-focused
+ROP edits, commit meaningful checkpoints, update SDD/workspace docs, and open a review-ready PR.
 
 ## Scope
 
-- Start from synced `main` and develop in a temporary branch.
-- Complete Phase 17 with bounded slices that close missing coverage bullets.
-- If no meaningful Phase 17 slices remain, move Present to Phase 18.
-- Update SDD/docs and workspace handoff artifacts.
-- Open one non-draft PR ready for review.
+- Start from `main` on temporary branch `temp/rop-comp-builders-pypi-parser`.
+- Replace the Git `comp-builders` dependency with PyPI `comp-builders>=1.0.0`.
+- Preserve the local `tabdat.monads` boundary for all runtime `comp_builders` imports.
+- Expand the boundary to cover async result helpers available in the PyPI package.
+- Centralize parser `Result` flow so public `ParseError` conversion remains at the parser edge.
+- Update focused tests, SDD docs, workspace handoff artifacts, and PR metadata.
 
 ## Constraints
 
-- Follow Phase 13+ approach priority (Python-first, then R via `rpy2`, then lower-level fallback).
-- Preserve deterministic command contracts and focused tests.
-- Keep help-topic coverage aligned with the current command surface.
+- Preserve all command syntax, parse diagnostics, CLI output, executor behavior, and backend behavior.
+- Keep ROP edits focused on parser entry flow and the local monad boundary.
+- Use `uv` for dependency and validation commands.
+- Keep checkpoints small enough to revert independently.
 
 ## Non-goals
 
-- Broad Phase 18 plugin architecture implementation.
-- Unbounded estimator-family expansion in one PR.
+- No broad parser rewrite.
+- No executor/backend ROP conversion in this PR.
+- No Phase 19 command implementation.
+- No direct `comp_builders` imports outside `src/tabdat/monads.py`.

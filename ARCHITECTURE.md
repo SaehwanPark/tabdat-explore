@@ -85,9 +85,9 @@ Phase 17 parsing adds
 `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, `xtlogit <y> <xvars>, fe [robust]`,
 `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
-responsibility. Recoverable parser failures compose through `comp-builders` `Result` values exposed
-by the local `tabdat.monads` boundary. Parser internals convert those values back to user-facing
-`ParseError` exceptions only at the public parser edge.
+responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
+exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
+user-facing `ParseError` exceptions only at the public parser edge.
 
 ### Executor
 
@@ -198,7 +198,7 @@ display formatting.
 - Internal extension-registry contracts for ingestion and estimator adapters live in
   `src/tabdat/extension_registry.py`.
 - Functional helper imports live in `src/tabdat/monads.py`, which re-exports the project-approved
-  `comp-builders` primitives and small edge conversion helpers.
+  PyPI `comp-builders` primitives, including `AsyncResult`, and small edge conversion helpers.
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
 - Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
@@ -293,7 +293,7 @@ display formatting.
 - For Phase 13+ statistical/econometric commands, use a library-first implementation order:
   Python libraries first, R libraries via `rpy2` second, and lower-level `numpy`/`scipy`
   implementations only as the last resort.
-- Import `Result`, `Option`, and `Validation` through `tabdat.monads`; do not import
+- Import `Result`, `Option`, `Validation`, and `AsyncResult` through `tabdat.monads`; do not import
   `comp-builders` directly from feature modules unless a future design records a reason to bypass
   the local boundary.
 - Keep transformation state session-local except for explicit `save` / `export`.

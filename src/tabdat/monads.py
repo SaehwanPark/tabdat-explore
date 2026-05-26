@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import NoReturn
 
 from comp_builders import (
+  AsyncResult,
   Err,
   Invalid,
   Nothing,
@@ -19,6 +20,7 @@ from comp_builders import (
   Some,
   Valid,
   Validation,
+  async_result,
   option,
   result,
   validation,
@@ -72,6 +74,7 @@ def maybe_from_optional[T](value: T | None) -> MaybeValue[T]:
 
 
 __all__ = [
+  "AsyncResult",
   "Err",
   "Invalid",
   "MaybeValue",
@@ -82,6 +85,7 @@ __all__ = [
   "Some",
   "Valid",
   "Validation",
+  "async_result",
   "maybe_from_optional",
   "option",
   "option_maybe",
