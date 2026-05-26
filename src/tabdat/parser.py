@@ -34,6 +34,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  LassoCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -101,6 +102,7 @@ _EXECUTABLE_COMMANDS = {
   "save",
   "export",
   "regress",
+  "lasso",
   "qreg",
   "logit",
   "probit",
@@ -396,6 +398,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "regress":
     return _parse_regress(parts)
+
+  if parts.name == "lasso":
+    return _parse_lasso(parts)
 
   if parts.name == "qreg":
     return _parse_qreg(parts)
@@ -918,6 +923,32 @@ def _parse_regress(parts: _CommandParts) -> RegressCommand:
     weight_variable=weight_variable,
     robust=robust,
     cluster_variable=cluster_variable,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_lasso(parts: _CommandParts) -> LassoCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("lasso expects syntax: lasso linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("lasso expects syntax: lasso linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("lasso model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"alpha", "noconstant"}
+  if unsupported:
+    raise ParseError(f"lasso unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "lasso", {"noconstant"})
+  alpha = _single_float_option(parts.options, "alpha", "lasso")
+  if alpha is None:
+    alpha = 1.0
+  if alpha <= 0.0:
+    raise ParseError("lasso option alpha must be positive")
+  return LassoCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    alpha=alpha,
     include_intercept="noconstant" not in option_names,
   )
 
@@ -1853,7 +1884,7 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"ll", "ul", "quantile", "lags", "instlag"}:
+  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag"}:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)

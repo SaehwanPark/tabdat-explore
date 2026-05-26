@@ -47,6 +47,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "save",
   "export",
   "regress",
+  "lasso",
   "qreg",
   "logit",
   "probit",
@@ -91,6 +92,7 @@ _COLUMN_COMMANDS = {
   "reshape",
   "panel",
   "regress",
+  "lasso",
   "qreg",
   "logit",
   "probit",
@@ -117,6 +119,7 @@ _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
+_LASSO_OPTIONS = ("alpha(", "noconstant")
 _QREG_OPTIONS = ("quantile(", "robust", "noconstant")
 _LOGIT_OPTIONS = ("robust", "cluster(", "noconstant")
 _PROBIT_OPTIONS = ("robust", "cluster(", "noconstant")
@@ -220,6 +223,7 @@ class TabdatCompleter(Completer):
       "scatter",
       "bar",
       "regress",
+      "lasso",
       "qreg",
       "logit",
       "probit",
@@ -327,6 +331,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_BAR_OPTIONS, word)
   if command_name == "regress":
     yield from _matching_completions(_REGRESS_OPTIONS, word)
+  if command_name == "lasso":
+    yield from _matching_completions(_LASSO_OPTIONS, word)
   if command_name == "qreg":
     yield from _matching_completions(_QREG_OPTIONS, word)
   if command_name == "logit":

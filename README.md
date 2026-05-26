@@ -33,6 +33,8 @@ command line. The current CLI supports:
 - Parquet persistence with `save` and `export`
 - linear regression with
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
+- bounded machine-learning lasso regression with
+  `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
 - quantile regression with
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
 - bounded panel-metadata DID with
@@ -81,7 +83,8 @@ The repository has completed the first three Phase 13 linear-econometrics slices
 Phase 12 estimation substrate, completed thirteen Phase 14 slices, delivered seven bounded
 Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`,
 and `nl`), delivered four bounded Phase 16 slices (`poisson`, `nbreg`, `zip`, `zinb`, and `streg`),
-and completed bounded Phase 17 starter coverage (`qreg`, `did`, `xtabond`, `xtlogit`, and `lowess`).
+completed bounded Phase 17 starter coverage (`qreg`, `did`, `xtabond`, `xtlogit`, and `lowess`),
+and implemented the first bounded Phase 19 ML starter slice (`lasso linear`).
 
 ## Quickstart
 
@@ -235,7 +238,8 @@ tabdat> run analysis.td
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
   latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, supports
-  `xb`/`residuals` after `xtabond`, and supports `pr` (plus `xb`) after `logit`/`probit`.
+  `xb`/`residuals` after `xtabond`, supports `pr` (plus `xb`) after `logit`/`probit`, and supports
+  `xb` only after `lasso linear`.
 - `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
   `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
   boundary (`survival::survreg` via `rpy2`).

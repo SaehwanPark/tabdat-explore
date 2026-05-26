@@ -352,6 +352,46 @@ def test_cli_runs_phase_13_regress_and_predict_flow(sample_parquet: Path, capsys
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_lasso_and_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "lasso.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as lasso_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "lasso linear y x, alpha(0.25)",
+      "-c",
+      "predict yhat",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: lasso linear y on x" in captured.out
+  assert "Estimator: lasso" in captured.out
+  assert "Alpha: 0.25" in captured.out
+  assert "Predicted yhat: 6 rows, 3 columns" in captured.out
+  assert "yhat" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_17_qreg_predict_and_estat_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "qreg.parquet"
   _write_sql_parquet(
@@ -1013,7 +1053,8 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+    "Error: predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, "
+    "zip, "
     "or zinb model" in captured.err
   )
 

@@ -29,6 +29,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  LassoCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -398,6 +399,23 @@ def test_parse_phase_17_qreg_command() -> None:
     robust=True,
   )
   assert parse_command("qreg cost age, noconstant") == QregCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_lasso_command() -> None:
+  assert parse_command("lasso linear cost age bmi") == LassoCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("lasso linear cost age, alpha(0.25)") == LassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    alpha=0.25,
+  )
+  assert parse_command("lasso linear cost age, noconstant") == LassoCommand(
     outcome="cost",
     predictors=("age",),
     include_intercept=False,
@@ -1107,6 +1125,14 @@ def test_parse_exit_aliases() -> None:
     "qreg y x, quantile(1)",
     "qreg y x, quantile(1.2)",
     "qreg y x, robust=true",
+    "lasso",
+    "lasso linear",
+    "lasso linear y",
+    "lasso logistic y x",
+    "lasso linear y x if y > 0",
+    "lasso linear y x, alpha()",
+    "lasso linear y x, alpha(-1)",
+    "lasso linear y x, robust",
     "nbreg",
     "nbreg y",
     "nbreg y x if y > 0",

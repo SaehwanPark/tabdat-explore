@@ -368,6 +368,13 @@ and describe the active work with concise verification criteria.
   - expanded the local `tabdat.monads` boundary to include async result helpers
   - centralized parser `Result` flow so public `ParseError` conversion stays at the parser edge
   - preserved existing command syntax and parser diagnostics
+- Implemented the first Phase 19 modern-extensions slice:
+  - `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` bounded ML starter via
+    Python-first `scikit-learn` `Lasso`
+  - deterministic lasso result formatting and typed estimator adapter metadata
+  - `predict <newvar>[, xb]` support after successful lasso with strict guards for
+    unsupported `residuals`/`pr` modes
+  - focused parser, executor, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
@@ -378,8 +385,8 @@ and describe the active work with concise verification criteria.
 
   Summary:
   Phase 18 is now checkpointed with ingestion/estimator adapter contracts, remote-loading hardening,
-  and replication demos in place. Active work shifts to explicitly late-stage modern extensions:
-  machine-learning integration, Bayesian workflows, and spatial models.
+  and replication demos in place. Phase 19 now has its first bounded ML slice (`lasso linear`)
+  implemented; remaining work is Bayesian and spatial workflow starters.
 
   Verification:
   - Remaining Phase 19 slices are listed in Future with library strategy notes
@@ -451,7 +458,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - machine-learning integration over stable tabular command/result boundaries
     - Bayesian workflow starter over mature Python or R backends
     - spatial-model workflow starter over mature Python or R backends
   - library strategy:

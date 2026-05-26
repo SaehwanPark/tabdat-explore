@@ -17,6 +17,7 @@ dependencies = [
     "statsmodels>=0.14.6",
     "linearmodels>=7.0",
     "rpy2>=3.6.4",
+    "scikit-learn>=1.7.0",
 ]
 
 [project.scripts]
@@ -63,6 +64,7 @@ module = [
     "scipy.*",
     "statsmodels",
     "statsmodels.*",
+    "sklearn.linear_model",
     "rpy2",
     "rpy2.*",
 ]
