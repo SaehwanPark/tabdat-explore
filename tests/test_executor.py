@@ -57,6 +57,8 @@ from tabdat.models import (
   IvRegressionResult,
   JoinCommand,
   KeepCommand,
+  BayesCommand,
+  BayesRegressionResult,
   LassoCommand,
   LassoRegressionResult,
   LoadResult,
@@ -876,6 +878,75 @@ def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
   assert "yhat" in preview.columns
 
 
+def test_phase_19_bayes_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "bayes.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      BayesCommand(
+        outcome="y",
+        predictors=("x",),
+        n_iter=200,
+        tol=1e-4,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, BayesRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.n_iter > 0
+  assert result.alpha > 0.0
+  assert result.lambda_ > 0.0
+  assert result.observation_count == 6
+  assert result.include_intercept is True
+  assert result.r_squared is not None
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+
+
+def test_phase_19_bayes_predict_supports_xb_and_residuals(tmp_path: Path) -> None:
+  path = tmp_path / "bayes-predict.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(BayesCommand(outcome="y", predictors=("x",)))
+    predicted_xb = executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+    predicted_resid = executor.execute(PredictCommand(target_variable="resid", kind="residuals"))
+    preview = executor.execute(HeadCommand(1))
+    
+    with pytest.raises(ExecutionError, match="predict only supports xb and residuals after bayes"):
+      executor.execute(PredictCommand(target_variable="pr_hat", kind="pr"))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted_xb, TransformResult)
+  assert isinstance(predicted_resid, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "yhat" in preview.columns
+  assert "resid" in preview.columns
+
+
+def test_phase_19_bayes_clears_other_regression_states(tmp_path: Path) -> None:
+  path = tmp_path / "bayes-state.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    assert executor.state.regression is not None
+    executor.execute(BayesCommand(outcome="y", predictors=("x",)))
+    assert executor.state.regression is None
+    assert executor.state.bayes_regression is not None
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    assert executor.state.bayes_regression is None
+  finally:
+    executor.close()
+
+
 def test_phase_19_failed_heckman_clears_prior_lasso_state(
   tmp_path: Path,
   monkeypatch: pytest.MonkeyPatch,
@@ -916,7 +987,7 @@ def test_phase_19_failed_heckman_clears_prior_lasso_state(
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, "
+        "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, "
         "zip, or zinb model"
       ),
     ):
@@ -2325,7 +2396,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -2693,7 +2764,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -2901,7 +2972,7 @@ def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -3768,7 +3839,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):

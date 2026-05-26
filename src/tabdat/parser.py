@@ -34,6 +34,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  BayesCommand,
   LassoCommand,
   LogitCommand,
   LowessCommand,
@@ -103,6 +104,7 @@ _EXECUTABLE_COMMANDS = {
   "export",
   "regress",
   "lasso",
+  "bayes",
   "qreg",
   "logit",
   "probit",
@@ -401,6 +403,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "lasso":
     return _parse_lasso(parts)
+
+  if parts.name == "bayes":
+    return _parse_bayes(parts)
 
   if parts.name == "qreg":
     return _parse_qreg(parts)
@@ -949,6 +954,36 @@ def _parse_lasso(parts: _CommandParts) -> LassoCommand:
     outcome=parts.arguments[1],
     predictors=parts.arguments[2:],
     alpha=alpha,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_bayes(parts: _CommandParts) -> BayesCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("bayes expects syntax: bayes linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("bayes expects syntax: bayes linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("bayes model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"n_iter", "tol", "noconstant"}
+  if unsupported:
+    raise ParseError(f"bayes unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "bayes", {"noconstant"})
+  n_iter = _single_integer_option(parts.options, "n_iter", "bayes", minimum=1)
+  if n_iter is None:
+    n_iter = 300
+  tol = _single_float_option(parts.options, "tol", "bayes")
+  if tol is None:
+    tol = 0.001
+  if tol <= 0.0:
+    raise ParseError("bayes option tol must be positive")
+  return BayesCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    n_iter=n_iter,
+    tol=tol,
     include_intercept="noconstant" not in option_names,
   )
 
@@ -1884,7 +1919,7 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag"}:
+  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag", "n_iter", "tol"}:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)
