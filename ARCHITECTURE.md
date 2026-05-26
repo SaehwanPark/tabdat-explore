@@ -11,7 +11,8 @@ binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase
 `did`, `xtabond` + `estat did`, `xtabond` lag/instrument controls + expanded `estat did`
 diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
 It has also completed a bounded Phase 18 extension-governance slice with a typed internal
-extension registry for ingestion and estimator adapters.
+extension registry for ingestion and estimator adapters, plus the first bounded Phase 19
+modern-extensions slice (`lasso linear` + `predict ..., xb`).
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -84,6 +85,8 @@ Phase 17 parsing adds
 `did <y> [controls], treat(<var>) post(<var>) [robust]`, plus
 `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, `xtlogit <y> <xvars>, fe [robust]`,
 `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
+Phase 19 parsing now adds
+`lasso linear <y> <xvars>[, alpha(<num>) noconstant]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
 exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
@@ -130,6 +133,8 @@ instrument options, expanded `estat did` diagnostics with deterministic DID cell
 diff-in-diff contrasts, deterministic `estat overid` and `predict ..., xb|residuals` after
 `xtabond`, bounded `xtlogit` fixed-effects nonlinear panel execution, and bounded `lowess`
 semiparametric/nonparametric smoothing transforms.
+Phase 19 currently adds a bounded ML starter through `scikit-learn`:
+`lasso linear` estimation with fixed `alpha(...)` and `predict ..., xb` routing.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -236,6 +241,8 @@ display formatting.
 - Phase 13 slices 1-3 are executable through
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
+- Phase 19 first ML slice is executable through
+  `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
 - Phase 14 IV slices are executable through
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after

@@ -1,30 +1,28 @@
-# ROP Dependency and Parser Refactor Request Summary
+# Phase 19 Resume Request Summary
 
 ## User Goal
 
-Review and update Railroad-Oriented Programming usage in TabDat-Explore, migrate `comp-builders`
-from the previous Git direct dependency to the published PyPI package, make bounded parser-focused
-ROP edits, commit meaningful checkpoints, update SDD/workspace docs, and open a review-ready PR.
+Resume development from `SPEC.md` by implementing the next vertical slice and following the
+project development workflow (branching, checkpoints, testing, docs/help updates, PR readiness).
 
-## Scope
+## Scope Chosen
 
-- Start from `main` on temporary branch `temp/rop-comp-builders-pypi-parser`.
-- Replace the Git `comp-builders` dependency with PyPI `comp-builders>=1.0.0`.
-- Preserve the local `tabdat.monads` boundary for all runtime `comp_builders` imports.
-- Expand the boundary to cover async result helpers available in the PyPI package.
-- Centralize parser `Result` flow so public `ParseError` conversion remains at the parser edge.
-- Update focused tests, SDD docs, workspace handoff artifacts, and PR metadata.
+- Phase 19 modern extensions
+- Single slice only (not multi-slice branch)
+- First slice: machine-learning integration starter
+- Command contract: `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
+- Include `predict <newvar>[, xb]` support after `lasso`
 
 ## Constraints
 
-- Preserve all command syntax, parse diagnostics, CLI output, executor behavior, and backend behavior.
-- Keep ROP edits focused on parser entry flow and the local monad boundary.
-- Use `uv` for dependency and validation commands.
-- Keep checkpoints small enough to revert independently.
+- Preserve existing parser/executor/CLI/help boundaries
+- Keep the change bounded; no Bayesian/spatial work in this branch
+- Keep in-app help coverage complete for all current commands
+- Run full validation before PR-ready handoff
 
 ## Non-goals
 
-- No broad parser rewrite.
-- No executor/backend ROP conversion in this PR.
-- No Phase 19 command implementation.
-- No direct `comp_builders` imports outside `src/tabdat/monads.py`.
+- No cross-validated alpha selection in this slice
+- No ridge/elastic-net/random-forest command surface
+- No new `estat` lasso diagnostics
+- No plugin architecture redesign

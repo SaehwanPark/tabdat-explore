@@ -6,12 +6,22 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Changed `predict` prerequisite diagnostics to include lasso model-state routing.
 - Moved `comp-builders` from the previous Git direct dependency to the published PyPI package,
   expanded the local `tabdat.monads` boundary with async-result helpers, and centralized parser
   `Result` flow while preserving public `ParseError` behavior.
 
 ### Added
 
+- Added the first Phase 19 modern-extensions slice with
+  `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first
+  `scikit-learn` L1-penalized linear estimation, deterministic formatter output, and focused
+  parser/executor/CLI/shell/help coverage.
+- Added deterministic `predict <newvar>[, xb]` routing after `lasso` with strict guards that
+  reject `residuals` and `pr`.
+- Added `scikit-learn` as the Phase 19 Python-first ML starter dependency.
+- Added typed extension-registry estimator metadata for `lasso`
+  (`python:sklearn.linear_model.Lasso`) with focused registry tests.
 - Added the fourth Phase 18 ecosystem and extension-layer slice with a typed internal
   extension-registry contract (`src/tabdat/extension_registry.py`) for ingestion and estimator
   adapter boundaries, centralized local/remote lazy-ingestion capability metadata, centralized
