@@ -41,6 +41,8 @@ def test_estimator_registry_contracts() -> None:
   tobit = estimator_adapter_for("tobit")
   heckman = estimator_adapter_for("heckman")
   lasso = estimator_adapter_for("lasso")
+  ridge = estimator_adapter_for("ridge")
+  elasticnet = estimator_adapter_for("elasticnet")
   bayes = estimator_adapter_for("bayes")
 
   assert xtabond.primary_backend == "python:linearmodels.iv.IVGMM"
@@ -51,5 +53,9 @@ def test_estimator_registry_contracts() -> None:
   assert heckman.fallback_backend is None
   assert lasso.primary_backend == "python:sklearn.linear_model.Lasso"
   assert lasso.fallback_backend is None
+  assert ridge.primary_backend == "python:sklearn.linear_model.Ridge"
+  assert ridge.fallback_backend is None
+  assert elasticnet.primary_backend == "python:sklearn.linear_model.ElasticNet"
+  assert elasticnet.fallback_backend is None
   assert bayes.primary_backend == "python:sklearn.linear_model.BayesianRidge"
   assert bayes.fallback_backend is None
