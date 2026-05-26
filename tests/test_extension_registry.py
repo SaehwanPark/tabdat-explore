@@ -40,6 +40,7 @@ def test_estimator_registry_contracts() -> None:
   xtabond = estimator_adapter_for("xtabond")
   tobit = estimator_adapter_for("tobit")
   heckman = estimator_adapter_for("heckman")
+  lasso = estimator_adapter_for("lasso")
 
   assert xtabond.primary_backend == "python:linearmodels.iv.IVGMM"
   assert xtabond.fallback_backend == "r:plm::pgmm"
@@ -47,3 +48,5 @@ def test_estimator_registry_contracts() -> None:
   assert tobit.fallback_backend == "python:scipy.optimize"
   assert heckman.primary_backend == "python:statsmodels.api"
   assert heckman.fallback_backend is None
+  assert lasso.primary_backend == "python:sklearn.linear_model.Lasso"
+  assert lasso.fallback_backend is None

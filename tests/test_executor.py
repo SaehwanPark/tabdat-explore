@@ -57,6 +57,8 @@ from tabdat.models import (
   IvRegressionResult,
   JoinCommand,
   KeepCommand,
+  LassoCommand,
+  LassoRegressionResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -826,6 +828,52 @@ def test_phase_13_regress_supports_weighted_covariance_modes(tmp_path: Path) -> 
   assert wls_cluster.covariance == "cluster(cluster_id)"
   assert isinstance(gls_robust, RegressionResult)
   assert gls_robust.covariance == "robust"
+
+
+def test_phase_19_lasso_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "lasso.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      LassoCommand(
+        outcome="y",
+        predictors=("x",),
+        alpha=0.25,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, LassoRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.alpha == pytest.approx(0.25)
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+
+
+def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
+  path = tmp_path / "lasso-predict.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(LassoCommand(outcome="y", predictors=("x",), alpha=0.25))
+    predicted = executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+    preview = executor.execute(HeadCommand(1))
+    with pytest.raises(ExecutionError, match="predict only supports xb after lasso"):
+      executor.execute(PredictCommand(target_variable="resid", kind="residuals"))
+    with pytest.raises(ExecutionError, match="predict only supports xb after lasso"):
+      executor.execute(PredictCommand(target_variable="pr_hat", kind="pr"))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted yhat"
+  assert isinstance(preview, PreviewResult)
+  assert "yhat" in preview.columns
 
 
 def test_phase_17_qreg_returns_typed_result(tmp_path: Path) -> None:
@@ -2228,7 +2276,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -2596,7 +2644,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -2804,7 +2852,7 @@ def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):
@@ -3671,7 +3719,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
         "or zinb model"
       ),
     ):

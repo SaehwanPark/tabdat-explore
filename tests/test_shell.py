@@ -190,6 +190,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     regress_command = _completion_texts(completer, "regr")
     regress_columns = _completion_texts(completer, "regress c")
     regress_options = _completion_texts(completer, "regress cost age, ")
+    lasso_command = _completion_texts(completer, "las")
+    lasso_columns = _completion_texts(completer, "lasso linear c")
+    lasso_options = _completion_texts(completer, "lasso linear cost age, ")
     qreg_command = _completion_texts(completer, "qre")
     qreg_columns = _completion_texts(completer, "qreg c")
     qreg_options = _completion_texts(completer, "qreg cost age, ")
@@ -261,6 +264,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert regress_command == ["regress"]
   assert regress_columns == ["cost"]
   assert regress_options == ["robust", "cluster(", "noconstant", "wls(", "gls("]
+  assert lasso_command == ["lasso"]
+  assert lasso_columns == ["cost"]
+  assert lasso_options == ["alpha(", "noconstant"]
   assert qreg_command == ["qreg"]
   assert qreg_columns == ["cost"]
   assert qreg_options == ["quantile(", "robust", "noconstant"]

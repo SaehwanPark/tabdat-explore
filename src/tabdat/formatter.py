@@ -13,6 +13,7 @@ from tabdat.models import (
   ExportResult,
   HeckmanRegressionResult,
   IvRegressionResult,
+  LassoRegressionResult,
   LoadResult,
   LogitRegressionResult,
   NbregRegressionResult,
@@ -126,6 +127,28 @@ def format_result(result: Result) -> str:
       f"R-squared: {_format_number(result.r_squared)}",
       f"Adj. R-squared: {_format_number(result.adjusted_r_squared)}",
       f"Root MSE: {_format_number(result.root_mse)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, LassoRegressionResult):
+    header = [
+      f"Model: lasso linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: lasso",
+      f"Alpha: {_format_number(result.alpha)}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
       "",
     ]
     coefficient_rows = (
