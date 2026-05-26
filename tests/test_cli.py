@@ -392,6 +392,87 @@ def test_cli_runs_phase_19_lasso_and_predict_flow(tmp_path: Path, capsys) -> Non
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_ridge_and_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "ridge.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as ridge_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "ridge linear y x, alpha(0.25)",
+      "-c",
+      "predict yhat",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: ridge linear y on x" in captured.out
+  assert "Estimator: ridge" in captured.out
+  assert "Alpha: 0.25" in captured.out
+  assert "Predicted yhat: 6 rows, 3 columns" in captured.out
+  assert "yhat" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_19_elasticnet_and_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "elasticnet.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as elasticnet_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "elasticnet linear y x, alpha(0.25) l1_ratio(0.5)",
+      "-c",
+      "predict yhat",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: elasticnet linear y on x" in captured.out
+  assert "Estimator: elasticnet" in captured.out
+  assert "Alpha: 0.25" in captured.out
+  assert "L1 Ratio: 0.5" in captured.out
+  assert "Predicted yhat: 6 rows, 3 columns" in captured.out
+  assert "yhat" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_19_bayes_and_predict_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "bayes.parquet"
   _write_sql_parquet(
@@ -1098,7 +1179,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, lasso, bayes, spregress, "
+    "Error: predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, "
     "qreg, did, cfregress, nl, poisson, nbreg, zip, or zinb model" in captured.err
   )
 

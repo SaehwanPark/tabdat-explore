@@ -447,7 +447,9 @@ def test_parse_phase_19_elasticnet_command() -> None:
     outcome="cost",
     predictors=("age", "bmi"),
   )
-  assert parse_command("elasticnet linear cost age, alpha(0.25) l1_ratio(0.75)") == ElasticnetCommand(
+  assert parse_command(
+    "elasticnet linear cost age, alpha(0.25) l1_ratio(0.75)"
+  ) == ElasticnetCommand(
     outcome="cost",
     predictors=("age",),
     alpha=0.25,

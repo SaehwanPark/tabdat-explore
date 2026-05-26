@@ -10,7 +10,9 @@ from pydantic.dataclasses import dataclass
 _MODEL_CONFIG = ConfigDict(strict=True, frozen=True)
 
 DataFormat = Literal["parquet", "stata"]
-EstimatorCommand = Literal["xtabond", "tobit", "heckman", "lasso", "ridge", "elasticnet", "bayes", "spregress"]
+EstimatorCommand = Literal[
+  "xtabond", "tobit", "heckman", "lasso", "ridge", "elasticnet", "bayes", "spregress"
+]
 
 
 @dataclass(config=_MODEL_CONFIG)

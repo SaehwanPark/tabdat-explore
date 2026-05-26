@@ -2036,7 +2036,18 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag", "n_iter", "tol", "knn", "l1_ratio"}:
+  if option_name in {
+    "alpha",
+    "ll",
+    "ul",
+    "quantile",
+    "lags",
+    "instlag",
+    "n_iter",
+    "tol",
+    "knn",
+    "l1_ratio",
+  }:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)

@@ -14,7 +14,7 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
-from sklearn.linear_model import BayesianRidge, Lasso, Ridge, ElasticNet
+from sklearn.linear_model import BayesianRidge, ElasticNet, Lasso, Ridge
 from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
@@ -98,12 +98,12 @@ from tabdat.models import (
   QregRegressionResult,
   RegressCommand,
   RegressionResult,
-  RidgeCommand,
-  RidgeRegressionResult,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
   Result,
+  RidgeCommand,
+  RidgeRegressionResult,
   SaveCommand,
   SaveResult,
   ScatterCommand,
@@ -177,7 +177,6 @@ class _ElasticnetRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
-
 
 
 @dataclass(frozen=True)
