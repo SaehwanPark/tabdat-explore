@@ -1,10 +1,14 @@
+import asyncio
+
 from tabdat.monads import (
+  AsyncResult,
   Err,
   Invalid,
   Nothing,
   Ok,
   Some,
   Valid,
+  async_result,
   maybe_from_optional,
   option,
   option_maybe,
@@ -79,6 +83,24 @@ def test_validation_accumulates_independent_errors() -> None:
 
   assert validate_profile("Ada", 36) == Valid(("Ada", 36))
   assert validate_profile("", -1) == Invalid(("name required", "age must be non-negative"))
+
+
+def _read_positive(raw: str):
+  parsed = yield AsyncResult.from_result(Ok[int, str](int(raw)))
+  if parsed < 0:
+    return (yield AsyncResult.from_result(Err[int, str]("must be non-negative")))
+  return parsed + 1
+
+
+async def _await_async_result(value: AsyncResult[int, str]):
+  return await value
+
+
+def test_async_result_block_short_circuits() -> None:
+  compute = async_result.block(_read_positive)
+
+  assert asyncio.run(_await_async_result(compute("2"))) == Ok(3)
+  assert asyncio.run(_await_async_result(compute("-1"))) == Err("must be non-negative")
 
 
 def test_maybe_from_optional() -> None:
