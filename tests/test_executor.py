@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
+from typing import Any, cast
 
 import duckdb
 import polars as pl
@@ -22,6 +23,7 @@ from tabdat.errors import (
   UnknownTableError,
   UnknownVariableError,
 )
+from tabdat.estimation import CoefficientEstimate
 from tabdat.executor import Executor, _xtabond_sample
 from tabdat.models import (
   ActivateResult,
@@ -3072,6 +3074,17 @@ def test_phase_17_xtabond_r_fallback_runs_when_python_fit_fails(
     "tabdat.executor._fit_xtabond_python",
     lambda **_: (_ for _ in ()).throw(ExecutionError("xtabond failed")),
   )
+  monkeypatch.setattr(
+    "tabdat.executor._fit_xtabond_r_fallback",
+    lambda **_: executor_module._XtAbondFitResult(
+      covariance="nonrobust",
+      coefficients=(
+        CoefficientEstimate(name="exper", value=1.0),
+        CoefficientEstimate(name="L1.wage", value=0.5),
+      ),
+      fitted_model=object(),
+    ),
+  )
   executor = Executor()
   try:
     executor.execute(UseCommand(path))
@@ -3235,9 +3248,9 @@ def test_phase_17_xtlogit_robust_passes_cov_type(
     """,
   )
   seen_cov_type: dict[str, str | None] = {"value": None}
-  original_fit = executor_module.ConditionalLogit.fit
+  original_fit = cast(Any, executor_module.ConditionalLogit.fit)
 
-  def _fit_with_capture(self: object, *args: object, **kwargs: object) -> object:
+  def _fit_with_capture(self: Any, *args: Any, **kwargs: Any) -> Any:
     cov_type = kwargs.get("cov_type")
     seen_cov_type["value"] = str(cov_type) if cov_type is not None else None
     return original_fit(self, *args, **kwargs)

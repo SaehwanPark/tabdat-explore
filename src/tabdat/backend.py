@@ -21,6 +21,11 @@ from tabdat.errors import (
   TypeMismatchExecutionError,
   UnknownVariableError,
 )
+from tabdat.extension_registry import (
+  lazy_engine_supported,
+  lazy_mode_supported,
+  remote_scheme_supported,
+)
 from tabdat.models import (
   BinaryExpression,
   CodebookRow,
@@ -56,8 +61,6 @@ ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
 NEXT_ACTIVE_TABLE = "__tabdat_next"
 NEXT_ACTIVE_VIEW = "__tabdat_next_view"
-REMOTE_PARQUET_SCHEMES = {"http", "https", "s3"}
-REMOTE_STATA_SCHEMES = {"http", "https"}
 
 
 @dataclass(frozen=True)
@@ -91,16 +94,14 @@ class DuckDBBackend:
 
     try:
       if source.format == "stata":
-        if execution_mode == "lazy":
+        if execution_mode == "lazy" and not lazy_mode_supported(source.format):
           raise ExecutionError("use lazy mode only supports Parquet files")
         if source.is_remote:
           import os
           import urllib.request
+
           try:
-            req = urllib.request.Request(
-              source.read_path,
-              headers={"User-Agent": "Mozilla/5.0"}
-            )
+            req = urllib.request.Request(source.read_path, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req) as response:
               with tempfile.NamedTemporaryFile(suffix=".dta", delete=False) as tmp_file:
                 tmp_file.write(response.read())
@@ -134,7 +135,7 @@ class DuckDBBackend:
         self._polars_lazy_frame = None
         return self.active_dataset_info(source.display_path)
       elif execution_mode == "lazy" and lazy_engine == "polars":
-        if source.is_remote:
+        if not lazy_engine_supported(source.format, "polars", is_remote=source.is_remote):
           raise ExecutionError("use lazy engine=polars only supports local Parquet paths")
         next_lazy_frame = pl.scan_parquet(str(source.display_path))
         schema = next_lazy_frame.collect_schema()
@@ -1654,11 +1655,11 @@ def resolve_load_source(path: Path | str) -> LoadSource:
     parsed = urlparse(path)
     suffix = parsed.path.lower()
     if suffix.endswith(".parquet"):
-      if parsed.scheme not in REMOTE_PARQUET_SCHEMES:
+      if not remote_scheme_supported("parquet", parsed.scheme):
         raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
       return LoadSource(format="parquet", read_path=path, display_path=path, is_remote=True)
     if suffix.endswith(".dta"):
-      if parsed.scheme not in REMOTE_STATA_SCHEMES:
+      if not remote_scheme_supported("stata", parsed.scheme):
         raise ExecutionError("use remote Stata files support http and https URLs")
       return LoadSource(format="stata", read_path=path, display_path=path, is_remote=True)
     raise ExecutionError("use only supports .parquet and .dta files")

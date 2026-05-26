@@ -1,7 +1,10 @@
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
 from tabdat.cli import main
+
 
 def test_heckman_mroz_demo(tmp_path: Path, capsys) -> None:
   demo_path = Path("demos/heckman_mroz.td")
@@ -10,29 +13,31 @@ def test_heckman_mroz_demo(tmp_path: Path, capsys) -> None:
   # Create a mock Stata dataset locally with the required columns
   np.random.seed(42)
   n = 100
-  df = pd.DataFrame({
-    "inlf": np.random.randint(0, 2, n),
-    "hours": np.random.randint(0, 2000, n),
-    "kidslt6": np.random.randint(0, 3, n),
-    "kidsge6": np.random.randint(0, 4, n),
-    "age": np.random.randint(30, 60, n),
-    "educ": np.random.randint(8, 18, n),
-    "wage": np.random.uniform(0.5, 30.0, n),
-    "repwage": np.random.uniform(0.5, 30.0, n),
-    "hushrs": np.random.randint(1000, 3000, n),
-    "husage": np.random.randint(30, 65, n),
-    "huseduc": np.random.randint(8, 18, n),
-    "huswage": np.random.uniform(5, 40, n),
-    "faminc": np.random.uniform(10, 100, n),
-    "mtr": np.random.uniform(0.1, 0.5, n),
-    "motheduc": np.random.randint(6, 18, n),
-    "fatheduc": np.random.randint(6, 18, n),
-    "unem": np.random.uniform(2, 10, n),
-    "city": np.random.randint(0, 2, n),
-    "exper": np.random.randint(1, 30, n),
-    "nwifeinc": np.random.uniform(5, 80, n),
-    "lwage": np.random.uniform(0.5, 3.5, n),
-  })
+  df = pd.DataFrame(
+    {
+      "inlf": np.random.randint(0, 2, n),
+      "hours": np.random.randint(0, 2000, n),
+      "kidslt6": np.random.randint(0, 3, n),
+      "kidsge6": np.random.randint(0, 4, n),
+      "age": np.random.randint(30, 60, n),
+      "educ": np.random.randint(8, 18, n),
+      "wage": np.random.uniform(0.5, 30.0, n),
+      "repwage": np.random.uniform(0.5, 30.0, n),
+      "hushrs": np.random.randint(1000, 3000, n),
+      "husage": np.random.randint(30, 65, n),
+      "huseduc": np.random.randint(8, 18, n),
+      "huswage": np.random.uniform(5, 40, n),
+      "faminc": np.random.uniform(10, 100, n),
+      "mtr": np.random.uniform(0.1, 0.5, n),
+      "motheduc": np.random.randint(6, 18, n),
+      "fatheduc": np.random.randint(6, 18, n),
+      "unem": np.random.uniform(2, 10, n),
+      "city": np.random.randint(0, 2, n),
+      "exper": np.random.randint(1, 30, n),
+      "nwifeinc": np.random.uniform(5, 80, n),
+      "lwage": np.random.uniform(0.5, 3.5, n),
+    }
+  )
   df["expersq"] = df["exper"] ** 2
   # Enforce selection rules: non-participants have wage = 0 and NaN log wage
   df.loc[df["inlf"] == 0, "wage"] = 0.0
@@ -44,8 +49,7 @@ def test_heckman_mroz_demo(tmp_path: Path, capsys) -> None:
   # Read original script and replace remote URL with local path
   script_content = demo_path.read_text(encoding="utf-8")
   modified_content = script_content.replace(
-    "https://www.stata.com/data/jwooldridge/eacsap/mroz.dta",
-    str(local_dta)
+    "https://www.stata.com/data/jwooldridge/eacsap/mroz.dta", str(local_dta)
   )
 
   # Write modified script to a temp file
@@ -75,15 +79,17 @@ def test_ivregress_card_demo(tmp_path: Path, capsys) -> None:
   # Create a mock Card Stata dataset locally with required columns
   np.random.seed(42)
   n = 120
-  df = pd.DataFrame({
-    "lwage": np.random.uniform(4.5, 7.5, n),
-    "educ": np.random.randint(8, 18, n),
-    "exper": np.random.randint(1, 20, n),
-    "black": np.random.randint(0, 2, n),
-    "south": np.random.randint(0, 2, n),
-    "smsa": np.random.randint(0, 2, n),
-    "nearc4": np.random.randint(0, 2, n),
-  })
+  df = pd.DataFrame(
+    {
+      "lwage": np.random.uniform(4.5, 7.5, n),
+      "educ": np.random.randint(8, 18, n),
+      "exper": np.random.randint(1, 20, n),
+      "black": np.random.randint(0, 2, n),
+      "south": np.random.randint(0, 2, n),
+      "smsa": np.random.randint(0, 2, n),
+      "nearc4": np.random.randint(0, 2, n),
+    }
+  )
   df["expersq"] = df["exper"] ** 2
   local_dta = tmp_path / "card.dta"
   df.to_stata(local_dta, write_index=False)
@@ -91,8 +97,7 @@ def test_ivregress_card_demo(tmp_path: Path, capsys) -> None:
   # Read original script and replace remote URL with local path
   script_content = demo_path.read_text(encoding="utf-8")
   modified_content = script_content.replace(
-    "https://www.stata.com/data/jwooldridge/eacsap/card.dta",
-    str(local_dta)
+    "https://www.stata.com/data/jwooldridge/eacsap/card.dta", str(local_dta)
   )
 
   # Write modified script to a temp file
@@ -129,14 +134,9 @@ def test_panel_union_demo(tmp_path: Path, capsys) -> None:
       union = np.random.randint(0, 2)
       age = 20 + (y - 70)
       grade = 10 + (y - 70) + np.random.randint(0, 2)
-      rows.append({
-        "idcode": i,
-        "year": y,
-        "union": union,
-        "age": age,
-        "grade": grade,
-        "south": south
-      })
+      rows.append(
+        {"idcode": i, "year": y, "union": union, "age": age, "grade": grade, "south": south}
+      )
   df = pd.DataFrame(rows)
   local_dta = tmp_path / "union.dta"
   df.to_stata(local_dta, write_index=False)
@@ -144,8 +144,7 @@ def test_panel_union_demo(tmp_path: Path, capsys) -> None:
   # Read original script and replace remote URL with local path
   script_content = demo_path.read_text(encoding="utf-8")
   modified_content = script_content.replace(
-    "https://www.stata-press.com/data/r14/union.dta",
-    str(local_dta)
+    "https://www.stata-press.com/data/r14/union.dta", str(local_dta)
   )
 
   # Write modified script to a temp file

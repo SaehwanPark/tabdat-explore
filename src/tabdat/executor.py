@@ -29,6 +29,7 @@ from tabdat.errors import (
   UnknownVariableError,
 )
 from tabdat.estimation import CoefficientEstimate
+from tabdat.extension_registry import estimator_adapter_for
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -340,12 +341,28 @@ class Executor:
     self.backend.close()
 
   def execute(self, command: Command) -> Result | None:
-    if isinstance(command, (
-      RegressCommand, QregCommand, LogitCommand, ProbitCommand, TobitCommand,
-      NlCommand, PoissonCommand, NbregCommand, ZipCommand, ZinbCommand,
-      StregCommand, IvRegressCommand, CfRegressCommand, XtRegCommand,
-      DidCommand, XtAbondCommand, XtLogitCommand
-    )):
+    if isinstance(
+      command,
+      (
+        RegressCommand,
+        QregCommand,
+        LogitCommand,
+        ProbitCommand,
+        TobitCommand,
+        NlCommand,
+        PoissonCommand,
+        NbregCommand,
+        ZipCommand,
+        ZinbCommand,
+        StregCommand,
+        IvRegressCommand,
+        CfRegressCommand,
+        XtRegCommand,
+        DidCommand,
+        XtAbondCommand,
+        XtLogitCommand,
+      ),
+    ):
       self.state.heckman_regression = None
 
     if isinstance(command, UseCommand):
@@ -2216,18 +2233,32 @@ class Executor:
       raise ExecutionError("tobit requires at least one complete observation")
     if command.cluster_variable is not None and (groups is None or missing_cluster_detected):
       raise ExecutionError("tobit requires complete cluster values")
+    adapter = estimator_adapter_for("tobit")
     try:
-      covariance, coefficients = _fit_tobit_with_r(
-        outcomes=outcomes,
-        predictors=predictors,
-        predictor_names=command.predictors,
-        include_intercept=command.include_intercept,
-        lower_limit=command.lower_limit,
-        upper_limit=command.upper_limit,
-        robust=command.robust,
-        cluster_values=groups,
-        cluster_variable=command.cluster_variable,
-      )
+      if adapter.primary_backend.startswith("r:"):
+        covariance, coefficients = _fit_tobit_with_r(
+          outcomes=outcomes,
+          predictors=predictors,
+          predictor_names=command.predictors,
+          include_intercept=command.include_intercept,
+          lower_limit=command.lower_limit,
+          upper_limit=command.upper_limit,
+          robust=command.robust,
+          cluster_values=groups,
+          cluster_variable=command.cluster_variable,
+        )
+      else:
+        covariance, coefficients = _fit_tobit_parametric(
+          outcomes=outcomes,
+          predictors=predictors,
+          predictor_names=command.predictors,
+          include_intercept=command.include_intercept,
+          lower_limit=command.lower_limit,
+          upper_limit=command.upper_limit,
+          robust=command.robust,
+          cluster_values=groups,
+          cluster_variable=command.cluster_variable,
+        )
     except ExecutionError:
       raise
     except Exception as exc:
@@ -2297,19 +2328,23 @@ class Executor:
       raise ExecutionError(
         "heckman selection dependent variable must be binary with values 0 and 1"
       )
+    adapter = estimator_adapter_for("heckman")
     try:
-      covariance, outcome_coefficients, selection_coefficients = _fit_heckman_with_r(
-        outcomes=outcomes,
-        outcome_predictors=outcome_predictors,
-        outcome_predictor_names=command.predictors,
-        selection_outcomes=selection_outcomes,
-        selection_predictors=selection_predictors,
-        selection_predictor_names=command.selection_predictors,
-        include_intercept=command.include_intercept,
-        robust=command.robust,
-        cluster_values=clusters,
-        cluster_variable=command.cluster_variable,
-      )
+      if adapter.primary_backend.startswith("python:"):
+        covariance, outcome_coefficients, selection_coefficients = _fit_heckman_with_r(
+          outcomes=outcomes,
+          outcome_predictors=outcome_predictors,
+          outcome_predictor_names=command.predictors,
+          selection_outcomes=selection_outcomes,
+          selection_predictors=selection_predictors,
+          selection_predictor_names=command.selection_predictors,
+          include_intercept=command.include_intercept,
+          robust=command.robust,
+          cluster_values=clusters,
+          cluster_variable=command.cluster_variable,
+        )
+      else:
+        raise ExecutionError("heckman failed")
     except ExecutionError:
       raise
     except Exception as exc:
@@ -2682,18 +2717,24 @@ class Executor:
     dependent, exogenous, endogenous, instruments = sample
     covariance_label = "robust" if command.robust else "nonrobust"
     cov_type: Literal["robust", "unadjusted"] = "robust" if command.robust else "unadjusted"
+    adapter = estimator_adapter_for("xtabond")
     try:
-      fit = _fit_xtabond_python(
-        dependent=dependent,
-        exogenous=exogenous,
-        endogenous=endogenous,
-        instruments=instruments,
-        outcome_name=command.outcome,
-        predictor_names=command.predictors,
-        cov_type=cov_type,
-        lag_depth=command.lag_depth,
-      )
+      if adapter.primary_backend.startswith("python:"):
+        fit = _fit_xtabond_python(
+          dependent=dependent,
+          exogenous=exogenous,
+          endogenous=endogenous,
+          instruments=instruments,
+          outcome_name=command.outcome,
+          predictor_names=command.predictors,
+          cov_type=cov_type,
+          lag_depth=command.lag_depth,
+        )
+      else:
+        raise ExecutionError("xtabond failed")
     except ExecutionError:
+      if adapter.fallback_backend is None:
+        raise
       fit = _fit_xtabond_r_fallback(
         rows=rows,
         predictor_count=len(command.predictors),
