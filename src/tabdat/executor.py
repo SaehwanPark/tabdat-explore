@@ -363,6 +363,7 @@ class Executor:
         LogitCommand,
         ProbitCommand,
         TobitCommand,
+        HeckmanCommand,
         NlCommand,
         PoissonCommand,
         NbregCommand,

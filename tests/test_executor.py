@@ -876,6 +876,55 @@ def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
   assert "yhat" in preview.columns
 
 
+def test_phase_19_failed_heckman_clears_prior_lasso_state(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  path = tmp_path / "lasso-heckman.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 0.0, 1.0),
+        (2.0, 14.0, 1.0, 1.5),
+        (3.0, 16.5, 0.0, 2.0),
+        (4.0, 19.0, 1.0, 2.5),
+        (5.0, 21.0, 1.0, 3.0),
+        (6.0, 23.5, 0.0, 3.5)
+    ) as sample(x, y, s, z)
+    """,
+  )
+  monkeypatch.setattr(
+    executor_module,
+    "_fit_heckman_with_r",
+    lambda **_: (_ for _ in ()).throw(ExecutionError("heckman failed")),
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(LassoCommand(outcome="y", predictors=("x",), alpha=0.25))
+    with pytest.raises(ExecutionError, match="heckman failed"):
+      executor.execute(
+        HeckmanCommand(
+          outcome="y",
+          predictors=("x",),
+          selection_dependent="s",
+          selection_predictors=("z",),
+        )
+      )
+    with pytest.raises(
+      ExecutionError,
+      match=(
+        "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, "
+        "zip, or zinb model"
+      ),
+    ):
+      executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+  finally:
+    executor.close()
+
+
 def test_phase_17_qreg_returns_typed_result(tmp_path: Path) -> None:
   path = tmp_path / "regression.parquet"
   _write_regression_parquet(path)
