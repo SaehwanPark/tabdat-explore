@@ -21,6 +21,7 @@ from tabdat.models import (
   DescribeCommand,
   DidCommand,
   DropCommand,
+  ElasticnetCommand,
   EstatCommand,
   ExitCommand,
   ExportCommand,
@@ -51,6 +52,7 @@ from tabdat.models import (
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
+  RidgeCommand,
   RunCommand,
   SaveCommand,
   ScatterCommand,
@@ -405,6 +407,12 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "lasso":
     return _parse_lasso(parts)
+
+  if parts.name == "ridge":
+    return _parse_ridge(parts)
+
+  if parts.name == "elasticnet":
+    return _parse_elasticnet(parts)
 
   if parts.name == "bayes":
     return _parse_bayes(parts)
@@ -959,6 +967,64 @@ def _parse_lasso(parts: _CommandParts) -> LassoCommand:
     outcome=parts.arguments[1],
     predictors=parts.arguments[2:],
     alpha=alpha,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_ridge(parts: _CommandParts) -> RidgeCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("ridge expects syntax: ridge linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("ridge expects syntax: ridge linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("ridge model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"alpha", "noconstant"}
+  if unsupported:
+    raise ParseError(f"ridge unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "ridge", {"noconstant"})
+  alpha = _single_float_option(parts.options, "alpha", "ridge")
+  if alpha is None:
+    alpha = 1.0
+  if alpha <= 0.0:
+    raise ParseError("ridge option alpha must be positive")
+  return RidgeCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    alpha=alpha,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_elasticnet(parts: _CommandParts) -> ElasticnetCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("elasticnet expects syntax: elasticnet linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("elasticnet expects syntax: elasticnet linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("elasticnet model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"alpha", "l1_ratio", "noconstant"}
+  if unsupported:
+    raise ParseError(f"elasticnet unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "elasticnet", {"noconstant"})
+  alpha = _single_float_option(parts.options, "alpha", "elasticnet")
+  if alpha is None:
+    alpha = 1.0
+  if alpha <= 0.0:
+    raise ParseError("elasticnet option alpha must be positive")
+  l1_ratio = _single_float_option(parts.options, "l1_ratio", "elasticnet")
+  if l1_ratio is None:
+    l1_ratio = 0.5
+  if not (0.0 <= l1_ratio <= 1.0):
+    raise ParseError("elasticnet option l1_ratio must be between 0 and 1 inclusive")
+  return ElasticnetCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    alpha=alpha,
+    l1_ratio=l1_ratio,
     include_intercept="noconstant" not in option_names,
   )
 

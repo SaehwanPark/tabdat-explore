@@ -266,6 +266,23 @@ class LassoCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class RidgeCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  alpha: float = 1.0
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ElasticnetCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  alpha: float = 1.0
+  l1_ratio: float = 0.5
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class BayesCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -527,6 +544,8 @@ Command = (
   | ExportCommand
   | RegressCommand
   | LassoCommand
+  | RidgeCommand
+  | ElasticnetCommand
   | BayesCommand
   | SpregressCommand
   | QregCommand
@@ -675,6 +694,29 @@ class LassoRegressionResult:
   outcome: str
   predictors: tuple[str, ...]
   alpha: float
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class RidgeRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  alpha: float
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class ElasticnetRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  alpha: float
+  l1_ratio: float
   observation_count: int
   include_intercept: bool
   r_squared: float | None
@@ -961,6 +1003,8 @@ Result = (
   | TransformResult
   | RegressionResult
   | LassoRegressionResult
+  | RidgeRegressionResult
+  | ElasticnetRegressionResult
   | BayesRegressionResult
   | SpatialRegressionResult
   | QregRegressionResult
