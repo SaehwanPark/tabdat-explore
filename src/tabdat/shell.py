@@ -68,6 +68,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "lowess",
   "did",
   "cfregress",
+  "spregress",
   "predict",
   "estat",
   "by",
@@ -114,6 +115,7 @@ _COLUMN_COMMANDS = {
   "did",
   "cfregress",
   "lowess",
+  "spregress",
 }
 _TABULATE_OPTIONS = ("row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
@@ -123,6 +125,7 @@ _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _LASSO_OPTIONS = ("alpha(", "noconstant")
 _BAYES_OPTIONS = ("n_iter(", "tol(", "noconstant")
+_SPREGRESS_OPTIONS = ("coord(", "model(", "knn(", "robust")
 _QREG_OPTIONS = ("quantile(", "robust", "noconstant")
 _LOGIT_OPTIONS = ("robust", "cluster(", "noconstant")
 _PROBIT_OPTIONS = ("robust", "cluster(", "noconstant")
@@ -338,6 +341,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_LASSO_OPTIONS, word)
   if command_name == "bayes":
     yield from _matching_completions(_BAYES_OPTIONS, word)
+  if command_name == "spregress":
+    yield from _matching_completions(_SPREGRESS_OPTIONS, word)
   if command_name == "qreg":
     yield from _matching_completions(_QREG_OPTIONS, word)
   if command_name == "logit":

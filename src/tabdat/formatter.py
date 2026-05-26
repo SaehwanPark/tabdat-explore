@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tabdat.models import (
   ActivateResult,
+  BayesRegressionResult,
   CfRegressionResult,
   CodebookResult,
   CountResult,
@@ -13,7 +14,6 @@ from tabdat.models import (
   ExportResult,
   HeckmanRegressionResult,
   IvRegressionResult,
-  BayesRegressionResult,
   LassoRegressionResult,
   LoadResult,
   LogitRegressionResult,
@@ -29,6 +29,7 @@ from tabdat.models import (
   Result,
   SaveResult,
   SetResult,
+  SpatialRegressionResult,
   SqlCreateResult,
   StregRegressionResult,
   SummarizeResult,
@@ -187,6 +188,32 @@ def format_result(result: Result) -> str:
       for estimate in result.coefficients
     )
     body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, SpatialRegressionResult):
+    estimator_label = "Spatial Lag (SAR)" if result.model_type == "lag" else "Spatial Error (SEM)"
+    if result.robust:
+      estimator_label += " (Robust)"
+
+    header = [
+      f"Model: spregress {result.outcome} on {' '.join(result.predictors)}",
+      f"Estimator: {estimator_label}",
+      f"Spatial Weights: KNN (k={result.knn}) from {' '.join(result.coord_variables)}",
+      f"Observations: {result.observation_count}",
+      f"Pseudo R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "z", "P>|z|"), coefficient_rows)
     return "\n".join([*header, *body])
 
   if isinstance(result, QregRegressionResult):

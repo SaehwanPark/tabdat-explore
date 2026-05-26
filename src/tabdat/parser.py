@@ -9,6 +9,7 @@ from tabdat.errors import ParseError
 from tabdat.models import (
   AppendCommand,
   BarCommand,
+  BayesCommand,
   BinaryExpression,
   ByCommand,
   CfRegressCommand,
@@ -34,7 +35,6 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
-  BayesCommand,
   LassoCommand,
   LogitCommand,
   LowessCommand,
@@ -56,6 +56,7 @@ from tabdat.models import (
   ScatterCommand,
   SelectCommand,
   SetCommand,
+  SpregressCommand,
   SqlCommand,
   StregCommand,
   StringExpression,
@@ -126,6 +127,7 @@ _EXECUTABLE_COMMANDS = {
   "lowess",
   "did",
   "cfregress",
+  "spregress",
   "exit",
   "quit",
 }
@@ -406,6 +408,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "bayes":
     return _parse_bayes(parts)
+
+  if parts.name == "spregress":
+    return _parse_spregress(parts)
 
   if parts.name == "qreg":
     return _parse_qreg(parts)
@@ -985,6 +990,50 @@ def _parse_bayes(parts: _CommandParts) -> BayesCommand:
     n_iter=n_iter,
     tol=tol,
     include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "spregress expects syntax: spregress <y> <xvars>, coord(<lat_var> <lon_var>) "
+      "[model(<lag|error>) knn(<k>) robust]"
+    )
+  if len(parts.arguments) < 2:
+    raise ParseError(
+      "spregress expects syntax: spregress <y> <xvars>, coord(<lat_var> <lon_var>) "
+      "[model(<lag|error>) knn(<k>) robust]"
+    )
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"coord", "model", "knn", "robust"}
+  if unsupported:
+    raise ParseError(f"spregress unsupported option: {', '.join(sorted(unsupported))}")
+
+  _require_flag_options(parts.options, "spregress", {"robust"})
+
+  coord_values = _single_tuple_option(parts.options, "coord", "spregress")
+  if coord_values is None or len(coord_values) != 2:
+    raise ParseError(
+      "spregress option coord expects exactly two variables representing "
+      "latitude and longitude coordinates"
+    )
+
+  model_type_val = _single_text_option(parts.options, "model", "spregress") or "lag"
+  if model_type_val not in ("lag", "error"):
+    raise ParseError("spregress option model must be 'lag' or 'error'")
+
+  knn_val = _single_integer_option(parts.options, "knn", "spregress", minimum=1)
+  if knn_val is None:
+    knn_val = 5
+
+  return SpregressCommand(
+    outcome=parts.arguments[0],
+    predictors=parts.arguments[1:],
+    model_type=model_type_val,
+    coord_variables=coord_values,
+    knn=knn_val,
+    robust="robust" in option_names,
   )
 
 
@@ -1919,7 +1968,7 @@ def _parenthesized_option_value(
 ) -> str | float | tuple[str, ...]:
   if option_name == "saving":
     return "".join(token.text for token in tokens)
-  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag", "n_iter", "tol"}:
+  if option_name in {"alpha", "ll", "ul", "quantile", "lags", "instlag", "n_iter", "tol", "knn"}:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)

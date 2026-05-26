@@ -18,6 +18,7 @@ dependencies = [
     "linearmodels>=7.0",
     "rpy2>=3.6.4",
     "scikit-learn>=1.7.0",
+    "spreg>=1.4.0",
 ]
 
 [project.scripts]
