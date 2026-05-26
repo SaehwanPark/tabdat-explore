@@ -13,7 +13,7 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
-from sklearn.linear_model import Lasso
+from sklearn.linear_model import BayesianRidge, Lasso
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
@@ -67,6 +67,8 @@ from tabdat.models import (
   IvRegressionResult,
   JoinCommand,
   KeepCommand,
+  BayesCommand,
+  BayesRegressionResult,
   LassoCommand,
   LassoRegressionResult,
   LoadResult,
@@ -144,6 +146,15 @@ class _RegressionState:
 
 @dataclass(frozen=True)
 class _LassoRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _BayesRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
   predictor_coefficients: tuple[float, ...]
@@ -324,6 +335,7 @@ class SessionState:
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
   lasso_regression: _LassoRegressionState | None = None
+  bayes_regression: _BayesRegressionState | None = None
   heckman_regression: _HeckmanRegressionState | None = None
   qreg_regression: _QregRegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
@@ -359,6 +371,7 @@ class Executor:
       (
         RegressCommand,
         LassoCommand,
+        BayesCommand,
         QregCommand,
         LogitCommand,
         ProbitCommand,
@@ -379,6 +392,7 @@ class Executor:
       ),
     ):
       self.state.lasso_regression = None
+      self.state.bayes_regression = None
       self.state.heckman_regression = None
 
     if isinstance(command, UseCommand):
@@ -543,6 +557,9 @@ class Executor:
 
     if isinstance(command, LassoCommand):
       return self._execute_lasso(command)
+
+    if isinstance(command, BayesCommand):
+      return self._execute_bayes(command)
 
     if isinstance(command, QregCommand):
       return self._execute_qreg(command)
@@ -855,6 +872,7 @@ class Executor:
       fitted_model=fitted,
     )
     self.state.lasso_regression = None
+    self.state.bayes_regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
@@ -925,6 +943,7 @@ class Executor:
       intercept=intercept,
       include_intercept=command.include_intercept,
     )
+    self.state.bayes_regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
     self.state.nl_regression = None
@@ -943,6 +962,73 @@ class Executor:
       outcome=command.outcome,
       predictors=command.predictors,
       alpha=command.alpha,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+    )
+
+  def _execute_bayes(self, command: BayesCommand) -> BayesRegressionResult:
+    dataset = self._require_active_dataset("bayes")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("bayes", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("bayes requires at least one complete observation")
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+    try:
+      fitted = BayesianRidge(
+        max_iter=command.n_iter,
+        tol=command.tol,
+        fit_intercept=command.include_intercept,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("bayes failed") from exc
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+    self.state.regression = None
+    self.state.lasso_regression = None
+    self.state.bayes_regression = _BayesRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    self.state.heckman_regression = None
+    return BayesRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      n_iter=int(fitted.n_iter_),
+      alpha=float(fitted.alpha_),
+      lambda_=float(fitted.lambda_),
       observation_count=len(outcome),
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
@@ -1851,8 +1937,11 @@ class Executor:
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
     lasso_regression = self.state.lasso_regression
+    bayes_regression = self.state.bayes_regression
     if lasso_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after lasso")
+    if bayes_regression is not None and command.kind not in ("xb", "residuals"):
+      raise ExecutionError("predict only supports xb and residuals after bayes")
     if command.kind == "pr":
       xtabond_regression = self.state.xtabond_regression
       if xtabond_regression is not None and self.state.binary_regression is None:
@@ -1918,6 +2007,17 @@ class Executor:
         intercept=lasso_regression.intercept,
         outcome_variable=lasso_regression.outcome_variable,
         kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if bayes_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=bayes_regression.predictor_names,
+        predictor_coefficients=bayes_regression.predictor_coefficients,
+        intercept=bayes_regression.intercept,
+        outcome_variable=bayes_regression.outcome_variable,
+        kind=command.kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     qreg_regression = self.state.qreg_regression
@@ -2235,7 +2335,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, zip, "
+      "predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, zip, "
       "or zinb model"
     )
 

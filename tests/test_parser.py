@@ -29,6 +29,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  BayesCommand,
   LassoCommand,
   LogitCommand,
   LowessCommand,
@@ -418,6 +419,30 @@ def test_parse_phase_19_lasso_command() -> None:
   assert parse_command("lasso linear cost age, noconstant") == LassoCommand(
     outcome="cost",
     predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_bayes_command() -> None:
+  assert parse_command("bayes linear cost age bmi") == BayesCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("bayes linear cost age, n_iter(500)") == BayesCommand(
+    outcome="cost",
+    predictors=("age",),
+    n_iter=500,
+  )
+  assert parse_command("bayes linear cost age, tol(1e-4)") == BayesCommand(
+    outcome="cost",
+    predictors=("age",),
+    tol=0.0001,
+  )
+  assert parse_command("bayes linear cost age, n_iter(100) tol(1e-5) noconstant") == BayesCommand(
+    outcome="cost",
+    predictors=("age",),
+    n_iter=100,
+    tol=1e-5,
     include_intercept=False,
   )
 
@@ -1133,6 +1158,17 @@ def test_parse_exit_aliases() -> None:
     "lasso linear y x, alpha()",
     "lasso linear y x, alpha(-1)",
     "lasso linear y x, robust",
+    "bayes",
+    "bayes linear",
+    "bayes linear y",
+    "bayes logistic y x",
+    "bayes linear y x if y > 0",
+    "bayes linear y x, n_iter()",
+    "bayes linear y x, n_iter(-10)",
+    "bayes linear y x, tol()",
+    "bayes linear y x, tol(-0.5)",
+    "bayes linear y x, alpha(1)",
+    "bayes linear y x, robust",
     "nbreg",
     "nbreg y",
     "nbreg y x if y > 0",

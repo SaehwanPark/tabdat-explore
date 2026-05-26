@@ -375,23 +375,29 @@ and describe the active work with concise verification criteria.
   - `predict <newvar>[, xb]` support after successful lasso with strict guards for
     unsupported `residuals`/`pr` modes
   - focused parser, executor, CLI, shell, help, and extension-registry coverage
+- Implemented the second Phase 19 modern-extensions slice:
+  - `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]` Bayesian ML starter
+    via Python-first `scikit-learn` `BayesianRidge`
+  - deterministic bayes result formatting and typed estimator adapter metadata
+  - `predict <newvar>[, xb residuals]` support after successful bayes with strict guards
+    for unsupported `pr` prediction mode
+  - focused parser, executor, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
 - Feature: Phase 19 modern extensions
   Status: Active
   Started: 2026-05-26
-  Branch: TBD
+  Branch: feature/bayes-linear
 
   Summary:
-  Phase 18 is now checkpointed with ingestion/estimator adapter contracts, remote-loading hardening,
-  and replication demos in place. Phase 19 now has its first bounded ML slice (`lasso linear`)
-  implemented; remaining work is Bayesian and spatial workflow starters.
+  Phase 19 now has its first two slices (`lasso linear` and `bayes linear`) successfully
+  implemented, tested, and fully integrated. Remaining work in this phase is the spatial workflow
+  starter.
 
   Verification:
-  - Remaining Phase 19 slices are listed in Future with library strategy notes
-  - New Phase 19 implementation branches define focused command contracts before code changes
-  - Full project test suite continues to pass before opening Phase 19 PRs
+  - Remaining Phase 19 spatial slice is listed in Future with library strategy notes
+  - Full project test suite and pyright type-checking continue to pass before opening PRs
 
   Out of Scope:
   - broad plugin architecture redesign during Phase 19 kickoff
@@ -458,7 +464,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - Bayesian workflow starter over mature Python or R backends
     - spatial-model workflow starter over mature Python or R backends
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and

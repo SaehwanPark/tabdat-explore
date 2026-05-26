@@ -392,6 +392,51 @@ def test_cli_runs_phase_19_lasso_and_predict_flow(tmp_path: Path, capsys) -> Non
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_bayes_and_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "bayes.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as bayes_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "bayes linear y x, n_iter(200) tol(1e-4)",
+      "-c",
+      "predict yhat",
+      "-c",
+      "predict resid, residuals",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: bayes linear y on x" in captured.out
+  assert "Estimator: bayesian_ridge" in captured.out
+  assert "Noise Precision" in captured.out
+  assert "Prior Precision" in captured.out
+  assert "Predicted yhat: 6 rows, 3 columns" in captured.out
+  assert "Predicted resid: 6 rows, 4 columns" in captured.out
+  assert "yhat" in captured.out
+  assert "resid" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_17_qreg_predict_and_estat_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "qreg.parquet"
   _write_sql_parquet(
@@ -1053,7 +1098,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
   assert exit_code == 1
   assert "Loaded:" in captured.out
   assert (
-    "Error: predict requires a prior regress, lasso, qreg, did, cfregress, nl, poisson, nbreg, "
+    "Error: predict requires a prior regress, lasso, bayes, qreg, did, cfregress, nl, poisson, nbreg, "
     "zip, "
     "or zinb model" in captured.err
   )

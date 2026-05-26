@@ -266,6 +266,15 @@ class LassoCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  n_iter: int = 300
+  tol: float = 0.001
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class QregCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -508,6 +517,7 @@ Command = (
   | ExportCommand
   | RegressCommand
   | LassoCommand
+  | BayesCommand
   | QregCommand
   | LogitCommand
   | ProbitCommand
@@ -654,6 +664,19 @@ class LassoRegressionResult:
   outcome: str
   predictors: tuple[str, ...]
   alpha: float
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  n_iter: int
+  alpha: float
+  lambda_: float
   observation_count: int
   include_intercept: bool
   r_squared: float | None
@@ -912,6 +935,7 @@ Result = (
   | TransformResult
   | RegressionResult
   | LassoRegressionResult
+  | BayesRegressionResult
   | QregRegressionResult
   | LogitRegressionResult
   | ProbitRegressionResult
