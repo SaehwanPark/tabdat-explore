@@ -392,12 +392,12 @@ and describe the active work with concise verification criteria.
 ## Present
 
 - Feature: Phase 19 modern extensions (Spatial Econometrics Workflow Starter)
-  Status: Completed
+  Status: In Progress (Spatial Starter Complete)
   Started: 2026-05-26
   Branch: feature/spregress-starter
 
   Summary:
-  Phase 19 is now fully complete! The final slice—`spregress` with K-Nearest Neighbors spatial weights matrix construction, Maximum Likelihood and robust GMM estimation, and `predict ..., xb` support—has been successfully implemented, tested, type-checked, and integrated.
+  The initial slices for Phase 19 modern extensions—including `lasso linear`, `bayes linear`, and `spregress` (with K-Nearest Neighbors spatial weights matrix construction, Maximum Likelihood and robust GMM estimation, and `predict ..., xb` support)—have been successfully implemented, tested, type-checked, and integrated. Remaining ML, Bayesian, and spatial econometrics extension features are tracked for future slices.
 
   Verification:
   - Strict type checking (`pyright`) returns 0 errors/warnings.
@@ -469,7 +469,14 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - none
+    - ML regularization extensions: implement `ridge linear` and `elasticnet linear` command variants built on the `scikit-learn` backend (`Ridge`, `ElasticNet`).
+    - ML cross-validation & hyperparameter tuning: implement cross-validation wrappers (e.g., `cvlasso`, `cvridge`, `cvelasticnet`) that automatically perform K-fold cross-validation to select optimal hyperparameters (like `alpha` or `l1_ratio`) using scikit-learn's CV estimators, outputting tuning reports to the artifact directory.
+    - Post-selection inference & double/debiased machine learning (DML): implement post-selection inference utilities (such as running OLS on selected features) and support debiased/double machine learning for treatment effect estimation under high-dimensional controls.
+    - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
+    - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
+    - Spatial weight matrix configuration and GIS file ingestion: support loading pre-computed spatial weights matrices from standard GIS files (e.g., `.gal` or `.gwt` files) and support polygon contiguity weights (Queen, Rook) in addition to KNN.
+    - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
+    - Spatial predictive workflows: expand `predict` support after spatial regression to include spatial lag prediction options (`predict ..., spatial_lag`) for full in-sample and out-of-sample predictions accounting for spatial spillover.
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
       `pysal` (`spreg`) for spatial econometrics
