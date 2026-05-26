@@ -10,6 +10,8 @@ binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase
 (`poisson`, `nbreg`, `zip`, `zinb`, and `streg`), plus seven bounded Phase 17 slices (`qreg`,
 `did`, `xtabond` + `estat did`, `xtabond` lag/instrument controls + expanded `estat did`
 diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
+It has also completed a bounded Phase 18 extension-governance slice with a typed internal
+extension registry for ingestion and estimator adapters.
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -193,6 +195,8 @@ display formatting.
 - Integrated public-dataset E2E tooling lives under `integrated_testing/`; generated datasets,
   run logs, plots, and Parquet outputs are ignored.
 - Runtime modules live under `src/tabdat/`.
+- Internal extension-registry contracts for ingestion and estimator adapters live in
+  `src/tabdat/extension_registry.py`.
 - Functional helper imports live in `src/tabdat/monads.py`, which re-exports the project-approved
   `comp-builders` primitives and small edge conversion helpers.
 - Focused tests live under `tests/`.

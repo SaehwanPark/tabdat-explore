@@ -358,31 +358,32 @@ and describe the active work with concise verification criteria.
   - added support for linear prediction (`predict ..., xb|residuals`) after `heckman` selection estimation
   - created three classic Stata-based advanced econometrics replication scripts under `demos/`: Heckman sample selection correction (`heckman_mroz.td`), Card returns to education IV/2SLS (`ivregress_card.td`), and NLSY wages panel Fixed/Random Effects with Hausman specification test (`panel_union.td`)
   - added automated test suite `tests/test_demos.py` to verify demo parser and executor flows via the CLI
+- Implemented the fourth Phase 18 extension-governance slice:
+  - added an internal typed extension registry contract for ingestion and estimator adapters
+  - centralized ingestion adapter capability metadata for local/remote format support and lazy-engine constraints
+  - centralized estimator adapter backend metadata for Python-first and R-fallback execution boundaries
+  - preserved command surface/output behavior while adding focused registry contract tests
 
 ## Present
 
-- Feature: Phase 18 ecosystem and extension layer
+- Feature: Phase 19 modern extensions
   Status: Active
-  Started: 2026-05-19
-  Branch: demos/econometrics-replication
+  Started: 2026-05-26
+  Branch: temp/phase18-extension-registry-contract
 
   Summary:
-  Phase 17 coverage is now represented by bounded dynamic-panel (`xtabond`), nonlinear panel
-  (`xtlogit`), quantile/distributional (`qreg`), semiparametric/nonparametric (`lowess`), and
-  causal (`did`) workflows with deterministic command contracts and focused validation.
-  Active work shifts to Phase 18 extension/interface hardening, remote loading robustness, and
-  real-data advanced econometrics replication.
+  Phase 18 is now checkpointed with ingestion/estimator adapter contracts, remote-loading hardening,
+  and replication demos in place. Active work shifts to explicitly late-stage modern extensions.
 
   Verification:
-  - Dynamic-panel workflows include `xtabond` with lag/instrument controls plus
-    `estat overid` and `predict ..., xb|residuals`
-  - Nonlinear panel workflow includes `xtlogit ..., fe [robust]`
-  - Semiparametric workflow includes `lowess ..., gen(...) [bandwidth=<0,1>]`
-  - Automated replication test suite `tests/test_demos.py` successfully runs and validates Heckman, IV/2SLS, and Panel OLS/Hausman demo scripts on live remote datasets
+  - Internal extension registry covers ingestion adapters and estimator adapter backends
+  - Ingestion routing preserves current Parquet/Stata local/remote and lazy-engine constraints
+  - Estimator routing preserves current xtabond/tobit/heckman adapter execution boundaries
+  - Full project test suite passes with focused registry coverage
   - In-app help topics cover the current command surface
 
   Out of Scope:
-  - full plugin architecture and cross-process extension governance
+  - broad plugin architecture redesign during Phase 19 kickoff
 
 ## Future
 
@@ -434,8 +435,7 @@ and describe the active work with concise verification criteria.
   - add a plugin system, broader remote connectors, and formalized R adapter governance once command
     and analytical result interfaces are stable
   - remaining meaningful slice in this phase (one-sentence summary):
-    - add a minimal extension registry contract that hardens Python/R adapter boundaries without
-      widening the estimator command surface
+    - none
   - library strategy:
     - approach (1): stabilize Python adapter layers for adopted libraries (`statsmodels`,
       `linearmodels`, `lifelines`, and related dependencies)

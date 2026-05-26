@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fourth Phase 18 ecosystem and extension-layer slice with a typed internal
+  extension-registry contract (`src/tabdat/extension_registry.py`) for ingestion and estimator
+  adapter boundaries, centralized local/remote lazy-ingestion capability metadata, centralized
+  estimator backend metadata for `xtabond`/`tobit`/`heckman`, and focused registry contract tests.
 - Added the fifth Phase 17 advanced empirical-methods slice with deterministic `estat overid`
   diagnostics after successful `xtabond`, deterministic `predict <newvar>[, xb residuals]` routing
   after `xtabond`, strict panel/variable compatibility guards, and focused
