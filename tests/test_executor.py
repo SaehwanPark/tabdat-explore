@@ -45,6 +45,8 @@ from tabdat.models import (
   DidCommand,
   DidRegressionResult,
   DropCommand,
+  ElasticnetCommand,
+  ElasticnetRegressionResult,
   EstatCommand,
   ExportCommand,
   ExportResult,
@@ -86,6 +88,8 @@ from tabdat.models import (
   QregRegressionResult,
   RegressCommand,
   RegressionResult,
+  RidgeCommand,
+  RidgeRegressionResult,
   RenameCommand,
   ReplaceCommand,
   ReshapeCommand,
@@ -878,6 +882,100 @@ def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
   assert "yhat" in preview.columns
 
 
+def test_phase_19_ridge_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "ridge.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      RidgeCommand(
+        outcome="y",
+        predictors=("x",),
+        alpha=0.25,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, RidgeRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.alpha == pytest.approx(0.25)
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+
+
+def test_phase_19_ridge_predict_supports_xb_only(tmp_path: Path) -> None:
+  path = tmp_path / "ridge-predict.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RidgeCommand(outcome="y", predictors=("x",), alpha=0.25))
+    predicted = executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+    preview = executor.execute(HeadCommand(1))
+    with pytest.raises(ExecutionError, match="predict only supports xb after ridge"):
+      executor.execute(PredictCommand(target_variable="resid", kind="residuals"))
+    with pytest.raises(ExecutionError, match="predict only supports xb after ridge"):
+      executor.execute(PredictCommand(target_variable="pr_hat", kind="pr"))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted yhat"
+  assert isinstance(preview, PreviewResult)
+  assert "yhat" in preview.columns
+
+
+def test_phase_19_elasticnet_returns_typed_result(tmp_path: Path) -> None:
+  path = tmp_path / "elasticnet.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      ElasticnetCommand(
+        outcome="y",
+        predictors=("x",),
+        alpha=0.25,
+        l1_ratio=0.75,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, ElasticnetRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.alpha == pytest.approx(0.25)
+  assert result.l1_ratio == pytest.approx(0.75)
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x"]
+
+
+def test_phase_19_elasticnet_predict_supports_xb_only(tmp_path: Path) -> None:
+  path = tmp_path / "elasticnet-predict.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(ElasticnetCommand(outcome="y", predictors=("x",), alpha=0.25, l1_ratio=0.75))
+    predicted = executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+    preview = executor.execute(HeadCommand(1))
+    with pytest.raises(ExecutionError, match="predict only supports xb after elasticnet"):
+      executor.execute(PredictCommand(target_variable="resid", kind="residuals"))
+    with pytest.raises(ExecutionError, match="predict only supports xb after elasticnet"):
+      executor.execute(PredictCommand(target_variable="pr_hat", kind="pr"))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert predicted.message == "Predicted yhat"
+  assert isinstance(preview, PreviewResult)
+  assert "yhat" in preview.columns
+
+
 def test_phase_19_bayes_returns_typed_result(tmp_path: Path) -> None:
   path = tmp_path / "bayes.parquet"
   _write_regression_parquet(path)
@@ -987,7 +1085,7 @@ def test_phase_19_failed_heckman_clears_prior_lasso_state(
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, bayes, spregress, qreg, "
+        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
         "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
       ),
     ):
@@ -2396,7 +2494,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, bayes, spregress, qreg, "
+        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
         "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
       ),
     ):
@@ -2764,7 +2862,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, bayes, spregress, qreg, "
+        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
         "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
       ),
     ):
@@ -2972,7 +3070,7 @@ def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, bayes, spregress, qreg, "
+        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
         "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
       ),
     ):
@@ -3839,7 +3937,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     with pytest.raises(
       ExecutionError,
       match=(
-        "predict requires a prior regress, lasso, bayes, spregress, qreg, "
+        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
         "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
       ),
     ):
