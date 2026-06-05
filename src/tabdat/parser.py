@@ -1087,9 +1087,12 @@ def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
       "latitude and longitude coordinates"
     )
 
-  model_type_val = _single_text_option(parts.options, "model", "spregress") or "lag"
+  model_type_val: Literal["lag", "error"] | str = (
+    _single_text_option(parts.options, "model", "spregress") or "lag"
+  )
   if model_type_val not in ("lag", "error"):
     raise ParseError("spregress option model must be 'lag' or 'error'")
+  model_type: Literal["lag", "error"] = model_type_val
 
   knn_val = _single_integer_option(parts.options, "knn", "spregress", minimum=1)
   if knn_val is None:
@@ -1098,7 +1101,7 @@ def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
   return SpregressCommand(
     outcome=parts.arguments[0],
     predictors=parts.arguments[1:],
-    model_type=model_type_val,
+    model_type=model_type,
     coord_variables=coord_values,
     knn=knn_val,
     robust="robust" in option_names,

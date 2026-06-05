@@ -63,6 +63,7 @@ reportMissingTypeStubs = false
 [[tool.mypy.overrides]]
 module = [
     "duckdb",
+    "libpysal.weights",
     "linearmodels",
     "linearmodels.*",
     "pandas",
@@ -72,6 +73,7 @@ module = [
     "statsmodels",
     "statsmodels.*",
     "sklearn.linear_model",
+    "spreg",
     "rpy2",
     "rpy2.*",
 ]
