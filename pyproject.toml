@@ -13,7 +13,6 @@ dependencies = [
     "polars>=1.36.1",
     "vl-convert-python>=1.9.0.post1",
     "comp-builders>=1.0.0",
-    "pyright>=1.1.409",
     "statsmodels>=0.14.6",
     "linearmodels>=7.0",
     "rpy2>=3.6.4",
@@ -26,6 +25,7 @@ tabdat = "tabdat.cli:main"
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.39.6",
     "mypy>=1.20.2",
     "pytest>=9.0.1",
     "ruff>=0.15.12",
@@ -54,9 +54,16 @@ check_untyped_defs = true
 strict_equality = true
 plugins = ["pydantic.mypy"]
 
+[tool.basedpyright]
+include = ["src/tabdat"]
+pythonVersion = "3.13"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+
 [[tool.mypy.overrides]]
 module = [
     "duckdb",
+    "libpysal.weights",
     "linearmodels",
     "linearmodels.*",
     "pandas",
@@ -66,6 +73,7 @@ module = [
     "statsmodels",
     "statsmodels.*",
     "sklearn.linear_model",
+    "spreg",
     "rpy2",
     "rpy2.*",
 ]

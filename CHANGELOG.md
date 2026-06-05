@@ -6,6 +6,10 @@ All notable project changes are tracked here.
 
 ### Changed
 
+- Cleaned `SPEC.md` so completed work no longer appears in `Present` or `Future`, leaving only
+  active guidance and genuinely unfinished future slices.
+- Replaced current Pyright tooling with Basedpyright as a development dependency and configured
+  scoped `src/tabdat` type checking.
 - Changed `predict` prerequisite diagnostics to include lasso model-state routing.
 - Moved `comp-builders` from the previous Git direct dependency to the published PyPI package,
   expanded the local `tabdat.monads` boundary with async-result helpers, and centralized parser
@@ -13,6 +17,8 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 20 doubly robust DID to `SPEC.md` as the next planned implementation phase, covering
+  outcome-regression, inverse-probability-weighted, and augmented doubly robust DID workflows.
 - Added the fourth Phase 19 modern-extensions slice with
   `ridge linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first `scikit-learn` `Ridge`
   L2-penalized linear estimation, and
