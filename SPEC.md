@@ -400,24 +400,7 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- Feature: Phase 19 modern extensions (Ridge & ElasticNet ML Regularization)
-  Status: Complete
-  Started: 2026-05-26
-  Branch: feature/phase19-ridge-elasticnet
-
-  Summary:
-  The Phase 19 modern extensions now include `lasso linear`, `bayes linear`, `spregress`,
-  `ridge linear`, and `elasticnet linear`. Ridge and ElasticNet implement bounded ML
-  regularization via Python-first `scikit-learn` with deterministic result formatting,
-  typed estimator adapter metadata, and `predict ..., xb` support.
-
-  Verification:
-  - Strict type checking (`pyright`) returns 0 errors/warnings.
-  - Ruff formatting and lint checking pass successfully with all checks.
-  - The comprehensive suite of 769 automated tests passes 100% green.
-
-  Out of Scope:
-  - broad plugin architecture redesign during Phase 19 kickoff
+- No active implementation slice is open.
 
 ## Future
 
@@ -431,52 +414,36 @@ and describe the active work with concise verification criteria.
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
-- Phase 15 nonlinear estimation core:
-  - add binary-choice models, marginal effects, nonlinear regression, and limited dependent
-    variable models such as Tobit, truncated regression, and sample selection
-  - remaining meaningful slice in this phase (one-sentence summary):
-    - none
+- Phase 20 doubly robust DID:
+  - extend the existing two-way fixed-effects `did` starter with a separate causal DID command for
+    doubly robust treatment-effect workflows
+  - planned command surface:
+    - `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust
+      bootstrap(<n>) seed(<n>)]`
+  - remaining meaningful slices in this phase:
+    - Outcome-regression DID: implement `method(or)` for a bounded two-period, two-group ATT
+      workflow that models untreated potential outcomes from covariates.
+    - Inverse-probability-weighted DID: implement `method(ipw)` with propensity-score estimation,
+      overlap diagnostics, and deterministic weight summaries.
+    - Augmented doubly robust DID: implement `method(aipw)` as the default combined estimator using
+      both outcome-regression and propensity-score nuisance models.
+    - Post-estimation diagnostics: add `estat drdid` for treatment/post cell counts, nuisance-model
+      summaries, overlap checks, and estimator-specific ATT diagnostics.
+    - Prediction and reproducibility: preserve deterministic output, explicit bootstrap seeding,
+      and strict parser/executor guards for unsupported DID designs.
+  - initial scope:
+    - binary treatment and binary post indicators
+    - two-period, two-group ATT designs over the current active dataset
+    - complete-case numeric covariate handling with deterministic validation errors
+    - no staggered adoption, multi-valued treatment, continuous treatment, repeated-cross-section
+      variants, or ML nuisance estimation in the first slices
   - library strategy:
-    - approach (1): `statsmodels` for logit/probit workflows, marginal effects, and core nonlinear
-      likelihood models
-    - approach (2): `sampleSelection`, `censReg`, and `truncreg` via `rpy2` for Heckman-style,
-      censored, and truncated models
-    - approach (3): targeted `scipy.optimize` + `numpy` MLE implementations only when necessary
-- Phase 16 specialized likelihood models:
-  - add discrete-choice systems, count models, mixture/hurdle/zero-inflated models, and
-    duration/survival models
-  - remaining meaningful slice in this phase (one-sentence summary):
-    - none
-  - library strategy:
-    - approach (1): `statsmodels` for multinomial/count/zero-inflated families and `lifelines` for
-      duration/survival workflows
-    - approach (2): `mlogit`, `glmmTMB`, and `survival` via `rpy2` for model families not covered
-      cleanly in Python
-    - approach (3): targeted `scipy.optimize` + `numpy` likelihood implementations only when needed
-- Phase 17 advanced empirical methods:
-  - add dynamic and advanced panel GMM, nonlinear panel models, quantile/distributional methods,
-    semiparametric/nonparametric methods, and causal-inference workflows
-  - remaining meaningful slice in this phase (one-sentence summary):
-    - none
-  - library strategy:
-    - approach (1): `linearmodels`/`statsmodels` where available for panel-GMM, quantile, and
-      semiparametric building blocks
-    - approach (2): `fixest`, `did`, `MatchIt`, `Synth`, and `quantreg` via `rpy2` for mature
-      causal and distributional workflows
-    - approach (3): targeted `numpy`/`scipy` implementations only when the first two layers are
-      insufficient
-- Phase 18 ecosystem and extension layer:
-  - add a plugin system, broader remote connectors, and formalized R adapter governance once command
-    and analytical result interfaces are stable
-  - remaining meaningful slice in this phase (one-sentence summary):
-    - none
-  - library strategy:
-    - approach (1): stabilize Python adapter layers for adopted libraries (`statsmodels`,
-      `linearmodels`, `lifelines`, and related dependencies)
-    - approach (2): harden `rpy2` adapter boundaries and package management for approved R
-      dependencies such as `fixest`, `plm`, and `lme4`
-    - approach (3): keep lower-level code limited to compatibility glue and performance-critical
-      kernels
+    - approach (1): use mature Python support only if it can satisfy the bounded command contract
+      without bespoke estimator orchestration
+    - approach (2): use a focused `rpy2` adapter to mature R DID packages such as `DRDID` and `did`
+      where Python coverage is insufficient
+    - approach (3): add a narrow `numpy`/`scipy` implementation only after the command contract,
+      validation rules, and output tables are fixed by tests
 - Phase 19 modern extensions:
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
