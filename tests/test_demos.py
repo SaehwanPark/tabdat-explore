@@ -162,3 +162,57 @@ def test_panel_union_demo(tmp_path: Path, capsys) -> None:
   assert "Model: xtreg re union" in captured.out
   assert "estat hausman" in captured.out
   assert "chi2" in captured.out
+
+
+def test_drdid_simulated_demo(tmp_path: Path, capsys) -> None:
+  demo_path = Path("demos/drdid_simulated.td")
+  assert demo_path.exists(), "DrDid demo script must exist"
+
+  # Create simulated panel data
+  import polars as pl
+
+  np.random.seed(42)
+  entities = 20
+  rows = []
+  for i in range(1, entities + 1):
+    # treated is 1 for entity 11-20
+    treated = 1 if i > 10 else 0
+    exposure = float(np.random.uniform(0.5, 2.0))
+    for y in [2020, 2021]:
+      post = 1 if y == 2021 else 0
+      # base wage
+      wage = float(10.0 + treated * 2.0 * post + exposure * 1.5 + np.random.normal(0, 0.2))
+      rows.append(
+        {
+          "firm_id": i,
+          "year": y,
+          "wage": wage,
+          "treated": treated,
+          "post": post,
+          "exposure": exposure,
+        }
+      )
+  df = pl.DataFrame(rows)
+  local_parquet = tmp_path / "drdid_simulated.parquet"
+  df.write_parquet(local_parquet)
+
+  # Read original script and replace placeholder path with local path
+  script_content = demo_path.read_text(encoding="utf-8")
+  modified_content = script_content.replace("demos/drdid_simulated.parquet", str(local_parquet))
+
+  # Write modified script to a temp file
+  temp_script = tmp_path / "drdid_simulated_local.td"
+  temp_script.write_text(modified_content, encoding="utf-8")
+
+  # Run script via CLI main
+  exit_code = main(["-f", str(temp_script)])
+  assert exit_code == 0, "DrDid demo script must run successfully"
+
+  captured = capsys.readouterr()
+  assert f"Loaded: {local_parquet}" in captured.out
+  assert "Model: drdid wage on exposure (treat=treated, post=post)" in captured.out
+  assert "Estimator: drdid_aipw" in captured.out
+  assert "Estimator: drdid_ipw" in captured.out
+  assert "Estimator: drdid_or" in captured.out
+  assert "Estimation Method" in captured.out
+  assert "AIPW" in captured.out

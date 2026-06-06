@@ -453,6 +453,7 @@ class EstatCommand:
     "margins",
     "gof",
     "did",
+    "drdid",
   ]
 
 
@@ -514,6 +515,18 @@ class DidCommand:
   treatment_variable: str
   post_variable: str
   robust: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DrDidCommand:
+  outcome: str
+  covariates: tuple[str, ...]
+  treatment_variable: str
+  post_variable: str
+  method: Literal["or", "ipw", "aipw"] = "aipw"
+  robust: bool = False
+  bootstrap: int | None = None
+  seed: int | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -596,6 +609,7 @@ Command = (
   | XtAbondCommand
   | LowessCommand
   | DidCommand
+  | DrDidCommand
   | CfRegressCommand
   | ParsedCommand
 )
@@ -995,6 +1009,20 @@ class DidRegressionResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class DrDidRegressionResult:
+  covariance: str
+  outcome: str
+  covariates: tuple[str, ...]
+  treatment_variable: str
+  post_variable: str
+  method: str
+  observation_count: int
+  coefficients: tuple[CoefficientEstimate, ...]
+  lci: float
+  uci: float
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class XtAbondRegressionResult:
   covariance: str
   outcome: str
@@ -1094,6 +1122,7 @@ Result = (
   | XtLogitRegressionResult
   | XtAbondRegressionResult
   | DidRegressionResult
+  | DrDidRegressionResult
   | CfRegressionResult
   | PanelResult
   | SqlCreateResult

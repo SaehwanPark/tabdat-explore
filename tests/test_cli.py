@@ -1535,6 +1535,48 @@ def test_cli_runs_phase_17_did_predict_flow(tmp_path: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_20_drdid_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "drdid.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.2, 0, 0, 1.1),
+        (1, 2021, 11.0, 0, 1, 0.8),
+        (2, 2020, 9.8, 0, 0, 1.0),
+        (2, 2021, 10.7, 0, 1, 1.2),
+        (3, 2020, 10.1, 1, 0, 0.9),
+        (3, 2021, 12.8, 1, 1, 1.3),
+        (4, 2020, 9.9, 1, 0, 1.0),
+        (4, 2021, 12.6, 1, 1, 1.1)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "panel firm_id year",
+      "-c",
+      "drdid wage exposure, treat(treated) post(post) method(aipw)",
+      "-c",
+      "estat drdid",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: drdid wage on exposure (treat=treated, post=post)" in captured.out
+  assert "Estimator: drdid_aipw" in captured.out
+  assert "ATT" in captured.out
+  assert "Estimation Method" in captured.out
+  assert "AIPW" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_17_xtabond_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "xtabond.parquet"
   _write_sql_parquet(

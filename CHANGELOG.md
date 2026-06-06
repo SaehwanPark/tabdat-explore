@@ -17,10 +17,14 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Phase 20: Doubly Robust Difference-in-Differences (`drdid`):
+  - `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]` command with Python-first outcome regression (OR), inverse probability weighting (IPW), and augmented doubly robust (AIPW) ATT estimators.
+  - post-estimation diagnostics: `estat drdid` prints treated/control cell counts, propensity score summaries, and overlap checks.
+  - robust and bootstrap standard error estimation with explicit seed support.
+  - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
+  - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
 - Added the fifth Phase 19 modern-extensions slice: cross-validation wrappers `cvlasso`, `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select optimal hyperparameters using custom grid search on scikit-learn estimators, saving structured CV reports to the artifact directory.
 - Added prediction support (`predict <newvar>, xb`) after successful cvlasso, cvridge, and cvelasticnet models.
-- Added Phase 20 doubly robust DID to `SPEC.md` as the next planned implementation phase, covering
-  outcome-regression, inverse-probability-weighted, and augmented doubly robust DID workflows.
 - Added the fourth Phase 19 modern-extensions slice with
   `ridge linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first `scikit-learn` `Ridge`
   L2-penalized linear estimation, and

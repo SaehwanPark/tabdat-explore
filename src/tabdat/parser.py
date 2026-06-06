@@ -18,8 +18,12 @@ from tabdat.models import (
   Command,
   CommandOption,
   CountCommand,
+  CvelasticnetCommand,
+  CvlassoCommand,
+  CvridgeCommand,
   DescribeCommand,
   DidCommand,
+  DrDidCommand,
   DropCommand,
   ElasticnetCommand,
   EstatCommand,
@@ -37,9 +41,6 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
-  CvlassoCommand,
-  CvridgeCommand,
-  CvelasticnetCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -136,6 +137,7 @@ _EXECUTABLE_COMMANDS = {
   "xtabond",
   "lowess",
   "did",
+  "drdid",
   "cfregress",
   "spregress",
   "exit",
@@ -496,6 +498,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "did":
     return _parse_did(parts)
+
+  if parts.name == "drdid":
+    return _parse_drdid(parts)
 
   if parts.name == "cfregress":
     return _parse_cfregress(parts)
@@ -1583,7 +1588,7 @@ def _parse_streg(parts: _CommandParts) -> StregCommand:
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
-    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did>"
+    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>"
   )
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(expected_estat_syntax)
@@ -1601,10 +1606,11 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "margins",
     "gof",
     "did",
+    "drdid",
   }:
     raise ParseError(
       "estat subcommand must be residuals, ovtest, vif, firststage, "
-      "overid, hausman, endogenous, margins, gof, or did"
+      "overid, hausman, endogenous, margins, gof, did, or drdid"
     )
   return EstatCommand(
     subcommand=cast(
@@ -1619,6 +1625,7 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
         "margins",
         "gof",
         "did",
+        "drdid",
       ],
       subcommand,
     )
@@ -1821,6 +1828,60 @@ def _parse_did(parts: _CommandParts) -> DidCommand:
     treatment_variable=treatment_variable,
     post_variable=post_variable,
     robust="robust" in option_names,
+  )
+
+
+def _parse_drdid(parts: _CommandParts) -> DrDidCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "drdid expects syntax: drdid <y> [covariates], treat(<var>) post(<var>) "
+      "[method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]"
+    )
+  if not parts.arguments:
+    raise ParseError(
+      "drdid expects syntax: drdid <y> [covariates], treat(<var>) post(<var>) "
+      "[method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]"
+    )
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"treat", "post", "method", "robust", "bootstrap", "seed"}
+  if unsupported:
+    raise ParseError(f"drdid unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "drdid", {"robust"})
+  treat_values = _single_tuple_option(parts.options, "treat", "drdid")
+  if treat_values is None or len(treat_values) != 1:
+    raise ParseError("drdid option treat expects one variable")
+  post_values = _single_tuple_option(parts.options, "post", "drdid")
+  if post_values is None or len(post_values) != 1:
+    raise ParseError("drdid option post expects one variable")
+  treatment_variable = treat_values[0]
+  post_variable = post_values[0]
+  if treatment_variable == post_variable:
+    raise ParseError("drdid treatment and post variables must be distinct")
+  outcome = parts.arguments[0]
+  covariates = parts.arguments[1:]
+  if treatment_variable == outcome or post_variable == outcome:
+    raise ParseError("drdid treatment and post variables must differ from outcome")
+  if treatment_variable in covariates or post_variable in covariates:
+    raise ParseError("drdid treatment and post variables must not appear in covariates")
+  method_str = _single_text_option(parts.options, "method", "drdid")
+  method: Literal["or", "ipw", "aipw"] = "aipw"
+  if method_str is not None:
+    if method_str not in {"or", "ipw", "aipw"}:
+      raise ParseError("drdid option method must be one of: or, ipw, aipw")
+    method = method_str  # type: ignore
+  bootstrap = _single_integer_option(parts.options, "bootstrap", "drdid", minimum=1)
+  seed = _single_integer_option(parts.options, "seed", "drdid", minimum=0)
+  if seed is not None and bootstrap is None:
+    raise ParseError("drdid option seed requires option bootstrap")
+  return DrDidCommand(
+    outcome=outcome,
+    covariates=covariates,
+    treatment_variable=treatment_variable,
+    post_variable=post_variable,
+    method=method,
+    robust="robust" in option_names,
+    bootstrap=bootstrap,
+    seed=seed,
   )
 
 
@@ -2173,6 +2234,8 @@ def _parenthesized_option_value(
     "tol",
     "knn",
     "cv",
+    "bootstrap",
+    "seed",
   }:
     numeric_text = "".join(token.text for token in tokens)
     try:

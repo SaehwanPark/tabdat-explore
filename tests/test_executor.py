@@ -40,10 +40,18 @@ from tabdat.models import (
   CollapseCommand,
   CountCommand,
   CountResult,
+  CvelasticnetCommand,
+  CvelasticnetRegressionResult,
+  CvlassoCommand,
+  CvlassoRegressionResult,
+  CvridgeCommand,
+  CvridgeRegressionResult,
   DescribeCommand,
   DescribeResult,
   DidCommand,
   DidRegressionResult,
+  DrDidCommand,
+  DrDidRegressionResult,
   DropCommand,
   ElasticnetCommand,
   ElasticnetRegressionResult,
@@ -63,12 +71,6 @@ from tabdat.models import (
   KeepCommand,
   LassoCommand,
   LassoRegressionResult,
-  CvlassoCommand,
-  CvlassoRegressionResult,
-  CvridgeCommand,
-  CvridgeRegressionResult,
-  CvelasticnetCommand,
-  CvelasticnetRegressionResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -279,6 +281,37 @@ def _write_did_parquet(path: Path) -> None:
         (3, 2021, 12.8, 1, 1, 1.3),
         (4, 2020, 9.9, 1, 0, 1.0),
         (4, 2021, 12.6, 1, 1, 1.1)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+
+
+def _write_drdid_larger_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 0, 0, 1.0), (1, 2021, 11.0, 0, 1, 1.0),
+        (2, 2020, 9.5, 0, 0, 0.9), (2, 2021, 10.8, 0, 1, 0.9),
+        (3, 2020, 10.1, 0, 0, 0.8), (3, 2021, 11.2, 0, 1, 0.8),
+        (4, 2020, 9.9, 0, 0, 1.1), (4, 2021, 10.5, 0, 1, 1.1),
+        (5, 2020, 10.2, 0, 0, 1.2), (5, 2021, 11.4, 0, 1, 1.2),
+        (6, 2020, 10.0, 0, 0, 1.0), (6, 2021, 10.9, 0, 1, 1.0),
+        (7, 2020, 9.7, 0, 0, 0.9), (7, 2021, 10.6, 0, 1, 0.9),
+        (8, 2020, 10.4, 0, 0, 1.1), (8, 2021, 11.5, 0, 1, 1.1),
+        (9, 2020, 9.6, 0, 0, 0.8), (9, 2021, 10.4, 0, 1, 0.8),
+        (10, 2020, 10.2, 0, 0, 1.2), (10, 2021, 11.3, 0, 1, 1.2),
+        (11, 2020, 9.8, 1, 0, 1.0), (11, 2021, 12.8, 1, 1, 1.0),
+        (12, 2020, 10.0, 1, 0, 0.9), (12, 2021, 12.5, 1, 1, 0.9),
+        (13, 2020, 10.3, 1, 0, 1.1), (13, 2021, 13.0, 1, 1, 1.1),
+        (14, 2020, 9.7, 1, 0, 0.8), (14, 2021, 12.2, 1, 1, 0.8),
+        (15, 2020, 10.1, 1, 0, 1.2), (15, 2021, 12.9, 1, 1, 1.2),
+        (16, 2020, 9.9, 1, 0, 1.0), (16, 2021, 12.7, 1, 1, 1.0),
+        (17, 2020, 10.2, 1, 0, 0.9), (17, 2021, 12.6, 1, 1, 0.9),
+        (18, 2020, 10.4, 1, 0, 1.1), (18, 2021, 13.1, 1, 1, 1.1),
+        (19, 2020, 9.6, 1, 0, 0.8), (19, 2021, 12.1, 1, 1, 0.8),
+        (20, 2020, 10.2, 1, 0, 1.2), (20, 2021, 12.8, 1, 1, 1.2)
     ) as did_data(firm_id, year, wage, treated, post, exposure)
     """,
   )
@@ -5346,5 +5379,242 @@ def test_use_rejects_non_parquet(tmp_path: Path) -> None:
   try:
     with pytest.raises(ExecutionError, match=r"\.parquet"):
       executor.execute(UseCommand(csv_path))
+  finally:
+    executor.close()
+
+
+def test_phase_20_drdid_returns_typed_result(tmp_path: Path) -> None:
+  from tabdat.formatter import format_result
+
+  path = tmp_path / "drdid.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+
+    # Test AIPW (default method)
+    result_aipw = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        method="aipw",
+      )
+    )
+    assert isinstance(result_aipw, DrDidRegressionResult)
+    assert result_aipw.method == "aipw"
+    assert len(result_aipw.coefficients) == 1
+    assert result_aipw.coefficients[0].name == "ATT"
+
+    # Test OR method
+    result_or = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        method="or",
+      )
+    )
+    assert isinstance(result_or, DrDidRegressionResult)
+    assert result_or.method == "or"
+
+    # Test IPW method
+    result_ipw = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        method="ipw",
+      )
+    )
+    assert isinstance(result_ipw, DrDidRegressionResult)
+    assert result_ipw.method == "ipw"
+
+    # Verify formatting output
+    formatted = format_result(result_aipw)
+    assert "Model: drdid wage on exposure" in formatted
+    assert "Estimator: drdid_aipw" in formatted
+    assert "ATT" in formatted
+    assert "[95% Conf. Interval]" in formatted
+  finally:
+    executor.close()
+
+
+def test_phase_20_drdid_requires_panel_metadata(tmp_path: Path) -> None:
+  path = tmp_path / "drdid.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="drdid requires panel metadata; run panel <id_var> <time_var> first",
+    ):
+      executor.execute(
+        DrDidCommand(
+          outcome="wage",
+          covariates=("exposure",),
+          treatment_variable="treated",
+          post_variable="post",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_20_drdid_requires_binary_treatment_and_post(tmp_path: Path) -> None:
+  path = tmp_path / "drdid-nonbinary.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 0, 0, 1.0),
+        (1, 2021, 11.0, 2, 1, 1.1),
+        (2, 2020, 9.5, 0, 0, 0.9),
+        (2, 2021, 10.8, 1, 1, 1.0)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    with pytest.raises(
+      ExecutionError,
+      match="drdid treatment and post variables must be binary with values 0 and 1",
+    ):
+      executor.execute(
+        DrDidCommand(
+          outcome="wage",
+          covariates=("exposure",),
+          treatment_variable="treated",
+          post_variable="post",
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_phase_20_drdid_bootstrap_seeding(tmp_path: Path) -> None:
+  path = tmp_path / "drdid.parquet"
+  _write_drdid_larger_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+
+    # Run bootstrap with seed
+    res1 = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        bootstrap=50,
+        seed=123,
+      )
+    )
+    res2 = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        bootstrap=50,
+        seed=123,
+      )
+    )
+    assert res1.coefficients[0].standard_error == res2.coefficients[0].standard_error
+    assert res1.lci == res2.lci
+    assert res1.uci == res2.uci
+  finally:
+    executor.close()
+
+
+def test_phase_20_drdid_r_fallback_runs_when_python_fit_fails(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  import numpy as np
+
+  path = tmp_path / "drdid.parquet"
+  _write_did_parquet(path)
+
+  # Mock Python fit function to fail with a non-ExecutionError (unexpected numerical failure).
+  # ExecutionError would propagate immediately (H1 fix); only non-ExecutionError triggers R-fallback.
+  monkeypatch.setattr(
+    "tabdat.executor._fit_drdid_python",
+    lambda **_: (_ for _ in ()).throw(RuntimeError("unexpected numerical failure")),
+  )
+
+  # Mock R fallback to return standard fit result fields
+  # att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre
+  mock_fit_result = (1.5, 0.2, 1.1, 1.9, np.array([0.5, 0.5]), 2, 2, 2, 2)
+  monkeypatch.setattr(
+    "tabdat.executor._fit_drdid_r_fallback",
+    lambda **_: mock_fit_result,
+  )
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, DrDidRegressionResult)
+  assert result.coefficients[0].value == 1.5
+  assert result.lci == 1.1
+  assert result.uci == 1.9
+
+
+def test_phase_20_estat_drdid(tmp_path: Path) -> None:
+  from tabdat.formatter import format_result
+
+  path = tmp_path / "drdid.parquet"
+  _write_did_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+
+    # Run drdid first
+    executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+      )
+    )
+
+    # Run estat drdid
+    result = executor.execute(EstatCommand(subcommand="drdid"))
+    assert isinstance(result, TableResult)
+    assert result.headers == ("Diagnostic Metric", "Value")
+
+    # Check that it contains estimation method and PS stats
+    rows_dict = dict(result.rows)
+    assert rows_dict["Estimation Method"] == "AIPW"
+    assert "Propensity Score Min" in rows_dict
+    assert "Common Support / Overlap Check Passed" in rows_dict
+
+    # Check formatting
+    formatted = format_result(result)
+    assert "Estimation Method" in formatted
+    assert "AIPW" in formatted
   finally:
     executor.close()

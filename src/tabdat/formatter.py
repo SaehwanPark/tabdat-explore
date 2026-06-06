@@ -9,16 +9,17 @@ from tabdat.models import (
   CfRegressionResult,
   CodebookResult,
   CountResult,
+  CvelasticnetRegressionResult,
+  CvlassoRegressionResult,
+  CvridgeRegressionResult,
   DescribeResult,
   DidRegressionResult,
+  DrDidRegressionResult,
   ElasticnetRegressionResult,
   ExportResult,
   HeckmanRegressionResult,
   IvRegressionResult,
   LassoRegressionResult,
-  CvlassoRegressionResult,
-  CvridgeRegressionResult,
-  CvelasticnetRegressionResult,
   LoadResult,
   LogitRegressionResult,
   NbregRegressionResult,
@@ -731,6 +732,35 @@ def format_result(result: Result) -> str:
       for estimate in result.coefficients
     )
     body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, DrDidRegressionResult):
+    covariates = " ".join(result.covariates) if result.covariates else "(none)"
+    header = [
+      (
+        f"Model: drdid {result.outcome} on {covariates} "
+        f"(treat={result.treatment_variable}, post={result.post_variable})"
+      ),
+      f"Estimator: drdid_{result.method}",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+        f"[{_format_number(result.lci)}, {_format_number(result.uci)}]",
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(
+      ("Variable", "Coef", "Std Err", "t", "P>|t|", "[95% Conf. Interval]"),
+      coefficient_rows,
+    )
     return "\n".join([*header, *body])
 
   if isinstance(result, CfRegressionResult):
