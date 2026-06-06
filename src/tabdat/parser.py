@@ -37,6 +37,9 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
+  CvlassoCommand,
+  CvridgeCommand,
+  CvelasticnetCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -109,6 +112,9 @@ _EXECUTABLE_COMMANDS = {
   "lasso",
   "ridge",
   "elasticnet",
+  "cvlasso",
+  "cvridge",
+  "cvelasticnet",
   "bayes",
   "qreg",
   "logit",
@@ -415,6 +421,15 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "elasticnet":
     return _parse_elasticnet(parts)
+
+  if parts.name == "cvlasso":
+    return _parse_cvlasso(parts)
+
+  if parts.name == "cvridge":
+    return _parse_cvridge(parts)
+
+  if parts.name == "cvelasticnet":
+    return _parse_cvelasticnet(parts)
 
   if parts.name == "bayes":
     return _parse_bayes(parts)
@@ -1026,6 +1041,112 @@ def _parse_elasticnet(parts: _CommandParts) -> ElasticnetCommand:
     outcome=parts.arguments[1],
     predictors=parts.arguments[2:],
     alpha=alpha,
+    l1_ratio=l1_ratio,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _elasticnet_cv_l1_ratio(
+  options: tuple[CommandOption, ...], command_name: str
+) -> float | tuple[float, ...] | None:
+  matched = [o for o in options if o.name == "l1_ratio"]
+  if not matched:
+    return None
+  if len(matched) > 1:
+    raise ParseError(f"{command_name} option l1_ratio may only be supplied once")
+  val = matched[0].value
+  if isinstance(val, tuple):
+    parsed: list[float] = []
+    for item in val:
+      try:
+        f = float(item)
+      except ValueError as exc:
+        raise ParseError(f"{command_name} option l1_ratio values must be numeric") from exc
+      if not (0.0 <= f <= 1.0):
+        raise ParseError(f"{command_name} option l1_ratio values must be between 0 and 1 inclusive")
+      parsed.append(f)
+    return tuple(parsed)
+  if isinstance(val, bool) or not isinstance(val, (int, float)):
+    raise ParseError(
+      f"{command_name} option l1_ratio expects a numeric value or list of numeric values"
+    )
+  f = float(val)
+  if not (0.0 <= f <= 1.0):
+    raise ParseError(f"{command_name} option l1_ratio values must be between 0 and 1 inclusive")
+  return f
+
+
+def _parse_cvlasso(parts: _CommandParts) -> CvlassoCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("cvlasso expects syntax: cvlasso linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("cvlasso expects syntax: cvlasso linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("cvlasso model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"cv", "noconstant"}
+  if unsupported:
+    raise ParseError(f"cvlasso unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "cvlasso", {"noconstant"})
+  cv = _single_integer_option(parts.options, "cv", "cvlasso", minimum=2)
+  if cv is None:
+    cv = 5
+  return CvlassoCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    cv=cv,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_cvridge(parts: _CommandParts) -> CvridgeCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("cvridge expects syntax: cvridge linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("cvridge expects syntax: cvridge linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("cvridge model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"cv", "noconstant"}
+  if unsupported:
+    raise ParseError(f"cvridge unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "cvridge", {"noconstant"})
+  cv = _single_integer_option(parts.options, "cv", "cvridge", minimum=2)
+  if cv is None:
+    cv = 5
+  return CvridgeCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    cv=cv,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_cvelasticnet(parts: _CommandParts) -> CvelasticnetCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("cvelasticnet expects syntax: cvelasticnet linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("cvelasticnet expects syntax: cvelasticnet linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("cvelasticnet model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"cv", "l1_ratio", "noconstant"}
+  if unsupported:
+    raise ParseError(f"cvelasticnet unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "cvelasticnet", {"noconstant"})
+  cv = _single_integer_option(parts.options, "cv", "cvelasticnet", minimum=2)
+  if cv is None:
+    cv = 5
+  l1_ratio = _elasticnet_cv_l1_ratio(parts.options, "cvelasticnet")
+  if l1_ratio is None:
+    l1_ratio = (0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0)
+  return CvelasticnetCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    cv=cv,
     l1_ratio=l1_ratio,
     include_intercept="noconstant" not in option_names,
   )
@@ -2049,13 +2170,39 @@ def _parenthesized_option_value(
     "n_iter",
     "tol",
     "knn",
-    "l1_ratio",
+    "cv",
   }:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)
     except ValueError as exc:
       raise ParseError(f"option {option_name} expects a numeric value") from exc
+  if option_name == "l1_ratio":
+    l1_ratio_values: list[str] = []
+    index = 0
+    while index < len(tokens):
+      token = tokens[index]
+      if token.kind == "number":
+        l1_ratio_values.append(token.text)
+        index += 1
+        continue
+      if (
+        token.kind == "symbol"
+        and token.text in {"-", "+"}
+        and index + 1 < len(tokens)
+        and tokens[index + 1].kind == "number"
+      ):
+        l1_ratio_values.append(f"{token.text}{tokens[index + 1].text}")
+        index += 2
+        continue
+      raise ParseError("option l1_ratio values must be numeric")
+    if len(l1_ratio_values) == 1:
+      try:
+        return float(l1_ratio_values[0])
+      except ValueError as exc:
+        raise ParseError("option l1_ratio expects a numeric value") from exc
+    return tuple(l1_ratio_values)
+
   if option_name == "start":
     values: list[str] = []
     index = 0

@@ -283,6 +283,31 @@ class ElasticnetCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvlassoCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  cv: int = 5
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvridgeCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  cv: int = 5
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvelasticnetCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  cv: int = 5
+  l1_ratio: float | tuple[float, ...] = (0.1, 0.5, 0.7, 0.9, 0.95, 0.99, 1.0)
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class BayesCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -546,6 +571,9 @@ Command = (
   | LassoCommand
   | RidgeCommand
   | ElasticnetCommand
+  | CvlassoCommand
+  | CvridgeCommand
+  | CvelasticnetCommand
   | BayesCommand
   | SpregressCommand
   | QregCommand
@@ -721,6 +749,46 @@ class ElasticnetRegressionResult:
   include_intercept: bool
   r_squared: float | None
   coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvlassoRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  selected_alpha: float
+  cv: int
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+  report_path: Path
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvridgeRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  selected_alpha: float
+  cv: int
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+  report_path: Path
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CvelasticnetRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  selected_alpha: float
+  selected_l1_ratio: float
+  cv: int
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+  report_path: Path
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1005,6 +1073,9 @@ Result = (
   | LassoRegressionResult
   | RidgeRegressionResult
   | ElasticnetRegressionResult
+  | CvlassoRegressionResult
+  | CvridgeRegressionResult
+  | CvelasticnetRegressionResult
   | BayesRegressionResult
   | SpatialRegressionResult
   | QregRegressionResult

@@ -396,7 +396,11 @@ and describe the active work with concise verification criteria.
   - deterministic ridge/elasticnet result formatting and typed estimator adapter metadata
   - `predict <newvar>[, xb]` support after successful ridge/elasticnet with strict guards
     for unsupported `residuals`/`pr` modes
-  - focused parser, executor, CLI, shell, help, and extension-registry coverage
+- Implemented the fifth Phase 19 modern-extensions slice:
+  - cross-validation wrappers `cvlasso`, `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select optimal hyperparameters using custom grid search on scikit-learn estimators
+  - save structured CV reports in the active `artifact_dir` without filename collisions
+  - support prediction (`predict <newvar>, xb`) after cross-validation estimation
+  - focused parser, executor/backend, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
@@ -448,7 +452,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - ML cross-validation & hyperparameter tuning: implement cross-validation wrappers (e.g., `cvlasso`, `cvridge`, `cvelasticnet`) that automatically perform K-fold cross-validation to select optimal hyperparameters (like `alpha` or `l1_ratio`) using scikit-learn's CV estimators, outputting tuning reports to the artifact directory.
     - Post-selection inference & double/debiased machine learning (DML): implement post-selection inference utilities (such as running OLS on selected features) and support debiased/double machine learning for treatment effect estimation under high-dimensional controls.
     - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.

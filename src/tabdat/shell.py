@@ -50,6 +50,9 @@ COMMAND_NAMES: tuple[str, ...] = (
   "lasso",
   "ridge",
   "elasticnet",
+  "cvlasso",
+  "cvridge",
+  "cvelasticnet",
   "bayes",
   "qreg",
   "logit",
@@ -97,6 +100,9 @@ _COLUMN_COMMANDS = {
   "panel",
   "regress",
   "lasso",
+  "cvlasso",
+  "cvridge",
+  "cvelasticnet",
   "bayes",
   "qreg",
   "logit",
@@ -126,6 +132,9 @@ _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _LASSO_OPTIONS = ("alpha(", "noconstant")
+_CVLASSO_OPTIONS = ("cv(", "noconstant")
+_CVRIDGE_OPTIONS = ("cv(", "noconstant")
+_CVELASTICNET_OPTIONS = ("cv(", "l1_ratio(", "noconstant")
 _BAYES_OPTIONS = ("n_iter(", "tol(", "noconstant")
 _SPREGRESS_OPTIONS = ("coord(", "model(", "knn(", "robust")
 _QREG_OPTIONS = ("quantile(", "robust", "noconstant")
@@ -341,6 +350,12 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_REGRESS_OPTIONS, word)
   if command_name == "lasso":
     yield from _matching_completions(_LASSO_OPTIONS, word)
+  if command_name == "cvlasso":
+    yield from _matching_completions(_CVLASSO_OPTIONS, word)
+  if command_name == "cvridge":
+    yield from _matching_completions(_CVRIDGE_OPTIONS, word)
+  if command_name == "cvelasticnet":
+    yield from _matching_completions(_CVELASTICNET_OPTIONS, word)
   if command_name == "bayes":
     yield from _matching_completions(_BAYES_OPTIONS, word)
   if command_name == "spregress":

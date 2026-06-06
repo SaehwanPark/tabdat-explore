@@ -11,7 +11,17 @@ _MODEL_CONFIG = ConfigDict(strict=True, frozen=True)
 
 DataFormat = Literal["parquet", "stata"]
 EstimatorCommand = Literal[
-  "xtabond", "tobit", "heckman", "lasso", "ridge", "elasticnet", "bayes", "spregress"
+  "xtabond",
+  "tobit",
+  "heckman",
+  "lasso",
+  "ridge",
+  "elasticnet",
+  "cvlasso",
+  "cvridge",
+  "cvelasticnet",
+  "bayes",
+  "spregress",
 ]
 
 
@@ -75,6 +85,18 @@ _ESTIMATOR_SPECS: tuple[EstimatorAdapterSpec, ...] = (
   EstimatorAdapterSpec(
     command="elasticnet",
     primary_backend="python:sklearn.linear_model.ElasticNet",
+  ),
+  EstimatorAdapterSpec(
+    command="cvlasso",
+    primary_backend="python:sklearn.linear_model.LassoCV",
+  ),
+  EstimatorAdapterSpec(
+    command="cvridge",
+    primary_backend="python:sklearn.linear_model.RidgeCV",
+  ),
+  EstimatorAdapterSpec(
+    command="cvelasticnet",
+    primary_backend="python:sklearn.linear_model.ElasticNetCV",
   ),
   EstimatorAdapterSpec(
     command="bayes",
