@@ -32,6 +32,9 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
+  CvlassoCommand,
+  CvridgeCommand,
+  CvelasticnetCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -423,6 +426,65 @@ def test_parse_phase_19_lasso_command() -> None:
     predictors=("age",),
     include_intercept=False,
   )
+
+
+def test_parse_phase_19_cvlasso_command() -> None:
+  assert parse_command("cvlasso linear cost age bmi") == CvlassoCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+    cv=5,
+  )
+  assert parse_command("cvlasso linear cost age, cv(3)") == CvlassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    cv=3,
+  )
+  assert parse_command("cvlasso linear cost age, noconstant") == CvlassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    cv=5,
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_cvridge_command() -> None:
+  assert parse_command("cvridge linear cost age bmi") == CvridgeCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+    cv=5,
+  )
+  assert parse_command("cvridge linear cost age, cv(10)") == CvridgeCommand(
+    outcome="cost",
+    predictors=("age",),
+    cv=10,
+  )
+
+
+def test_parse_phase_19_cvelasticnet_command() -> None:
+  assert parse_command("cvelasticnet linear cost age bmi") == CvelasticnetCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+    cv=5,
+  )
+  assert parse_command("cvelasticnet linear cost age, l1_ratio(0.3)") == CvelasticnetCommand(
+    outcome="cost",
+    predictors=("age",),
+    cv=5,
+    l1_ratio=0.3,
+  )
+  assert parse_command(
+    "cvelasticnet linear cost age, l1_ratio(0.1 0.5 0.9)"
+  ) == CvelasticnetCommand(
+    outcome="cost",
+    predictors=("age",),
+    cv=5,
+    l1_ratio=(0.1, 0.5, 0.9),
+  )
+
+  from tabdat.parser import ParseError
+
+  with pytest.raises(ParseError, match="option l1_ratio expects at least one value"):
+    parse_command("cvelasticnet linear cost age, l1_ratio()")
 
 
 def test_parse_phase_19_ridge_command() -> None:

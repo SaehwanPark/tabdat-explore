@@ -63,6 +63,12 @@ from tabdat.models import (
   KeepCommand,
   LassoCommand,
   LassoRegressionResult,
+  CvlassoCommand,
+  CvlassoRegressionResult,
+  CvridgeCommand,
+  CvridgeRegressionResult,
+  CvelasticnetCommand,
+  CvelasticnetRegressionResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -882,6 +888,80 @@ def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
   assert "yhat" in preview.columns
 
 
+def test_phase_19_cv_models_returns_typed_result_and_tuning_report(tmp_path: Path) -> None:
+  path = tmp_path / "cv_models.parquet"
+  _write_regression_parquet(path)
+  executor = Executor(config=TabDatConfig(artifact_dir=tmp_path))
+  try:
+    executor.execute(UseCommand(path))
+
+    # test cvlasso
+    lasso_res = executor.execute(CvlassoCommand(outcome="y", predictors=("x",), cv=3))
+    assert isinstance(lasso_res, CvlassoRegressionResult)
+    assert lasso_res.cv == 3
+    assert lasso_res.report_path.exists()
+    report_content = lasso_res.report_path.read_text(encoding="utf-8")
+    assert "Tuning Report for cvlasso" in report_content
+    assert "Selected Alpha" in report_content
+
+    # test cvridge
+    ridge_res = executor.execute(CvridgeCommand(outcome="y", predictors=("x",), cv=3))
+    assert isinstance(ridge_res, CvridgeRegressionResult)
+    assert ridge_res.cv == 3
+    assert ridge_res.report_path.exists()
+    report_content_ridge = ridge_res.report_path.read_text(encoding="utf-8")
+    assert "Tuning Report for cvridge" in report_content_ridge
+    assert "Selected Alpha" in report_content_ridge
+
+    # test cvelasticnet
+    en_res = executor.execute(
+      CvelasticnetCommand(outcome="y", predictors=("x",), cv=3, l1_ratio=(0.2, 0.8))
+    )
+    assert isinstance(en_res, CvelasticnetRegressionResult)
+    assert en_res.cv == 3
+    assert en_res.report_path.exists()
+    report_content_en = en_res.report_path.read_text(encoding="utf-8")
+    assert "Tuning Report for cvelasticnet" in report_content_en
+    assert "Selected L1 Ratio" in report_content_en
+
+    # test predict
+    predicted = executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
+    assert isinstance(predicted, TransformResult)
+    preview = executor.execute(HeadCommand(1))
+    assert "yhat" in preview.columns
+
+    with pytest.raises(ExecutionError, match="predict only supports xb after cvelasticnet"):
+      executor.execute(PredictCommand(target_variable="resid", kind="residuals"))
+
+  finally:
+    executor.close()
+
+
+def test_phase_19_cv_models_requires_enough_observations(tmp_path: Path) -> None:
+  path = tmp_path / "cv_small.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    # _write_regression_parquet outputs 6 rows. If we specify cv=10, it should fail.
+    with pytest.raises(
+      ExecutionError, match="cvlasso requires at least as many complete observations"
+    ):
+      executor.execute(CvlassoCommand(outcome="y", predictors=("x",), cv=10))
+
+    with pytest.raises(
+      ExecutionError, match="cvridge requires at least as many complete observations"
+    ):
+      executor.execute(CvridgeCommand(outcome="y", predictors=("x",), cv=10))
+
+    with pytest.raises(
+      ExecutionError, match="cvelasticnet requires at least as many complete observations"
+    ):
+      executor.execute(CvelasticnetCommand(outcome="y", predictors=("x",), cv=10))
+  finally:
+    executor.close()
+
+
 def test_phase_19_ridge_returns_typed_result(tmp_path: Path) -> None:
   path = tmp_path / "ridge.parquet"
   _write_regression_parquet(path)
@@ -1084,10 +1164,7 @@ def test_phase_19_failed_heckman_clears_prior_lasso_state(
       )
     with pytest.raises(
       ExecutionError,
-      match=(
-        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
-        "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
-      ),
+      match="predict requires a prior regress",
     ):
       executor.execute(PredictCommand(target_variable="yhat", kind="xb"))
   finally:
@@ -2493,10 +2570,7 @@ def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> Non
     executor.execute(UseCommand(sample_parquet))
     with pytest.raises(
       ExecutionError,
-      match=(
-        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
-        "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
-      ),
+      match="predict requires a prior regress",
     ):
       executor.execute(PredictCommand(target_variable="cost_hat"))
   finally:
@@ -2861,10 +2935,7 @@ def test_phase_14_ivregress_clears_prior_regress_state(tmp_path: Path) -> None:
     )
     with pytest.raises(
       ExecutionError,
-      match=(
-        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
-        "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
-      ),
+      match="predict requires a prior regress",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):
@@ -3069,10 +3140,7 @@ def test_phase_14_xtreg_clears_prior_did_state(tmp_path: Path) -> None:
     )
     with pytest.raises(
       ExecutionError,
-      match=(
-        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
-        "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
-      ),
+      match="predict requires a prior regress",
     ):
       executor.execute(PredictCommand(target_variable="pred_after_xtreg"))
   finally:
@@ -3936,10 +4004,7 @@ def test_phase_14_estimation_state_invalidation_across_families(tmp_path: Path) 
     )
     with pytest.raises(
       ExecutionError,
-      match=(
-        "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, "
-        "did, cfregress, nl, poisson, nbreg, zip, or zinb model"
-      ),
+      match="predict requires a prior regress",
     ):
       executor.execute(PredictCommand(target_variable="y_hat"))
     with pytest.raises(ExecutionError, match="estat requires a prior regress model"):

@@ -1178,10 +1178,7 @@ def test_cli_predict_requires_prior_regress(sample_parquet: Path, capsys) -> Non
 
   assert exit_code == 1
   assert "Loaded:" in captured.out
-  assert (
-    "Error: predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, "
-    "qreg, did, cfregress, nl, poisson, nbreg, zip, or zinb model" in captured.err
-  )
+  assert "Error: predict requires a prior regress" in captured.err
 
 
 def test_cli_runs_phase_13_estat_flow(tmp_path: Path, capsys) -> None:

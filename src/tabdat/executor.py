@@ -14,7 +14,15 @@ from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
 from scipy.stats import chi2, norm
-from sklearn.linear_model import BayesianRidge, ElasticNet, Lasso, Ridge
+from sklearn.linear_model import (
+  BayesianRidge,
+  ElasticNet,
+  Lasso,
+  Ridge,
+  LassoCV,
+  RidgeCV,
+  ElasticNetCV,
+)
 from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
@@ -75,6 +83,12 @@ from tabdat.models import (
   KeepCommand,
   LassoCommand,
   LassoRegressionResult,
+  CvlassoCommand,
+  CvlassoRegressionResult,
+  CvridgeCommand,
+  CvridgeRegressionResult,
+  CvelasticnetCommand,
+  CvelasticnetRegressionResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -172,6 +186,33 @@ class _RidgeRegressionState:
 
 @dataclass(frozen=True)
 class _ElasticnetRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _CvlassoRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _CvridgeRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _CvelasticnetRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
   predictor_coefficients: tuple[float, ...]
@@ -374,6 +415,9 @@ class SessionState:
   lasso_regression: _LassoRegressionState | None = None
   ridge_regression: _RidgeRegressionState | None = None
   elasticnet_regression: _ElasticnetRegressionState | None = None
+  cvlasso_regression: _CvlassoRegressionState | None = None
+  cvridge_regression: _CvridgeRegressionState | None = None
+  cvelasticnet_regression: _CvelasticnetRegressionState | None = None
   bayes_regression: _BayesRegressionState | None = None
   heckman_regression: _HeckmanRegressionState | None = None
   qreg_regression: _QregRegressionState | None = None
@@ -402,6 +446,31 @@ class Executor:
     self.backend = backend or DuckDBBackend()
     self.state = SessionState(config=config or TabDatConfig())
 
+  def _clear_all_regression_states(self) -> None:
+    self.state.regression = None
+    self.state.lasso_regression = None
+    self.state.ridge_regression = None
+    self.state.elasticnet_regression = None
+    self.state.cvlasso_regression = None
+    self.state.cvridge_regression = None
+    self.state.cvelasticnet_regression = None
+    self.state.bayes_regression = None
+    self.state.spatial_regression = None
+    self.state.qreg_regression = None
+    self.state.binary_regression = None
+    self.state.nl_regression = None
+    self.state.poisson_regression = None
+    self.state.nbreg_regression = None
+    self.state.zip_regression = None
+    self.state.zinb_regression = None
+    self.state.streg_regression = None
+    self.state.iv_regression = None
+    self.state.cf_regression = None
+    self.state.xt_regressions = _XtModelCache()
+    self.state.did_regression = None
+    self.state.xtabond_regression = None
+    self.state.heckman_regression = None
+
   def close(self) -> None:
     self.backend.close()
 
@@ -413,6 +482,9 @@ class Executor:
         LassoCommand,
         RidgeCommand,
         ElasticnetCommand,
+        CvlassoCommand,
+        CvridgeCommand,
+        CvelasticnetCommand,
         BayesCommand,
         QregCommand,
         LogitCommand,
@@ -437,6 +509,9 @@ class Executor:
       self.state.lasso_regression = None
       self.state.ridge_regression = None
       self.state.elasticnet_regression = None
+      self.state.cvlasso_regression = None
+      self.state.cvridge_regression = None
+      self.state.cvelasticnet_regression = None
       self.state.bayes_regression = None
       self.state.heckman_regression = None
       self.state.spatial_regression = None
@@ -609,6 +684,15 @@ class Executor:
 
     if isinstance(command, ElasticnetCommand):
       return self._execute_elasticnet(command)
+
+    if isinstance(command, CvlassoCommand):
+      return self._execute_cvlasso(command)
+
+    if isinstance(command, CvridgeCommand):
+      return self._execute_cvridge(command)
+
+    if isinstance(command, CvelasticnetCommand):
+      return self._execute_cvelasticnet(command)
 
     if isinstance(command, BayesCommand):
       return self._execute_bayes(command)
@@ -866,6 +950,7 @@ class Executor:
     return TransformResult(message, dataset)
 
   def _execute_regress(self, command: RegressCommand) -> RegressionResult:
+    self._clear_all_regression_states()
     dataset = self._require_active_dataset("regress")
     numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
     if command.weight_variable is not None:
@@ -960,6 +1045,7 @@ class Executor:
     )
 
   def _execute_lasso(self, command: LassoCommand) -> LassoRegressionResult:
+    self._clear_all_regression_states()
     dataset = self._require_active_dataset("lasso")
     numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
     _require_numeric_columns("lasso", dataset, numeric_variables)
@@ -1028,6 +1114,7 @@ class Executor:
     )
 
   def _execute_ridge(self, command: RidgeCommand) -> RidgeRegressionResult:
+    self._clear_all_regression_states()
     dataset = self._require_active_dataset("ridge")
     numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
     _require_numeric_columns("ridge", dataset, numeric_variables)
@@ -1096,6 +1183,7 @@ class Executor:
     )
 
   def _execute_elasticnet(self, command: ElasticnetCommand) -> ElasticnetRegressionResult:
+    self._clear_all_regression_states()
     dataset = self._require_active_dataset("elasticnet")
     numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
     _require_numeric_columns("elasticnet", dataset, numeric_variables)
@@ -1163,6 +1251,367 @@ class Executor:
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
       coefficients=coefficients,
+    )
+
+  def _get_tuning_report_path(
+    self,
+    command_name: str,
+    outcome: str,
+    predictors: tuple[str, ...],
+  ) -> Path:
+    artifact_dir = self.state.config.artifact_dir
+    artifact_dir.mkdir(parents=True, exist_ok=True)
+    slug = "-".join((command_name, outcome, *predictors))
+    slug = "".join(c if c.isalnum() or c in "-_" else "_" for c in slug)
+    base_path = artifact_dir / f"tuning_report_{slug}.txt"
+    normalized = base_path.expanduser()
+    if not normalized.exists():
+      return normalized
+    stem = normalized.stem
+    suffix = normalized.suffix
+    parent = normalized.parent
+    index = 2
+    while True:
+      candidate = parent / f"{stem}-{index}{suffix}"
+      if not candidate.exists():
+        return candidate
+      index += 1
+
+  def _execute_cvlasso(self, command: CvlassoCommand) -> CvlassoRegressionResult:
+    self._clear_all_regression_states()
+    dataset = self._require_active_dataset("cvlasso")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("cvlasso", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("cvlasso requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvlasso requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+
+    alphas = [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+    mse_results = {}
+    for alpha in alphas:
+      n_samples = len(outcome_array)
+      indices = np.arange(n_samples)
+      rng = np.random.default_rng(42)
+      rng.shuffle(indices)
+      fold_sizes = np.full(command.cv, n_samples // command.cv, dtype=int)
+      fold_sizes[: n_samples % command.cv] += 1
+      current = 0
+      fold_mses = []
+      for fold_size in fold_sizes:
+        val_idx = indices[current : current + fold_size]
+        train_idx = np.concatenate((indices[:current], indices[current + fold_size :]))
+        current += fold_size
+        X_train, X_val = design[train_idx], design[val_idx]
+        y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+        model = Lasso(alpha=alpha, fit_intercept=command.include_intercept, max_iter=10_000)
+        try:
+          model.fit(X_train, y_train)
+          preds = model.predict(X_val)
+          fold_mses.append(float(np.mean((y_val - preds) ** 2)))
+        except Exception:
+          fold_mses.append(float("inf"))
+      mse_results[alpha] = float(np.mean(fold_mses))
+
+    best_alpha = min(alphas, key=lambda a: mse_results[a])
+
+    try:
+      fitted = Lasso(
+        alpha=best_alpha,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("cvlasso failed") from exc
+
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+
+    report_path = self._get_tuning_report_path("cvlasso", command.outcome, command.predictors)
+    with open(report_path, "w", encoding="utf-8") as f:
+      f.write("Tuning Report for cvlasso\n")
+      f.write("=========================\n")
+      f.write(f"Outcome: {command.outcome}\n")
+      f.write(f"Predictors: {' '.join(command.predictors)}\n")
+      f.write(f"CV Folds: {command.cv}\n")
+      f.write(f"Include Intercept: {command.include_intercept}\n")
+      f.write(f"Observations: {len(outcome)}\n\n")
+      f.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
+      f.write("Grid Search Results:\n")
+      f.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
+      f.write(f"{'-' * 40}\n")
+      for alpha in alphas:
+        sel_label = " (Selected)" if alpha == best_alpha else ""
+        f.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
+
+    self.state.cvlasso_regression = _CvlassoRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+
+    return CvlassoRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      selected_alpha=best_alpha,
+      cv=command.cv,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+      report_path=report_path,
+    )
+
+  def _execute_cvridge(self, command: CvridgeCommand) -> CvridgeRegressionResult:
+    self._clear_all_regression_states()
+    dataset = self._require_active_dataset("cvridge")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("cvridge", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("cvridge requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvridge requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+
+    alphas = [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+    mse_results = {}
+    for alpha in alphas:
+      n_samples = len(outcome_array)
+      indices = np.arange(n_samples)
+      rng = np.random.default_rng(42)
+      rng.shuffle(indices)
+      fold_sizes = np.full(command.cv, n_samples // command.cv, dtype=int)
+      fold_sizes[: n_samples % command.cv] += 1
+      current = 0
+      fold_mses = []
+      for fold_size in fold_sizes:
+        val_idx = indices[current : current + fold_size]
+        train_idx = np.concatenate((indices[:current], indices[current + fold_size :]))
+        current += fold_size
+        X_train, X_val = design[train_idx], design[val_idx]
+        y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+        model = Ridge(alpha=alpha, fit_intercept=command.include_intercept, max_iter=10_000)
+        try:
+          model.fit(X_train, y_train)
+          preds = model.predict(X_val)
+          fold_mses.append(float(np.mean((y_val - preds) ** 2)))
+        except Exception:
+          fold_mses.append(float("inf"))
+      mse_results[alpha] = float(np.mean(fold_mses))
+
+    best_alpha = min(alphas, key=lambda a: mse_results[a])
+
+    try:
+      fitted = Ridge(
+        alpha=best_alpha,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("cvridge failed") from exc
+
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+
+    report_path = self._get_tuning_report_path("cvridge", command.outcome, command.predictors)
+    with open(report_path, "w", encoding="utf-8") as f:
+      f.write("Tuning Report for cvridge\n")
+      f.write("=========================\n")
+      f.write(f"Outcome: {command.outcome}\n")
+      f.write(f"Predictors: {' '.join(command.predictors)}\n")
+      f.write(f"CV Folds: {command.cv}\n")
+      f.write(f"Include Intercept: {command.include_intercept}\n")
+      f.write(f"Observations: {len(outcome)}\n\n")
+      f.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
+      f.write("Grid Search Results:\n")
+      f.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
+      f.write(f"{'-' * 40}\n")
+      for alpha in alphas:
+        sel_label = " (Selected)" if alpha == best_alpha else ""
+        f.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
+
+    self.state.cvridge_regression = _CvridgeRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+
+    return CvridgeRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      selected_alpha=best_alpha,
+      cv=command.cv,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+      report_path=report_path,
+    )
+
+  def _execute_cvelasticnet(self, command: CvelasticnetCommand) -> CvelasticnetRegressionResult:
+    self._clear_all_regression_states()
+    dataset = self._require_active_dataset("cvelasticnet")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("cvelasticnet", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("cvelasticnet requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvelasticnet requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+
+    alphas = [0.0001, 0.001, 0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
+    l1_ratios = (
+      list(command.l1_ratio) if isinstance(command.l1_ratio, tuple) else [command.l1_ratio]
+    )
+
+    mse_results = {}
+    best_score = float("inf")
+    best_alpha = alphas[0]
+    best_l1 = l1_ratios[0]
+
+    for l1 in l1_ratios:
+      for alpha in alphas:
+        n_samples = len(outcome_array)
+        indices = np.arange(n_samples)
+        rng = np.random.default_rng(42)
+        rng.shuffle(indices)
+        fold_sizes = np.full(command.cv, n_samples // command.cv, dtype=int)
+        fold_sizes[: n_samples % command.cv] += 1
+        current = 0
+        fold_mses = []
+        for fold_size in fold_sizes:
+          val_idx = indices[current : current + fold_size]
+          train_idx = np.concatenate((indices[:current], indices[current + fold_size :]))
+          current += fold_size
+          X_train, X_val = design[train_idx], design[val_idx]
+          y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+          model = ElasticNet(
+            alpha=alpha, l1_ratio=l1, fit_intercept=command.include_intercept, max_iter=10_000
+          )
+          try:
+            model.fit(X_train, y_train)
+            preds = model.predict(X_val)
+            fold_mses.append(float(np.mean((y_val - preds) ** 2)))
+          except Exception:
+            fold_mses.append(float("inf"))
+
+        score = float(np.mean(fold_mses))
+        mse_results[(alpha, l1)] = score
+        if score < best_score:
+          best_score = score
+          best_alpha = alpha
+          best_l1 = l1
+
+    try:
+      fitted = ElasticNet(
+        alpha=best_alpha,
+        l1_ratio=best_l1,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("cvelasticnet failed") from exc
+
+    intercept = float(fitted.intercept_) if command.include_intercept else None
+    predictor_coefficients = tuple(float(value) for value in fitted.coef_)
+    coefficients = tuple(
+      CoefficientEstimate(name=name, value=value)
+      for name, value in zip(command.predictors, predictor_coefficients, strict=True)
+    )
+    if command.include_intercept and intercept is not None:
+      coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
+
+    report_path = self._get_tuning_report_path("cvelasticnet", command.outcome, command.predictors)
+    with open(report_path, "w", encoding="utf-8") as f:
+      f.write("Tuning Report for cvelasticnet\n")
+      f.write("==============================\n")
+      f.write(f"Outcome: {command.outcome}\n")
+      f.write(f"Predictors: {' '.join(command.predictors)}\n")
+      f.write(f"CV Folds: {command.cv}\n")
+      f.write(f"Include Intercept: {command.include_intercept}\n")
+      f.write(f"Observations: {len(outcome)}\n\n")
+      f.write(f"Selected Alpha: {best_alpha:.6f}\n")
+      f.write(f"Selected L1 Ratio: {best_l1:.6f}\n\n")
+      f.write("Grid Search Results:\n")
+      f.write(f"{'Alpha':<15}{'L1 Ratio':<15}{'Mean MSE (across folds)':<25}\n")
+      f.write(f"{'-' * 55}\n")
+      for l1 in l1_ratios:
+        for alpha in alphas:
+          sel_label = " (Selected)" if alpha == best_alpha and l1 == best_l1 else ""
+          f.write(f"{alpha:<15.6f}{l1:<15.6f}{mse_results[(alpha, l1)]:<25.6f}{sel_label}\n")
+
+    self.state.cvelasticnet_regression = _CvelasticnetRegressionState(
+      outcome_variable=command.outcome,
+      predictor_names=command.predictors,
+      predictor_coefficients=predictor_coefficients,
+      intercept=intercept,
+      include_intercept=command.include_intercept,
+    )
+
+    return CvelasticnetRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      selected_alpha=best_alpha,
+      selected_l1_ratio=best_l1,
+      cv=command.cv,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+      report_path=report_path,
     )
 
   def _execute_bayes(self, command: BayesCommand) -> BayesRegressionResult:
@@ -2304,15 +2753,24 @@ class Executor:
   def _execute_predict(self, command: PredictCommand) -> TransformResult:
     dataset = self._require_active_dataset("predict")
     lasso_regression = self.state.lasso_regression
+    cvlasso_regression = self.state.cvlasso_regression
     ridge_regression = self.state.ridge_regression
+    cvridge_regression = self.state.cvridge_regression
     elasticnet_regression = self.state.elasticnet_regression
+    cvelasticnet_regression = self.state.cvelasticnet_regression
     bayes_regression = self.state.bayes_regression
     if lasso_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after lasso")
+    if cvlasso_regression is not None and command.kind != "xb":
+      raise ExecutionError("predict only supports xb after cvlasso")
     if ridge_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after ridge")
+    if cvridge_regression is not None and command.kind != "xb":
+      raise ExecutionError("predict only supports xb after cvridge")
     if elasticnet_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after elasticnet")
+    if cvelasticnet_regression is not None and command.kind != "xb":
+      raise ExecutionError("predict only supports xb after cvelasticnet")
     if bayes_regression is not None and command.kind not in ("xb", "residuals"):
       raise ExecutionError("predict only supports xb and residuals after bayes")
     if command.kind == "pr":
@@ -2382,6 +2840,17 @@ class Executor:
         kind="xb",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if cvlasso_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=cvlasso_regression.predictor_names,
+        predictor_coefficients=cvlasso_regression.predictor_coefficients,
+        intercept=cvlasso_regression.intercept,
+        outcome_variable=cvlasso_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     if ridge_regression is not None:
       next_dataset = self.backend.add_linear_prediction_column(
         dataset,
@@ -2393,6 +2862,17 @@ class Executor:
         kind="xb",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if cvridge_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=cvridge_regression.predictor_names,
+        predictor_coefficients=cvridge_regression.predictor_coefficients,
+        intercept=cvridge_regression.intercept,
+        outcome_variable=cvridge_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     if elasticnet_regression is not None:
       next_dataset = self.backend.add_linear_prediction_column(
         dataset,
@@ -2401,6 +2881,17 @@ class Executor:
         predictor_coefficients=elasticnet_regression.predictor_coefficients,
         intercept=elasticnet_regression.intercept,
         outcome_variable=elasticnet_regression.outcome_variable,
+        kind="xb",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if cvelasticnet_regression is not None:
+      next_dataset = self.backend.add_linear_prediction_column(
+        dataset,
+        target_variable=command.target_variable,
+        predictor_names=cvelasticnet_regression.predictor_names,
+        predictor_coefficients=cvelasticnet_regression.predictor_coefficients,
+        intercept=cvelasticnet_regression.intercept,
+        outcome_variable=cvelasticnet_regression.outcome_variable,
         kind="xb",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
@@ -2744,7 +3235,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, lasso, ridge, elasticnet, bayes, spregress, qreg, did, "
+      "predict requires a prior regress, lasso, ridge, elasticnet, cvlasso, cvridge, cvelasticnet, bayes, spregress, qreg, did, "
       "cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 

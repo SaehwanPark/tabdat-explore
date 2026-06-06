@@ -17,6 +17,8 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the fifth Phase 19 modern-extensions slice: cross-validation wrappers `cvlasso`, `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select optimal hyperparameters using custom grid search on scikit-learn estimators, saving structured CV reports to the artifact directory.
+- Added prediction support (`predict <newvar>, xb`) after successful cvlasso, cvridge, and cvelasticnet models.
 - Added Phase 20 doubly robust DID to `SPEC.md` as the next planned implementation phase, covering
   outcome-regression, inverse-probability-weighted, and augmented doubly robust DID workflows.
 - Added the fourth Phase 19 modern-extensions slice with

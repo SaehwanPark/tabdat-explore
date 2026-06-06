@@ -16,6 +16,9 @@ from tabdat.models import (
   HeckmanRegressionResult,
   IvRegressionResult,
   LassoRegressionResult,
+  CvlassoRegressionResult,
+  CvridgeRegressionResult,
+  CvelasticnetRegressionResult,
   LoadResult,
   LogitRegressionResult,
   NbregRegressionResult,
@@ -196,6 +199,79 @@ def format_result(result: Result) -> str:
       "Estimator: elasticnet",
       f"Alpha: {_format_number(result.alpha)}",
       f"L1 Ratio: {_format_number(result.l1_ratio)}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, CvlassoRegressionResult):
+    header = [
+      f"Model: cvlasso linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: cvlasso",
+      f"Folds: {result.cv}",
+      f"Optimal Alpha: {_format_number(result.selected_alpha)}",
+      f"Tuning Report: {result.report_path}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, CvridgeRegressionResult):
+    header = [
+      f"Model: cvridge linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: cvridge",
+      f"Folds: {result.cv}",
+      f"Optimal Alpha: {_format_number(result.selected_alpha)}",
+      f"Tuning Report: {result.report_path}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, CvelasticnetRegressionResult):
+    header = [
+      f"Model: cvelasticnet linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: cvelasticnet",
+      f"Folds: {result.cv}",
+      f"Optimal Alpha: {_format_number(result.selected_alpha)}",
+      f"Optimal L1 Ratio: {_format_number(result.selected_l1_ratio)}",
+      f"Tuning Report: {result.report_path}",
       f"Observations: {result.observation_count}",
       f"R-squared: {_format_number(result.r_squared)}",
       "",
