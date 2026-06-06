@@ -334,6 +334,7 @@ class _DrDidRegressionState:
   mean_ps: float
   att: float
   se: float
+  # Reserved for future post-estimation predict/margins support; currently always None.
   fitted_model: object
 
 
@@ -4124,7 +4125,12 @@ class Executor:
         bootstrap=command.bootstrap,
         seed=command.seed,
       )
+    except ExecutionError:
+      # User-actionable errors (singular matrix, inconsistent treatment, etc.)
+      # must propagate immediately so the user sees the diagnostic message.
+      raise
     except Exception:
+      # Unexpected numerical/library failures fall back to the R implementation.
       try:
         fit = _fit_drdid_r_fallback(
           rows=rows,
@@ -4183,6 +4189,8 @@ class Executor:
       treatment_variable=command.treatment_variable,
       post_variable=command.post_variable,
       method=command.method,
+      # n is the number of units (wide-pivoted). Multiply by 2 for the total
+      # long-format row count (pre + post period per unit).
       observation_count=n * 2,
       coefficients=coefficients,
       lci=lci,
@@ -7199,6 +7207,8 @@ def _fit_drdid_python(
     if len(boot_atts) >= 2:
       boot_atts = np.array(boot_atts)
       iqr = np.percentile(boot_atts, 75) - np.percentile(boot_atts, 25)
+      # Use IQR-based (robust) SE estimate: IQR / 1.349 ≈ σ for Gaussian.
+      # More resistant to outlier bootstrap draws than std(boot_atts).
       se = float(iqr / 1.3489795003921634)
       abs_t = np.abs((boot_atts - att) / se) if se != 0.0 else np.zeros_like(boot_atts)
       cv = float(np.percentile(abs_t, 95))

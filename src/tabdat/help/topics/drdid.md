@@ -14,6 +14,7 @@ Examples:
 - `drdid wage exper tenure, treat(treated) post(post)`
 - `drdid wage exper tenure, treat(treated) post(post) method(ipw)`
 - `drdid wage exper, treat(treated) post(post) robust bootstrap(100) seed(42)`
+- `estat drdid`  (post-estimation diagnostics: method, cell counts, propensity score summary)
 
 Links:
 - `docs/microecometrics_topics.md`

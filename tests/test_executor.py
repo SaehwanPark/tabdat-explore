@@ -5545,10 +5545,11 @@ def test_phase_20_drdid_r_fallback_runs_when_python_fit_fails(
   path = tmp_path / "drdid.parquet"
   _write_did_parquet(path)
 
-  # Mock Python fit function to fail
+  # Mock Python fit function to fail with a non-ExecutionError (unexpected numerical failure).
+  # ExecutionError would propagate immediately (H1 fix); only non-ExecutionError triggers R-fallback.
   monkeypatch.setattr(
     "tabdat.executor._fit_drdid_python",
-    lambda **_: (_ for _ in ()).throw(ExecutionError("drdid failed")),
+    lambda **_: (_ for _ in ()).throw(RuntimeError("unexpected numerical failure")),
   )
 
   # Mock R fallback to return standard fit result fields
