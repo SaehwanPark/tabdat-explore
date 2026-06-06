@@ -406,6 +406,7 @@ and describe the active work with concise verification criteria.
   - post-estimation diagnostics: `estat drdid` prints treated/control cell counts, propensity score summaries, and overlap checks.
   - robust and bootstrap standard error estimation with explicit seed support.
   - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
+  - visible notes when otherwise eligible units are dropped because covariates have missing or non-finite values.
   - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
 
 ## Present

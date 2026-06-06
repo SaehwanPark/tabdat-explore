@@ -22,6 +22,7 @@ All notable project changes are tracked here.
   - post-estimation diagnostics: `estat drdid` prints treated/control cell counts, propensity score summaries, and overlap checks.
   - robust and bootstrap standard error estimation with explicit seed support.
   - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
+  - visible notes when otherwise eligible units are dropped because covariates have missing or non-finite values.
   - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
 - Added the fifth Phase 19 modern-extensions slice: cross-validation wrappers `cvlasso`, `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select optimal hyperparameters using custom grid search on scikit-learn estimators, saving structured CV reports to the artifact directory.
 - Added prediction support (`predict <newvar>, xb`) after successful cvlasso, cvridge, and cvelasticnet models.

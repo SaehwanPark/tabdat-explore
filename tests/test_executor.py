@@ -8,10 +8,12 @@ from decimal import Decimal
 from functools import partial
 from pathlib import Path
 from typing import Any, cast
+from unittest.mock import Mock
 
 import duckdb
 import polars as pl
 import pytest
+from scipy.stats import norm
 
 import tabdat.executor as executor_module
 from tabdat.backend import resolve_parquet_source
@@ -312,6 +314,25 @@ def _write_drdid_larger_parquet(path: Path) -> None:
         (18, 2020, 10.4, 1, 0, 1.1), (18, 2021, 13.1, 1, 1, 1.1),
         (19, 2020, 9.6, 1, 0, 0.8), (19, 2021, 12.1, 1, 1, 0.8),
         (20, 2020, 10.2, 1, 0, 1.2), (20, 2021, 12.8, 1, 1, 1.2)
+    ) as did_data(firm_id, year, wage, treated, post, exposure)
+    """,
+  )
+
+
+def _write_drdid_missing_covariate_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2020, 10.0, 0, 0, NULL), (1, 2021, 11.0, 0, 1, 1.0),
+        (2, 2020, 9.5, 0, 0, 0.9), (2, 2021, 10.8, 0, 1, 0.9),
+        (3, 2020, 10.1, 0, 0, 0.8), (3, 2021, 11.2, 0, 1, 0.8),
+        (4, 2020, 9.9, 0, 0, 1.1), (4, 2021, 10.5, 0, 1, 1.1),
+        (5, 2020, 10.2, 1, 0, 1.2), (5, 2021, 12.9, 1, 1, 1.2),
+        (6, 2020, 9.9, 1, 0, 1.0), (6, 2021, 12.7, 1, 1, 1.0),
+        (7, 2020, 10.2, 1, 0, 0.9), (7, 2021, 12.6, 1, 1, 0.9),
+        (8, 2020, 10.4, 1, 0, 1.1), (8, 2021, 13.1, 1, 1, 1.1)
     ) as did_data(firm_id, year, wage, treated, post, exposure)
     """,
   )
@@ -5420,6 +5441,10 @@ def test_phase_20_drdid_returns_typed_result(tmp_path: Path) -> None:
     )
     assert isinstance(result_or, DrDidRegressionResult)
     assert result_or.method == "or"
+    att = result_or.coefficients[0].value
+    se = result_or.coefficients[0].standard_error
+    assert result_or.uci - att == pytest.approx(float(norm.ppf(0.975)) * se)
+    assert att - result_or.lci == pytest.approx(float(norm.ppf(0.975)) * se)
 
     # Test IPW method
     result_ipw = executor.execute(
@@ -5442,6 +5467,37 @@ def test_phase_20_drdid_returns_typed_result(tmp_path: Path) -> None:
     assert "[95% Conf. Interval]" in formatted
   finally:
     executor.close()
+
+
+def test_phase_20_drdid_notes_units_dropped_for_missing_covariates(tmp_path: Path) -> None:
+  from tabdat.formatter import format_result
+
+  path = tmp_path / "drdid-missing-covariate.parquet"
+  _write_drdid_missing_covariate_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(PanelCommand(action="set", id_variable="firm_id", time_variable="year"))
+    result = executor.execute(
+      DrDidCommand(
+        outcome="wage",
+        covariates=("exposure",),
+        treatment_variable="treated",
+        post_variable="post",
+        method="or",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, DrDidRegressionResult)
+  assert result.observation_count == 14
+  assert result.notes == (
+    "Note: drdid dropped 1 unit(s) because covariates had missing or non-finite values.",
+  )
+  formatted = format_result(result)
+  assert "Observations: 14" in formatted
+  assert result.notes[0] in formatted
 
 
 def test_phase_20_drdid_requires_panel_metadata(tmp_path: Path) -> None:
@@ -5546,7 +5602,7 @@ def test_phase_20_drdid_r_fallback_runs_when_python_fit_fails(
   _write_did_parquet(path)
 
   # Mock Python fit function to fail with a non-ExecutionError (unexpected numerical failure).
-  # ExecutionError would propagate immediately (H1 fix); only non-ExecutionError triggers R-fallback.
+  # ExecutionError would propagate immediately; only non-ExecutionError triggers R-fallback.
   monkeypatch.setattr(
     "tabdat.executor._fit_drdid_python",
     lambda **_: (_ for _ in ()).throw(RuntimeError("unexpected numerical failure")),
@@ -5555,10 +5611,8 @@ def test_phase_20_drdid_r_fallback_runs_when_python_fit_fails(
   # Mock R fallback to return standard fit result fields
   # att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre
   mock_fit_result = (1.5, 0.2, 1.1, 1.9, np.array([0.5, 0.5]), 2, 2, 2, 2)
-  monkeypatch.setattr(
-    "tabdat.executor._fit_drdid_r_fallback",
-    lambda **_: mock_fit_result,
-  )
+  mock_r_fallback = Mock(return_value=mock_fit_result)
+  monkeypatch.setattr("tabdat.executor._fit_drdid_r_fallback", mock_r_fallback)
 
   executor = Executor()
   try:
@@ -5579,6 +5633,9 @@ def test_phase_20_drdid_r_fallback_runs_when_python_fit_fails(
   assert result.coefficients[0].value == 1.5
   assert result.lci == 1.1
   assert result.uci == 1.9
+  mock_r_fallback.assert_called_once()
+  assert mock_r_fallback.call_args.kwargs["method"] == "aipw"
+  assert mock_r_fallback.call_args.kwargs["covariate_names"] == ("exposure",)
 
 
 def test_phase_20_estat_drdid(tmp_path: Path) -> None:

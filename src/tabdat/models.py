@@ -1020,6 +1020,7 @@ class DrDidRegressionResult:
   coefficients: tuple[CoefficientEstimate, ...]
   lci: float
   uci: float
+  notes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

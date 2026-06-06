@@ -4113,7 +4113,10 @@ class Executor:
       raise ExecutionError(
         "drdid requires a balanced panel with pre- and post-treatment periods for each unit"
       )
-    y1, y0, D, X_covs = wide_sample
+    y1 = wide_sample.y1
+    y0 = wide_sample.y0
+    D = wide_sample.D
+    X_covs = wide_sample.X_covs
     n = len(D)
     try:
       fit = _fit_drdid_python(
@@ -4182,6 +4185,13 @@ class Executor:
       if command.bootstrap is not None
       else ("robust" if command.robust else "nonrobust")
     )
+    dropped_covariate_units = wide_sample.dropped_covariate_units
+    notes: tuple[str, ...] = ()
+    if dropped_covariate_units > 0:
+      notes = (
+        "Note: drdid dropped "
+        f"{dropped_covariate_units} unit(s) because covariates had missing or non-finite values.",
+      )
     return DrDidRegressionResult(
       covariance=covariance_label,
       outcome=command.outcome,
@@ -4195,6 +4205,7 @@ class Executor:
       coefficients=coefficients,
       lci=lci,
       uci=uci,
+      notes=notes,
     )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
@@ -7085,10 +7096,19 @@ def _touches_panel_metadata(metadata: PanelMetadata | None, variable: str) -> bo
   return variable in {metadata.id_variable, metadata.time_variable}
 
 
+@dataclass(frozen=True)
+class _DrDidWideSample:
+  y1: np.ndarray
+  y0: np.ndarray
+  D: np.ndarray
+  X_covs: np.ndarray
+  dropped_covariate_units: int
+
+
 def _drdid_wide_sample(
   rows: tuple[tuple[object, ...], ...],
   covariate_count: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+) -> _DrDidWideSample | None:
   from collections import defaultdict
 
   by_unit = defaultdict(list)
@@ -7102,6 +7122,7 @@ def _drdid_wide_sample(
   y0_list = []
   D_list = []
   X_list = []
+  dropped_covariate_units = 0
 
   for unit_rows in by_unit.values():
     treat_idx = 3 + covariate_count
@@ -7111,8 +7132,6 @@ def _drdid_wide_sample(
     post_1_row = None
     for r in unit_rows:
       if r[2] is None or r[treat_idx] is None or r[post_idx] is None:
-        continue
-      if any(v is None for v in r[3:treat_idx]):
         continue
 
       post_val = _coerce_float(r[post_idx])
@@ -7151,6 +7170,7 @@ def _drdid_wide_sample(
     for raw in post_0_row[3:treat_idx]:
       val = _coerce_float(raw)
       if val is None or not math.isfinite(val):
+        dropped_covariate_units += 1
         break
       covs.append(val)
     else:
@@ -7163,11 +7183,12 @@ def _drdid_wide_sample(
   if not y1_list:
     return None
 
-  return (
-    np.array(y1_list, dtype=float),
-    np.array(y0_list, dtype=float),
-    np.array(D_list, dtype=float),
-    np.array(X_list, dtype=float),
+  return _DrDidWideSample(
+    y1=np.array(y1_list, dtype=float),
+    y0=np.array(y0_list, dtype=float),
+    D=np.array(D_list, dtype=float),
+    X_covs=np.array(X_list, dtype=float),
+    dropped_covariate_units=dropped_covariate_units,
   )
 
 
@@ -7350,8 +7371,9 @@ def _drdid_point_and_se(
     inf_func = inf_treat - inf_control
 
   se = float(np.std(inf_func, ddof=0) / np.sqrt(n))
-  lci = att - 1.96 * se
-  uci = att + 1.96 * se
+  critical_value = float(norm.ppf(0.975))
+  lci = att - critical_value * se
+  uci = att + critical_value * se
   return att, se, lci, uci, ps_fit
 
 
@@ -7390,9 +7412,8 @@ def _fit_drdid_r_fallback(
     raise ExecutionError("drdid failed") from exc
 
   import pandas as pd
-  from rpy2.robjects import pandas2ri
-
-  pandas2ri.activate()
+  from rpy2.robjects import conversion, default_converter, numpy2ri, pandas2ri
+  from rpy2.robjects.conversion import localconverter
 
   col_names = (
     [panel_id_name, panel_time_name, outcome_name]
@@ -7400,7 +7421,8 @@ def _fit_drdid_r_fallback(
     + [treatment_name, post_name]
   )
   df = pd.DataFrame(rows, columns=col_names)
-  r_df = pandas2ri.py2rpy(df)
+  with localconverter(default_converter + pandas2ri.converter + numpy2ri.converter):
+    r_df = conversion.get_conversion().py2rpy(df)
   robjects.globalenv["r_df"] = r_df
 
   if covariate_names:

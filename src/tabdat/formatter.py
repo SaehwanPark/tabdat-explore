@@ -746,6 +746,9 @@ def format_result(result: Result) -> str:
       f"Observations: {result.observation_count}",
       "",
     ]
+    if result.notes:
+      header.extend(result.notes)
+      header.append("")
     coefficient_rows = (
       (
         estimate.name,
