@@ -14,8 +14,12 @@ from tabdat.models import (
   CollapseCommand,
   CommandOption,
   CountCommand,
+  CvelasticnetCommand,
+  CvlassoCommand,
+  CvridgeCommand,
   DescribeCommand,
   DidCommand,
+  DrDidCommand,
   DropCommand,
   ElasticnetCommand,
   EstatCommand,
@@ -32,9 +36,6 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
-  CvlassoCommand,
-  CvridgeCommand,
-  CvelasticnetCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -830,6 +831,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat margins") == EstatCommand(subcommand="margins")
   assert parse_command("estat gof") == EstatCommand(subcommand="gof")
   assert parse_command("estat did") == EstatCommand(subcommand="did")
+  assert parse_command("estat drdid") == EstatCommand(subcommand="drdid")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -973,6 +975,28 @@ def test_parse_phase_14_cfregress_command() -> None:
     instruments=("distance",),
     cluster_variable="group_id",
     include_intercept=False,
+  )
+
+
+def test_parse_phase_20_drdid_command() -> None:
+  assert parse_command("drdid wage exper tenure, treat(treated) post(post)") == DrDidCommand(
+    outcome="wage",
+    covariates=("exper", "tenure"),
+    treatment_variable="treated",
+    post_variable="post",
+    method="aipw",
+  )
+  assert parse_command(
+    "drdid wage, treat(treated) post(post) method(or) robust bootstrap(100) seed(42)"
+  ) == DrDidCommand(
+    outcome="wage",
+    covariates=(),
+    treatment_variable="treated",
+    post_variable="post",
+    method="or",
+    robust=True,
+    bootstrap=100,
+    seed=42,
   )
 
 
@@ -1397,6 +1421,17 @@ def test_parse_exit_aliases() -> None:
     "did y x, treat(t) post(p q)",
     "did y x, robust",
     "did y x, treat(t) post(p) cluster(g)",
+    "drdid",
+    "drdid y",
+    "drdid y x",
+    "drdid y x, treat(t) post(p) robust=true",
+    "drdid y x, treat() post(p)",
+    "drdid y x, treat(t p) post(p)",
+    "drdid y x, treat(t) post()",
+    "drdid y x, treat(t) post(p q)",
+    "drdid y x, robust",
+    "drdid y x, treat(t) post(p) method(invalid)",
+    "drdid y x, treat(t) post(p) seed(123)",
     "save",
     "save out.parquet, force",
     "save out.parquet, replace=true",

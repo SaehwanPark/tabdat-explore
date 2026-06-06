@@ -401,6 +401,12 @@ and describe the active work with concise verification criteria.
   - save structured CV reports in the active `artifact_dir` without filename collisions
   - support prediction (`predict <newvar>, xb`) after cross-validation estimation
   - focused parser, executor/backend, CLI, shell, help, and extension-registry coverage
+- Implemented Phase 20 doubly robust DID:
+  - `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]` command with Python-first outcome regression (OR), inverse probability weighting (IPW), and augmented doubly robust (AIPW) ATT estimators.
+  - post-estimation diagnostics: `estat drdid` prints treated/control cell counts, propensity score summaries, and overlap checks.
+  - robust and bootstrap standard error estimation with explicit seed support.
+  - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
+  - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
 
 ## Present
 
@@ -418,36 +424,6 @@ and describe the active work with concise verification criteria.
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
     Phase 12 estimation result contract
-- Phase 20 doubly robust DID:
-  - extend the existing two-way fixed-effects `did` starter with a separate causal DID command for
-    doubly robust treatment-effect workflows
-  - planned command surface:
-    - `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust
-      bootstrap(<n>) seed(<n>)]`
-  - remaining meaningful slices in this phase:
-    - Outcome-regression DID: implement `method(or)` for a bounded two-period, two-group ATT
-      workflow that models untreated potential outcomes from covariates.
-    - Inverse-probability-weighted DID: implement `method(ipw)` with propensity-score estimation,
-      overlap diagnostics, and deterministic weight summaries.
-    - Augmented doubly robust DID: implement `method(aipw)` as the default combined estimator using
-      both outcome-regression and propensity-score nuisance models.
-    - Post-estimation diagnostics: add `estat drdid` for treatment/post cell counts, nuisance-model
-      summaries, overlap checks, and estimator-specific ATT diagnostics.
-    - Prediction and reproducibility: preserve deterministic output, explicit bootstrap seeding,
-      and strict parser/executor guards for unsupported DID designs.
-  - initial scope:
-    - binary treatment and binary post indicators
-    - two-period, two-group ATT designs over the current active dataset
-    - complete-case numeric covariate handling with deterministic validation errors
-    - no staggered adoption, multi-valued treatment, continuous treatment, repeated-cross-section
-      variants, or ML nuisance estimation in the first slices
-  - library strategy:
-    - approach (1): use mature Python support only if it can satisfy the bounded command contract
-      without bespoke estimator orchestration
-    - approach (2): use a focused `rpy2` adapter to mature R DID packages such as `DRDID` and `did`
-      where Python coverage is insufficient
-    - approach (3): add a narrow `numpy`/`scipy` implementation only after the command contract,
-      validation rules, and output tables are fixed by tests
 - Phase 19 modern extensions:
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions

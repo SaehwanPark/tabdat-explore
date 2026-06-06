@@ -19,9 +19,6 @@ from sklearn.linear_model import (
   ElasticNet,
   Lasso,
   Ridge,
-  LassoCV,
-  RidgeCV,
-  ElasticNetCV,
 )
 from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
@@ -57,11 +54,19 @@ from tabdat.models import (
   Command,
   CountCommand,
   CountResult,
+  CvelasticnetCommand,
+  CvelasticnetRegressionResult,
+  CvlassoCommand,
+  CvlassoRegressionResult,
+  CvridgeCommand,
+  CvridgeRegressionResult,
   DatasetInfo,
   DescribeCommand,
   DescribeResult,
   DidCommand,
   DidRegressionResult,
+  DrDidCommand,
+  DrDidRegressionResult,
   DropCommand,
   ElasticnetCommand,
   ElasticnetRegressionResult,
@@ -83,12 +88,6 @@ from tabdat.models import (
   KeepCommand,
   LassoCommand,
   LassoRegressionResult,
-  CvlassoCommand,
-  CvlassoRegressionResult,
-  CvridgeCommand,
-  CvridgeRegressionResult,
-  CvelasticnetCommand,
-  CvelasticnetRegressionResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -320,6 +319,25 @@ class _DidRegressionState:
 
 
 @dataclass(frozen=True)
+class _DrDidRegressionState:
+  outcome_variable: str
+  covariates: tuple[str, ...]
+  treatment_variable: str
+  post_variable: str
+  method: str
+  count_treated_post: int
+  count_treated_pre: int
+  count_untreated_post: int
+  count_untreated_pre: int
+  min_ps: float
+  max_ps: float
+  mean_ps: float
+  att: float
+  se: float
+  fitted_model: object
+
+
+@dataclass(frozen=True)
 class _BinaryRegressionState:
   family: Literal["logit", "probit"]
   outcome_variable: str
@@ -432,6 +450,7 @@ class SessionState:
   cf_regression: _CfRegressionState | None = None
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
   did_regression: _DidRegressionState | None = None
+  drdid_regression: _DrDidRegressionState | None = None
   xtabond_regression: _XtAbondRegressionState | None = None
   spatial_regression: _SpatialRegressionState | None = None
 
@@ -468,6 +487,7 @@ class Executor:
     self.state.cf_regression = None
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
+    self.state.drdid_regression = None
     self.state.xtabond_regression = None
     self.state.heckman_regression = None
 
@@ -501,6 +521,7 @@ class Executor:
         CfRegressCommand,
         XtRegCommand,
         DidCommand,
+        DrDidCommand,
         XtAbondCommand,
         XtLogitCommand,
         SpregressCommand,
@@ -756,6 +777,9 @@ class Executor:
 
     if isinstance(command, DidCommand):
       return self._execute_did(command)
+
+    if isinstance(command, DrDidCommand):
+      return self._execute_drdid(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -3235,7 +3259,8 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
-      "predict requires a prior regress, lasso, ridge, elasticnet, cvlasso, cvridge, cvelasticnet, bayes, spregress, qreg, did, "
+      "predict requires a prior regress, lasso, ridge, elasticnet, cvlasso, "
+      "cvridge, cvelasticnet, bayes, spregress, qreg, did, "
       "cfregress, nl, poisson, nbreg, zip, or zinb model"
     )
 
@@ -3586,6 +3611,11 @@ class Executor:
       if did_regression is None:
         raise ExecutionError("estat did requires a prior did model")
       return _estat_did_table(did_regression)
+    if command.subcommand == "drdid":
+      drdid_regression = self.state.drdid_regression
+      if drdid_regression is None:
+        raise ExecutionError("estat drdid requires a prior drdid model")
+      return _estat_drdid_table(drdid_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -4052,6 +4082,111 @@ class Executor:
       post_variable=command.post_variable,
       observation_count=len(outcomes),
       coefficients=coefficients,
+    )
+
+  def _execute_drdid(self, command: DrDidCommand) -> DrDidRegressionResult:
+    dataset = self._require_active_dataset("drdid")
+    panel_metadata = dataset.panel_metadata
+    if panel_metadata is None:
+      raise ExecutionError("drdid requires panel metadata; run panel <id_var> <time_var> first")
+    variables: tuple[str, ...] = (
+      panel_metadata.id_variable,
+      panel_metadata.time_variable,
+      command.outcome,
+      *command.covariates,
+      command.treatment_variable,
+      command.post_variable,
+    )
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    missing = tuple(variable for variable in variables if variable not in column_types)
+    if missing:
+      raise UnknownVariableError(f"drdid unknown variable: {', '.join(missing)}")
+    _require_numeric_columns(
+      "drdid",
+      dataset,
+      (command.outcome, *command.covariates, command.treatment_variable, command.post_variable),
+    )
+    rows = self.backend.regression_rows(dataset, variables)
+    wide_sample = _drdid_wide_sample(rows, len(command.covariates))
+    if wide_sample is None:
+      raise ExecutionError(
+        "drdid requires a balanced panel with pre- and post-treatment periods for each unit"
+      )
+    y1, y0, D, X_covs = wide_sample
+    n = len(D)
+    try:
+      fit = _fit_drdid_python(
+        y1=y1,
+        y0=y0,
+        D=D,
+        X_covs=X_covs,
+        method=command.method,
+        bootstrap=command.bootstrap,
+        seed=command.seed,
+      )
+    except Exception:
+      try:
+        fit = _fit_drdid_r_fallback(
+          rows=rows,
+          covariate_count=len(command.covariates),
+          panel_id_name=panel_metadata.id_variable,
+          panel_time_name=panel_metadata.time_variable,
+          outcome_name=command.outcome,
+          covariate_names=command.covariates,
+          treatment_name=command.treatment_variable,
+          post_name=command.post_variable,
+          method=command.method,
+          bootstrap=command.bootstrap,
+          seed=command.seed,
+        )
+      except Exception as r_exc:
+        raise ExecutionError("drdid failed") from r_exc
+    att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre = fit
+    t_statistic = att / se if se != 0.0 else 0.0
+    p_value = float(norm.sf(abs(t_statistic)) * 2)
+    coefficients = (
+      CoefficientEstimate(
+        name="ATT",
+        value=att,
+        standard_error=se,
+        statistic=t_statistic,
+        p_value=p_value,
+      ),
+    )
+    self._clear_all_regression_states()
+    self.state.drdid_regression = _DrDidRegressionState(
+      outcome_variable=command.outcome,
+      covariates=command.covariates,
+      treatment_variable=command.treatment_variable,
+      post_variable=command.post_variable,
+      method=command.method,
+      count_treated_post=count_tp,
+      count_treated_pre=count_tpre,
+      count_untreated_post=count_up,
+      count_untreated_pre=count_upre,
+      min_ps=float(np.min(ps_fit)) if len(ps_fit) > 0 else 0.0,
+      max_ps=float(np.max(ps_fit)) if len(ps_fit) > 0 else 0.0,
+      mean_ps=float(np.mean(ps_fit)) if len(ps_fit) > 0 else 0.0,
+      att=att,
+      se=se,
+      fitted_model=None,
+    )
+    covariance_label = (
+      "bootstrap"
+      if command.bootstrap is not None
+      else ("robust" if command.robust else "nonrobust")
+    )
+    return DrDidRegressionResult(
+      covariance=covariance_label,
+      outcome=command.outcome,
+      covariates=command.covariates,
+      treatment_variable=command.treatment_variable,
+      post_variable=command.post_variable,
+      method=command.method,
+      observation_count=n * 2,
+      coefficients=coefficients,
+      lci=lci,
+      uci=uci,
     )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
@@ -6940,3 +7075,398 @@ def _touches_panel_metadata(metadata: PanelMetadata | None, variable: str) -> bo
   if metadata is None:
     return False
   return variable in {metadata.id_variable, metadata.time_variable}
+
+
+def _drdid_wide_sample(
+  rows: tuple[tuple[object, ...], ...],
+  covariate_count: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray] | None:
+  from collections import defaultdict
+
+  by_unit = defaultdict(list)
+  for row in rows:
+    unit_id = row[0]
+    if unit_id is None:
+      continue
+    by_unit[unit_id].append(row)
+
+  y1_list = []
+  y0_list = []
+  D_list = []
+  X_list = []
+
+  for unit_rows in by_unit.values():
+    treat_idx = 3 + covariate_count
+    post_idx = treat_idx + 1
+
+    post_0_row = None
+    post_1_row = None
+    for r in unit_rows:
+      if r[2] is None or r[treat_idx] is None or r[post_idx] is None:
+        continue
+      if any(v is None for v in r[3:treat_idx]):
+        continue
+
+      post_val = _coerce_float(r[post_idx])
+      if post_val == 0.0:
+        if post_0_row is not None:
+          post_0_row = "duplicate"
+        else:
+          post_0_row = r
+      elif post_val == 1.0:
+        if post_1_row is not None:
+          post_1_row = "duplicate"
+        else:
+          post_1_row = r
+
+    if (
+      post_0_row is None
+      or post_0_row == "duplicate"
+      or post_1_row is None
+      or post_1_row == "duplicate"
+    ):
+      continue
+
+    y1_val = _coerce_float(post_1_row[2])
+    y0_val = _coerce_float(post_0_row[2])
+    d_val = _coerce_float(post_1_row[treat_idx])
+    d_val_0 = _coerce_float(post_0_row[treat_idx])
+
+    if d_val not in {0.0, 1.0} or d_val_0 not in {0.0, 1.0}:
+      raise ExecutionError("drdid treatment and post variables must be binary with values 0 and 1")
+    if d_val != d_val_0:
+      raise ExecutionError(
+        "drdid treatment variable must be consistent for each unit across periods"
+      )
+
+    covs = []
+    for raw in post_0_row[3:treat_idx]:
+      val = _coerce_float(raw)
+      if val is None or not math.isfinite(val):
+        break
+      covs.append(val)
+    else:
+      if len(covs) == covariate_count:
+        y1_list.append(y1_val)
+        y0_list.append(y0_val)
+        D_list.append(d_val)
+        X_list.append(covs)
+
+  if not y1_list:
+    return None
+
+  return (
+    np.array(y1_list, dtype=float),
+    np.array(y0_list, dtype=float),
+    np.array(D_list, dtype=float),
+    np.array(X_list, dtype=float),
+  )
+
+
+def _fit_drdid_python(
+  y1: np.ndarray,
+  y0: np.ndarray,
+  D: np.ndarray,
+  X_covs: np.ndarray,
+  method: str,
+  bootstrap: int | None,
+  seed: int | None,
+) -> tuple[float, float, float, float, np.ndarray, int, int, int, int]:
+  n = len(D)
+  count_tp = int(np.sum(D == 1))
+  count_tpre = count_tp
+  count_up = int(np.sum(D == 0))
+  count_upre = count_up
+
+  X = np.column_stack([np.ones(n), X_covs])
+  weights = np.ones(n)
+
+  att, se, lci, uci, ps_fit = _drdid_point_and_se(y1, y0, D, X, weights, method)
+
+  if bootstrap is not None:
+    rng = np.random.default_rng(seed)
+    boot_atts = []
+    for _ in range(bootstrap):
+      idx = rng.choice(n, size=n, replace=True)
+      try:
+        b_att, _, _, _, _ = _drdid_point_and_se(
+          y1[idx], y0[idx], D[idx], X[idx], weights[idx], method
+        )
+        if not math.isnan(b_att):
+          boot_atts.append(b_att)
+      except Exception:
+        continue
+    if len(boot_atts) >= 2:
+      boot_atts = np.array(boot_atts)
+      iqr = np.percentile(boot_atts, 75) - np.percentile(boot_atts, 25)
+      se = float(iqr / 1.3489795003921634)
+      abs_t = np.abs((boot_atts - att) / se) if se != 0.0 else np.zeros_like(boot_atts)
+      cv = float(np.percentile(abs_t, 95))
+      lci = float(att - cv * se)
+      uci = float(att + cv * se)
+
+  return att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre
+
+
+def _drdid_point_and_se(
+  y1: np.ndarray,
+  y0: np.ndarray,
+  D: np.ndarray,
+  X: np.ndarray,
+  weights: np.ndarray,
+  method: str,
+) -> tuple[float, float, float, float, np.ndarray]:
+  n = len(D)
+  delta_y = y1 - y0
+
+  ps_fit = np.zeros(n)
+  trim_ps = np.ones(n, dtype=bool)
+
+  inf_func = np.zeros(n)
+  att = 0.0
+
+  if method in {"ipw", "aipw"}:
+    try:
+      glm = sm.GLM(D, X, family=sm.families.Binomial())
+      fit_res = glm.fit()
+      ps_fit = fit_res.predict(X)
+    except Exception as exc:
+      raise ExecutionError("drdid propensity score estimation failed") from exc
+    ps_fit = np.clip(ps_fit, 0, 1 - 1e-6)
+    trim_ps = ps_fit < 1.01
+    trim_ps[D == 0] = ps_fit[D == 0] < 0.995
+
+  out_delta = np.zeros(n)
+  if method in {"or", "aipw"}:
+    X_ctrl = X[D == 0]
+    y_ctrl = delta_y[D == 0]
+    w_ctrl = weights[D == 0]
+    try:
+      ols = sm.WLS(y_ctrl, X_ctrl, weights=cast(Any, w_ctrl))
+      ols_res = ols.fit()
+      reg_coeff = ols_res.params
+      out_delta = X @ reg_coeff
+    except Exception as exc:
+      raise ExecutionError("drdid outcome regression failed") from exc
+
+  if method == "or":
+    w_treat = weights * D
+    eta_treat = np.mean(w_treat * delta_y) / np.mean(w_treat)
+    eta_cont = np.mean(w_treat * out_delta) / np.mean(w_treat)
+    att = float(eta_treat - eta_cont)
+
+    weights_ols = weights * (1 - D)
+    wols_x = weights_ols[:, None] * X
+    wols_eX = (weights_ols * (delta_y - out_delta))[:, None] * X
+    XpX = (wols_x.T @ X) / n
+    if np.linalg.cond(XpX) > 1e15:
+      raise ExecutionError(
+        "The regression design matrix is singular. Consider removing some covariates."
+      )
+    XpX_inv = np.linalg.inv(XpX)
+    asy_lin_rep_ols = wols_eX @ XpX_inv
+
+    inf_treat = (w_treat * delta_y - w_treat * eta_treat) / np.mean(w_treat)
+    inf_cont_1 = w_treat * out_delta - w_treat * eta_cont
+    M1 = np.mean(w_treat[:, None] * X, axis=0)
+    inf_cont_2 = asy_lin_rep_ols @ M1
+    inf_control = (inf_cont_1 + inf_cont_2) / np.mean(w_treat)
+    inf_func = inf_treat - inf_control
+
+  elif method == "ipw":
+    w_treat = trim_ps * weights * D
+    w_cont = trim_ps * weights * ps_fit * (1 - D) / (1 - ps_fit)
+    att_treat = w_treat * delta_y
+    att_cont = w_cont * delta_y
+    eta_treat = np.mean(att_treat) / np.mean(weights * D)
+    eta_cont = np.mean(att_cont) / np.mean(weights * D)
+    att = float(eta_treat - eta_cont)
+
+    score_ps = weights[:, None] * (D - ps_fit)[:, None] * X
+    W = ps_fit * (1 - ps_fit) * weights
+    XpWX = (X.T @ (W[:, None] * X)) / n
+    if np.linalg.cond(XpWX) > 1e15:
+      raise ExecutionError(
+        "The propensity score design matrix is singular. Consider removing some covariates."
+      )
+    Hessian_ps = np.linalg.inv(XpWX)
+    asy_lin_rep_ps = score_ps @ Hessian_ps
+
+    att_lin1 = att_treat - att_cont
+    mom_logit = np.mean(att_cont[:, None] * X, axis=0)
+    att_lin2 = asy_lin_rep_ps @ mom_logit
+    inf_func = (att_lin1 - att_lin2 - weights * D * att) / np.mean(weights * D)
+
+  elif method == "aipw":
+    w_treat = trim_ps * weights * D
+    w_cont = trim_ps * weights * ps_fit * (1 - D) / (1 - ps_fit)
+    dr_att_treat = w_treat * (delta_y - out_delta)
+    dr_att_cont = w_cont * (delta_y - out_delta)
+    eta_treat = np.mean(dr_att_treat) / np.mean(w_treat)
+    eta_cont = np.mean(dr_att_cont) / np.mean(w_cont)
+    att = float(eta_treat - eta_cont)
+
+    weights_ols = weights * (1 - D)
+    XpX = (X.T @ (weights_ols[:, None] * X)) / n
+    if np.linalg.cond(XpX) > 1e15:
+      raise ExecutionError(
+        "The regression design matrix is singular. Consider removing some covariates."
+      )
+    XpX_inv = np.linalg.inv(XpX)
+    asy_lin_rep_wols = ((weights_ols * (delta_y - out_delta))[:, None] * X) @ XpX_inv
+
+    score_ps = weights[:, None] * (D - ps_fit)[:, None] * X
+    W = ps_fit * (1 - ps_fit) * weights
+    XpWX = (X.T @ (W[:, None] * X)) / n
+    if np.linalg.cond(XpWX) > 1e15:
+      raise ExecutionError(
+        "The propensity score design matrix is singular. Consider removing some covariates."
+      )
+    Hessian_ps = np.linalg.inv(XpWX)
+    asy_lin_rep_ps = score_ps @ Hessian_ps
+
+    inf_treat_1 = dr_att_treat - w_treat * eta_treat
+    M1 = np.mean(w_treat[:, None] * X, axis=0)
+    inf_treat_2 = asy_lin_rep_wols @ M1
+    inf_treat = (inf_treat_1 - inf_treat_2) / np.mean(w_treat)
+
+    inf_cont_1 = dr_att_cont - w_cont * eta_cont
+    M2 = np.mean((w_cont * (delta_y - out_delta - eta_cont))[:, None] * X, axis=0)
+    inf_cont_2 = asy_lin_rep_ps @ M2
+    M3 = np.mean(w_cont[:, None] * X, axis=0)
+    inf_cont_3 = asy_lin_rep_wols @ M3
+    inf_control = (inf_cont_1 + inf_cont_2 - inf_cont_3) / np.mean(w_cont)
+
+    inf_func = inf_treat - inf_control
+
+  se = float(np.std(inf_func, ddof=0) / np.sqrt(n))
+  lci = att - 1.96 * se
+  uci = att + 1.96 * se
+  return att, se, lci, uci, ps_fit
+
+
+def _fit_drdid_r_fallback(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+  covariate_count: int,
+  panel_id_name: str,
+  panel_time_name: str,
+  outcome_name: str,
+  covariate_names: tuple[str, ...],
+  treatment_name: str,
+  post_name: str,
+  method: str,
+  bootstrap: int | None,
+  seed: int | None,
+) -> tuple[float, float, float, float, np.ndarray, int, int, int, int]:
+  try:
+    from rpy2 import robjects
+    from rpy2.robjects import packages
+    from rpy2.robjects.vectors import StrVector
+  except Exception as exc:
+    raise ExecutionError("drdid failed") from exc
+
+  try:
+    user_library = Path.home() / "R/library"
+    if user_library.exists():
+      libpaths_fn = cast(Any, robjects.r[".libPaths"])
+      current_paths = tuple(str(path) for path in libpaths_fn())
+      libpaths_fn(StrVector((str(user_library), *current_paths)))
+    require_namespace = cast(Any, robjects.r["requireNamespace"])
+    if not bool(require_namespace("DRDID", quietly=True)[0]):
+      raise ExecutionError("drdid failed")
+    packages.importr("DRDID")
+  except Exception as exc:
+    raise ExecutionError("drdid failed") from exc
+
+  import pandas as pd
+  from rpy2.robjects import pandas2ri
+
+  pandas2ri.activate()
+
+  col_names = (
+    [panel_id_name, panel_time_name, outcome_name]
+    + list(covariate_names)
+    + [treatment_name, post_name]
+  )
+  df = pd.DataFrame(rows, columns=col_names)
+  r_df = pandas2ri.py2rpy(df)
+  robjects.globalenv["r_df"] = r_df
+
+  if covariate_names:
+    formula_str = " ~ " + " + ".join(covariate_names)
+  else:
+    formula_str = "NULL"
+
+  boot_str = "TRUE" if bootstrap is not None else "FALSE"
+  nboot_str = str(bootstrap) if bootstrap is not None else "NULL"
+
+  if method == "or":
+    r_func_name = "ordid"
+    method_opt = ""
+  elif method == "ipw":
+    r_func_name = "ipwdid"
+    method_opt = ""
+  else:
+    r_func_name = "drdid"
+    method_opt = ", estMethod='trad'"
+
+  r_code = (
+    f"DRDID::{r_func_name}(yname='{outcome_name}', tname='{post_name}', "
+    f"idname='{panel_id_name}', dname='{treatment_name}', "
+    f"xformla={formula_str if formula_str == 'NULL' else f'as.formula("{formula_str}")'}, "
+    f"data=r_df, panel=TRUE{method_opt}, boot={boot_str}, nboot={nboot_str})"
+  )
+
+  if seed is not None:
+    robjects.r(f"set.seed({seed})")
+
+  try:
+    r_result = cast(Any, robjects.r(r_code))
+  except Exception as exc:
+    raise ExecutionError("drdid failed") from exc
+
+  att = float(r_result.rx2("ATT")[0])
+  se = float(r_result.rx2("se")[0])
+  lci = float(r_result.rx2("lci")[0])
+  uci = float(r_result.rx2("uci")[0])
+  ps_fit = np.array([])
+
+  count_tp = len(df[(df[treatment_name] == 1) & (df[post_name] == 1)])
+  count_tpre = len(df[(df[treatment_name] == 1) & (df[post_name] == 0)])
+  count_up = len(df[(df[treatment_name] == 0) & (df[post_name] == 1)])
+  count_upre = len(df[(df[treatment_name] == 0) & (df[post_name] == 0)])
+
+  return att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre
+
+
+def _estat_drdid_table(drdid_regression: _DrDidRegressionState) -> TableResult:
+  headers = ("Diagnostic Metric", "Value")
+  rows = [
+    ("Estimation Method", drdid_regression.method.upper()),
+    (
+      "Treated Units (Pre/Post)",
+      f"{drdid_regression.count_treated_pre} / {drdid_regression.count_treated_post}",
+    ),
+    (
+      "Untreated Units (Pre/Post)",
+      f"{drdid_regression.count_untreated_pre} / {drdid_regression.count_untreated_post}",
+    ),
+  ]
+
+  if drdid_regression.method in {"ipw", "aipw"}:
+    rows.extend(
+      [
+        ("Propensity Score Min", f"{drdid_regression.min_ps:.6f}"),
+        ("Propensity Score Max", f"{drdid_regression.max_ps:.6f}"),
+        ("Propensity Score Mean", f"{drdid_regression.mean_ps:.6f}"),
+      ]
+    )
+    overlap_ok = (
+      "Yes"
+      if (drdid_regression.min_ps > 1e-4 and drdid_regression.max_ps < 1 - 1e-4)
+      else "Warning (Extreme PS detected)"
+    )
+    rows.append(("Common Support / Overlap Check Passed", overlap_ok))
+
+  return TableResult(headers=headers, rows=tuple(rows))
