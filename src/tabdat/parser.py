@@ -1056,6 +1056,8 @@ def _elasticnet_cv_l1_ratio(
     raise ParseError(f"{command_name} option l1_ratio may only be supplied once")
   val = matched[0].value
   if isinstance(val, tuple):
+    if not val:
+      raise ParseError(f"{command_name} option l1_ratio cannot be empty")
     parsed: list[float] = []
     for item in val:
       try:

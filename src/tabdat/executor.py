@@ -1292,6 +1292,11 @@ class Executor:
     )
     if not outcome:
       raise ExecutionError("cvlasso requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvlasso requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
 
@@ -1393,6 +1398,11 @@ class Executor:
     )
     if not outcome:
       raise ExecutionError("cvridge requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvridge requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
 
@@ -1494,6 +1504,11 @@ class Executor:
     )
     if not outcome:
       raise ExecutionError("cvelasticnet requires at least one complete observation")
+    if len(outcome) < command.cv:
+      raise ExecutionError(
+        f"cvelasticnet requires at least as many complete observations ({len(outcome)}) "
+        f"as cv folds ({command.cv})"
+      )
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
 

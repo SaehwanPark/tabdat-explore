@@ -88,15 +88,15 @@ _ESTIMATOR_SPECS: tuple[EstimatorAdapterSpec, ...] = (
   ),
   EstimatorAdapterSpec(
     command="cvlasso",
-    primary_backend="python:sklearn.linear_model.LassoCV",
+    primary_backend="python:sklearn.linear_model.Lasso",
   ),
   EstimatorAdapterSpec(
     command="cvridge",
-    primary_backend="python:sklearn.linear_model.RidgeCV",
+    primary_backend="python:sklearn.linear_model.Ridge",
   ),
   EstimatorAdapterSpec(
     command="cvelasticnet",
-    primary_backend="python:sklearn.linear_model.ElasticNetCV",
+    primary_backend="python:sklearn.linear_model.ElasticNet",
   ),
   EstimatorAdapterSpec(
     command="bayes",

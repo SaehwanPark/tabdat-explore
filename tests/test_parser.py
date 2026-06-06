@@ -481,6 +481,11 @@ def test_parse_phase_19_cvelasticnet_command() -> None:
     l1_ratio=(0.1, 0.5, 0.9),
   )
 
+  from tabdat.parser import ParseError
+
+  with pytest.raises(ParseError, match="option l1_ratio expects at least one value"):
+    parse_command("cvelasticnet linear cost age, l1_ratio()")
+
 
 def test_parse_phase_19_ridge_command() -> None:
   assert parse_command("ridge linear cost age bmi") == RidgeCommand(

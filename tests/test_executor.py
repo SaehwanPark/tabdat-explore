@@ -937,6 +937,31 @@ def test_phase_19_cv_models_returns_typed_result_and_tuning_report(tmp_path: Pat
     executor.close()
 
 
+def test_phase_19_cv_models_requires_enough_observations(tmp_path: Path) -> None:
+  path = tmp_path / "cv_small.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    # _write_regression_parquet outputs 6 rows. If we specify cv=10, it should fail.
+    with pytest.raises(
+      ExecutionError, match="cvlasso requires at least as many complete observations"
+    ):
+      executor.execute(CvlassoCommand(outcome="y", predictors=("x",), cv=10))
+
+    with pytest.raises(
+      ExecutionError, match="cvridge requires at least as many complete observations"
+    ):
+      executor.execute(CvridgeCommand(outcome="y", predictors=("x",), cv=10))
+
+    with pytest.raises(
+      ExecutionError, match="cvelasticnet requires at least as many complete observations"
+    ):
+      executor.execute(CvelasticnetCommand(outcome="y", predictors=("x",), cv=10))
+  finally:
+    executor.close()
+
+
 def test_phase_19_ridge_returns_typed_result(tmp_path: Path) -> None:
   path = tmp_path / "ridge.parquet"
   _write_regression_parquet(path)
