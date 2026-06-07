@@ -1,4 +1,4 @@
-# Phase 19 Lasso Slice QA Report
+# Phase 19 Slice 6 QA Report
 
 ## Status
 
@@ -7,19 +7,24 @@ pass
 ## Boundaries Checked
 
 - Parser boundary:
-  - `lasso linear` syntax + options parse to typed command models.
-  - Invalid lasso forms fail with deterministic parse errors.
+  - `predict <newvar>, spatial_lag` parses to the shared typed `PredictCommand`.
+  - invalid option combinations with `xb`, `residuals`, or `pr` fail deterministically.
 - Executor boundary:
-  - lasso fit returns typed regression result with deterministic fields.
-  - lasso predict supports `xb` only and rejects `residuals`/`pr`.
-  - estimation-state transitions preserve existing predict behavior contracts.
+  - `spregress ... model(lag)` stores explicit same-sample prediction state.
+  - `predict ..., spatial_lag` succeeds only when the active dataset still matches the fitted
+    spatial sample.
+  - `predict ..., spatial_lag` after `spregress ... model(error)` fails deterministically.
+  - existing `predict ..., xb` after `spregress` still works.
 - CLI/formatter boundary:
-  - deterministic `Model/Estimator/Alpha` output and prediction transcript.
+  - CLI transcript prints deterministic `Predicted <newvar> ...` output for the new mode.
+  - no unrelated formatter regressions were introduced.
 - Shell/help boundary:
-  - command and option completion include `lasso`.
-  - help-topic coverage gate still enforces all implemented commands.
-- Extension governance:
-  - estimator registry includes typed lasso adapter metadata.
+  - `predict` completions now include `spatial_lag`.
+  - `help predict` and `help spregress` document the new workflow.
+  - help-topic coverage gate still passes.
+- SDD boundary:
+  - `SPEC.md` now records this sub-slice as complete and narrows the remaining spatial future work.
+  - `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md` are consistent with the implemented scope.
 
 ## Blocking Issues
 
@@ -27,5 +32,15 @@ pass
 
 ## Validation Evidence
 
-- Focused tests passed for parser/shell/help/registry/executor/CLI.
-- Full suite (`717 passed`) and static checks (`pyright`, `mypy`, `ruff`) passed.
+- Focused tests passed:
+  - `tests/test_parser.py`
+  - `tests/test_shell.py`
+  - `tests/test_spregress.py`
+  - `tests/test_cli.py -k spregress`
+  - `tests/test_help.py`
+- Static checks passed:
+  - `basedpyright`
+  - `mypy`
+  - `ruff check .`
+  - `ruff format --check .`
+- Full suite passed: `800 passed`.

@@ -232,7 +232,10 @@ def test_execute_spregress_predict(tmp_path: Path) -> None:
     )
 
     # Predict non-xb must fail
-    with pytest.raises(ExecutionError, match="predict only supports xb and spatial_lag after spregress"):
+    with pytest.raises(
+      ExecutionError,
+      match="predict only supports xb and spatial_lag after spregress",
+    ):
       executor.execute(PredictCommand(target_variable="y_res", kind="residuals"))
   finally:
     executor.close()

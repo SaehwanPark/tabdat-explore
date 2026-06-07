@@ -11,6 +11,7 @@ How do I model spatial dependencies and spatial autocorrelation in my data using
 
 Examples:
 - `spregress price size rooms, coord(lat lon)`
+- `spregress price size rooms, coord(lat lon)` then `predict price_full, spatial_lag`
 - `spregress price size rooms, coord(lat lon) model(error) knn(8)`
 - `spregress price size rooms, coord(lat lon) robust`
 

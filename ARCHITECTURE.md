@@ -71,7 +71,7 @@ constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gl
 `cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
 Phase 15 parsing adds
 `logit|probit <y> <xvars>[, robust cluster(...) noconstant]`, `estat margins`,
-`predict <newvar>[, xb residuals pr]`, and
+`predict <newvar>[, xb residuals pr spatial_lag]`, and
 `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(...) noconstant]`.
 Phase 16 parsing adds
 `poisson <y> <xvars>[, robust cluster(...) noconstant]`,
@@ -133,8 +133,10 @@ instrument options, expanded `estat did` diagnostics with deterministic DID cell
 diff-in-diff contrasts, deterministic `estat overid` and `predict ..., xb|residuals` after
 `xtabond`, bounded `xtlogit` fixed-effects nonlinear panel execution, and bounded `lowess`
 semiparametric/nonparametric smoothing transforms.
-Phase 19 currently adds a bounded ML starter through `scikit-learn`:
-`lasso linear` estimation with fixed `alpha(...)` and `predict ..., xb` routing.
+Phase 19 currently adds bounded ML and spatial extension slices through `scikit-learn` and
+`spreg`: `lasso linear` estimation with fixed `alpha(...)` and `predict ..., xb` routing, plus
+`spregress` lag/error estimation with bounded `predict ..., xb` support and same-sample
+`predict ..., spatial_lag` routing after lag-model fits only.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -243,6 +245,8 @@ display formatting.
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
 - Phase 19 first ML slice is executable through
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
+- Phase 19 spatial predictive follow-up is executable through
+  `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, coord(<lat> <lon>) model(lag)`.
 - Phase 14 IV slices are executable through
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after

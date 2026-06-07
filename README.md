@@ -44,6 +44,8 @@ command line. The current CLI supports:
   `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]`
 - spatial regression with
   `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]`
+- same-sample spatial spillover prediction with
+  `predict <newvar>, spatial_lag` after `spregress ... model(lag)`
 - doubly robust difference-in-differences with
   `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]`
 - quantile regression with
@@ -84,7 +86,7 @@ command line. The current CLI supports:
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - panel-data transforms with
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
-- prediction workflows with `predict <newvar>[, xb residuals pr]`
+- prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag]`
 - post-estimation diagnostics with
   `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and

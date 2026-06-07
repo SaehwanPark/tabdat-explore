@@ -2848,6 +2848,7 @@ class Executor:
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     if command.kind == "spatial_lag" and self.state.spatial_regression is None:
       raise ExecutionError("predict option spatial_lag requires a prior spregress model")
+    linear_kind: Literal["xb", "residuals"] = "residuals" if command.kind == "residuals" else "xb"
     binary_regression = self.state.binary_regression
     if binary_regression is not None:
       if command.kind == "residuals":
@@ -2876,7 +2877,7 @@ class Executor:
         predictor_coefficients=regression.predictor_coefficients,
         intercept=regression.intercept,
         outcome_variable=regression.outcome_variable,
-        kind=command.kind,
+        kind=linear_kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     if lasso_regression is not None:
@@ -2961,9 +2962,7 @@ class Executor:
     if spatial_regression is not None:
       if command.kind == "spatial_lag":
         if spatial_regression.model_type != "lag":
-          raise ExecutionError(
-            "predict spatial_lag is only available after spregress model(lag)"
-          )
+          raise ExecutionError("predict spatial_lag is only available after spregress model(lag)")
         required_columns = (
           spatial_regression.outcome_variable,
           *spatial_regression.predictor_names,
@@ -2974,7 +2973,9 @@ class Executor:
           raise ExecutionError("predict requires a prior spregress model with matching variables")
         rows = self.backend.regression_rows(dataset, required_columns)
         if _spatial_sample_fingerprint(rows=rows) != spatial_regression.sample_fingerprint:
-          raise ExecutionError("predict requires the same active dataset sample as the prior spregress model")
+          raise ExecutionError(
+            "predict requires the same active dataset sample as the prior spregress model"
+          )
         next_dataset = self.backend.add_numeric_column_from_values(
           dataset,
           target_variable=command.target_variable,
@@ -3073,7 +3074,7 @@ class Executor:
         second_stage_residual_index=cf_regression.second_stage_residual_index,
         endogenous_variable=cf_regression.endogenous_variable,
         outcome_variable=cf_regression.outcome_variable,
-        kind=command.kind,
+        kind=linear_kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     nl_regression = self.state.nl_regression
@@ -3280,13 +3281,16 @@ class Executor:
       if any(name not in available_columns for name in required_columns):
         raise ExecutionError("predict requires a prior xtabond model with matching variables")
       rows = self.backend.regression_rows(dataset, required_columns)
+      xtabond_kind: Literal["xb", "residuals", "pr"] = (
+        "residuals" if command.kind == "residuals" else "xb"
+      )
       predictions = _xtabond_predictions(
         rows=rows,
         predictor_count=len(xtabond_regression.predictor_names),
         lag_depth=xtabond_regression.lag_depth,
         instrument_lag_start=xtabond_regression.instrument_lag_start,
         fitted_model=xtabond_regression.fitted_model,
-        kind=command.kind,
+        kind=xtabond_kind,
       )
       next_dataset = self.backend.add_numeric_column_from_values(
         dataset,
@@ -5311,7 +5315,7 @@ def _spatial_sample_fingerprint(
         if coerced is None:
           digest.update(repr(value).encode("utf-8"))
         else:
-          digest.update(f"{coerced:.17g}".encode("utf-8"))
+          digest.update(f"{coerced:.17g}".encode())
       digest.update(b"\x1f")
     digest.update(b"\x1e")
   return digest.hexdigest()
@@ -7211,8 +7215,8 @@ def _drdid_wide_sample(
     treat_idx = 3 + covariate_count
     post_idx = treat_idx + 1
 
-    post_0_row = None
-    post_1_row = None
+    post_0_row: tuple[object, ...] | Literal["duplicate"] | None = None
+    post_1_row: tuple[object, ...] | Literal["duplicate"] | None = None
     for r in unit_rows:
       if r[2] is None or r[treat_idx] is None or r[post_idx] is None:
         continue
@@ -7297,7 +7301,7 @@ def _fit_drdid_python(
 
   if bootstrap is not None:
     rng = np.random.default_rng(seed)
-    boot_atts = []
+    boot_atts: list[float] = []
     for _ in range(bootstrap):
       idx = rng.choice(n, size=n, replace=True)
       try:
@@ -7309,12 +7313,12 @@ def _fit_drdid_python(
       except Exception:
         continue
     if len(boot_atts) >= 2:
-      boot_atts = np.array(boot_atts)
-      iqr = np.percentile(boot_atts, 75) - np.percentile(boot_atts, 25)
+      boot_att_array = np.array(boot_atts, dtype=float)
+      iqr = np.percentile(boot_att_array, 75) - np.percentile(boot_att_array, 25)
       # Use IQR-based (robust) SE estimate: IQR / 1.349 ≈ σ for Gaussian.
       # More resistant to outlier bootstrap draws than std(boot_atts).
       se = float(iqr / 1.3489795003921634)
-      abs_t = np.abs((boot_atts - att) / se) if se != 0.0 else np.zeros_like(boot_atts)
+      abs_t = np.abs((boot_att_array - att) / se) if se != 0.0 else np.zeros_like(boot_att_array)
       cv = float(np.percentile(abs_t, 95))
       lci = float(att - cv * se)
       uci = float(att + cv * se)
