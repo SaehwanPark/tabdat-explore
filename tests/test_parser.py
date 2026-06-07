@@ -562,6 +562,10 @@ def test_parse_phase_13_predict_command() -> None:
     target_variable="p_hat",
     kind="pr",
   )
+  assert parse_command("predict spatial_hat, spatial_lag") == PredictCommand(
+    target_variable="spatial_hat",
+    kind="spatial_lag",
+  )
 
 
 def test_parse_phase_15_logit_command() -> None:
@@ -1223,7 +1227,10 @@ def test_parse_exit_aliases() -> None:
     "predict a b",
     "predict cost_hat if age > 18",
     "predict cost_hat, xb residuals",
+    "predict cost_hat, xb spatial_lag",
     "predict cost_hat, pr residuals",
+    "predict cost_hat, pr spatial_lag",
+    "predict cost_hat, residuals spatial_lag",
     "predict cost_hat, residuals=true",
     "tobit",
     "tobit y",

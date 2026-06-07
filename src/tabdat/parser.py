@@ -1266,18 +1266,20 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
   if len(parts.arguments) != 1:
     raise ParseError("predict expects syntax: predict <newvar>")
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"xb", "residuals", "pr"}
+  unsupported = option_names - {"xb", "residuals", "pr", "spatial_lag"}
   if unsupported:
     raise ParseError(f"predict unsupported option: {', '.join(sorted(unsupported))}")
-  _require_flag_options(parts.options, "predict", {"xb", "residuals", "pr"})
-  selected_kinds = {"xb", "residuals", "pr"} & option_names
+  _require_flag_options(parts.options, "predict", {"xb", "residuals", "pr", "spatial_lag"})
+  selected_kinds = {"xb", "residuals", "pr", "spatial_lag"} & option_names
   if len(selected_kinds) > 1:
-    raise ParseError("predict options xb, residuals, and pr cannot be combined")
-  kind: Literal["xb", "residuals", "pr"] = "xb"
+    raise ParseError("predict options xb, residuals, pr, and spatial_lag cannot be combined")
+  kind: Literal["xb", "residuals", "pr", "spatial_lag"] = "xb"
   if "residuals" in option_names:
     kind = "residuals"
   if "pr" in option_names:
     kind = "pr"
+  if "spatial_lag" in option_names:
+    kind = "spatial_lag"
   return PredictCommand(
     target_variable=parts.arguments[0],
     kind=kind,

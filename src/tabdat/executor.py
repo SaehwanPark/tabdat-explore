@@ -235,8 +235,13 @@ class _SpatialRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
+  model_type: Literal["lag", "error"]
+  coord_variables: tuple[str, str]
+  knn: int
   spatial_coefficient: float
   spatial_coefficient_name: str
+  sample_fingerprint: str
+  full_predictions: tuple[float | None, ...]
 
 
 @dataclass(frozen=True)
@@ -1723,8 +1728,9 @@ class Executor:
     outcomes: list[float] = []
     predictors_list: list[tuple[float, ...]] = []
     coords_list: list[tuple[float, float]] = []
+    complete_row_indices: list[int] = []
 
-    for row in rows:
+    for index, row in enumerate(rows):
       if len(row) != len(numeric_variables):
         raise ExecutionError("spregress failed")
       raw_outcome = row[0]
@@ -1758,6 +1764,7 @@ class Executor:
       outcomes.append(outcome_val)
       predictors_list.append(predictor_vals)
       coords_list.append((lat_val, lon_val))
+      complete_row_indices.append(index)
 
     if not outcomes:
       raise ExecutionError("spregress requires at least one complete observation")
@@ -1833,6 +1840,17 @@ class Executor:
       )
     )
 
+    sample_fingerprint = _spatial_sample_fingerprint(rows=rows)
+    full_prediction_values: list[float | None] = [None] * len(rows)
+    if command.model_type == "lag":
+      reduced_form_predictions = _fitted_spatial_lag_predictions(fitted_any)
+      for row_index, predicted_value in zip(
+        complete_row_indices,
+        reduced_form_predictions,
+        strict=True,
+      ):
+        full_prediction_values[row_index] = predicted_value
+
     self.state.regression = None
     self.state.lasso_regression = None
     self.state.bayes_regression = None
@@ -1842,8 +1860,13 @@ class Executor:
       predictor_coefficients=predictor_coefficients,
       intercept=intercept,
       include_intercept=True,
+      model_type=command.model_type,
+      coord_variables=command.coord_variables,
+      knn=command.knn,
       spatial_coefficient=spatial_coef,
       spatial_coefficient_name=spatial_coef_name,
+      sample_fingerprint=sample_fingerprint,
+      full_predictions=tuple(full_prediction_values),
     )
     self.state.qreg_regression = None
     self.state.binary_regression = None
@@ -2823,6 +2846,8 @@ class Executor:
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if command.kind == "spatial_lag" and self.state.spatial_regression is None:
+      raise ExecutionError("predict option spatial_lag requires a prior spregress model")
     binary_regression = self.state.binary_regression
     if binary_regression is not None:
       if command.kind == "residuals":
@@ -2921,6 +2946,7 @@ class Executor:
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     if bayes_regression is not None:
+      bayes_kind: Literal["xb", "residuals"] = "residuals" if command.kind == "residuals" else "xb"
       next_dataset = self.backend.add_linear_prediction_column(
         dataset,
         target_variable=command.target_variable,
@@ -2928,13 +2954,36 @@ class Executor:
         predictor_coefficients=bayes_regression.predictor_coefficients,
         intercept=bayes_regression.intercept,
         outcome_variable=bayes_regression.outcome_variable,
-        kind=command.kind,
+        kind=bayes_kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     spatial_regression = self.state.spatial_regression
     if spatial_regression is not None:
+      if command.kind == "spatial_lag":
+        if spatial_regression.model_type != "lag":
+          raise ExecutionError(
+            "predict spatial_lag is only available after spregress model(lag)"
+          )
+        required_columns = (
+          spatial_regression.outcome_variable,
+          *spatial_regression.predictor_names,
+          *spatial_regression.coord_variables,
+        )
+        available_columns = {column.name for column in dataset.columns}
+        if any(name not in available_columns for name in required_columns):
+          raise ExecutionError("predict requires a prior spregress model with matching variables")
+        rows = self.backend.regression_rows(dataset, required_columns)
+        if _spatial_sample_fingerprint(rows=rows) != spatial_regression.sample_fingerprint:
+          raise ExecutionError("predict requires the same active dataset sample as the prior spregress model")
+        next_dataset = self.backend.add_numeric_column_from_values(
+          dataset,
+          target_variable=command.target_variable,
+          values=spatial_regression.full_predictions,
+          command_name="predict",
+        )
+        return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
       if command.kind != "xb":
-        raise ExecutionError("predict only supports xb after spregress")
+        raise ExecutionError("predict only supports xb and spatial_lag after spregress")
       next_dataset = self.backend.add_linear_prediction_column(
         dataset,
         target_variable=command.target_variable,
@@ -3249,6 +3298,9 @@ class Executor:
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     heckman_regression = self.state.heckman_regression
     if heckman_regression is not None:
+      heckman_kind: Literal["xb", "residuals"] = (
+        "residuals" if command.kind == "residuals" else "xb"
+      )
       next_dataset = self.backend.add_linear_prediction_column(
         dataset,
         target_variable=command.target_variable,
@@ -3256,7 +3308,7 @@ class Executor:
         predictor_coefficients=heckman_regression.predictor_coefficients,
         intercept=heckman_regression.intercept,
         outcome_variable=heckman_regression.outcome_variable,
-        kind=command.kind,
+        kind=heckman_kind,
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
     raise ExecutionError(
@@ -5243,6 +5295,37 @@ def _xt_sample_fingerprint(
       digest.update(f"{predictor:.17g}".encode())
     digest.update(b"\x1e")
   return digest.hexdigest()
+
+
+def _spatial_sample_fingerprint(
+  *,
+  rows: tuple[tuple[object, ...], ...],
+) -> str:
+  digest = hashlib.sha256()
+  for row in rows:
+    for value in row:
+      if value is None:
+        digest.update(b"<none>")
+      else:
+        coerced = _coerce_float(value)
+        if coerced is None:
+          digest.update(repr(value).encode("utf-8"))
+        else:
+          digest.update(f"{coerced:.17g}".encode("utf-8"))
+      digest.update(b"\x1f")
+    digest.update(b"\x1e")
+  return digest.hexdigest()
+
+
+def _fitted_spatial_lag_predictions(fitted_model: Any) -> tuple[float, ...]:
+  reduced_form = getattr(fitted_model, "predy_e", None)
+  if reduced_form is None:
+    raise ExecutionError("predict spatial_lag failed")
+  try:
+    prediction_array = np.asarray(reduced_form, dtype=float).reshape(-1)
+  except (TypeError, ValueError) as exc:
+    raise ExecutionError("predict spatial_lag failed") from exc
+  return tuple(float(value) for value in prediction_array)
 
 
 def _xtabond_sample(

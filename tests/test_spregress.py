@@ -224,18 +224,51 @@ def test_execute_spregress_predict(tmp_path: Path) -> None:
         kind="xb",
       )
     )
+    spatial_predict_res = executor.execute(
+      PredictCommand(
+        target_variable="y_full",
+        kind="spatial_lag",
+      )
+    )
 
     # Predict non-xb must fail
-    with pytest.raises(ExecutionError, match="predict only supports xb after spregress"):
+    with pytest.raises(ExecutionError, match="predict only supports xb and spatial_lag after spregress"):
       executor.execute(PredictCommand(target_variable="y_res", kind="residuals"))
   finally:
     executor.close()
 
   assert predict_res is not None
+  assert spatial_predict_res is not None
   # Active dataset in state should now contain y_hat column
   active_ds = executor.state.active_dataset
   assert active_ds is not None
   assert "y_hat" in [col.name for col in active_ds.columns]
+  assert "y_full" in [col.name for col in active_ds.columns]
+
+
+def test_execute_spregress_error_rejects_spatial_lag_predict(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_error_predict.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="error",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="predict spatial_lag is only available after spregress model\\(lag\\)",
+    ):
+      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+  finally:
+    executor.close()
 
 
 def test_spregress_shell_autocomplete() -> None:
