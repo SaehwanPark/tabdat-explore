@@ -44,6 +44,7 @@ from tabdat.models import (
   PanelCommand,
   ParsedCommand,
   PoissonCommand,
+  PostlassoCommand,
   PredictCommand,
   ProbitCommand,
   QregCommand,
@@ -423,6 +424,28 @@ def test_parse_phase_19_lasso_command() -> None:
     alpha=0.25,
   )
   assert parse_command("lasso linear cost age, noconstant") == LassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    include_intercept=False,
+  )
+
+
+def test_parse_phase_19_postlasso_command() -> None:
+  assert parse_command("postlasso linear cost age bmi") == PostlassoCommand(
+    outcome="cost",
+    predictors=("age", "bmi"),
+  )
+  assert parse_command("postlasso linear cost age, alpha(0.25)") == PostlassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    alpha=0.25,
+  )
+  assert parse_command("postlasso linear cost age, robust") == PostlassoCommand(
+    outcome="cost",
+    predictors=("age",),
+    robust=True,
+  )
+  assert parse_command("postlasso linear cost age, noconstant") == PostlassoCommand(
     outcome="cost",
     predictors=("age",),
     include_intercept=False,
@@ -1290,6 +1313,14 @@ def test_parse_exit_aliases() -> None:
     "lasso linear y x, alpha()",
     "lasso linear y x, alpha(-1)",
     "lasso linear y x, robust",
+    "postlasso",
+    "postlasso linear",
+    "postlasso linear y",
+    "postlasso logistic y x",
+    "postlasso linear y x if y > 0",
+    "postlasso linear y x, alpha()",
+    "postlasso linear y x, alpha(-1)",
+    "postlasso linear y x, cv(5)",
     "ridge",
     "ridge linear",
     "ridge linear y",

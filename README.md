@@ -35,6 +35,8 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - bounded machine-learning lasso regression with
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
+- post-selection linear inference with
+  `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`
 - bounded machine-learning ridge regression with
   `ridge linear <y> <xvars>[, alpha(<num>) noconstant]`
 - bounded machine-learning elastic-net regression with
@@ -97,9 +99,9 @@ The repository is at **v0.16.0**. It has completed Phase 1–12 core infrastruct
 estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
 `nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven
 Phase 17 advanced-empirics slices (`qreg`, `did`, `xtabond`, `xtlogit`, `lowess`), three Phase 18
-ingestion/demo/registry slices, five Phase 19 ML/spatial extension slices (`lasso`, `bayes`,
-`spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20 doubly
-robust DID (`drdid`).
+ingestion/demo/registry slices, seven Phase 19 ML/spatial extension slices (`lasso`, `postlasso`,
+`bayes`, `spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20
+doubly robust DID (`drdid`).
 
 
 ## Quickstart
@@ -252,6 +254,9 @@ tabdat> run analysis.td
   Parquet. Existing files require `replace`.
 - `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
   `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
+- `postlasso` runs Lasso selection through `scikit-learn` and refits OLS through `statsmodels` on
+  selected predictors. It supports `robust` HC1 covariance, but does not yet add `predict`
+  routing.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
   latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, supports
   `xb`/`residuals` after `xtabond`, supports `pr` (plus `xb`) after `logit`/`probit`, and supports

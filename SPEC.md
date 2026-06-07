@@ -415,6 +415,14 @@ and describe the active work with concise verification criteria.
   - deterministic executor guards now reject `spatial_lag` after `spregress ... model(error)` or
     mismatched active samples
   - focused parser, executor, CLI, shell, and help coverage
+- Implemented the seventh Phase 19 modern-extensions slice:
+  - `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`
+  - Lasso-based candidate predictor selection followed by OLS refit on selected predictors
+  - deterministic no-selection behavior: intercept-only refit by default and explicit
+    `noconstant` guard
+  - deterministic post-selection inference formatting, shell autocomplete, help, and extension
+    registry metadata
+  - focused parser, executor, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
@@ -436,7 +444,8 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - Post-selection inference & double/debiased machine learning (DML): implement post-selection inference utilities (such as running OLS on selected features) and support debiased/double machine learning for treatment effect estimation under high-dimensional controls.
+    - Double/debiased machine learning (DML): extend beyond the completed post-Lasso inference
+      starter to support treatment effect estimation under high-dimensional controls.
     - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
     - Spatial weight matrix configuration and GIS file ingestion: support loading pre-computed spatial weights matrices from standard GIS files (e.g., `.gal` or `.gwt` files) and support polygon contiguity weights (Queen, Rook) in addition to KNN.

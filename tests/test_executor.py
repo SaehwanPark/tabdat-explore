@@ -90,6 +90,8 @@ from tabdat.models import (
   PlotResult,
   PoissonCommand,
   PoissonRegressionResult,
+  PostlassoCommand,
+  PostlassoRegressionResult,
   PredictCommand,
   PreviewResult,
   ProbitCommand,
@@ -940,6 +942,85 @@ def test_phase_19_lasso_predict_supports_xb_only(tmp_path: Path) -> None:
   assert predicted.message == "Predicted yhat"
   assert isinstance(preview, PreviewResult)
   assert "yhat" in preview.columns
+
+
+def test_phase_19_postlasso_refits_selected_predictors(tmp_path: Path) -> None:
+  path = tmp_path / "postlasso.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (10.0, 1.0, 9.0),
+        (12.0, 2.0, 9.0),
+        (14.0, 3.0, 9.0),
+        (16.0, 4.0, 9.0),
+        (18.0, 5.0, 9.0),
+        (20.0, 6.0, 9.0)
+    ) as postlasso_data(y, x_signal, x_constant)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      PostlassoCommand(
+        outcome="y",
+        predictors=("x_signal", "x_constant"),
+        alpha=0.01,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PostlassoRegressionResult)
+  assert result.predictors == ("x_signal", "x_constant")
+  assert result.selected_predictors == ("x_signal",)
+  assert result.alpha == pytest.approx(0.01)
+  assert result.covariance == "nonrobust"
+  assert result.observation_count == 6
+  assert [estimate.name for estimate in result.coefficients] == ["intercept", "x_signal"]
+
+
+def test_phase_19_postlasso_supports_robust_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "postlasso-robust.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      PostlassoCommand(outcome="y", predictors=("x",), alpha=0.01, robust=True)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PostlassoRegressionResult)
+  assert result.covariance == "robust"
+  assert all(estimate.standard_error is not None for estimate in result.coefficients)
+
+
+def test_phase_19_postlasso_intercept_only_when_no_predictors_selected(tmp_path: Path) -> None:
+  path = tmp_path / "postlasso-empty.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(PostlassoCommand(outcome="y", predictors=("x",), alpha=10_000.0))
+    with pytest.raises(ExecutionError, match="postlasso selected no predictors"):
+      executor.execute(
+        PostlassoCommand(
+          outcome="y",
+          predictors=("x",),
+          alpha=10_000.0,
+          include_intercept=False,
+        )
+      )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PostlassoRegressionResult)
+  assert result.selected_predictors == ()
+  assert [estimate.name for estimate in result.coefficients] == ["intercept"]
 
 
 def test_phase_19_cv_models_returns_typed_result_and_tuning_report(tmp_path: Path) -> None:
