@@ -11,6 +11,11 @@ dependency cleanup, Basedpyright adoption, and monads boundary hardening.
 
 ### Added
 
+- Added the seventh Phase 19 modern-extensions slice with
+  `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`, combining Python-first
+  `scikit-learn` Lasso predictor selection with `statsmodels` OLS refit inference, deterministic
+  no-selection behavior, formatter output, shell autocomplete, help, extension-registry metadata,
+  and focused parser/executor/CLI coverage.
 - Added the sixth Phase 19 modern-extensions slice with same-sample
   `predict <newvar>, spatial_lag` support after `spregress ... model(lag)`, preserving existing
   `predict ..., xb` support and adding deterministic guards for incompatible spatial states.

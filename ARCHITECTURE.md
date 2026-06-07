@@ -11,8 +11,9 @@ binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase
 `did`, `xtabond` + `estat did`, `xtabond` lag/instrument controls + expanded `estat did`
 diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
 It has also completed a bounded Phase 18 extension-governance slice with a typed internal
-extension registry for ingestion and estimator adapters, plus the first bounded Phase 19
-modern-extensions slice (`lasso linear` + `predict ..., xb`).
+extension registry for ingestion and estimator adapters, plus bounded Phase 19 modern-extension
+slices for ML regularization, Bayesian starters, spatial regression, cross-validation wrappers,
+same-sample spatial-lag prediction, and post-Lasso inference.
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -85,8 +86,9 @@ Phase 17 parsing adds
 `did <y> [controls], treat(<var>) post(<var>) [robust]`, plus
 `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, `xtlogit <y> <xvars>, fe [robust]`,
 `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
-Phase 19 parsing now adds
-`lasso linear <y> <xvars>[, alpha(<num>) noconstant]`.
+Phase 19 parsing now adds ML/spatial commands including
+`lasso linear <y> <xvars>[, alpha(<num>) noconstant]` and
+`postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
 exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
@@ -133,10 +135,11 @@ instrument options, expanded `estat did` diagnostics with deterministic DID cell
 diff-in-diff contrasts, deterministic `estat overid` and `predict ..., xb|residuals` after
 `xtabond`, bounded `xtlogit` fixed-effects nonlinear panel execution, and bounded `lowess`
 semiparametric/nonparametric smoothing transforms.
-Phase 19 currently adds bounded ML and spatial extension slices through `scikit-learn` and
-`spreg`: `lasso linear` estimation with fixed `alpha(...)` and `predict ..., xb` routing, plus
-`spregress` lag/error estimation with bounded `predict ..., xb` support and same-sample
-`predict ..., spatial_lag` routing after lag-model fits only.
+Phase 19 currently adds bounded ML and spatial extension slices through `scikit-learn`,
+`statsmodels`, and `spreg`: regularized linear estimators, cross-validated regularization,
+Bayesian-ridge starter estimation, post-Lasso OLS refit inference, and `spregress` lag/error
+estimation with bounded `predict ..., xb` support and same-sample `predict ..., spatial_lag`
+routing after lag-model fits only.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
@@ -245,6 +248,8 @@ display formatting.
   plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
 - Phase 19 first ML slice is executable through
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
+- Phase 19 post-selection starter is executable through
+  `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`.
 - Phase 19 spatial predictive follow-up is executable through
   `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, coord(<lat> <lon>) model(lag)`.
 - Phase 14 IV slices are executable through
