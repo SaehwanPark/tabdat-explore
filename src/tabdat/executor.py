@@ -1182,7 +1182,8 @@ class Executor:
     except Exception as exc:
       raise ExecutionError("postlasso selection failed") from exc
 
-    selection = _postlasso_selection(command.predictors, predictors, tuple(lasso_fit.coef_))
+    lasso_coefficients = tuple(float(value) for value in np.asarray(lasso_fit.coef_).ravel())
+    selection = _postlasso_selection(command.predictors, predictors, lasso_coefficients)
     if not selection.selected_predictors and not command.include_intercept:
       raise ExecutionError(
         "postlasso selected no predictors; remove noconstant or lower alpha to refit"
@@ -6749,8 +6750,7 @@ def _postlasso_selection(
   )
   selected_predictors = tuple(predictor_names[index] for index in selected_indexes)
   selected_columns = tuple(
-    tuple(row[index] for index in selected_indexes)
-    for row in predictor_rows
+    tuple(row[index] for index in selected_indexes) for row in predictor_rows
   )
   return _PostlassoSelection(
     selected_predictors=selected_predictors,
