@@ -22,7 +22,8 @@ Implemented the bounded spatial predictive follow-up slice on branch
 ## Milestones / Commits
 
 - `1c78e67` — `feat(spregress): add spatial_lag predict mode`
-- Uncommitted at this report stage: docs/report sync and validation-driven type/lint cleanup
+- `bcc5383` — `docs(sdd): record spatial lag predict slice`
+- Uncommitted at this report stage: review-driven regression tests and final report sync
 
 ## Validation Commands
 
@@ -42,3 +43,7 @@ Implemented the bounded spatial predictive follow-up slice on branch
 
 - The new `spatial_lag` mode is intentionally same-sample only in this slice.
 - Out-of-sample spatial prediction and broader spatial model follow-ons remain in `SPEC.md`.
+- Review follow-up added regression coverage for:
+  - `predict ..., pr` still rejecting after non-binary regression
+  - spatial fingerprint mismatch rejection
+  - stale-state isolation across `ridge -> spregress -> predict ..., spatial_lag`

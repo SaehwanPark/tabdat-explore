@@ -21,6 +21,8 @@ Completed a bounded spatial predictive follow-up slice: `predict ..., spatial_la
 - `uv run ruff format --check .`
 - `uv run pytest`
 
+Result: `803 passed`
+
 ## Remaining Phase 19 Slices
 
 - Post-selection inference and DML
