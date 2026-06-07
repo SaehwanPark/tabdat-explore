@@ -2,18 +2,12 @@
 
 All notable project changes are tracked here.
 
-## Unreleased
+---
 
-### Changed
+## [0.16.0] — 2026-06-07
 
-- Cleaned `SPEC.md` so completed work no longer appears in `Present` or `Future`, leaving only
-  active guidance and genuinely unfinished future slices.
-- Replaced current Pyright tooling with Basedpyright as a development dependency and configured
-  scoped `src/tabdat` type checking.
-- Changed `predict` prerequisite diagnostics to include lasso model-state routing.
-- Moved `comp-builders` from the previous Git direct dependency to the published PyPI package,
-  expanded the local `tabdat.monads` boundary with async-result helpers, and centralized parser
-  `Result` flow while preserving public `ParseError` behavior.
+Phase 19 ML/spatial modern extensions and Phase 20 doubly robust DID; ROP
+dependency cleanup, Basedpyright adoption, and monads boundary hardening.
 
 ### Added
 
@@ -24,8 +18,12 @@ All notable project changes are tracked here.
   - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
   - visible notes when otherwise eligible units are dropped because covariates have missing or non-finite values.
   - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
-- Added the fifth Phase 19 modern-extensions slice: cross-validation wrappers `cvlasso`, `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select optimal hyperparameters using custom grid search on scikit-learn estimators, saving structured CV reports to the artifact directory.
-- Added prediction support (`predict <newvar>, xb`) after successful cvlasso, cvridge, and cvelasticnet models.
+- Added the fifth Phase 19 modern-extensions slice: cross-validation wrappers `cvlasso`,
+  `cvridge`, and `cvelasticnet` that automatically perform K-fold cross-validation to select
+  optimal hyperparameters using custom grid search on scikit-learn estimators, saving structured
+  CV reports to the artifact directory.
+- Added prediction support (`predict <newvar>, xb`) after successful `cvlasso`, `cvridge`, and
+  `cvelasticnet` models.
 - Added the fourth Phase 19 modern-extensions slice with
   `ridge linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first `scikit-learn` `Ridge`
   L2-penalized linear estimation, and
@@ -37,6 +35,15 @@ All notable project changes are tracked here.
 - Added typed extension-registry estimator metadata for `ridge`
   (`python:sklearn.linear_model.Ridge`) and `elasticnet`
   (`python:sklearn.linear_model.ElasticNet`) with focused registry tests.
+- Added the third Phase 19 modern-extensions slice with
+  `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]` command,
+  on-the-fly row-standardized KNN spatial weights matrices, ML lag/error and GMM-based
+  heteroskedasticity-robust estimators (`spreg`), bounded exogenous linear prediction,
+  integrated in-app help, autocomplete, extension registry, and comprehensive tests.
+- Added the second Phase 19 modern-extensions slice with
+  `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]` Bayesian ML starter via
+  Python-first `scikit-learn` `BayesianRidge`, deterministic result formatting, and focused
+  parser/executor/CLI/shell/help/extension-registry coverage.
 - Added the first Phase 19 modern-extensions slice with
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` via Python-first
   `scikit-learn` L1-penalized linear estimation, deterministic formatter output, and focused
@@ -46,27 +53,50 @@ All notable project changes are tracked here.
 - Added `scikit-learn` as the Phase 19 Python-first ML starter dependency.
 - Added typed extension-registry estimator metadata for `lasso`
   (`python:sklearn.linear_model.Lasso`) with focused registry tests.
-- Added the fourth Phase 18 ecosystem and extension-layer slice with a typed internal
-  extension-registry contract (`src/tabdat/extension_registry.py`) for ingestion and estimator
-  adapter boundaries, centralized local/remote lazy-ingestion capability metadata, centralized
-  estimator backend metadata for `xtabond`/`tobit`/`heckman`, and focused registry contract tests.
-- Added the fifth Phase 17 advanced empirical-methods slice with deterministic `estat overid`
-  diagnostics after successful `xtabond`, deterministic `predict <newvar>[, xb residuals]` routing
-  after `xtabond`, strict panel/variable compatibility guards, and focused
-  parser/executor/CLI/shell/help coverage.
+
+### Changed
+
+- Cleaned `SPEC.md` so completed work no longer appears in `Present` or `Future`, leaving only
+  active guidance and genuinely unfinished future slices.
+- Replaced Pyright tooling with Basedpyright as a development dependency and configured scoped
+  `src/tabdat` type checking.
+- Changed `predict` prerequisite diagnostics to include lasso model-state routing.
+- Moved `comp-builders` from the previous Git direct dependency to the published PyPI package,
+  expanded the local `tabdat.monads` boundary with async-result helpers, and centralized parser
+  `Result` flow while preserving public `ParseError` behavior.
+
+### Fixed
+
+- Fixed Pyright type-check failures in parser option extraction, optional-value monad helpers,
+  and integrated E2E PTY spawning.
+- Fixed interactive shell Ctrl-C handling so prompt-toolkit completion interrupts return to the
+  prompt instead of terminating with a traceback.
+
+---
+
+## [0.15.0]
+
+Phase 17 advanced empirical methods and Phase 18 ingestion, demos, and extension registry.
+
+### Added
+
+- Added the seventh Phase 17 advanced empirical-methods slice with
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, bounded semiparametric/nonparametric
+  smoothing through Python-first `statsmodels.nonparametric.smoothers_lowess.lowess`,
+  deterministic transform output, and focused parser/executor/CLI/shell/help coverage.
 - Added the sixth Phase 17 advanced empirical-methods slice with
   `xtlogit <y> <xvars>, fe [robust]`, required prior panel metadata
   (`panel <id_var> <time_var>`), bounded fixed-effects nonlinear-panel execution through
   Python-first `statsmodels.discrete.conditional_models.ConditionalLogit`, deterministic output,
   and focused parser/executor/CLI/shell/help coverage.
-- Added the seventh Phase 17 advanced empirical-methods slice with
-  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, bounded semiparametric/nonparametric
-  smoothing through Python-first `statsmodels.nonparametric.smoothers_lowess.lowess`,
-  deterministic transform output, and focused parser/executor/CLI/shell/help coverage.
+- Added the fifth Phase 17 advanced empirical-methods slice with deterministic `estat overid`
+  diagnostics after successful `xtabond`, deterministic `predict <newvar>[, xb residuals]` routing
+  after `xtabond`, strict panel/variable compatibility guards, and focused
+  parser/executor/CLI/shell/help coverage.
 - Added the fourth Phase 17 advanced empirical-methods slice with
-  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, strict lag-depth/instrument-lag validation,
-  bounded configurable dynamic-panel execution over Python-first `linearmodels.iv.IVGMM` with R
-  fallback retained, and focused parser/executor/CLI/shell/help coverage.
+  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, strict lag-depth/instrument-lag
+  validation, bounded configurable dynamic-panel execution over Python-first `linearmodels.iv.IVGMM`
+  with R fallback retained, and focused parser/executor/CLI/shell/help coverage.
 - Added expanded deterministic `estat did` diagnostics after successful `did`, including DID cell
   counts, cell means, treated/untreated changes, and raw diff-in-diff contrasts in addition to
   interaction-coefficient metrics.
@@ -86,6 +116,31 @@ All notable project changes are tracked here.
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`, deterministic
   nonrobust/robust covariance output, `predict <newvar>[, xb residuals]` routing after `qreg`,
   `estat residuals` diagnostics after `qreg`, and focused parser/executor/CLI/shell/help coverage.
+- Added the fourth Phase 18 ecosystem and extension-layer slice with a typed internal
+  extension-registry contract (`src/tabdat/extension_registry.py`) for ingestion and estimator
+  adapter boundaries, centralized local/remote lazy-ingestion capability metadata, centralized
+  estimator backend metadata for `xtabond`/`tobit`/`heckman`, and focused registry contract tests.
+- Added the third Phase 18 advanced econometrics replication demo slice with remote Stata URL
+  loader bypass in `inspect_parquet`, linear prediction (`predict ..., xb|residuals`) after
+  `heckman`, and three classic Stata-based demo scripts under `demos/`
+  (`heckman_mroz.td`, `ivregress_card.td`, `panel_union.td`) with automated test coverage.
+- Added eager `use` acceptance of local and HTTP/HTTPS Stata `.dta` files through
+  `pandas.read_stata`; `use ..., lazy` remains Parquet-only.
+
+### Changed
+
+- Changed `predict` prerequisite diagnostics to include `did` model-state routing.
+- Changed `predict` prerequisite diagnostics to include `qreg` model-state routing while
+  preserving existing binary-choice and count-model boundaries.
+
+---
+
+## [0.14.0]
+
+Phase 16 specialized likelihood models: count, zero-inflated, and parametric survival regression.
+
+### Added
+
 - Added the fourth Phase 16 specialized likelihood-model slice with
   `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
   [robust cluster(<var>) noconstant]`, bounded parametric duration/survival execution,
@@ -106,6 +161,15 @@ All notable project changes are tracked here.
   `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`, deterministic nonrobust/robust/cluster
   covariance output, `predict <newvar>[, xb residuals]` routing after `poisson`, and `estat gof`
   post-estimation diagnostics with focused parser/executor/CLI/shell/help coverage.
+
+---
+
+## [0.13.0]
+
+Phase 15 nonlinear estimation core: binary choice, censored, sample-selection, and NLS regression.
+
+### Added
+
 - Added the seventh Phase 15 nonlinear estimation core slice with
   `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`,
   bounded nonlinear least-squares estimation, deterministic nonrobust/robust covariance labels,
@@ -114,23 +178,44 @@ All notable project changes are tracked here.
 - Added the sixth Phase 15 nonlinear estimation core slice with
   `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`,
   deterministic bounded sample-selection execution, and focused parser/executor/CLI/shell coverage.
-- Added the fourth Phase 15 nonlinear estimation core slice with bounded binary-choice prediction
-  routing via `predict <newvar>[, xb residuals pr]`, including `pr` support after `logit`/`probit`
-  and focused parser/executor/CLI/shell coverage.
 - Added the fifth Phase 15 nonlinear estimation core slice with
   `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`, deterministic
   bounded output/guards, and focused parser/executor/CLI/shell coverage.
+- Added the fourth Phase 15 nonlinear estimation core slice with bounded binary-choice prediction
+  routing via `predict <newvar>[, xb residuals pr]`, including `pr` support after `logit`/`probit`
+  and focused parser/executor/CLI/shell coverage.
+- Added the third Phase 15 nonlinear estimation core slice with `estat margins` after `logit` or
+  `probit`, deterministic predictor-level marginal-effects output (`dy_dx`, `std_error`,
+  `statistic`, `p_value`, `ci_lower`, `ci_upper`), and focused parser/executor/CLI/shell coverage.
 - Added the second Phase 15 nonlinear estimation core slice with
   `probit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` probit
   execution, deterministic pseudo R-squared and coefficient output, and focused
   parser/executor/CLI/shell coverage.
-- Added the third Phase 15 nonlinear estimation core slice with `estat margins` after `logit` or
-  `probit`, deterministic predictor-level marginal-effects output (`dy_dx`, `std_error`,
-  `statistic`, `p_value`, `ci_lower`, `ci_upper`), and focused parser/executor/CLI/shell coverage.
 - Added the first Phase 15 nonlinear estimation core slice with
   `logit <y> <xvars>[, robust cluster(<var>) noconstant]`, Python-first `statsmodels` logit
   execution, deterministic pseudo R-squared and coefficient output, and focused
   parser/executor/CLI/shell coverage.
+- Added `rpy2` as the bounded Phase 15 adapter dependency for R-backed Tobit execution.
+
+### Changed
+
+- Changed `predict` routing so binary-model state (`logit`/`probit`) now supports `xb` and `pr`,
+  while preserving existing linear/control-function prediction behavior and keeping binary
+  residual prediction out of scope.
+- Changed binary-choice estimation-state handling so `logit` and `probit` both register compatible
+  post-estimation model state for `estat margins` while preserving existing `predict` and other
+  `estat` family boundaries.
+- Changed estimation-state handling so `logit` clears incompatible prior estimation family state
+  (`regress`, `ivregress`, `cfregress`, and `xtreg`) before later post-estimation usage.
+
+---
+
+## [0.12.0]
+
+Phase 14 endogeneity foundations and panel econometrics (thirteen slices covering IV, control-function, and panel methods).
+
+### Added
+
 - Added the thirteenth Phase 14 panel semantics extension slice with deterministic `panel` report
   metrics (`observation_count`, `entity_count`, `time_count`, per-entity min/max observations, and
   balancedness), with focused backend/executor/formatter/CLI coverage.
@@ -166,19 +251,34 @@ All notable project changes are tracked here.
 - Added the fourth Phase 14 panel-indexing slice with
   `xtdata <varlist>, within|between`, panel-metadata preconditions, deterministic
   `_within`/`_between` transformed columns, and focused parser/executor/CLI/shell coverage.
-- Added the second Phase 14 diagnostics slice with `estat firststage` and `estat overid` over
-  `ivregress` model state, deterministic Sargan/Wooldridge overidentification output, and focused
-  parser/executor/CLI/shell coverage.
 - Added the third Phase 14 panel-model starter slice with
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]`, required `panel` metadata preconditions,
   `estat hausman` for matching FE/RE fits, deterministic formatter output, and focused
+  parser/executor/CLI/shell coverage.
+- Added the second Phase 14 diagnostics slice with `estat firststage` and `estat overid` over
+  `ivregress` model state, deterministic Sargan/Wooldridge overidentification output, and focused
   parser/executor/CLI/shell coverage.
 - Added the first Phase 14 endogeneity foundations slice with
   `ivregress 2sls <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`,
   Python-first `linearmodels` IV2SLS execution, deterministic formatter output, and focused
   parser/executor/CLI/shell coverage.
 - Added `linearmodels` as the Phase 14 Python-first IV/2SLS backend dependency.
-- Added `rpy2` as the bounded Phase 15 adapter dependency for R-backed Tobit execution.
+
+### Changed
+
+- Changed estimation-state handling so `regress`, `ivregress`, and `xtreg` clear incompatible
+  prior model-family state before later `predict`/`estat` usage.
+- Updated SDD state (`SPEC.md`, `ARCHITECTURE.md`, and `README.md`) to record completed Phase 13
+  hardening and the initial Phase 14 `ivregress 2sls` slice.
+
+---
+
+## [0.11.0]
+
+Phase 12 estimation substrate and Phase 13 linear econometrics (`regress`, `predict`, `estat`).
+
+### Added
+
 - Added integrated E2E scenario `s5_titanic_phase13_dogfood` to exercise real-dataset
   `regress`/`predict`/`estat` flows as a Phase 13 hardening gate.
 - Added the third Phase 13 linear econometrics slice with `estat <residuals|ovtest|vif>`
@@ -194,16 +294,24 @@ All notable project changes are tracked here.
   `regress <y> <xvars>[, robust cluster(<var>) noconstant]` and
   `predict <newvar>[, xb residuals]`, including Python-first `statsmodels` OLS fitting,
   regression-result formatting, and focused parser/executor/backend/CLI/shell coverage.
-- Added Phase 9 export widening with suffix-driven local `.parquet`, `.csv`, and `.feather`
-  `export`, distinct `Exported:` CLI output, and focused parser, executor, and CLI coverage.
-- Added a bounded real Phase 10 Polars lazy execution slice for local Parquet projection,
-  row-filtering, count, and preview commands, plus explicit eager fallback for unsupported
-  commands.
-- Added Phase 9 startup config fallback through XDG user config at
-  `$XDG_CONFIG_HOME/tabdat/config.toml` or `~/.config/tabdat/config.toml` when no explicit
-  `--config` or project-local `.tabdat.toml` is present.
 - Added Phase 12 estimation substrate with reusable statistical primitives, bootstrap resampling,
   least-squares contracts, and shared MLE/GMM estimation interfaces plus focused tests.
+
+### Changed
+
+- Updated `SPEC.md`, `docs/dev_phase.md`, and `ARCHITECTURE.md` to define a Phase 13+
+  statistical implementation priority order: Python libraries first, R via `rpy2` second, and
+  lower-level `numpy`/`scipy` implementations last.
+- Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.
+
+---
+
+## [0.10.0]
+
+Phase 10 execution and state foundations, Phase 11 data workflow primitives (join, append, reshape,
+panel), script reproducibility (seed, let, if/else/end), remote Parquet, and monads boundary.
+
+### Added
 
 - Completed the remaining Phase 11 prerequisites with script-only non-nested `if` / `else` / `end`
   conditionals, macro-expanded condition evaluation, inactive branch skipping, and narrow
@@ -231,85 +339,152 @@ All notable project changes are tracked here.
   extraction, and named table shell completions.
 - Added `comp-builders` as the functional helper implementation behind `tabdat.monads`, including
   `Result`, `Option`, `Validation`, builder re-exports, and small edge conversion helpers.
+
+### Changed
+
 - Reorganized the post-Phase-9 roadmap across `docs/dev_phase.md` and `SPEC.md` into an
-  interleaved Phase 10-19 sequence that stages execution/state foundations, reproducibility and
+  interleaved Phase 10–19 sequence that stages execution/state foundations, reproducibility and
   data-workflow primitives, core econometrics coverage, advanced empirical methods, and late
   ecosystem extensions coherently.
+- Changed structured parser failure composition from handwritten `Either` helpers to
+  `comp-builders` `Result` values while preserving the public `ParseError` behavior.
+
+### Removed
+
+- Removed the external PyMonad dependency in favor of local `tabdat.monads` helpers.
+
+---
+
+## [0.9.0]
+
+Phase 9 configuration and persistence (`set`, `.tabdat.toml`, `save`, `export`).
+
+### Added
+
+- Added Phase 9 export widening with suffix-driven local `.parquet`, `.csv`, and `.feather`
+  `export`, distinct `Exported:` CLI output, and focused parser, executor, and CLI coverage.
+- Added a bounded real Phase 10 Polars lazy execution slice for local Parquet projection,
+  row-filtering, count, and preview commands, plus explicit eager fallback for unsupported
+  commands.
+- Added Phase 9 startup config fallback through XDG user config at
+  `$XDG_CONFIG_HOME/tabdat/config.toml` or `~/.config/tabdat/config.toml` when no explicit
+  `--config` or project-local `.tabdat.toml` is present.
 - Added an integrated public-dataset E2E harness and run documentation for the Titanic batch,
   interactive shell, NYC taxi lazy-scale, and Penguins script reproducibility scenarios.
 - Added Phase 9 configuration and persistence with `.tabdat.toml`, `--config <path>`, runtime
   `set graph_format`, `set artifact_dir`, and `set graph_open`, config-aware plot defaults,
   live `count` execution for lazy datasets, Parquet `save`, and multi-format `export`.
+
+### Changed
+
+- Updated script reproducibility integrated-E2E expectations to match current `export` output
+  wording (`Exported:`).
+
+---
+
+## [0.8.0]
+
+Phase 8 scripting and reproducibility (`tabdat -f`, `run`, multiline SQL, script diagnostics).
+
+### Added
+
 - Added Phase 8 scripting and reproducibility with `tabdat -f <script>`, positional script
   execution, interactive and nested `run <script>`, deterministic script metadata, command
   transcripts, multiline SQL script blocks, line-numbered script errors, and script-mode plot
   auto-open suppression.
+
+---
+
+## [0.7.0]
+
+Phase 7 lazy execution entrypoint and local typed monad helpers.
+
+### Added
+
 - Added local typed monad helpers for parser failure composition and pure-core absence handling.
 - Added Phase 7 lazy execution entrypoint with `use <path>, lazy`, optional
   `engine=duckdb|polars` selection, DuckDB `read_parquet` scan views for lazy loading, typed
   execution-mode metadata, and CLI output that identifies lazy sessions.
+
+---
+
+## [0.6.0]
+
+Phase 6 artifact-based visualization (`histogram`, `scatter`, `bar`; Altair-backed SVG/PNG).
+
+### Added
+
 - Added Phase 6 artifact-based visualization with `histogram`, `scatter`, and `bar` commands,
   Altair-backed SVG/PNG output, default `artifacts/plots/` paths, `saving(...)`, `noopen`, `bins=`,
   and `missing` options, plus interactive-only plot auto-open behavior.
+
+---
+
+## [0.5.0]
+
+Phase 5 prompt-toolkit interactive shell UX (syntax highlighting, history, autocomplete).
+
+### Added
+
 - Added Phase 5 prompt-toolkit interactive shell UX with syntax highlighting, persistent command
   history, inline history suggestions, and context-aware autocomplete for commands, active dataset
   columns, common options, `by:` forms, and lightweight SQL helpers.
+
+---
+
+## [0.4.0]
+
+Phase 4 SQL integration (`sql`, multiline queries, `into <table>`).
+
+### Added
+
 - Added Phase 4 SQL integration with `sql` queries over the active dataset exposed as `active`,
   multiline `sql """..."""` parsing, and `into <table>` active-dataset replacement.
+
+---
+
+## [0.3.0]
+
+Phase 3 full EDA command surface (transformations, grouping, tabulate, codebook, count, head, tail).
+
+### Added
+
 - Completed the roadmap Phase 3 core EDA surface with executable transformations (`keep`, `drop`,
   `select`, `rename`, `generate`, `replace`), grouping (`by:` and `collapse`), and `tabulate`.
 - Added session-local active DuckDB table state so transformations feed subsequent inspection and
   summary commands.
 - Added the Phase 3 inspection slice with executable `codebook`, `count`, `head`, and `tail`
   commands over the active Parquet dataset.
+
+---
+
+## [0.2.0]
+
+Phase 2 structured parser foundation (options, `if` clauses, expression ASTs, diagnostics).
+
+### Added
+
 - Added the Phase 2 parser foundation with structured command options, `if` clauses, expression
   ASTs, parsed-only future command forms, and focused diagnostics tests.
-- Fixed Phase 2 parser regressions so `summarize` rejects assignment syntax and punctuated varlist
-  names remain supported.
-- Added Phase 1 `tabdat` CLI skeleton with `use`, `describe`, and `summarize`.
-- Added DuckDB-backed local Parquet loading and numeric summary execution.
-- Added focused parser, executor/backend, and CLI smoke tests.
-- Added Phase 0 product guardrails for positioning, naming, MVP assumptions, non-goals, and contributor expectations.
-- Added the v0 command glossary with the initial 12-command surface.
-- Added SDD state files with feature status and planned architecture.
-- Added repository guidance for 2-space tab size and proactive linting/formatting.
-
-### Removed
-
-- Removed the external PyMonad dependency in favor of local `tabdat.monads` helpers.
-
-### Changed
-
-- Changed `predict` prerequisite diagnostics to include `did` model-state routing.
-- Changed `predict` prerequisite diagnostics to include `qreg` model-state routing while preserving
-  existing binary-choice and count-model boundaries.
-- Changed `predict` routing so binary-model state (`logit`/`probit`) now supports `xb` and `pr`,
-  while preserving existing linear/control-function prediction behavior and keeping binary
-  residual prediction out of scope.
-- Changed binary-choice estimation-state handling so `logit` and `probit` both register compatible
-  post-estimation model state for `estat margins` while preserving existing `predict` and other
-  `estat` family boundaries.
-- Changed estimation-state handling so `logit` clears incompatible prior estimation family state
-  (`regress`, `ivregress`, `cfregress`, and `xtreg`) before later post-estimation usage.
-- Changed estimation-state handling so `regress`, `ivregress`, and `xtreg` clear incompatible
-  prior model-family state before later `predict`/`estat` usage.
-- Updated script reproducibility integrated-E2E expectations to match current `export` output
-  wording (`Exported:`).
-- Updated SDD state (`SPEC.md`, `ARCHITECTURE.md`, and `README.md`) to record completed Phase 13
-  hardening and the initial Phase 14 `ivregress 2sls` slice.
-- Reworked `SPEC.md` to keep `Present` focused on the remaining Phase 13 hardening work and to
-  move completed roadmap phases out of `Future`.
-- Updated SDD state so `SPEC.md` records Phase 12 estimation substrate as implemented.
-- Updated `SPEC.md`, `docs/dev_phase.md`, and `ARCHITECTURE.md` to define a Phase 13+ statistical
-  implementation priority order: Python libraries first, R via `rpy2` second, and lower-level
-  `numpy`/`scipy` implementations last.
-
-- Changed structured parser failure composition from handwritten `Either` helpers to
-  `comp-builders` `Result` values while preserving the public `ParseError` behavior.
 
 ### Fixed
 
-- Fixed current Pyright type-check failures in parser option extraction, optional-value monad
-  helpers, and integrated E2E PTY spawning.
-- Fixed interactive shell Ctrl-C handling so prompt-toolkit completion interrupts return to the
-  prompt instead of terminating with a traceback.
+- Fixed Phase 2 parser regressions so `summarize` rejects assignment syntax and punctuated varlist
+  names remain supported.
+
+---
+
+## [0.1.0]
+
+Phase 0 project bootstrap and Phase 1 CLI skeleton (`use`, `describe`, `summarize`).
+
+### Added
+
+- Added Phase 1 `tabdat` CLI skeleton with `use`, `describe`, and `summarize`.
+- Added DuckDB-backed local Parquet loading and numeric summary execution.
+- Added focused parser, executor/backend, and CLI smoke tests.
+- Added Phase 0 product guardrails for positioning, naming, MVP assumptions, non-goals, and
+  contributor expectations.
+- Added the v0 command glossary with the initial 12-command surface.
+- Added SDD state files with feature status and planned architecture.
+- Added repository guidance for 2-space tab size and proactive linting/formatting.

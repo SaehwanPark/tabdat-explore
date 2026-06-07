@@ -35,6 +35,17 @@ command line. The current CLI supports:
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
 - bounded machine-learning lasso regression with
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
+- bounded machine-learning ridge regression with
+  `ridge linear <y> <xvars>[, alpha(<num>) noconstant]`
+- bounded machine-learning elastic-net regression with
+  `elasticnet linear <y> <xvars>[, alpha(<num>) l1_ratio(<num>) noconstant]`
+- cross-validated hyperparameter selection with `cvlasso`, `cvridge`, and `cvelasticnet`
+- Bayesian linear regression with
+  `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]`
+- spatial regression with
+  `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]`
+- doubly robust difference-in-differences with
+  `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]`
 - quantile regression with
   `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
 - bounded panel-metadata DID with
@@ -75,16 +86,19 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals pr]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository has completed the first three Phase 13 linear-econometrics slices on top of the
-Phase 12 estimation substrate, completed thirteen Phase 14 slices, delivered seven bounded
-Phase 15 slices (`logit`, `probit`, `estat margins`, binary `predict` routing, `tobit`, `heckman`,
-and `nl`), delivered four bounded Phase 16 slices (`poisson`, `nbreg`, `zip`, `zinb`, and `streg`),
-completed bounded Phase 17 starter coverage (`qreg`, `did`, `xtabond`, `xtlogit`, and `lowess`),
-and implemented the first bounded Phase 19 ML starter slice (`lasso linear`).
+The repository is at **v0.16.0**. It has completed Phase 1–12 core infrastructure, three Phase
+13 linear-econometrics slices, thirteen Phase 14 IV/panel slices, seven Phase 15 nonlinear
+estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
+`nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven
+Phase 17 advanced-empirics slices (`qreg`, `did`, `xtabond`, `xtlogit`, `lowess`), three Phase 18
+ingestion/demo/registry slices, five Phase 19 ML/spatial extension slices (`lasso`, `bayes`,
+`spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20 doubly
+robust DID (`drdid`).
+
 
 ## Quickstart
 
