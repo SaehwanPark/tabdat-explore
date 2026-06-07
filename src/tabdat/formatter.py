@@ -27,6 +27,7 @@ from tabdat.models import (
   PanelResult,
   PlotResult,
   PoissonRegressionResult,
+  PostlassoRegressionResult,
   PreviewResult,
   ProbitRegressionResult,
   QregRegressionResult,
@@ -157,6 +158,33 @@ def format_result(result: Result) -> str:
       f"Alpha: {_format_number(result.alpha)}",
       f"Observations: {result.observation_count}",
       f"R-squared: {_format_number(result.r_squared)}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, PostlassoRegressionResult):
+    selected = " ".join(result.selected_predictors) if result.selected_predictors else "(none)"
+    header = [
+      f"Model: postlasso linear {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: postlasso",
+      f"Alpha: {_format_number(result.alpha)}",
+      f"Selected Predictors: {selected}",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"R-squared: {_format_number(result.r_squared)}",
+      f"Adjusted R-squared: {_format_number(result.adjusted_r_squared)}",
+      f"Root MSE: {_format_number(result.root_mse)}",
       "",
     ]
     coefficient_rows = (

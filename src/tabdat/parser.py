@@ -49,6 +49,7 @@ from tabdat.models import (
   PanelCommand,
   ParsedCommand,
   PoissonCommand,
+  PostlassoCommand,
   PredictCommand,
   ProbitCommand,
   QregCommand,
@@ -111,6 +112,7 @@ _EXECUTABLE_COMMANDS = {
   "export",
   "regress",
   "lasso",
+  "postlasso",
   "ridge",
   "elasticnet",
   "cvlasso",
@@ -417,6 +419,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "lasso":
     return _parse_lasso(parts)
+
+  if parts.name == "postlasso":
+    return _parse_postlasso(parts)
 
   if parts.name == "ridge":
     return _parse_ridge(parts)
@@ -989,6 +994,33 @@ def _parse_lasso(parts: _CommandParts) -> LassoCommand:
     outcome=parts.arguments[1],
     predictors=parts.arguments[2:],
     alpha=alpha,
+    include_intercept="noconstant" not in option_names,
+  )
+
+
+def _parse_postlasso(parts: _CommandParts) -> PostlassoCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("postlasso expects syntax: postlasso linear <y> <xvars>")
+  if len(parts.arguments) < 3:
+    raise ParseError("postlasso expects syntax: postlasso linear <y> <xvars>")
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("postlasso model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"alpha", "robust", "noconstant"}
+  if unsupported:
+    raise ParseError(f"postlasso unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "postlasso", {"robust", "noconstant"})
+  alpha = _single_float_option(parts.options, "alpha", "postlasso")
+  if alpha is None:
+    alpha = 1.0
+  if alpha <= 0.0:
+    raise ParseError("postlasso option alpha must be positive")
+  return PostlassoCommand(
+    outcome=parts.arguments[1],
+    predictors=parts.arguments[2:],
+    alpha=alpha,
+    robust="robust" in option_names,
     include_intercept="noconstant" not in option_names,
   )
 

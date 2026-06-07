@@ -15,6 +15,7 @@ EstimatorCommand = Literal[
   "tobit",
   "heckman",
   "lasso",
+  "postlasso",
   "ridge",
   "elasticnet",
   "cvlasso",
@@ -77,6 +78,10 @@ _ESTIMATOR_SPECS: tuple[EstimatorAdapterSpec, ...] = (
   EstimatorAdapterSpec(
     command="lasso",
     primary_backend="python:sklearn.linear_model.Lasso",
+  ),
+  EstimatorAdapterSpec(
+    command="postlasso",
+    primary_backend="python:sklearn.linear_model.Lasso+statsmodels.OLS",
   ),
   EstimatorAdapterSpec(
     command="ridge",

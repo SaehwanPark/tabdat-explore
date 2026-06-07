@@ -48,6 +48,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "export",
   "regress",
   "lasso",
+  "postlasso",
   "ridge",
   "elasticnet",
   "cvlasso",
@@ -101,6 +102,7 @@ _COLUMN_COMMANDS = {
   "panel",
   "regress",
   "lasso",
+  "postlasso",
   "cvlasso",
   "cvridge",
   "cvelasticnet",
@@ -134,6 +136,7 @@ _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _LASSO_OPTIONS = ("alpha(", "noconstant")
+_POSTLASSO_OPTIONS = ("alpha(", "robust", "noconstant")
 _CVLASSO_OPTIONS = ("cv(", "noconstant")
 _CVRIDGE_OPTIONS = ("cv(", "noconstant")
 _CVELASTICNET_OPTIONS = ("cv(", "l1_ratio(", "noconstant")
@@ -245,6 +248,7 @@ class TabdatCompleter(Completer):
       "bar",
       "regress",
       "lasso",
+      "postlasso",
       "qreg",
       "logit",
       "probit",
@@ -355,6 +359,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_REGRESS_OPTIONS, word)
   if command_name == "lasso":
     yield from _matching_completions(_LASSO_OPTIONS, word)
+  if command_name == "postlasso":
+    yield from _matching_completions(_POSTLASSO_OPTIONS, word)
   if command_name == "cvlasso":
     yield from _matching_completions(_CVLASSO_OPTIONS, word)
   if command_name == "cvridge":

@@ -103,6 +103,8 @@ from tabdat.models import (
   PlotResult,
   PoissonCommand,
   PoissonRegressionResult,
+  PostlassoCommand,
+  PostlassoRegressionResult,
   PredictCommand,
   PreviewResult,
   ProbitCommand,
@@ -172,6 +174,12 @@ class _LassoRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _PostlassoSelection:
+  selected_predictors: tuple[str, ...]
+  selected_columns: tuple[tuple[float, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -506,6 +514,7 @@ class Executor:
       (
         RegressCommand,
         LassoCommand,
+        PostlassoCommand,
         RidgeCommand,
         ElasticnetCommand,
         CvlassoCommand,
@@ -705,6 +714,9 @@ class Executor:
 
     if isinstance(command, LassoCommand):
       return self._execute_lasso(command)
+
+    if isinstance(command, PostlassoCommand):
+      return self._execute_postlasso(command)
 
     if isinstance(command, RidgeCommand):
       return self._execute_ridge(command)
@@ -1140,6 +1152,76 @@ class Executor:
       observation_count=len(outcome),
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
+      coefficients=coefficients,
+    )
+
+  def _execute_postlasso(self, command: PostlassoCommand) -> PostlassoRegressionResult:
+    self._clear_all_regression_states()
+    dataset = self._require_active_dataset("postlasso")
+    numeric_variables: tuple[str, ...] = (command.outcome, *command.predictors)
+    _require_numeric_columns("postlasso", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome, predictors, _, _ = _regression_sample(
+      rows=rows,
+      predictor_count=len(command.predictors),
+      has_cluster=False,
+      has_weight=False,
+      weight_label="weights",
+    )
+    if not outcome:
+      raise ExecutionError("postlasso requires at least one complete observation")
+
+    design = np.array(predictors, dtype=float)
+    outcome_array = np.array(outcome, dtype=float)
+    try:
+      lasso_fit = Lasso(
+        alpha=command.alpha,
+        fit_intercept=command.include_intercept,
+        max_iter=10_000,
+      ).fit(design, outcome_array)
+    except Exception as exc:
+      raise ExecutionError("postlasso selection failed") from exc
+
+    selection = _postlasso_selection(command.predictors, predictors, tuple(lasso_fit.coef_))
+    if not selection.selected_predictors and not command.include_intercept:
+      raise ExecutionError(
+        "postlasso selected no predictors; remove noconstant or lower alpha to refit"
+      )
+
+    refit_design = _design_matrix(
+      selection.selected_columns,
+      include_intercept=command.include_intercept,
+    )
+    try:
+      fitted = sm.OLS(outcome, refit_design).fit()
+      covariance: Literal["nonrobust", "robust"] = "nonrobust"
+      if command.robust:
+        fitted = fitted.get_robustcov_results(cov_type="HC1")
+        covariance = "robust"
+    except Exception as exc:
+      raise ExecutionError("postlasso refit failed") from exc
+
+    parameter_names = (
+      ("intercept", *selection.selected_predictors)
+      if command.include_intercept
+      else selection.selected_predictors
+    )
+    coefficients = _coefficient_estimates(parameter_names, fitted)
+    return PostlassoRegressionResult(
+      outcome=command.outcome,
+      predictors=command.predictors,
+      selected_predictors=selection.selected_predictors,
+      alpha=command.alpha,
+      covariance=covariance,
+      observation_count=len(outcome),
+      include_intercept=command.include_intercept,
+      r_squared=_to_float(getattr(fitted, "rsquared", None)),
+      adjusted_r_squared=_to_float(getattr(fitted, "rsquared_adj", None)),
+      root_mse=_root_mse(
+        mse_resid=getattr(fitted, "mse_resid", None),
+        residuals=getattr(fitted, "resid", None),
+        parameter_count=len(parameter_names),
+      ),
       coefficients=coefficients,
     )
 
@@ -6655,6 +6737,25 @@ def _design_matrix(
   if include_intercept:
     return [[1.0, *row] for row in predictors]
   return [list(row) for row in predictors]
+
+
+def _postlasso_selection(
+  predictor_names: tuple[str, ...],
+  predictor_rows: tuple[tuple[float, ...], ...],
+  coefficients: tuple[float, ...],
+) -> _PostlassoSelection:
+  selected_indexes = tuple(
+    index for index, coefficient in enumerate(coefficients) if abs(float(coefficient)) > 1e-12
+  )
+  selected_predictors = tuple(predictor_names[index] for index in selected_indexes)
+  selected_columns = tuple(
+    tuple(row[index] for index in selected_indexes)
+    for row in predictor_rows
+  )
+  return _PostlassoSelection(
+    selected_predictors=selected_predictors,
+    selected_columns=selected_columns,
+  )
 
 
 def _coefficient_estimates(

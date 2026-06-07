@@ -266,6 +266,15 @@ class LassoCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class PostlassoCommand:
+  outcome: str
+  predictors: tuple[str, ...]
+  alpha: float = 1.0
+  robust: bool = False
+  include_intercept: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class RidgeCommand:
   outcome: str
   predictors: tuple[str, ...]
@@ -582,6 +591,7 @@ Command = (
   | ExportCommand
   | RegressCommand
   | LassoCommand
+  | PostlassoCommand
   | RidgeCommand
   | ElasticnetCommand
   | CvlassoCommand
@@ -739,6 +749,21 @@ class LassoRegressionResult:
   observation_count: int
   include_intercept: bool
   r_squared: float | None
+  coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class PostlassoRegressionResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  selected_predictors: tuple[str, ...]
+  alpha: float
+  covariance: Literal["nonrobust", "robust"]
+  observation_count: int
+  include_intercept: bool
+  r_squared: float | None
+  adjusted_r_squared: float | None
+  root_mse: float | None
   coefficients: tuple[CoefficientEstimate, ...]
 
 
@@ -1100,6 +1125,7 @@ Result = (
   | TransformResult
   | RegressionResult
   | LassoRegressionResult
+  | PostlassoRegressionResult
   | RidgeRegressionResult
   | ElasticnetRegressionResult
   | CvlassoRegressionResult

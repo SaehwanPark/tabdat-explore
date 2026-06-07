@@ -435,6 +435,42 @@ def test_cli_runs_phase_19_lasso_and_predict_flow(tmp_path: Path, capsys) -> Non
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_postlasso_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "postlasso.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (10.0, 1.0, 9.0),
+        (12.0, 2.0, 9.0),
+        (14.0, 3.0, 9.0),
+        (16.0, 4.0, 9.0),
+        (18.0, 5.0, 9.0),
+        (20.0, 6.0, 9.0)
+    ) as postlasso_data(y, x_signal, x_constant)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "postlasso linear y x_signal x_constant, alpha(0.01) robust",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: postlasso linear y on x_signal x_constant" in captured.out
+  assert "Estimator: postlasso" in captured.out
+  assert "Alpha: 0.01" in captured.out
+  assert "Selected Predictors: x_signal" in captured.out
+  assert "Covariance: robust" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_19_ridge_and_predict_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "ridge.parquet"
   _write_sql_parquet(
