@@ -159,7 +159,7 @@ _DID_OPTIONS = ("treat(", "post(", "robust")
 _DRDID_OPTIONS = ("treat(", "post(", "method(", "robust", "bootstrap(", "seed(")
 _CFREGRESS_OPTIONS = ("endog(", "iv(", "robust", "cluster(", "noconstant")
 _LOWESS_OPTIONS = ("gen(", "bandwidth=")
-_PREDICT_OPTIONS = ("xb", "residuals", "pr")
+_PREDICT_OPTIONS = ("xb", "residuals", "pr", "spatial_lag")
 _ESTAT_SUBCOMMANDS = (
   "residuals",
   "ovtest",

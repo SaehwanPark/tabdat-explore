@@ -749,7 +749,7 @@ def format_result(result: Result) -> str:
     if result.notes:
       header.extend(result.notes)
       header.append("")
-    coefficient_rows = (
+    drdid_rows = tuple(
       (
         estimate.name,
         _format_number(estimate.value),
@@ -762,7 +762,7 @@ def format_result(result: Result) -> str:
     )
     body = _table(
       ("Variable", "Coef", "Std Err", "t", "P>|t|", "[95% Conf. Interval]"),
-      coefficient_rows,
+      drdid_rows,
     )
     return "\n".join([*header, *body])
 

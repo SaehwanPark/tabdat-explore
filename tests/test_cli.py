@@ -22,6 +22,25 @@ def _write_sql_parquet(path: Path, query: str) -> None:
     connection.close()
 
 
+def _write_spatial_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (10.0, 1.0, 1.0, 1.0),
+        (12.0, 2.0, 1.5, 2.0),
+        (15.0, 3.0, 2.0, 1.5),
+        (18.0, 4.0, 2.5, 3.0),
+        (20.0, 5.0, 3.0, 2.5),
+        (22.0, 6.0, 3.5, 3.5),
+        (25.0, 7.0, 4.0, 4.0),
+        (28.0, 8.0, 4.5, 4.5)
+    ) as sp_data(y, x, lat, lon)
+    """,
+  )
+
+
 def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
   exit_code = main(
     [
@@ -101,6 +120,30 @@ def test_cli_runs_phase_3_inspection_commands(sample_parquet: Path, capsys) -> N
   assert "age  bmi   sex  cost" in captured.out
   assert "30   22.5  F    100.0" in captured.out
   assert "54   27.5  F    ." in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_19_spregress_spatial_lag_predict_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "spatial_cli.parquet"
+  _write_spatial_parquet(path)
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "spregress y x, coord(lat lon)",
+      "-c",
+      "predict y_full, spatial_lag",
+      "-c",
+      "head 2",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Predicted y_full: 8 rows, 5 columns" in captured.out
+  assert "y_full" in captured.out
   assert captured.err == ""
 
 

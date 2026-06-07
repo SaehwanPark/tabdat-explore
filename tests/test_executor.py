@@ -2618,6 +2618,20 @@ def test_phase_13_predict_adds_linear_predictions_and_residuals(sample_parquet: 
   assert preview.rows[2][5] is None
 
 
+def test_phase_13_predict_rejects_pr_after_regress(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(RegressCommand(outcome="cost", predictors=("age",)))
+    with pytest.raises(
+      ExecutionError,
+      match="predict option pr requires a prior logit or probit model",
+    ):
+      executor.execute(PredictCommand(target_variable="cost_pr", kind="pr"))
+  finally:
+    executor.close()
+
+
 def test_phase_13_predict_requires_prior_regression(sample_parquet: Path) -> None:
   executor = Executor()
   try:

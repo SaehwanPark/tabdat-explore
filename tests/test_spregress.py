@@ -7,7 +7,11 @@ from tabdat.errors import ExecutionError, ParseError
 from tabdat.executor import Executor
 from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
+  BinaryExpression,
+  IdentifierExpression,
+  NumberExpression,
   PredictCommand,
+  RidgeCommand,
   SpatialRegressionResult,
   SpregressCommand,
   UseCommand,
@@ -224,18 +228,121 @@ def test_execute_spregress_predict(tmp_path: Path) -> None:
         kind="xb",
       )
     )
+    spatial_predict_res = executor.execute(
+      PredictCommand(
+        target_variable="y_full",
+        kind="spatial_lag",
+      )
+    )
 
     # Predict non-xb must fail
-    with pytest.raises(ExecutionError, match="predict only supports xb after spregress"):
+    with pytest.raises(
+      ExecutionError,
+      match="predict only supports xb and spatial_lag after spregress",
+    ):
       executor.execute(PredictCommand(target_variable="y_res", kind="residuals"))
   finally:
     executor.close()
 
   assert predict_res is not None
+  assert spatial_predict_res is not None
   # Active dataset in state should now contain y_hat column
   active_ds = executor.state.active_dataset
   assert active_ds is not None
   assert "y_hat" in [col.name for col in active_ds.columns]
+  assert "y_full" in [col.name for col in active_ds.columns]
+
+
+def test_execute_spregress_error_rejects_spatial_lag_predict(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_error_predict.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="error",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+    with pytest.raises(
+      ExecutionError,
+      match="predict spatial_lag is only available after spregress model\\(lag\\)",
+    ):
+      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_predict_rejects_mismatched_sample(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_mismatch.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    load_result = executor.execute(UseCommand(path))
+    assert load_result is not None
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    next_dataset = executor.backend.filter_rows(
+      dataset,
+      BinaryExpression(
+        left=IdentifierExpression("x"),
+        operator=">",
+        right=NumberExpression(1.0),
+      ),
+      keep=True,
+    )
+    executor.state.active_dataset = next_dataset
+    with pytest.raises(
+      ExecutionError,
+      match="predict requires the same active dataset sample as the prior spregress model",
+    ):
+      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_predict_ignores_stale_ridge_state(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_state_isolation.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RidgeCommand(outcome="y", predictors=("x",), alpha=1.0))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+    predict_res = executor.execute(
+      PredictCommand(
+        target_variable="y_full",
+        kind="spatial_lag",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert predict_res is not None
 
 
 def test_spregress_shell_autocomplete() -> None:

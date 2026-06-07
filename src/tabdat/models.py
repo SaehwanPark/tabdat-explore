@@ -356,7 +356,7 @@ class ProbitCommand:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class PredictCommand:
   target_variable: str
-  kind: Literal["xb", "residuals", "pr"] = "xb"
+  kind: Literal["xb", "residuals", "pr", "spatial_lag"] = "xb"
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

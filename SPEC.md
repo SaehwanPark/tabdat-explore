@@ -408,6 +408,13 @@ and describe the active work with concise verification criteria.
   - mocked R fallback calling CRAN `DRDID` R package via `rpy2` on error.
   - visible notes when otherwise eligible units are dropped because covariates have missing or non-finite values.
   - interactive shell autocompletions, in-app help topic, and comprehensive integration tests.
+- Implemented the sixth Phase 19 modern-extensions slice:
+  - added `predict <newvar>, spatial_lag` after successful `spregress ... model(lag)` fits
+  - preserved existing `predict <newvar>, xb` support after `spregress`
+  - bounded the new mode to the same active-dataset sample used during spatial fitting
+  - deterministic executor guards now reject `spatial_lag` after `spregress ... model(error)` or
+    mismatched active samples
+  - focused parser, executor, CLI, shell, and help coverage
 
 ## Present
 
@@ -434,7 +441,9 @@ and describe the active work with concise verification criteria.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
     - Spatial weight matrix configuration and GIS file ingestion: support loading pre-computed spatial weights matrices from standard GIS files (e.g., `.gal` or `.gwt` files) and support polygon contiguity weights (Queen, Rook) in addition to KNN.
     - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
-    - Spatial predictive workflows: expand `predict` support after spatial regression to include spatial lag prediction options (`predict ..., spatial_lag`) for full in-sample and out-of-sample predictions accounting for spatial spillover.
+    - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
+      support to additional spatial prediction scopes, especially out-of-sample workflows and any
+      future spatial model families beyond the current lag-model path.
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
       `pysal` (`spreg`) for spatial econometrics

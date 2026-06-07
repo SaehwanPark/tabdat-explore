@@ -11,6 +11,9 @@ dependency cleanup, Basedpyright adoption, and monads boundary hardening.
 
 ### Added
 
+- Added the sixth Phase 19 modern-extensions slice with same-sample
+  `predict <newvar>, spatial_lag` support after `spregress ... model(lag)`, preserving existing
+  `predict ..., xb` support and adding deterministic guards for incompatible spatial states.
 - Added Phase 20: Doubly Robust Difference-in-Differences (`drdid`):
   - `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]` command with Python-first outcome regression (OR), inverse probability weighting (IPW), and augmented doubly robust (AIPW) ATT estimators.
   - post-estimation diagnostics: `estat drdid` prints treated/control cell counts, propensity score summaries, and overlap checks.
@@ -58,6 +61,8 @@ dependency cleanup, Basedpyright adoption, and monads boundary hardening.
 
 - Cleaned `SPEC.md` so completed work no longer appears in `Present` or `Future`, leaving only
   active guidance and genuinely unfinished future slices.
+- Changed the shared `predict` command surface to accept `spatial_lag` as a bounded spatial-only
+  mode after `spregress`.
 - Replaced Pyright tooling with Basedpyright as a development dependency and configured scoped
   `src/tabdat` type checking.
 - Changed `predict` prerequisite diagnostics to include lasso model-state routing.

@@ -2,27 +2,35 @@
 
 ## User Goal
 
-Resume development from `SPEC.md` by implementing the next vertical slice and following the
-project development workflow (branching, checkpoints, testing, docs/help updates, PR readiness).
+Resume development from the latest `SPEC.md` checkpoint by implementing the next bounded vertical
+slice, following the repo workflow for branch creation, TDD, docs updates, PR creation, and
+independent review.
+
+## Checkpoint
+
+- Base branch: `origin/main`
+- Base commit: `bd5fded40c9aab71fc65fd0cea0e7a0e4005040c`
+- Working branch: `temp/phase19-slice6-spregress-spatial-lag-predict`
 
 ## Scope Chosen
 
 - Phase 19 modern extensions
-- Single slice only (not multi-slice branch)
-- First slice: machine-learning integration starter
-- Command contract: `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
-- Include `predict <newvar>[, xb]` support after `lasso`
+- Split the coarse remaining spatial predictive workflow into a thinner slice
+- Slice target: `predict <newvar>, spatial_lag` after `spregress ... model(lag)`
 
 ## Constraints
 
 - Preserve existing parser/executor/CLI/help boundaries
-- Keep the change bounded; no Bayesian/spatial work in this branch
-- Keep in-app help coverage complete for all current commands
+- Keep the change bounded to the existing `spregress` command family
+- Preserve current `predict ..., xb` behavior after `spregress`
+- Keep help-topic coverage complete for all implemented commands
 - Run full validation before PR-ready handoff
 
 ## Non-goals
 
-- No cross-validated alpha selection in this slice
-- No ridge/elastic-net/random-forest command surface
-- No new `estat` lasso diagnostics
-- No plugin architecture redesign
+- No Bayesian MCMC prefix work
+- No posterior predictive workflows
+- No GIS file ingestion or alternative weight matrix formats
+- No SAC/SARAR support
+- No Moran's I or LM diagnostics
+- No spatial full-prediction support for `spregress ... model(error)` in this slice
