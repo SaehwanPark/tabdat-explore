@@ -23,6 +23,7 @@ from tabdat.models import (
   CvridgeCommand,
   DescribeCommand,
   DidCommand,
+  DmlCommand,
   DrDidCommand,
   DropCommand,
   ElasticnetCommand,
@@ -140,6 +141,7 @@ _EXECUTABLE_COMMANDS = {
   "lowess",
   "did",
   "drdid",
+  "dml",
   "cfregress",
   "spregress",
   "exit",
@@ -506,6 +508,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "drdid":
     return _parse_drdid(parts)
+
+  if parts.name == "dml":
+    return _parse_dml(parts)
 
   if parts.name == "cfregress":
     return _parse_cfregress(parts)
@@ -1622,7 +1627,7 @@ def _parse_streg(parts: _CommandParts) -> StregCommand:
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
-    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>"
+    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml>"
   )
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(expected_estat_syntax)
@@ -1641,10 +1646,11 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "gof",
     "did",
     "drdid",
+    "dml",
   }:
     raise ParseError(
       "estat subcommand must be residuals, ovtest, vif, firststage, "
-      "overid, hausman, endogenous, margins, gof, did, or drdid"
+      "overid, hausman, endogenous, margins, gof, did, drdid, or dml"
     )
   return EstatCommand(
     subcommand=cast(
@@ -1660,6 +1666,7 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
         "gof",
         "did",
         "drdid",
+        "dml",
       ],
       subcommand,
     )
@@ -1916,6 +1923,56 @@ def _parse_drdid(parts: _CommandParts) -> DrDidCommand:
     robust="robust" in option_names,
     bootstrap=bootstrap,
     seed=seed,
+  )
+
+
+def _parse_dml(parts: _CommandParts) -> DmlCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError(
+      "dml expects syntax: dml linear <y> <controls>, treat(<var>) "
+      "[folds(<int>) alpha(<num>) robust seed(<int>) noconstant]"
+    )
+  if len(parts.arguments) < 3:
+    raise ParseError(
+      "dml expects syntax: dml linear <y> <controls>, treat(<var>) "
+      "[folds(<int>) alpha(<num>) robust seed(<int>) noconstant]"
+    )
+  model = parts.arguments[0].lower()
+  if model != "linear":
+    raise ParseError("dml model must be linear")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"treat", "folds", "alpha", "robust", "seed", "noconstant"}
+  if unsupported:
+    raise ParseError(f"dml unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "dml", {"robust", "noconstant"})
+  treat_values = _single_tuple_option(parts.options, "treat", "dml")
+  if treat_values is None or len(treat_values) != 1:
+    raise ParseError("dml option treat expects one variable")
+  treatment_variable = treat_values[0]
+  outcome = parts.arguments[1]
+  controls = parts.arguments[2:]
+  if treatment_variable == outcome:
+    raise ParseError("dml treatment variable must differ from outcome")
+  if treatment_variable in controls:
+    raise ParseError("dml treatment variable must not appear in controls")
+  folds = _single_integer_option(parts.options, "folds", "dml", minimum=2)
+  if folds is None:
+    folds = 5
+  alpha = _single_float_option(parts.options, "alpha", "dml")
+  if alpha is None:
+    alpha = 1.0
+  if alpha <= 0.0:
+    raise ParseError("dml option alpha must be positive")
+  seed = _single_integer_option(parts.options, "seed", "dml", minimum=0)
+  return DmlCommand(
+    outcome=outcome,
+    controls=controls,
+    treatment_variable=treatment_variable,
+    folds=folds,
+    alpha=alpha,
+    robust="robust" in option_names,
+    seed=seed,
+    include_intercept="noconstant" not in option_names,
   )
 
 
@@ -2270,6 +2327,7 @@ def _parenthesized_option_value(
     "cv",
     "bootstrap",
     "seed",
+    "folds",
   }:
     numeric_text = "".join(token.text for token in tokens)
     try:

@@ -9,6 +9,7 @@ def test_help_topics_are_discoverable() -> None:
   assert "describe" in topics
   assert "lasso" in topics
   assert "postlasso" in topics
+  assert "dml" in topics
   assert "ridge" in topics
   assert "elasticnet" in topics
   assert "poisson" in topics

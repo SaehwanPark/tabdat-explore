@@ -52,6 +52,8 @@ from tabdat.models import (
   DescribeResult,
   DidCommand,
   DidRegressionResult,
+  DmlCommand,
+  DmlRegressionResult,
   DrDidCommand,
   DrDidRegressionResult,
   DropCommand,
@@ -1021,6 +1023,195 @@ def test_phase_19_postlasso_intercept_only_when_no_predictors_selected(tmp_path:
   assert isinstance(result, PostlassoRegressionResult)
   assert result.selected_predictors == ()
   assert [estimate.name for estimate in result.coefficients] == ["intercept"]
+
+
+def test_phase_19_dml_returns_positive_ate(tmp_path: Path) -> None:
+  path = tmp_path / "dml.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select
+      2.0 * d + x1 + (row_number() over () % 5) * 0.01 as y,
+      d,
+      x1,
+      x2
+    from (
+      select
+        case when x1 + x2 > 1.0 then 1.0 else 0.0 end as d,
+        x1,
+        x2
+      from (
+        select
+          (row_number() over () % 10) / 10.0 as x1,
+          ((row_number() over () * 3) % 10) / 10.0 as x2
+        from range(1, 121)
+      ) controls
+    ) dml_data
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      DmlCommand(
+        outcome="y",
+        controls=("x1", "x2"),
+        treatment_variable="d",
+        folds=3,
+        alpha=0.01,
+        seed=42,
+      )
+    )
+    diagnostics = executor.execute(EstatCommand(subcommand="dml"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, DmlRegressionResult)
+  assert result.outcome == "y"
+  assert result.controls == ("x1", "x2")
+  assert result.treatment_variable == "d"
+  assert result.folds == 3
+  assert result.alpha == pytest.approx(0.01)
+  assert result.observation_count == 120
+  assert len(result.coefficients) == 1
+  assert result.coefficients[0].name == "ATE"
+  assert result.coefficients[0].value == pytest.approx(2.0, rel=0.25, abs=0.5)
+  assert result.coefficients[0].standard_error is not None
+  assert diagnostics is not None
+  assert diagnostics.headers == ("Diagnostic Metric", "Value")
+  assert any(row[0] == "Treated Observations" for row in diagnostics.rows)
+
+
+def test_phase_19_dml_supports_robust_covariance(tmp_path: Path) -> None:
+  path = tmp_path / "dml-robust.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select
+      1.5 * d + x1 as y,
+      d,
+      x1
+    from (
+      select
+        case when x1 > 0.5 then 1.0 else 0.0 end as d,
+        x1
+      from (
+        select (row_number() over () % 10) / 10.0 as x1
+        from range(1, 61)
+      ) controls
+    ) dml_data
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      DmlCommand(
+        outcome="y",
+        controls=("x1",),
+        treatment_variable="d",
+        folds=3,
+        alpha=0.01,
+        robust=True,
+        seed=7,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, DmlRegressionResult)
+  assert result.covariance == "robust"
+  assert result.coefficients[0].standard_error is not None
+
+
+def test_phase_19_dml_requires_binary_treatment(tmp_path: Path) -> None:
+  path = tmp_path / "dml-binary.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 0.5, 0.1),
+        (2.0, 1.0, 0.2),
+        (3.0, 0.0, 0.3)
+    ) as dml_data(y, d, x1)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="binary with values 0 and 1"):
+      executor.execute(DmlCommand(outcome="y", controls=("x1",), treatment_variable="d", folds=2))
+  finally:
+    executor.close()
+
+
+def test_phase_19_dml_requires_both_treatment_levels(tmp_path: Path) -> None:
+  path = tmp_path / "dml-constant-treatment.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 0.1),
+        (2.0, 1.0, 0.2),
+        (3.0, 1.0, 0.3)
+    ) as dml_data(y, d, x1)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="both 0 and 1 values"):
+      executor.execute(DmlCommand(outcome="y", controls=("x1",), treatment_variable="d", folds=2))
+  finally:
+    executor.close()
+
+
+def test_phase_19_dml_requires_at_least_one_control(tmp_path: Path) -> None:
+  path = tmp_path / "dml-no-controls.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="at least one control variable"):
+      executor.execute(DmlCommand(outcome="y", controls=(), treatment_variable="x", folds=2))
+  finally:
+    executor.close()
+
+
+def test_phase_19_dml_requires_observations_at_least_equal_to_folds(tmp_path: Path) -> None:
+  path = tmp_path / "dml-folds.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 0.1),
+        (2.0, 0.0, 0.2),
+        (3.0, 1.0, 0.3)
+    ) as dml_data(y, d, x1)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="at least as many observations as folds"):
+      executor.execute(DmlCommand(outcome="y", controls=("x1",), treatment_variable="d", folds=5))
+  finally:
+    executor.close()
+
+
+def test_phase_19_estat_dml_requires_prior_model(tmp_path: Path) -> None:
+  path = tmp_path / "dml-estat.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="estat dml requires a prior dml model"):
+      executor.execute(EstatCommand(subcommand="dml"))
+  finally:
+    executor.close()
 
 
 def test_phase_19_cv_models_returns_typed_result_and_tuning_report(tmp_path: Path) -> None:

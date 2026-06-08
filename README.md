@@ -37,6 +37,8 @@ command line. The current CLI supports:
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
 - post-selection linear inference with
   `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`
+- partial-linear double/debiased machine learning with
+  `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
 - bounded machine-learning ridge regression with
   `ridge linear <y> <xvars>[, alpha(<num>) noconstant]`
 - bounded machine-learning elastic-net regression with
@@ -90,17 +92,17 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository is at **v0.16.0**. It has completed Phase 1–12 core infrastructure, three Phase
+The repository is at **v0.17.0**. It has completed Phase 1–12 core infrastructure, three Phase
 13 linear-econometrics slices, thirteen Phase 14 IV/panel slices, seven Phase 15 nonlinear
 estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
 `nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven
 Phase 17 advanced-empirics slices (`qreg`, `did`, `xtabond`, `xtlogit`, `lowess`), three Phase 18
-ingestion/demo/registry slices, seven Phase 19 ML/spatial extension slices (`lasso`, `postlasso`,
-`bayes`, `spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20
+ingestion/demo/registry slices, eight Phase 19 ML/spatial extension slices (`lasso`, `postlasso`,
+`dml`, `bayes`, `spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20
 doubly robust DID (`drdid`).
 
 
@@ -257,6 +259,8 @@ tabdat> run analysis.td
 - `postlasso` runs Lasso selection through `scikit-learn` and refits OLS through `statsmodels` on
   selected predictors. It supports `robust` HC1 covariance, but does not yet add `predict`
   routing.
+- `dml` estimates binary-treatment ATEs with cross-fitted Lasso nuisances and an OLS final stage.
+  Use `estat dml` for fold, overlap, and nuisance-fit diagnostics.
 - `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
   latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, supports
   `xb`/`residuals` after `xtabond`, supports `pr` (plus `xb`) after `logit`/`probit`, and supports

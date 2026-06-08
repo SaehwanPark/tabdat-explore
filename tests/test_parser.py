@@ -19,6 +19,7 @@ from tabdat.models import (
   CvridgeCommand,
   DescribeCommand,
   DidCommand,
+  DmlCommand,
   DrDidCommand,
   DropCommand,
   ElasticnetCommand,
@@ -428,6 +429,45 @@ def test_parse_phase_19_lasso_command() -> None:
     predictors=("age",),
     include_intercept=False,
   )
+
+
+def test_parse_phase_19_dml_command() -> None:
+  assert parse_command("dml linear y x1 x2, treat(d)") == DmlCommand(
+    outcome="y",
+    controls=("x1", "x2"),
+    treatment_variable="d",
+  )
+  assert parse_command("dml linear y x1, treat(d) folds(3)") == DmlCommand(
+    outcome="y",
+    controls=("x1",),
+    treatment_variable="d",
+    folds=3,
+  )
+  assert parse_command("dml linear y x1 x2, treat(d) alpha(0.5)") == DmlCommand(
+    outcome="y",
+    controls=("x1", "x2"),
+    treatment_variable="d",
+    alpha=0.5,
+  )
+  assert parse_command("dml linear y x1, treat(d) robust") == DmlCommand(
+    outcome="y",
+    controls=("x1",),
+    treatment_variable="d",
+    robust=True,
+  )
+  assert parse_command("dml linear y x1, treat(d) seed(42)") == DmlCommand(
+    outcome="y",
+    controls=("x1",),
+    treatment_variable="d",
+    seed=42,
+  )
+  assert parse_command("dml linear y x1, treat(d) noconstant") == DmlCommand(
+    outcome="y",
+    controls=("x1",),
+    treatment_variable="d",
+    include_intercept=False,
+  )
+  assert parse_command("estat dml") == EstatCommand(subcommand="dml")
 
 
 def test_parse_phase_19_postlasso_command() -> None:
@@ -1321,6 +1361,17 @@ def test_parse_exit_aliases() -> None:
     "postlasso linear y x, alpha()",
     "postlasso linear y x, alpha(-1)",
     "postlasso linear y x, cv(5)",
+    "dml",
+    "dml linear",
+    "dml linear y",
+    "dml logistic y x, treat(d)",
+    "dml linear y x if y > 0, treat(d)",
+    "dml linear y, treat(d)",
+    "dml linear y x, treat()",
+    "dml linear y x, alpha()",
+    "dml linear y x, alpha(-1)",
+    "dml linear y x, folds(1)",
+    "dml linear y x, treat(d) robust=true",
     "ridge",
     "ridge linear",
     "ridge linear y",

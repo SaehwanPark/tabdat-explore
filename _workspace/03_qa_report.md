@@ -1,46 +1,18 @@
-# Phase 19 Slice 6 QA Report
+# Phase 19 Slice 8 QA Report
 
-## Status
+## Verdict
 
-pass
+`pass`
 
-## Boundaries Checked
+## Evidence
 
-- Parser boundary:
-  - `predict <newvar>, spatial_lag` parses to the shared typed `PredictCommand`.
-  - invalid option combinations with `xb`, `residuals`, or `pr` fail deterministically.
-- Executor boundary:
-  - `spregress ... model(lag)` stores explicit same-sample prediction state.
-  - `predict ..., spatial_lag` succeeds only when the active dataset still matches the fitted
-    spatial sample.
-  - `predict ..., spatial_lag` after `spregress ... model(error)` fails deterministically.
-  - existing `predict ..., xb` after `spregress` still works.
-- CLI/formatter boundary:
-  - CLI transcript prints deterministic `Predicted <newvar> ...` output for the new mode.
-  - no unrelated formatter regressions were introduced.
-- Shell/help boundary:
-  - `predict` completions now include `spatial_lag`.
-  - `help predict` and `help spregress` document the new workflow.
-  - help-topic coverage gate still passes.
-- SDD boundary:
-  - `SPEC.md` now records this sub-slice as complete and narrows the remaining spatial future work.
-  - `ARCHITECTURE.md`, `CHANGELOG.md`, and `README.md` are consistent with the implemented scope.
+- Parser contract matches `_workspace/01_product_command-contract.md` for syntax, options, and
+  `estat dml`.
+- Executor stores DML state, clears prior estimation state, and formats deterministic ATE output.
+- CLI, shell, help, and extension registry surfaces are aligned.
+- Full validation suite passes (`834 passed`).
 
-## Blocking Issues
+## Residual Risk
 
-- None.
-
-## Validation Evidence
-
-- Focused tests passed:
-  - `tests/test_parser.py`
-  - `tests/test_shell.py`
-  - `tests/test_spregress.py`
-  - `tests/test_cli.py -k spregress`
-  - `tests/test_help.py`
-- Static checks passed:
-  - `basedpyright`
-  - `mypy`
-  - `ruff check .`
-  - `ruff format --check .`
-- Full suite passed: `803 passed`.
+- DML slice is bounded to binary partial-linear ATE with same-sample cross-fitting only.
+- Broader DML families, IV, CATE, and predict routing remain deferred in `SPEC.md`.

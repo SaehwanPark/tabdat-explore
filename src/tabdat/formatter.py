@@ -14,6 +14,7 @@ from tabdat.models import (
   CvridgeRegressionResult,
   DescribeResult,
   DidRegressionResult,
+  DmlRegressionResult,
   DrDidRegressionResult,
   ElasticnetRegressionResult,
   ExportResult,
@@ -791,6 +792,34 @@ def format_result(result: Result) -> str:
     body = _table(
       ("Variable", "Coef", "Std Err", "t", "P>|t|", "[95% Conf. Interval]"),
       drdid_rows,
+    )
+    return "\n".join([*header, *body])
+
+  if isinstance(result, DmlRegressionResult):
+    controls = " ".join(result.controls)
+    header = [
+      (f"Model: dml linear {result.outcome} on {controls} (treat={result.treatment_variable})"),
+      "Estimator: dml",
+      f"Covariance: {result.covariance}",
+      f"Observations: {result.observation_count}",
+      f"Folds: {result.folds}",
+      f"Alpha: {result.alpha}",
+      "",
+    ]
+    dml_rows = tuple(
+      (
+        estimate.name,
+        _format_number(estimate.value),
+        _format_number(estimate.standard_error),
+        _format_number(estimate.statistic),
+        _format_number(estimate.p_value),
+        f"[{_format_number(result.lci)}, {_format_number(result.uci)}]",
+      )
+      for estimate in result.coefficients
+    )
+    body = _table(
+      ("Variable", "Coef", "Std Err", "t", "P>|t|", "[95% Conf. Interval]"),
+      dml_rows,
     )
     return "\n".join([*header, *body])
 

@@ -423,6 +423,14 @@ and describe the active work with concise verification criteria.
   - deterministic post-selection inference formatting, shell autocomplete, help, and extension
     registry metadata
   - focused parser, executor, CLI, shell, help, and extension-registry coverage
+- Implemented the eighth Phase 19 modern-extensions slice:
+  - `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
+  - partial-linear cross-fitted average treatment effect estimation for binary treatments under
+    high-dimensional controls via Python-first `scikit-learn` Lasso nuisances and `statsmodels` OLS
+    final stage
+  - `estat dml` post-estimation diagnostics with fold count, treated/control counts, nuisance
+    treatment-fit summaries, and overlap checks
+  - focused parser, executor, CLI, shell, help, and extension-registry coverage
 
 ## Present
 
@@ -444,8 +452,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - Double/debiased machine learning (DML): extend beyond the completed post-Lasso inference
-      starter to support treatment effect estimation under high-dimensional controls.
     - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
     - Spatial weight matrix configuration and GIS file ingestion: support loading pre-computed spatial weights matrices from standard GIS files (e.g., `.gal` or `.gwt` files) and support polygon contiguity weights (Queen, Rook) in addition to KNN.

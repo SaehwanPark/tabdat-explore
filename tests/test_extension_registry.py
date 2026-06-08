@@ -42,6 +42,7 @@ def test_estimator_registry_contracts() -> None:
   heckman = estimator_adapter_for("heckman")
   lasso = estimator_adapter_for("lasso")
   postlasso = estimator_adapter_for("postlasso")
+  dml = estimator_adapter_for("dml")
   ridge = estimator_adapter_for("ridge")
   elasticnet = estimator_adapter_for("elasticnet")
   bayes = estimator_adapter_for("bayes")
@@ -56,6 +57,8 @@ def test_estimator_registry_contracts() -> None:
   assert lasso.fallback_backend is None
   assert postlasso.primary_backend == "python:sklearn.linear_model.Lasso+statsmodels.OLS"
   assert postlasso.fallback_backend is None
+  assert dml.primary_backend == "python:sklearn.linear_model.Lasso+statsmodels.OLS"
+  assert dml.fallback_backend is None
   assert ridge.primary_backend == "python:sklearn.linear_model.Ridge"
   assert ridge.fallback_backend is None
   assert elasticnet.primary_backend == "python:sklearn.linear_model.ElasticNet"
