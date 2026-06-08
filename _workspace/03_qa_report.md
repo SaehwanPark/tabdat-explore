@@ -1,4 +1,4 @@
-# Phase 19 Slice 8 QA Report
+# Phase 19 Slice 9 QA Report
 
 ## Verdict
 
@@ -6,13 +6,13 @@
 
 ## Evidence
 
-- Parser contract matches `_workspace/01_product_command-contract.md` for syntax, options, and
-  `estat dml`.
-- Executor stores DML state, clears prior estimation state, and formats deterministic ATE output.
-- CLI, shell, help, and extension registry surfaces are aligned.
-- Full validation suite passes (`834 passed`).
+- **Parser/Executor Coherence**: Options parsed correctly and validated for exclusivity.
+- **Weights Loading & Alignment**: Verified that `.gal`, `.gwt`, and `.shp` weights load correctly, align correctly to dataset rows (even when rows are dropped due to missing values), and handle case-insensitive attribute lookups.
+- **Prediction Alignment**: Same-sample prediction works correctly matching IDs.
+- **CLI/Formatter Coherence**: Display format correctly captures the file name and options.
+- **Test suite**: `uv run pytest tests/test_spregress.py` passes.
+- **Lint/Type-checks**: `basedpyright` and `ruff check` both pass with 0 errors/warnings.
 
 ## Residual Risk
 
-- DML slice is bounded to binary partial-linear ATE with same-sample cross-fitting only.
-- Broader DML families, IV, CATE, and predict routing remain deferred in `SPEC.md`.
+- Shapefile polygon contiguity weights extraction requires a local `.shp` file accompanied by a `.dbf` file in the same directory.

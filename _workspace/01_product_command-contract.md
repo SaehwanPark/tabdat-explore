@@ -1,62 +1,36 @@
-# Phase 19 Slice 8 Command Contract: `dml linear` and `estat dml`
+# Phase 19 Slice 9 Command Contract: `spregress` Spatial Weights Configuration & GIS Ingestion
 
 ## Roadmap Phase
 
 - Phase 19 modern extensions
-- Double/debiased machine learning starter for binary treatment effects
+- Spatial weight matrix configuration and GIS file ingestion
 
 ## Syntax
 
 ```stata
-dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]
-estat dml
+spregress <y> <xvars>, weights(<path>) id(<id_var>) [contiguity(queen|rook)] [options...]
 ```
 
 ## Behavior
 
-- `dml linear` estimates a partial-linear average treatment effect (ATE) for a binary treatment
-  using K-fold cross-fitted Lasso nuisances on the active dataset.
-- Nuisance models:
-  - outcome nuisance `E[Y|X]` via Lasso on controls
-  - treatment nuisance `E[D|X]` via Lasso on controls
-- Final stage: OLS of orthogonalized outcome on orthogonalized treatment without intercept.
-- Required option: `treat(<tvar>)`.
-- Defaults: `folds(5)`, `alpha(1.0)`, intercept on unless `noconstant`.
-- `robust` uses HC1 standard errors on the final stage.
-- `seed(<int>)` fixes fold shuffling.
+- Mutual exclusivity: either `coord()` or `weights()` option is allowed, but not both.
+- `weights(path)` specifies the path to a `.gal`, `.gwt`, or `.shp` file.
+- `id(id_var)` specifies the dataset variable containing matching IDs for the spatial weights matrix.
+- `contiguity(queen|rook)` specifies shapefile contiguity (Queen by default, Rook optional); ignored for `.gal` and `.gwt` files.
+- The executor loads the spatial weights matrix from the GIS file using `libpysal.io.open` or `libpysal.weights.Queen/Rook`.
+- The loaded matrix is subsetted and reordered (aligned) to match the cleaned regression sample (handling observations dropped due to missing values).
+- The matrix is row-standardized (standard behavior).
 
 ## Option Rules
 
-- `treat(<tvar>)` is required.
-- `folds` must be an integer >= 2.
-- `alpha` must be positive.
-- `treat`, `folds`, `alpha`, `robust`, `seed`, and `noconstant` are the only supported options.
-- Treatment must differ from outcome and controls.
-
-## Data/State Rules
-
-- Requires an active dataset with complete numeric observations for outcome, treatment, and controls.
-- Treatment must be binary with values 0 and 1.
-- At least one control variable is required.
-- Clears prior estimation state before fitting; stores DML state for `estat dml`.
-
-## Output Contract
-
-- Estimation header includes model line, `Estimator: dml`, covariance label, observation count,
-  fold count, and alpha.
-- Coefficient table includes one `ATE` row with Coef, Std Err, t, P>|t|, and 95% CI.
-- `estat dml` reports method, fold count, treated/control counts, nuisance observation count,
-  and overlap summary (nuisance treatment-fit min/mean/max with overlap pass/warning).
+- `weights` requires `id`.
+- `contiguity` requires `weights`.
+- `weights` cannot coexist with `coord` or `knn`.
 
 ## Acceptance Criteria
 
-- Parser, executor, CLI, shell, help, and registry tests cover the new behavior.
-- Invalid syntax and guards fail deterministically.
+- Parser rejects invalid combinations of `coord` and `weights`.
+- Executor supports `.gal`, `.gwt`, and `.shp` files correctly.
+- Aligns spatial weights to the active dataset's rows (matching the regression sample subset).
+- Triggers `ExecutionError` for missing files, unsupported formats, or missing/mismatching IDs.
 - Full validation suite passes.
-- SDD docs record slice completion.
-
-## Non-goals
-
-- No `dml logistic`, IV, causal forests, CATE, or `predict` routing.
-- No panel precondition or `did`/`drdid` integration.
-- No new runtime dependencies or R fallback.

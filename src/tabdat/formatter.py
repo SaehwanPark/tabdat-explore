@@ -349,10 +349,14 @@ def format_result(result: Result) -> str:
       estimator_label += " (Robust)"
 
     if result.coord_variables is not None:
-      weights_line = f"Spatial Weights: KNN (k={result.knn}) from {' '.join(result.coord_variables)}"
+      coord_str = " ".join(result.coord_variables)
+      weights_line = f"Spatial Weights: KNN (k={result.knn}) from {coord_str}"
     else:
       contiguity_label = f", Contiguity: {result.contiguity}" if result.contiguity else ""
-      weights_line = f"Spatial Weights: File ({result.weights_file}) with ID {result.id_variable}{contiguity_label}"
+      weights_line = (
+        f"Spatial Weights: File ({result.weights_file}) "
+        f"with ID {result.id_variable}{contiguity_label}"
+      )
 
     header = [
       f"Model: spregress {result.outcome} on {' '.join(result.predictors)}",

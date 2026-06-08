@@ -1,34 +1,27 @@
-# Phase 19 Slice 8 Delivery Summary
+# Phase 19 Slice 9 Delivery Summary
 
 ## Outcome
 
-Completed partial-linear DML for binary treatment effects: `dml linear` plus `estat dml`.
+Completed spatial weight matrix configuration and GIS file ingestion support in `spregress` command.
 
 ## Implemented
 
-- `dml linear <y> <controls>, treat(<tvar>)` with cross-fitted Lasso nuisances and OLS ATE stage
-- `estat dml` diagnostics for folds, treated/control counts, nuisance treatment-fit summary, and
-  overlap checks
-- Updated `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`, and in-app help
+- Added parser options for loading spatial weights from files (`weights()`, `id()`, `contiguity()`).
+- Supported `.gal`, `.gwt`, and `.shp` files for contiguity (Queen and Rook) using `libpysal`.
+- Resolved attributes case-insensitively in shapefile DBFs.
+- Subsets and reorders loaded weights matrices to match the regression sample.
+- Updated prediction routing to support file-based weights model estimations.
+- Passed all type safety checks (`basedpyright`) and style formatting checks (`ruff`).
 
 ## Validation
 
-- `uv run basedpyright`
-- `uv run mypy`
-- `uv run ruff check .`
-- `uv run ruff format --check .`
-- `uv run pytest`
-
-Result: `834 passed`
+- `uv run pytest tests/test_spregress.py` (all tests passed)
+- `uv run basedpyright` (0 errors, 0 warnings)
+- `uv run ruff check` & `uv run ruff format --check` (All checks passed)
 
 ## Remaining Phase 19 Slices
 
 - General Bayesian MCMC command prefix
 - Bayesian diagnostics and posterior predictive workflows
-- Spatial weight matrix configuration and GIS ingestion
-- Advanced spatial autoregressive models and diagnostics
-- Broader spatial predictive workflows
-
-## Residual Risk
-
-- Same-sample cross-fitted partial-linear ATE only; broader DML semantics remain deferred.
+- Advanced spatial autoregressive models & diagnostics (SARAR/SAC, Moran's I)
+- Spatial predictive workflows (out-of-sample)
