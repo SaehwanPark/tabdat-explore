@@ -659,6 +659,107 @@ def test_execute_spregress_weights_errors(tmp_path: Path) -> None:
     executor.close()
 
 
+def test_execute_spregress_weights_edge_cases(tmp_path: Path) -> None:
+  import shutil
+
+  import duckdb
+  import libpysal
+  import pandas as pd
+
+  # Write a base parquet data path
+  data_path = tmp_path / "data_edge.parquet"
+  df = pd.DataFrame({"y": [10.0, 12.0, 15.0], "x": [1.0, 2.0, 3.0], "id": ["A", "B", "C"]})
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+  _ = df
+
+  gal_path = tmp_path / "w_edge.gal"
+  gal_path.write_text("0 3 test GAL\nA 1\nB\nB 1\nA\nC 0\n")
+
+  executor = Executor()
+  try:
+    # 1. Duplicate IDs check
+    df_dup = pd.DataFrame({"y": [10.0, 12.0, 15.0], "x": [1.0, 2.0, 3.0], "id": ["A", "A", "C"]})
+    dup_data_path = tmp_path / "dup.parquet"
+    con.execute("copy df_dup to ? (format parquet)", [str(dup_data_path)])
+    _ = df_dup
+    executor.execute(UseCommand(dup_data_path))
+
+    with pytest.raises(ExecutionError, match="contains duplicate values"):
+      executor.execute(
+        SpregressCommand(
+          outcome="y",
+          predictors=("x",),
+          model_type="lag",
+          weights_file=str(gal_path),
+          id_variable="id",
+          contiguity="queen",
+          robust=False,
+        )
+      )
+
+    # 2. Float IDs to string conversion check (1.0 -> "1" matching string keys "1", "2", "3")
+    df_float_id = pd.DataFrame(
+      {"y": [10.0, 12.0, 15.0], "x": [1.0, 2.0, 3.0], "id": [1.0, 2.0, 3.0]}
+    )
+    float_id_data_path = tmp_path / "float_id.parquet"
+    con.execute("copy df_float_id to ? (format parquet)", [str(float_id_data_path)])
+    _ = df_float_id
+    executor.execute(UseCommand(float_id_data_path))
+
+    gal_num_path = tmp_path / "w_num.gal"
+    gal_num_path.write_text("0 3 test GAL\n1 1\n2\n2 1\n1\n3 0\n")
+
+    result_float = executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        weights_file=str(gal_num_path),
+        id_variable="id",
+        contiguity="queen",
+        robust=False,
+      )
+    )
+    assert isinstance(result_float, SpatialRegressionResult)
+
+    # 3. Uppercase DBF check
+    shp_src = libpysal.examples.get_path("baltim.shp")
+    dbf_src = libpysal.examples.get_path("baltim.dbf")
+    shx_src = libpysal.examples.get_path("baltim.shx")
+
+    shp_dest = tmp_path / "BALTIM.SHP"
+    dbf_dest = tmp_path / "BALTIM.DBF"
+    shx_dest = tmp_path / "BALTIM.SHX"
+    shutil.copy(shp_src, shp_dest)
+    shutil.copy(dbf_src, dbf_dest)
+    shutil.copy(shx_src, shx_dest)
+
+    db = libpysal.io.open(str(dbf_dest))
+    df_balt = db.to_df()
+    df_balt.columns = [c.lower() for c in df_balt.columns]
+    balt_data_path = tmp_path / "baltim_edge.parquet"
+    con.execute("copy df_balt to ? (format parquet)", [str(balt_data_path)])
+    db.close()
+
+    executor.execute(UseCommand(balt_data_path))
+    result_shp = executor.execute(
+      SpregressCommand(
+        outcome="price",
+        predictors=("nroom", "age"),
+        model_type="lag",
+        weights_file=str(shp_dest),
+        id_variable="station",
+        contiguity="queen",
+        robust=False,
+      )
+    )
+    assert isinstance(result_shp, SpatialRegressionResult)
+
+  finally:
+    executor.close()
+
+
 def test_spregress_shell_autocomplete_updated() -> None:
   completions = list(_option_completions("spregress", ""))
   completion_texts = [c.text for c in completions]

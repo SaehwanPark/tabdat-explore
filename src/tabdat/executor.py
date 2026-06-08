@@ -1877,6 +1877,11 @@ class Executor:
       if not outcomes:
         raise ExecutionError("spregress requires at least one complete observation")
 
+      if len(set(ids_list)) != len(ids_list):
+        raise ExecutionError(
+          f"id variable '{id_var}' contains duplicate values in the estimation sample"
+        )
+
       weights_path = Path(command.weights_file)
       if not weights_path.exists():
         raise ExecutionError("weights file not found")
@@ -1892,10 +1897,49 @@ class Executor:
       try:
         if ext == ".shp":
           resolved_id_var = id_var
-          db_path = str(weights_path)[:-4] + ".dbf"
-          if Path(db_path).exists():
+          shp_path_lower = weights_path.with_suffix(".shp")
+          symlinked_shp = False
+          if not shp_path_lower.exists():
+            shp_path_upper = weights_path.with_suffix(".SHP")
+            if shp_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(shp_path_upper.name, shp_path_lower)
+                symlinked_shp = True
+              except Exception:
+                pass
+
+          db_path = weights_path.with_suffix(".dbf")
+          symlinked_dbf = False
+          if not db_path.exists():
+            db_path_upper = weights_path.with_suffix(".DBF")
+            if db_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(db_path_upper.name, db_path)
+                symlinked_dbf = True
+              except Exception:
+                pass
+
+          shx_path = weights_path.with_suffix(".shx")
+          symlinked_shx = False
+          if not shx_path.exists():
+            shx_path_upper = weights_path.with_suffix(".SHX")
+            if shx_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(shx_path_upper.name, shx_path)
+                symlinked_shx = True
+              except Exception:
+                pass
+
+          actual_db_path = db_path if db_path.exists() else weights_path.with_suffix(".DBF")
+          if actual_db_path.exists():
             try:
-              db: Any = libpysal.io.open(db_path)
+              db: Any = libpysal.io.open(str(actual_db_path))
               for col in db.header:
                 if col.lower() == id_var.lower():
                   resolved_id_var = col
@@ -1904,23 +1948,42 @@ class Executor:
             except Exception:
               pass
 
-          if command.contiguity == "rook":
-            w_original = Rook.from_shapefile(str(weights_path), idVariable=resolved_id_var)
-          else:
-            w_original = Queen.from_shapefile(str(weights_path), idVariable=resolved_id_var)
+          try:
+            if command.contiguity == "rook":
+              w_original = Rook.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+            else:
+              w_original = Queen.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+          finally:
+            if symlinked_shp and shp_path_lower.is_symlink():
+              try:
+                shp_path_lower.unlink()
+              except Exception:
+                pass
+            if symlinked_dbf and db_path.is_symlink():
+              try:
+                db_path.unlink()
+              except Exception:
+                pass
+            if symlinked_shx and shx_path.is_symlink():
+              try:
+                shx_path.unlink()
+              except Exception:
+                pass
         else:
           w_original = libpysal.io.open(str(weights_path)).read()
       except Exception as exc:
         raise ExecutionError(f"failed to load spatial weights file: {exc}") from exc
 
       # Align the type of ids_list to the type of keys in w_original
-      if ids_list:
+      if ids_list and hasattr(w_original, "neighbors") and w_original.neighbors:
         sample_key = next(iter(w_original.neighbors.keys()))
         if isinstance(sample_key, str) and not isinstance(ids_list[0], str):
-          ids_list = [str(x) for x in ids_list]
+          ids_list = [
+            str(int(x)) if isinstance(x, float) and x.is_integer() else str(x) for x in ids_list
+          ]
         elif isinstance(sample_key, int) and not isinstance(ids_list[0], int):
           try:
-            ids_list = [int(x) for x in ids_list]
+            ids_list = [int(float(x)) if isinstance(x, str) else int(x) for x in ids_list]
           except ValueError:
             pass
 
