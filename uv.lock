@@ -1308,7 +1308,7 @@ wheels = [
 
 [[package]]
 name = "tabdat-explore-dev"
-version = "0.16.0"
+version = "0.17.0"
 source = { editable = "." }
 dependencies = [
     { name = "altair" },
