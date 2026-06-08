@@ -1229,28 +1229,29 @@ def _parse_bayes(parts: _CommandParts) -> BayesCommand:
 def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
   if parts.condition is not None or parts.expression is not None:
     raise ParseError(
-      "spregress expects syntax: spregress <y> <xvars>, coord(<lat_var> <lon_var>) "
-      "[model(<lag|error>) knn(<k>) robust]"
+      "spregress expects syntax: spregress <y> <xvars>, [coord(<lat_var> <lon_var>) [knn(<k>)] | "
+      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] [model(<lag|error>) robust]"
     )
   if len(parts.arguments) < 2:
     raise ParseError(
-      "spregress expects syntax: spregress <y> <xvars>, coord(<lat_var> <lon_var>) "
-      "[model(<lag|error>) knn(<k>) robust]"
+      "spregress expects syntax: spregress <y> <xvars>, [coord(<lat_var> <lon_var>) [knn(<k>)] | "
+      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] [model(<lag|error>) robust]"
     )
 
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"coord", "model", "knn", "robust"}
+  unsupported = option_names - {"coord", "model", "knn", "robust", "weights", "id", "contiguity"}
   if unsupported:
     raise ParseError(f"spregress unsupported option: {', '.join(sorted(unsupported))}")
 
   _require_flag_options(parts.options, "spregress", {"robust"})
 
-  coord_values = _single_tuple_option(parts.options, "coord", "spregress")
-  if coord_values is None or len(coord_values) != 2:
-    raise ParseError(
-      "spregress option coord expects exactly two variables representing "
-      "latitude and longitude coordinates"
-    )
+  has_coord = "coord" in option_names
+  has_weights = "weights" in option_names
+
+  if has_coord and has_weights:
+    raise ParseError("spregress option coord and weights are mutually exclusive")
+  elif not has_coord and not has_weights:
+    raise ParseError("spregress requires either coord() or weights() option")
 
   model_type_val: Literal["lag", "error"] | str = (
     _single_text_option(parts.options, "model", "spregress") or "lag"
@@ -1259,18 +1260,58 @@ def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
     raise ParseError("spregress option model must be 'lag' or 'error'")
   model_type: Literal["lag", "error"] = model_type_val
 
-  knn_val = _single_integer_option(parts.options, "knn", "spregress", minimum=1)
-  if knn_val is None:
-    knn_val = 5
+  if has_coord:
+    if "id" in option_names:
+      raise ParseError("spregress option id can only be used with weights() option")
+    if "contiguity" in option_names:
+      raise ParseError("spregress option contiguity can only be used with weights() option")
 
-  return SpregressCommand(
-    outcome=parts.arguments[0],
-    predictors=parts.arguments[1:],
-    model_type=model_type,
-    coord_variables=coord_values,
-    knn=knn_val,
-    robust="robust" in option_names,
-  )
+    coord_values = _single_tuple_option(parts.options, "coord", "spregress")
+    if coord_values is None or len(coord_values) != 2:
+      raise ParseError(
+        "spregress option coord expects exactly two variables representing "
+        "latitude and longitude coordinates"
+      )
+
+    knn_val = _single_integer_option(parts.options, "knn", "spregress", minimum=1)
+    if knn_val is None:
+      knn_val = 5
+
+    return SpregressCommand(
+      outcome=parts.arguments[0],
+      predictors=parts.arguments[1:],
+      model_type=model_type,
+      coord_variables=coord_values,
+      knn=knn_val,
+      robust="robust" in option_names,
+    )
+  else:
+    # weights is specified
+    if "knn" in option_names or "coord" in option_names:
+      raise ParseError("spregress option knn/coord can only be used with coord() option")
+
+    weights_path = _single_path_option(parts.options, "weights", "spregress")
+    if weights_path is None:
+      raise ParseError("spregress option weights() expects a path")
+
+    id_var = _single_text_option(parts.options, "id", "spregress")
+    if id_var is None:
+      raise ParseError("spregress option id() is required when weights() is specified")
+
+    contiguity_val = _single_text_option(parts.options, "contiguity", "spregress") or "queen"
+    if contiguity_val not in ("queen", "rook"):
+      raise ParseError("spregress option contiguity must be 'queen' or 'rook'")
+    contiguity: Literal["queen", "rook"] = contiguity_val
+
+    return SpregressCommand(
+      outcome=parts.arguments[0],
+      predictors=parts.arguments[1:],
+      model_type=model_type,
+      weights_file=str(weights_path),
+      id_variable=id_var,
+      contiguity=contiguity,
+      robust="robust" in option_names,
+    )
 
 
 def _parse_qreg(parts: _CommandParts) -> QregCommand:
@@ -2312,7 +2353,7 @@ def _parenthesized_option_value(
   option_name: str,
   tokens: tuple[_Token, ...],
 ) -> str | float | tuple[str, ...]:
-  if option_name == "saving":
+  if option_name in {"saving", "weights"}:
     return "".join(token.text for token in tokens)
   if option_name in {
     "alpha",

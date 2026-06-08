@@ -247,12 +247,15 @@ class _SpatialRegressionState:
   intercept: float | None
   include_intercept: bool
   model_type: Literal["lag", "error"]
-  coord_variables: tuple[str, str]
-  knn: int
   spatial_coefficient: float
   spatial_coefficient_name: str
   sample_fingerprint: str
   full_predictions: tuple[float | None, ...]
+  coord_variables: tuple[str, str] | None = None
+  knn: int | None = None
+  weights_file: str | None = None
+  id_variable: str | None = None
+  contiguity: Literal["queen", "rook"] | None = None
 
 
 @dataclass(frozen=True)
@@ -1823,71 +1826,187 @@ class Executor:
 
   def _execute_spregress(self, command: SpregressCommand) -> SpatialRegressionResult:
     dataset = self._require_active_dataset("spregress")
-    numeric_variables: tuple[str, ...] = (
-      command.outcome,
-      *command.predictors,
-      *command.coord_variables,
-    )
-    _require_numeric_columns("spregress", dataset, numeric_variables)
-
-    rows = self.backend.regression_rows(dataset, numeric_variables)
 
     outcomes: list[float] = []
     predictors_list: list[tuple[float, ...]] = []
-    coords_list: list[tuple[float, float]] = []
     complete_row_indices: list[int] = []
+    w = None
 
-    for index, row in enumerate(rows):
-      if len(row) != len(numeric_variables):
-        raise ExecutionError("spregress failed")
-      raw_outcome = row[0]
-      raw_predictors = row[1 : 1 + len(command.predictors)]
-      raw_lat = row[1 + len(command.predictors)]
-      raw_lon = row[2 + len(command.predictors)]
+    if command.weights_file is not None:
+      from pathlib import Path
 
-      if (
-        raw_outcome is None
-        or any(val is None for val in raw_predictors)
-        or raw_lat is None
-        or raw_lon is None
-      ):
-        continue
+      id_var = command.id_variable
+      if id_var is None:
+        raise ExecutionError("id variable is required when weights file is specified")
+      if id_var not in [col.name for col in dataset.columns]:
+        raise ExecutionError(f"id variable '{id_var}' not found in active dataset")
 
-      outcome_val = _coerce_float(raw_outcome)
-      coerced_predictors = [_coerce_float(val) for val in raw_predictors]
-      lat_val = _coerce_float(raw_lat)
-      lon_val = _coerce_float(raw_lon)
-
-      if (
-        outcome_val is None
-        or any(val is None for val in coerced_predictors)
-        or lat_val is None
-        or lon_val is None
-      ):
-        continue
-
-      predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
-
-      outcomes.append(outcome_val)
-      predictors_list.append(predictor_vals)
-      coords_list.append((lat_val, lon_val))
-      complete_row_indices.append(index)
-
-    if not outcomes:
-      raise ExecutionError("spregress requires at least one complete observation")
-
-    if len(outcomes) <= command.knn:
-      raise ExecutionError(
-        "spregress requires more complete observations than the number of "
-        f"neighbors (knn={command.knn})"
+      numeric_variables: tuple[str, ...] = (
+        command.outcome,
+        *command.predictors,
       )
+      _require_numeric_columns("spregress", dataset, numeric_variables)
 
-    coords_arr = np.array(coords_list, dtype=float)
-    try:
-      w = KNN.from_array(coords_arr, k=command.knn)
-      w.transform = "r"
-    except Exception as exc:
-      raise ExecutionError("spregress weight matrix construction failed") from exc
+      all_variables = (*numeric_variables, id_var)
+      rows = self.backend.regression_rows(dataset, all_variables)
+      ids_list: list[Any] = []
+
+      for index, row in enumerate(rows):
+        if len(row) != len(all_variables):
+          raise ExecutionError("spregress failed")
+        raw_outcome = row[0]
+        raw_predictors = row[1 : 1 + len(command.predictors)]
+        raw_id = row[-1]
+
+        if raw_outcome is None or any(val is None for val in raw_predictors) or raw_id is None:
+          continue
+
+        outcome_val = _coerce_float(raw_outcome)
+        coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+
+        if outcome_val is None or any(val is None for val in coerced_predictors):
+          continue
+
+        predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+        outcomes.append(outcome_val)
+        predictors_list.append(predictor_vals)
+        ids_list.append(raw_id)
+        complete_row_indices.append(index)
+
+      if not outcomes:
+        raise ExecutionError("spregress requires at least one complete observation")
+
+      weights_path = Path(command.weights_file)
+      if not weights_path.exists():
+        raise ExecutionError("weights file not found")
+
+      ext = weights_path.suffix.lower()
+      if ext not in (".gal", ".gwt", ".shp"):
+        raise ExecutionError(f"unsupported weights file format: {ext}")
+
+      import libpysal
+      from libpysal.weights import Queen, Rook, w_subset
+
+      w_original: Any = None
+      try:
+        if ext == ".shp":
+          resolved_id_var = id_var
+          db_path = str(weights_path)[:-4] + ".dbf"
+          if Path(db_path).exists():
+            try:
+              db: Any = libpysal.io.open(db_path)
+              for col in db.header:
+                if col.lower() == id_var.lower():
+                  resolved_id_var = col
+                  break
+              db.close()
+            except Exception:
+              pass
+
+          if command.contiguity == "rook":
+            w_original = Rook.from_shapefile(str(weights_path), idVariable=resolved_id_var)
+          else:
+            w_original = Queen.from_shapefile(str(weights_path), idVariable=resolved_id_var)
+        else:
+          w_original = libpysal.io.open(str(weights_path)).read()
+      except Exception as exc:
+        raise ExecutionError(f"failed to load spatial weights file: {exc}") from exc
+
+      # Align the type of ids_list to the type of keys in w_original
+      if ids_list:
+        sample_key = next(iter(w_original.neighbors.keys()))
+        if isinstance(sample_key, str) and not isinstance(ids_list[0], str):
+          ids_list = [str(x) for x in ids_list]
+        elif isinstance(sample_key, int) and not isinstance(ids_list[0], int):
+          try:
+            ids_list = [int(x) for x in ids_list]
+          except ValueError:
+            pass
+
+      w_keys = set(w_original.neighbors.keys())
+      missing_ids = [str(r_id) for r_id in ids_list if r_id not in w_keys]
+      if missing_ids:
+        raise ExecutionError(
+          "some regression sample IDs are missing from the spatial weights matrix: "
+          f"{', '.join(missing_ids[:5])}"
+        )
+
+      try:
+        w = w_subset(w_original, ids_list)
+        w.id_order = ids_list
+        w.transform = "r"
+      except Exception as exc:
+        raise ExecutionError("spregress weight matrix construction failed") from exc
+
+    else:
+      # KNN coord variables path
+      if command.coord_variables is None or command.knn is None:
+        raise ExecutionError(
+          "coord variables and knn are required if weights file is not specified"
+        )
+
+      numeric_variables = (
+        command.outcome,
+        *command.predictors,
+        *command.coord_variables,
+      )
+      _require_numeric_columns("spregress", dataset, numeric_variables)
+
+      rows = self.backend.regression_rows(dataset, numeric_variables)
+      coords_list: list[tuple[float, float]] = []
+
+      for index, row in enumerate(rows):
+        if len(row) != len(numeric_variables):
+          raise ExecutionError("spregress failed")
+        raw_outcome = row[0]
+        raw_predictors = row[1 : 1 + len(command.predictors)]
+        raw_lat = row[1 + len(command.predictors)]
+        raw_lon = row[2 + len(command.predictors)]
+
+        if (
+          raw_outcome is None
+          or any(val is None for val in raw_predictors)
+          or raw_lat is None
+          or raw_lon is None
+        ):
+          continue
+
+        outcome_val = _coerce_float(raw_outcome)
+        coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+        lat_val = _coerce_float(raw_lat)
+        lon_val = _coerce_float(raw_lon)
+
+        if (
+          outcome_val is None
+          or any(val is None for val in coerced_predictors)
+          or lat_val is None
+          or lon_val is None
+        ):
+          continue
+
+        predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+        outcomes.append(outcome_val)
+        predictors_list.append(predictor_vals)
+        coords_list.append((lat_val, lon_val))
+        complete_row_indices.append(index)
+
+      if not outcomes:
+        raise ExecutionError("spregress requires at least one complete observation")
+
+      if len(outcomes) <= command.knn:
+        raise ExecutionError(
+          "spregress requires more complete observations than the number of "
+          f"neighbors (knn={command.knn})"
+        )
+
+      coords_arr = np.array(coords_list, dtype=float)
+      try:
+        w = KNN.from_array(coords_arr, k=command.knn)
+        w.transform = "r"
+      except Exception as exc:
+        raise ExecutionError("spregress weight matrix construction failed") from exc
 
     design = np.array(predictors_list, dtype=float)
     outcome_array = np.array(outcomes, dtype=float).reshape(-1, 1)
@@ -1970,6 +2089,9 @@ class Executor:
       model_type=command.model_type,
       coord_variables=command.coord_variables,
       knn=command.knn,
+      weights_file=command.weights_file,
+      id_variable=command.id_variable,
+      contiguity=command.contiguity,
       spatial_coefficient=spatial_coef,
       spatial_coefficient_name=spatial_coef_name,
       sample_fingerprint=sample_fingerprint,
@@ -1998,6 +2120,9 @@ class Executor:
       model_type=command.model_type,
       coord_variables=command.coord_variables,
       knn=command.knn,
+      weights_file=command.weights_file,
+      id_variable=command.id_variable,
+      contiguity=command.contiguity,
       robust=command.robust,
       observation_count=len(outcomes),
       r_squared=r_squared,
@@ -3070,10 +3195,16 @@ class Executor:
       if command.kind == "spatial_lag":
         if spatial_regression.model_type != "lag":
           raise ExecutionError("predict spatial_lag is only available after spregress model(lag)")
+        if spatial_regression.coord_variables is not None:
+          extra_vars = spatial_regression.coord_variables
+        else:
+          extra_vars = (
+            (spatial_regression.id_variable,) if spatial_regression.id_variable is not None else ()
+          )
         required_columns = (
           spatial_regression.outcome_variable,
           *spatial_regression.predictor_names,
-          *spatial_regression.coord_variables,
+          *extra_vars,
         )
         available_columns = {column.name for column in dataset.columns}
         if any(name not in available_columns for name in required_columns):

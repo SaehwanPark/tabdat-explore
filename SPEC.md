@@ -431,6 +431,12 @@ and describe the active work with concise verification criteria.
   - `estat dml` post-estimation diagnostics with fold count, treated/control counts, nuisance
     treatment-fit summaries, and overlap checks
   - focused parser, executor, CLI, shell, help, and extension-registry coverage
+- Implemented Phase 19 spatial weight matrix configuration and GIS file ingestion:
+  - `spregress <y> <xvars>, weights(<path>) id(<id_var>) [contiguity(queen|rook)]` command support
+  - loaded pre-computed spatial weights from standard `.gal`, `.gwt`, and `.shp` files
+  - case-insensitive attribute column resolution and dynamic matrix subsetting/reordering
+  - predict `xb` and `spatial_lag` support after weights-file-based estimation
+  - focused parser, executor/backend, CLI, autocomplete, and help topic coverage
 
 ## Present
 
@@ -454,7 +460,6 @@ and describe the active work with concise verification criteria.
   - remaining meaningful slices in this phase:
     - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
-    - Spatial weight matrix configuration and GIS file ingestion: support loading pre-computed spatial weights matrices from standard GIS files (e.g., `.gal` or `.gwt` files) and support polygon contiguity weights (Queen, Rook) in addition to KNN.
     - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
     - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
       support to additional spatial prediction scopes, especially out-of-sample workflows and any

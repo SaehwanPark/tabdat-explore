@@ -72,8 +72,10 @@ def test_parse_spregress_command() -> None:
 
 
 def test_parse_spregress_errors() -> None:
-  # Missing coord option
-  with pytest.raises(ParseError, match="spregress option coord expects exactly two variables"):
+  # Missing coord / weights option
+  with pytest.raises(
+    ParseError, match="spregress requires either coord\\(\\) or weights\\(\\) option"
+  ):
     parse_command("spregress y x")
 
   # coord with 1 variable
@@ -363,3 +365,303 @@ def test_spregress_help_topic() -> None:
   assert "spregress" in text
   assert "coord(" in text
   assert "Examples:" in text
+
+
+def test_parse_spregress_weights_options() -> None:
+  # Default contiguity(queen)
+  assert parse_command("spregress y x1 x2, weights(path/to/w.gal) id(station)") == SpregressCommand(
+    outcome="y",
+    predictors=("x1", "x2"),
+    model_type="lag",
+    coord_variables=None,
+    knn=None,
+    weights_file="path/to/w.gal",
+    id_variable="station",
+    contiguity="queen",
+    robust=False,
+  )
+
+  # Custom contiguity, model, robust
+  assert parse_command(
+    "spregress y x, weights(w.shp) id(station) contiguity(rook) model(error) robust"
+  ) == SpregressCommand(
+    outcome="y",
+    predictors=("x",),
+    model_type="error",
+    coord_variables=None,
+    knn=None,
+    weights_file="w.shp",
+    id_variable="station",
+    contiguity="rook",
+    robust=True,
+  )
+
+
+def test_parse_spregress_weights_errors() -> None:
+  # Conflict: both coord and weights
+  with pytest.raises(
+    ParseError,
+    match="spregress option coord and weights are mutually exclusive",
+  ):
+    parse_command("spregress y x, coord(lat lon) weights(w.gal) id(station)")
+
+  # Missing ID when weights is specified
+  with pytest.raises(
+    ParseError,
+    match="spregress option id\\(\\) is required when weights\\(\\) is specified",
+  ):
+    parse_command("spregress y x, weights(w.gal)")
+
+  # Missing weights/coord
+  with pytest.raises(
+    ParseError,
+    match="spregress requires either coord\\(\\) or weights\\(\\) option",
+  ):
+    parse_command("spregress y x, id(station)")
+
+  # Invalid contiguity
+  with pytest.raises(ParseError, match="spregress option contiguity must be 'queen' or 'rook'"):
+    parse_command("spregress y x, weights(w.shp) id(station) contiguity(invalid)")
+
+  # Unrecognized option with weights (e.g. knn)
+  with pytest.raises(
+    ParseError,
+    match="spregress option knn/coord can only be used with coord\\(\\)",
+  ):
+    parse_command("spregress y x, weights(w.shp) id(station) knn(3)")
+
+  # Contiguity with coord option
+  with pytest.raises(
+    ParseError,
+    match="spregress option contiguity can only be used with weights\\(\\)",
+  ):
+    parse_command("spregress y x, coord(lat lon) contiguity(queen)")
+
+
+def test_execute_spregress_weights_gal_gwt(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data.parquet"
+  df = pd.DataFrame(
+    {"y": [10.0, 12.0, 15.0, 18.0], "x": [1.0, 2.0, 3.0, 4.0], "id": ["A", "B", "C", "D"]}
+  )
+  assert len(df) == 4
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  # Write .gal file
+  # Format:
+  # 0 4
+  # A 2
+  # B C
+  # B 2
+  # A D
+  # C 2
+  # A D
+  # D 2
+  # B C
+  gal_path = tmp_path / "w.gal"
+  gal_path.write_text("0 4 test GAL\nA 2\nB C\nB 2\nA D\nC 2\nA D\nD 2\nB C\n")
+
+  # Write .gwt file
+  gwt_path = tmp_path / "w.gwt"
+  gwt_path.write_text(
+    "0 4 test.shp STATION\nA B 1.0\nA C 1.0\nB A 1.0\nB D 1.0\nC A 1.0\nC D 1.0\nD B 1.0\nD C 1.0\n"
+  )
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+
+    # GAL execution
+    result_gal = executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        weights_file=str(gal_path),
+        id_variable="id",
+        contiguity="queen",
+        robust=False,
+      )
+    )
+    assert isinstance(result_gal, SpatialRegressionResult)
+    assert result_gal.observation_count == 4
+    assert len(result_gal.coefficients) == 3
+
+    # GWT execution
+    result_gwt = executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        weights_file=str(gwt_path),
+        id_variable="id",
+        contiguity="queen",
+        robust=False,
+      )
+    )
+    assert isinstance(result_gwt, SpatialRegressionResult)
+    assert result_gwt.observation_count == 4
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_weights_shp(tmp_path: Path) -> None:
+  import libpysal
+
+  shp_path = libpysal.examples.get_path("baltim.shp")
+  dbf_path = libpysal.examples.get_path("baltim.dbf")
+
+  db = libpysal.io.open(dbf_path)
+  df = db.to_df()
+  # Normalize columns
+  df.columns = [c.lower() for c in df.columns]
+
+  import duckdb
+
+  data_path = tmp_path / "baltim.parquet"
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    result = executor.execute(
+      SpregressCommand(
+        outcome="price",
+        predictors=("nroom", "age"),
+        model_type="lag",
+        weights_file=shp_path,
+        id_variable="station",
+        contiguity="queen",
+        robust=False,
+      )
+    )
+    assert isinstance(result, SpatialRegressionResult)
+    assert result.observation_count == len(df)
+
+    # Predict xb
+    predict_xb = executor.execute(
+      PredictCommand(
+        target_variable="price_hat",
+        kind="xb",
+      )
+    )
+    assert predict_xb is not None
+
+    # Predict spatial_lag
+    predict_lag = executor.execute(
+      PredictCommand(
+        target_variable="price_lag",
+        kind="spatial_lag",
+      )
+    )
+    assert predict_lag is not None
+
+    active_ds = executor.state.active_dataset
+    assert active_ds is not None
+    columns = [col.name for col in active_ds.columns]
+    assert "price_hat" in columns
+    assert "price_lag" in columns
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_weights_errors(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data_err.parquet"
+  df = pd.DataFrame({"y": [10.0, 12.0, 15.0], "x": [1.0, 2.0, 3.0], "id": ["A", "B", "C"]})
+  assert len(df) == 3
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  gal_path = tmp_path / "w_err.gal"
+  gal_path.write_text("0 3 test GAL\nA 1\nB\nB 1\nA\nC 0\n")
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+
+    # 1. Non-existent file
+    with pytest.raises(ExecutionError, match="weights file not found"):
+      executor.execute(
+        SpregressCommand(
+          outcome="y",
+          predictors=("x",),
+          model_type="lag",
+          weights_file="nonexistent.gal",
+          id_variable="id",
+          contiguity="queen",
+          robust=False,
+        )
+      )
+
+    # 2. Unsupported extension
+    txt_path = tmp_path / "w.txt"
+    txt_path.write_text("dummy")
+    with pytest.raises(ExecutionError, match="unsupported weights file format"):
+      executor.execute(
+        SpregressCommand(
+          outcome="y",
+          predictors=("x",),
+          model_type="lag",
+          weights_file=str(txt_path),
+          id_variable="id",
+          contiguity="queen",
+          robust=False,
+        )
+      )
+
+    # 3. ID column not in active dataset
+    with pytest.raises(ExecutionError, match="id variable 'missing_id' not found"):
+      executor.execute(
+        SpregressCommand(
+          outcome="y",
+          predictors=("x",),
+          model_type="lag",
+          weights_file=str(gal_path),
+          id_variable="missing_id",
+          contiguity="queen",
+          robust=False,
+        )
+      )
+
+    # 4. ID mismatch (missing IDs in weights file)
+    # Create a dataset with ID D, which is not in the gal file (A, B, C)
+    df_mismatch = pd.DataFrame(
+      {"y": [10.0, 12.0, 15.0], "x": [1.0, 2.0, 3.0], "id": ["A", "B", "D"]}
+    )
+    assert len(df_mismatch) == 3
+    mismatch_data_path = tmp_path / "mismatch.parquet"
+    con.execute("copy df_mismatch to ? (format parquet)", [str(mismatch_data_path)])
+    executor.execute(UseCommand(mismatch_data_path))
+
+    with pytest.raises(
+      ExecutionError,
+      match="some regression sample IDs are missing from the spatial weights",
+    ):
+      executor.execute(
+        SpregressCommand(
+          outcome="y",
+          predictors=("x",),
+          model_type="lag",
+          weights_file=str(gal_path),
+          id_variable="id",
+          contiguity="queen",
+          robust=False,
+        )
+      )
+  finally:
+    executor.close()
+
+
+def test_spregress_shell_autocomplete_updated() -> None:
+  completions = list(_option_completions("spregress", ""))
+  completion_texts = [c.text for c in completions]
+  assert "weights(" in completion_texts
+  assert "id(" in completion_texts
+  assert "contiguity(" in completion_texts

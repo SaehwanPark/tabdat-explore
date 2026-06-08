@@ -4,6 +4,21 @@ All notable project changes are tracked here.
 
 ---
 
+## [0.18.0] — 2026-06-08
+
+Phase 19 spatial weight matrix configuration and GIS file ingestion support.
+
+### Added
+
+- Added Phase 19 spatial weight matrix configuration and GIS file ingestion in `spregress` command:
+  - Supports loading pre-computed spatial weight matrices from `.gal`, `.gwt`, and `.shp` files via `weights(path)` and `id(id_var)`.
+  - Added Rook and Queen polygon contiguity weights from shapefiles via `contiguity(queen|rook)` option.
+  - Implemented case-insensitive DBF column resolution and dynamic matrix subsetting and reordering to align with regression sample.
+  - Updated predict `xb` and `spatial_lag` to support file-based weights estimations.
+  - Added shell completions, help documentation, and comprehensive unit/integration test coverage.
+
+---
+
 ## [0.17.0] — 2026-06-08
 
 Phase 19 partial-linear DML treatment-effect estimation starter.

@@ -330,9 +330,12 @@ class SpregressCommand:
   outcome: str
   predictors: tuple[str, ...]
   model_type: Literal["lag", "error"]
-  coord_variables: tuple[str, str]
-  knn: int
-  robust: bool
+  coord_variables: tuple[str, str] | None = None
+  knn: int | None = None
+  weights_file: str | None = None
+  id_variable: str | None = None
+  contiguity: Literal["queen", "rook"] | None = None
+  robust: bool = False
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -862,14 +865,17 @@ class SpatialRegressionResult:
   outcome: str
   predictors: tuple[str, ...]
   model_type: Literal["lag", "error"]
-  coord_variables: tuple[str, str]
-  knn: int
   robust: bool
   observation_count: int
   r_squared: float | None
   coefficients: tuple[CoefficientEstimate, ...]
   spatial_coefficient: float
   spatial_coefficient_name: str
+  coord_variables: tuple[str, str] | None = None
+  knn: int | None = None
+  weights_file: str | None = None
+  id_variable: str | None = None
+  contiguity: Literal["queen", "rook"] | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
