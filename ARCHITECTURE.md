@@ -88,7 +88,8 @@ Phase 17 parsing adds
 `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
 Phase 19 parsing now adds ML/spatial commands including
 `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` and
-`postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`.
+`postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`, and
+`dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
 exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
@@ -250,6 +251,9 @@ display formatting.
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
 - Phase 19 post-selection starter is executable through
   `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`.
+- Phase 19 partial-linear DML starter is executable through
+  `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
+  plus `estat dml`.
 - Phase 19 spatial predictive follow-up is executable through
   `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, coord(<lat> <lon>) model(lag)`.
 - Phase 14 IV slices are executable through

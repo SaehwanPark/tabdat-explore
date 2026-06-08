@@ -4,6 +4,23 @@ All notable project changes are tracked here.
 
 ---
 
+## [0.17.0] — 2026-06-08
+
+Phase 19 partial-linear DML treatment-effect estimation starter.
+
+### Added
+
+- Added the eighth Phase 19 modern-extensions slice with
+  `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`,
+  combining Python-first `scikit-learn` cross-fitted Lasso nuisances with a `statsmodels` OLS final
+  stage for binary-treatment ATE estimation.
+- Added `estat dml` post-estimation diagnostics with fold count, treated/control counts, nuisance
+  treatment-fit summaries, and overlap checks.
+- Added typed extension-registry estimator metadata for `dml`
+  (`python:sklearn.linear_model.Lasso+statsmodels.OLS`) with focused registry tests.
+
+---
+
 ## [0.16.0] — 2026-06-07
 
 Phase 19 ML/spatial modern extensions and Phase 20 doubly robust DID; ROP

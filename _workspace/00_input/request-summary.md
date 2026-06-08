@@ -1,36 +1,31 @@
-# Phase 19 Resume Request Summary
+# Request Summary: Phase 19 Slice 8 DML
 
-## User Goal
+## Goal
 
-Resume development from the latest `SPEC.md` checkpoint by implementing the next bounded vertical
-slice, following the repo workflow for branch creation, TDD, docs updates, PR creation, and
-independent review.
+Resume development from the latest checkpoint on `main` and implement the next bounded Phase 19
+slice: partial-linear double/debiased machine learning (DML) for binary treatment-effect estimation
+under high-dimensional controls.
 
 ## Checkpoint
 
-- Base branch: `origin/main`
-- Base commit: `bd5fded40c9aab71fc65fd0cea0e7a0e4005040c`
-- Working branch: `temp/phase19-slice6-spregress-spatial-lag-predict`
+- Branch base: `main` at latest (`a170850`)
+- Working branch: `temp/phase19-slice8-dml-linear-treatment`
+- Prior completed slice: Phase 19 slice 7 (`postlasso`)
 
-## Scope Chosen
+## Touched Surfaces
 
-- Phase 19 modern extensions
-- Split the coarse remaining spatial predictive workflow into a thinner slice
-- Slice target: `predict <newvar>, spatial_lag` after `spregress ... model(lag)`
+- Parser (`dml`, `estat dml`)
+- Executor (cross-fitted sklearn Lasso nuisances + final OLS stage)
+- Formatter, shell completions, help, extension registry
+- Tests and SDD docs (`SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `README.md`)
 
-## Constraints
+## Assumptions
 
-- Preserve existing parser/executor/CLI/help boundaries
-- Keep the change bounded to the existing `spregress` command family
-- Preserve current `predict ..., xb` behavior after `spregress`
-- Keep help-topic coverage complete for all implemented commands
-- Run full validation before PR-ready handoff
+- Partial-linear binary-treatment ATE only; no IV, CATE, or predict routing in this slice.
+- Python-first via existing `scikit-learn` + `statsmodels`; no new runtime dependencies.
+- Binary treatment validation follows existing `did`/`drdid` conventions.
 
 ## Non-goals
 
-- No Bayesian MCMC prefix work
-- No posterior predictive workflows
-- No GIS file ingestion or alternative weight matrix formats
-- No SAC/SARAR support
-- No Moran's I or LM diagnostics
-- No spatial full-prediction support for `spregress ... model(error)` in this slice
+- Bayesian MCMC prefix, spatial GIS ingestion, advanced SAR diagnostics.
+- `predict` after `dml`, panel preconditions, R fallback.
