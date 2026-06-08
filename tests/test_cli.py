@@ -435,6 +435,53 @@ def test_cli_runs_phase_19_lasso_and_predict_flow(tmp_path: Path, capsys) -> Non
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_dml_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "dml.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select
+      2.0 * d + x1 as y,
+      d,
+      x1,
+      x2
+    from (
+      select
+        case when x1 + x2 > 1.0 then 1.0 else 0.0 end as d,
+        x1,
+        x2
+      from (
+        select
+          (row_number() over () % 10) / 10.0 as x1,
+          ((row_number() over () * 3) % 10) / 10.0 as x2
+        from range(1, 81)
+      ) controls
+    ) dml_data
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "dml linear y x1 x2, treat(d) folds(3) alpha(0.01) seed(42)",
+      "-c",
+      "estat dml",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Model: dml linear y on x1 x2 (treat=d)" in captured.out
+  assert "Estimator: dml" in captured.out
+  assert "Folds: 3" in captured.out
+  assert "Alpha: 0.01" in captured.out
+  assert "ATE" in captured.out
+  assert "Cross-Fit Folds" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_19_postlasso_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "postlasso.parquet"
   _write_sql_parquet(

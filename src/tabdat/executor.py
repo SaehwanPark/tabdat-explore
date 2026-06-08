@@ -20,6 +20,7 @@ from sklearn.linear_model import (
   Lasso,
   Ridge,
 )
+from sklearn.model_selection import KFold
 from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
@@ -65,6 +66,8 @@ from tabdat.models import (
   DescribeResult,
   DidCommand,
   DidRegressionResult,
+  DmlCommand,
+  DmlRegressionResult,
   DrDidCommand,
   DrDidRegressionResult,
   DropCommand,
@@ -352,6 +355,21 @@ class _DrDidRegressionState:
 
 
 @dataclass(frozen=True)
+class _DmlRegressionState:
+  outcome_variable: str
+  controls: tuple[str, ...]
+  treatment_variable: str
+  folds: int
+  alpha: float
+  observation_count: int
+  count_treated: int
+  count_control: int
+  min_nuisance_treatment_fit: float
+  max_nuisance_treatment_fit: float
+  mean_nuisance_treatment_fit: float
+
+
+@dataclass(frozen=True)
 class _BinaryRegressionState:
   family: Literal["logit", "probit"]
   outcome_variable: str
@@ -465,6 +483,7 @@ class SessionState:
   xt_regressions: _XtModelCache = field(default_factory=_XtModelCache)
   did_regression: _DidRegressionState | None = None
   drdid_regression: _DrDidRegressionState | None = None
+  dml_regression: _DmlRegressionState | None = None
   xtabond_regression: _XtAbondRegressionState | None = None
   spatial_regression: _SpatialRegressionState | None = None
 
@@ -502,6 +521,7 @@ class Executor:
     self.state.xt_regressions = _XtModelCache()
     self.state.did_regression = None
     self.state.drdid_regression = None
+    self.state.dml_regression = None
     self.state.xtabond_regression = None
     self.state.heckman_regression = None
 
@@ -537,6 +557,7 @@ class Executor:
         XtRegCommand,
         DidCommand,
         DrDidCommand,
+        DmlCommand,
         XtAbondCommand,
         XtLogitCommand,
         SpregressCommand,
@@ -798,6 +819,9 @@ class Executor:
 
     if isinstance(command, DrDidCommand):
       return self._execute_drdid(command)
+
+    if isinstance(command, DmlCommand):
+      return self._execute_dml(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -3756,6 +3780,11 @@ class Executor:
       if drdid_regression is None:
         raise ExecutionError("estat drdid requires a prior drdid model")
       return _estat_drdid_table(drdid_regression)
+    if command.subcommand == "dml":
+      dml_regression = self.state.dml_regression
+      if dml_regression is None:
+        raise ExecutionError("estat dml requires a prior dml model")
+      return _estat_dml_table(dml_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -4345,6 +4374,105 @@ class Executor:
       lci=lci,
       uci=uci,
       notes=notes,
+    )
+
+  def _execute_dml(self, command: DmlCommand) -> DmlRegressionResult:
+    _ = estimator_adapter_for("dml")
+    self._clear_all_regression_states()
+    dataset = self._require_active_dataset("dml")
+    numeric_variables: tuple[str, ...] = (
+      command.outcome,
+      command.treatment_variable,
+      *command.controls,
+    )
+    _require_numeric_columns("dml", dataset, numeric_variables)
+    rows = self.backend.regression_rows(dataset, numeric_variables)
+    outcome_index = 0
+    treatment_index = 1
+    control_count = len(command.controls)
+    outcome: list[float] = []
+    treatment: list[float] = []
+    controls: list[tuple[float, ...]] = []
+    for row in rows:
+      outcome_value = _coerce_float(row[outcome_index])
+      treatment_value = _coerce_float(row[treatment_index])
+      if outcome_value is None or treatment_value is None:
+        continue
+      control_values: list[float] = []
+      for raw in row[2 : 2 + control_count]:
+        control_value = _coerce_float(raw)
+        if control_value is None:
+          break
+        control_values.append(control_value)
+      else:
+        outcome.append(outcome_value)
+        treatment.append(treatment_value)
+        controls.append(tuple(control_values))
+    if not outcome:
+      raise ExecutionError("dml requires at least one complete observation")
+    allowed = {0.0, 1.0}
+    treatment_set = set(treatment)
+    if treatment_set - allowed:
+      raise ExecutionError("dml treatment variable must be binary with values 0 and 1")
+    if len(treatment_set) < 2:
+      raise ExecutionError("dml treatment variable must include both 0 and 1 values")
+    if len(outcome) < command.folds:
+      raise ExecutionError("dml requires at least as many observations as folds")
+    try:
+      fit = _fit_dml_linear(
+        outcome=np.array(outcome, dtype=float),
+        treatment=np.array(treatment, dtype=float),
+        controls=np.array(controls, dtype=float),
+        folds=command.folds,
+        alpha=command.alpha,
+        include_intercept=command.include_intercept,
+        robust=command.robust,
+        seed=command.seed,
+      )
+    except ExecutionError:
+      raise
+    except Exception as exc:
+      raise ExecutionError("dml estimation failed") from exc
+    ate, se, lci, uci, nuisance_fits = fit
+    t_statistic = ate / se if se != 0.0 else 0.0
+    p_value = float(norm.sf(abs(t_statistic)) * 2)
+    coefficients = (
+      CoefficientEstimate(
+        name="ATE",
+        value=ate,
+        standard_error=se,
+        statistic=t_statistic,
+        p_value=p_value,
+      ),
+    )
+    count_treated = sum(1 for value in treatment if value == 1.0)
+    count_control = len(treatment) - count_treated
+    clipped_fits = np.clip(nuisance_fits, 0.0, 1.0)
+    self.state.dml_regression = _DmlRegressionState(
+      outcome_variable=command.outcome,
+      controls=command.controls,
+      treatment_variable=command.treatment_variable,
+      folds=command.folds,
+      alpha=command.alpha,
+      observation_count=len(outcome),
+      count_treated=count_treated,
+      count_control=count_control,
+      min_nuisance_treatment_fit=float(np.min(clipped_fits)),
+      max_nuisance_treatment_fit=float(np.max(clipped_fits)),
+      mean_nuisance_treatment_fit=float(np.mean(clipped_fits)),
+    )
+    covariance: Literal["nonrobust", "robust"] = "robust" if command.robust else "nonrobust"
+    return DmlRegressionResult(
+      covariance=covariance,
+      outcome=command.outcome,
+      controls=command.controls,
+      treatment_variable=command.treatment_variable,
+      folds=command.folds,
+      alpha=command.alpha,
+      observation_count=len(outcome),
+      coefficients=coefficients,
+      lci=lci,
+      uci=uci,
     )
 
   def _require_active_dataset(self, command_name: str) -> DatasetInfo:
@@ -7658,6 +7786,94 @@ def _fit_drdid_r_fallback(
   count_upre = len(df[(df[treatment_name] == 0) & (df[post_name] == 0)])
 
   return att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre
+
+
+def _fit_dml_linear(
+  *,
+  outcome: np.ndarray,
+  treatment: np.ndarray,
+  controls: np.ndarray,
+  folds: int,
+  alpha: float,
+  include_intercept: bool,
+  robust: bool,
+  seed: int | None,
+) -> tuple[float, float, float, float, np.ndarray]:
+  n = len(outcome)
+  y_tilde = np.zeros(n, dtype=float)
+  d_tilde = np.zeros(n, dtype=float)
+  nuisance_fits = np.zeros(n, dtype=float)
+  kfold = KFold(n_splits=folds, shuffle=True, random_state=seed)
+  for train_idx, test_idx in kfold.split(controls):
+    train_controls = controls[train_idx]
+    test_controls = controls[test_idx]
+    y_train = outcome[train_idx]
+    d_train = treatment[train_idx]
+    try:
+      outcome_model = Lasso(
+        alpha=alpha,
+        fit_intercept=include_intercept,
+        max_iter=10_000,
+      ).fit(train_controls, y_train)
+      treatment_model = Lasso(
+        alpha=alpha,
+        fit_intercept=include_intercept,
+        max_iter=10_000,
+      ).fit(train_controls, d_train)
+    except Exception as exc:
+      raise ExecutionError("dml nuisance model fitting failed") from exc
+    y_tilde[test_idx] = outcome[test_idx] - outcome_model.predict(test_controls)
+    nuisance_predictions = treatment_model.predict(test_controls)
+    nuisance_fits[test_idx] = nuisance_predictions
+    d_tilde[test_idx] = treatment[test_idx] - nuisance_predictions
+  if float(np.sum(d_tilde**2)) == 0.0:
+    raise ExecutionError("dml orthogonalized treatment variation is zero")
+  try:
+    fitted = sm.OLS(y_tilde, d_tilde).fit()
+    if robust:
+      fitted = fitted.get_robustcov_results(cov_type="HC1")
+  except Exception as exc:
+    raise ExecutionError("dml final-stage estimation failed") from exc
+  ate = float(fitted.params[0])
+  se = float(fitted.bse[0])
+  confidence = fitted.conf_int(alpha=0.05)
+  lci = float(confidence[0, 0])
+  uci = float(confidence[0, 1])
+  return ate, se, lci, uci, nuisance_fits
+
+
+def _estat_dml_table(dml_regression: _DmlRegressionState) -> TableResult:
+  headers = ("Diagnostic Metric", "Value")
+  rows = [
+    ("Estimation Method", "PARTIAL_LINEAR_DML"),
+    ("Cross-Fit Folds", str(dml_regression.folds)),
+    ("Alpha", f"{dml_regression.alpha:.6f}"),
+    ("Treated Observations", str(dml_regression.count_treated)),
+    ("Control Observations", str(dml_regression.count_control)),
+    ("Complete Observations", str(dml_regression.observation_count)),
+    (
+      "Nuisance Treatment Fit Min",
+      f"{dml_regression.min_nuisance_treatment_fit:.6f}",
+    ),
+    (
+      "Nuisance Treatment Fit Max",
+      f"{dml_regression.max_nuisance_treatment_fit:.6f}",
+    ),
+    (
+      "Nuisance Treatment Fit Mean",
+      f"{dml_regression.mean_nuisance_treatment_fit:.6f}",
+    ),
+  ]
+  overlap_ok = (
+    "Yes"
+    if (
+      dml_regression.min_nuisance_treatment_fit > 1e-4
+      and dml_regression.max_nuisance_treatment_fit < 1 - 1e-4
+    )
+    else "Warning (Extreme nuisance treatment fit detected)"
+  )
+  rows.append(("Common Support / Overlap Check Passed", overlap_ok))
+  return TableResult(headers=headers, rows=tuple(rows))
 
 
 def _estat_drdid_table(drdid_regression: _DrDidRegressionState) -> TableResult:
