@@ -23,6 +23,7 @@ EstimatorCommand = Literal[
   "cvelasticnet",
   "bayes",
   "spregress",
+  "dml",
 ]
 
 
@@ -110,6 +111,10 @@ _ESTIMATOR_SPECS: tuple[EstimatorAdapterSpec, ...] = (
   EstimatorAdapterSpec(
     command="spregress",
     primary_backend="python:spreg",
+  ),
+  EstimatorAdapterSpec(
+    command="dml",
+    primary_backend="python:sklearn.linear_model.Lasso+statsmodels.OLS",
   ),
 )
 

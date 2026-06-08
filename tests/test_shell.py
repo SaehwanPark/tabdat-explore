@@ -196,6 +196,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     postlasso_command = _completion_texts(completer, "post")
     postlasso_columns = _completion_texts(completer, "postlasso linear c")
     postlasso_options = _completion_texts(completer, "postlasso linear cost age, ")
+    dml_command = _completion_texts(completer, "dm")
+    dml_columns = _completion_texts(completer, "dml linear c")
+    dml_options = _completion_texts(completer, "dml linear cost age, ")
     qreg_command = _completion_texts(completer, "qre")
     qreg_columns = _completion_texts(completer, "qreg c")
     qreg_options = _completion_texts(completer, "qreg cost age, ")
@@ -273,6 +276,9 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert postlasso_command == ["postlasso"]
   assert postlasso_columns == ["cost"]
   assert postlasso_options == ["alpha(", "robust", "noconstant"]
+  assert dml_command == ["dml"]
+  assert dml_columns == ["cost"]
+  assert dml_options == ["treat(", "folds(", "alpha(", "robust", "seed(", "noconstant"]
   assert qreg_command == ["qreg"]
   assert qreg_columns == ["cost"]
   assert qreg_options == ["quantile(", "robust", "noconstant"]
