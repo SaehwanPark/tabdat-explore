@@ -4377,8 +4377,10 @@ class Executor:
     )
 
   def _execute_dml(self, command: DmlCommand) -> DmlRegressionResult:
-    _ = estimator_adapter_for("dml")
+    _ = estimator_adapter_for("dml")  # registry validation only; no R fallback for dml
     self._clear_all_regression_states()
+    if not command.controls:
+      raise ExecutionError("dml requires at least one control variable")
     dataset = self._require_active_dataset("dml")
     numeric_variables: tuple[str, ...] = (
       command.outcome,
@@ -4433,9 +4435,7 @@ class Executor:
       raise
     except Exception as exc:
       raise ExecutionError("dml estimation failed") from exc
-    ate, se, lci, uci, nuisance_fits = fit
-    t_statistic = ate / se if se != 0.0 else 0.0
-    p_value = float(norm.sf(abs(t_statistic)) * 2)
+    ate, se, lci, uci, t_statistic, p_value, nuisance_fits = fit
     coefficients = (
       CoefficientEstimate(
         name="ATE",
@@ -7798,7 +7798,7 @@ def _fit_dml_linear(
   include_intercept: bool,
   robust: bool,
   seed: int | None,
-) -> tuple[float, float, float, float, np.ndarray]:
+) -> tuple[float, float, float, float, float, float, np.ndarray]:
   n = len(outcome)
   y_tilde = np.zeros(n, dtype=float)
   d_tilde = np.zeros(n, dtype=float)
@@ -7826,8 +7826,10 @@ def _fit_dml_linear(
     nuisance_predictions = treatment_model.predict(test_controls)
     nuisance_fits[test_idx] = nuisance_predictions
     d_tilde[test_idx] = treatment[test_idx] - nuisance_predictions
-  if float(np.sum(d_tilde**2)) == 0.0:
-    raise ExecutionError("dml orthogonalized treatment variation is zero")
+  if np.sum(d_tilde**2) < 1e-10 * n:
+    raise ExecutionError(
+      "dml orthogonalized treatment variation is near zero; try a smaller alpha or more folds"
+    )
   try:
     fitted = sm.OLS(y_tilde, d_tilde).fit()
     if robust:
@@ -7836,10 +7838,12 @@ def _fit_dml_linear(
     raise ExecutionError("dml final-stage estimation failed") from exc
   ate = float(fitted.params[0])
   se = float(fitted.bse[0])
+  t_statistic = float(fitted.tvalues[0])
+  p_value = float(fitted.pvalues[0])
   confidence = fitted.conf_int(alpha=0.05)
   lci = float(confidence[0, 0])
   uci = float(confidence[0, 1])
-  return ate, se, lci, uci, nuisance_fits
+  return ate, se, lci, uci, t_statistic, p_value, nuisance_fits
 
 
 def _estat_dml_table(dml_regression: _DmlRegressionState) -> TableResult:

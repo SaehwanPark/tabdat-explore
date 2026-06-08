@@ -92,11 +92,11 @@ command line. The current CLI supports:
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
 - prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository is at **v0.16.0**. It has completed Phase 1–12 core infrastructure, three Phase
+The repository is at **v0.17.0**. It has completed Phase 1–12 core infrastructure, three Phase
 13 linear-econometrics slices, thirteen Phase 14 IV/panel slices, seven Phase 15 nonlinear
 estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
 `nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven

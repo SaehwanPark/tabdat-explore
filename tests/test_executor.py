@@ -1168,6 +1168,40 @@ def test_phase_19_dml_requires_both_treatment_levels(tmp_path: Path) -> None:
     executor.close()
 
 
+def test_phase_19_dml_requires_at_least_one_control(tmp_path: Path) -> None:
+  path = tmp_path / "dml-no-controls.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="at least one control variable"):
+      executor.execute(DmlCommand(outcome="y", controls=(), treatment_variable="x", folds=2))
+  finally:
+    executor.close()
+
+
+def test_phase_19_dml_requires_observations_at_least_equal_to_folds(tmp_path: Path) -> None:
+  path = tmp_path / "dml-folds.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 1.0, 0.1),
+        (2.0, 0.0, 0.2),
+        (3.0, 1.0, 0.3)
+    ) as dml_data(y, d, x1)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="at least as many observations as folds"):
+      executor.execute(DmlCommand(outcome="y", controls=("x1",), treatment_variable="d", folds=5))
+  finally:
+    executor.close()
+
+
 def test_phase_19_estat_dml_requires_prior_model(tmp_path: Path) -> None:
   path = tmp_path / "dml-estat.parquet"
   _write_regression_parquet(path)
