@@ -44,6 +44,9 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesMcmcEstimate,
+  BayesMcmcResult,
+  BayesPrefixCommand,
   BayesRegressionResult,
   BinaryExpression,
   ByCommand,
@@ -237,6 +240,17 @@ class _BayesRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
+
+
+@dataclass(frozen=True)
+class _BayesMcmcRegressionState:
+  outcome_variable: str
+  predictor_names: tuple[str, ...]
+  predictor_coefficients: tuple[float, ...]
+  intercept: float | None
+  include_intercept: bool
+  command_name: str
+  idata: Any
 
 
 @dataclass(frozen=True)
@@ -472,6 +486,7 @@ class SessionState:
   cvridge_regression: _CvridgeRegressionState | None = None
   cvelasticnet_regression: _CvelasticnetRegressionState | None = None
   bayes_regression: _BayesRegressionState | None = None
+  bayes_mcmc_regression: _BayesMcmcRegressionState | None = None
   heckman_regression: _HeckmanRegressionState | None = None
   qreg_regression: _QregRegressionState | None = None
   binary_regression: _BinaryRegressionState | None = None
@@ -510,6 +525,7 @@ class Executor:
     self.state.cvridge_regression = None
     self.state.cvelasticnet_regression = None
     self.state.bayes_regression = None
+    self.state.bayes_mcmc_regression = None
     self.state.spatial_regression = None
     self.state.qreg_regression = None
     self.state.binary_regression = None
@@ -831,6 +847,9 @@ class Executor:
 
     if isinstance(command, EstatCommand):
       return self._execute_estat(command)
+
+    if isinstance(command, BayesPrefixCommand):
+      return self._execute_bayes_prefix(command)
 
     raise ExecutionError("unsupported command")
 
@@ -1822,6 +1841,222 @@ class Executor:
       include_intercept=command.include_intercept,
       r_squared=_to_float(fitted.score(design, outcome_array)),
       coefficients=coefficients,
+    )
+
+  def _execute_bayes_prefix(self, command: BayesPrefixCommand) -> BayesMcmcResult:
+    self._clear_all_regression_states()
+
+    inner = command.command
+    if isinstance(inner, RegressCommand):
+      cmd_name = "regress"
+      outcome = inner.outcome
+      predictors = inner.predictors
+      include_intercept = inner.include_intercept
+      is_logit = False
+    elif isinstance(inner, LogitCommand):
+      cmd_name = "logit"
+      outcome = inner.outcome
+      predictors = inner.predictors
+      include_intercept = inner.include_intercept
+      is_logit = True
+    else:
+      raise ExecutionError("bayes prefix only supports regress and logit commands")
+
+    dataset = self._require_active_dataset(f"bayes: {cmd_name}")
+    numeric_variables = (outcome, *predictors)
+    _require_numeric_columns(f"bayes: {cmd_name}", dataset, numeric_variables)
+
+    row_columns = [outcome, *predictors]
+    rows = self.backend.regression_rows(dataset, tuple(row_columns))
+
+    if is_logit:
+      outcomes, predictors_data, _, missing_cluster_detected = _logit_sample(
+        rows=rows,
+        predictor_count=len(predictors),
+        has_cluster=False,
+      )
+      if not outcomes:
+        raise ExecutionError(f"bayes: {cmd_name} requires at least one complete observation")
+      observed_outcomes = set(outcomes)
+      if (
+        observed_outcomes != {0.0, 1.0}
+        and observed_outcomes != {0.0}
+        and observed_outcomes != {1.0}
+      ):
+        raise ExecutionError(f"bayes: {cmd_name} outcome must be binary with values 0 and 1")
+    else:
+      outcomes, predictors_data, _, _ = _regression_sample(
+        rows=rows,
+        predictor_count=len(predictors),
+        has_cluster=False,
+        has_weight=False,
+        weight_label="weights",
+      )
+      if not outcomes:
+        raise ExecutionError(f"bayes: {cmd_name} requires at least one complete observation")
+
+    formula_parts = []
+    if not include_intercept:
+      formula_parts.append("0")
+    for pred in predictors:
+      formula_parts.append(pred)
+
+    formula_rhs = " + ".join(formula_parts) if formula_parts else "1"
+    formula = f"{outcome} ~ {formula_rhs}"
+
+    import pandas as pd
+
+    df = pd.DataFrame(predictors_data, columns=predictors)
+    df[outcome] = outcomes
+
+    import bambi as bmb
+
+    priors = {}
+    for var_name, dist_str in command.priors:
+      prior_name = "Intercept" if var_name.lower() == "intercept" else var_name
+      import re
+
+      match = re.match(r"^([a-zA-Z]+)\(([^)]+)\)$", dist_str.strip())
+      if not match:
+        raise ExecutionError(f"invalid prior distribution: {dist_str}")
+      dist_name = match.group(1).lower()
+      args_str = match.group(2)
+      try:
+        args = [float(x.strip()) for x in args_str.split(",")]
+      except ValueError:
+        raise ExecutionError(f"prior parameters must be numeric in {dist_str}")
+
+      if dist_name == "normal":
+        if len(args) != 2:
+          raise ExecutionError(f"normal prior expects 2 parameters (mean, sd), got {len(args)}")
+        priors[prior_name] = bmb.Prior("Normal", mu=args[0], sigma=args[1])
+      elif dist_name == "uniform":
+        if len(args) != 2:
+          raise ExecutionError(
+            f"uniform prior expects 2 parameters (lower, upper), got {len(args)}"
+          )
+        priors[prior_name] = bmb.Prior("Uniform", lower=args[0], upper=args[1])
+      else:
+        raise ExecutionError(f"unsupported prior distribution: {dist_name}")
+
+    model = bmb.Model(
+      formula,
+      data=df,
+      family="bernoulli" if is_logit else "gaussian",
+      priors=priors if priors else None,
+    )
+
+    fit_kwargs = {}
+    if command.draws is not None:
+      fit_kwargs["draws"] = command.draws
+    if command.burnin is not None:
+      fit_kwargs["tune"] = command.burnin
+    if command.chains is not None:
+      fit_kwargs["chains"] = command.chains
+    if command.thin is not None:
+      fit_kwargs["thin"] = command.thin
+    if command.seed is not None:
+      fit_kwargs["random_seed"] = command.seed
+
+    fit_kwargs["progressbar"] = False
+
+    try:
+      idata = model.fit(**fit_kwargs)
+    except Exception as exc:
+      raise ExecutionError(f"bayes: {cmd_name} sampling failed") from exc
+
+    import arviz as az
+
+    summary = az.summary(idata, ci_prob=0.95)
+
+    estimates_list = []
+    for pred in predictors:
+      if pred in summary.index:
+        mean_val = float(summary.loc[pred, "mean"])
+        sd_val = float(summary.loc[pred, "sd"])
+        mcse_val = float(summary.loc[pred, "mcse_mean"])
+        ci_lower = float(summary.loc[pred, "eti95_lb"])
+        ci_upper = float(summary.loc[pred, "eti95_ub"])
+        estimates_list.append(
+          BayesMcmcEstimate(
+            name=pred,
+            mean=mean_val,
+            sd=sd_val,
+            mcse=mcse_val,
+            ci_lower=ci_lower,
+            ci_upper=ci_upper,
+          )
+        )
+
+    if include_intercept and "Intercept" in summary.index:
+      mean_val = float(summary.loc["Intercept", "mean"])
+      sd_val = float(summary.loc["Intercept", "sd"])
+      mcse_val = float(summary.loc["Intercept", "mcse_mean"])
+      ci_lower = float(summary.loc["Intercept", "eti95_lb"])
+      ci_upper = float(summary.loc["Intercept", "eti95_ub"])
+      estimates_list.insert(
+        0,
+        BayesMcmcEstimate(
+          name="Intercept",
+          mean=mean_val,
+          sd=sd_val,
+          mcse=mcse_val,
+          ci_lower=ci_lower,
+          ci_upper=ci_upper,
+        ),
+      )
+
+    if not is_logit and "sigma" in summary.index:
+      mean_val = float(summary.loc["sigma", "mean"])
+      sd_val = float(summary.loc["sigma", "sd"])
+      mcse_val = float(summary.loc["sigma", "mcse_mean"])
+      ci_lower = float(summary.loc["sigma", "eti95_lb"])
+      ci_upper = float(summary.loc["sigma", "eti95_ub"])
+      estimates_list.append(
+        BayesMcmcEstimate(
+          name="sigma",
+          mean=mean_val,
+          sd=sd_val,
+          mcse=mcse_val,
+          ci_lower=ci_lower,
+          ci_upper=ci_upper,
+        )
+      )
+
+    estimates = tuple(estimates_list)
+
+    mean_intercept = None
+    if include_intercept and "Intercept" in summary.index:
+      mean_intercept = float(summary.loc["Intercept", "mean"])
+
+    mean_predictor_coefs = []
+    for pred in predictors:
+      if pred in summary.index:
+        mean_predictor_coefs.append(float(summary.loc[pred, "mean"]))
+      else:
+        mean_predictor_coefs.append(0.0)
+
+    self.state.bayes_mcmc_regression = _BayesMcmcRegressionState(
+      outcome_variable=outcome,
+      predictor_names=predictors,
+      predictor_coefficients=tuple(mean_predictor_coefs),
+      intercept=mean_intercept,
+      include_intercept=include_intercept,
+      command_name=cmd_name,
+      idata=idata,
+    )
+
+    return BayesMcmcResult(
+      outcome=outcome,
+      predictors=predictors,
+      command_name=cmd_name,
+      draws=command.draws or 1000,
+      burnin=command.burnin or 1000,
+      chains=command.chains or 4,
+      thin=command.thin or 1,
+      observation_count=len(outcomes),
+      estimates=estimates,
+      ci_level=0.95,
     )
 
   def _execute_spregress(self, command: SpregressCommand) -> SpatialRegressionResult:

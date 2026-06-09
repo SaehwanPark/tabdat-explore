@@ -32,6 +32,8 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesMcmcResult,
+  BayesPrefixCommand,
   BayesRegressionResult,
   BinaryExpression,
   ByCommand,
@@ -1449,6 +1451,101 @@ def test_phase_19_bayes_clears_other_regression_states(tmp_path: Path) -> None:
     assert executor.state.bayes_regression is None
   finally:
     executor.close()
+
+
+def test_phase_19_bayes_prefix_returns_mcmc_result(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, BayesMcmcResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.command_name == "regress"
+  assert result.draws == 30
+  assert result.burnin == 15
+  assert result.chains == 1
+  assert result.observation_count == 6
+  assert len(result.estimates) == 3
+  names = [est.name for est in result.estimates]
+  assert "Intercept" in names
+  assert "x" in names
+  assert "sigma" in names
+
+
+def test_phase_19_bayes_prefix_logit(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_logit.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0),
+        (1.0, 2.0),
+        (0.0, 3.0),
+        (1.0, 4.0),
+        (0.0, 5.0),
+        (1.0, 6.0)
+    ) as t(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      BayesPrefixCommand(
+        command=LogitCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, BayesMcmcResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.command_name == "logit"
+  assert len(result.estimates) == 2
+
+
+def test_phase_19_bayes_prefix_custom_priors(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_priors.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+        priors=(("x", "normal(0,5)"), ("intercept", "uniform(-10,10)")),
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, BayesMcmcResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
 
 
 def test_phase_19_failed_heckman_clears_prior_lasso_state(

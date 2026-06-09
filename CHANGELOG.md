@@ -2,6 +2,19 @@
 
 All notable project changes are tracked here.
 
+## [0.19.0] — 2026-06-08
+
+Phase 19 general Bayesian MCMC command prefix support.
+
+### Added
+
+- Added Phase 19 general Bayesian MCMC prefix command `bayes:`:
+  - Supports `bayes [, options]: regress` and `bayes [, options]: logit` using Python-first `bambi` as the MCMC backend.
+  - Implemented MCMC specification options: `draws`, `burnin`/`tune`, `chains`, `thin`, and `seed`/`rseed`.
+  - Added support for custom prior distributions via `prior(variable, distribution)` with `normal(mu, sigma)` and `uniform(lower, upper)` distribution specifications.
+  - Formatted MCMC posterior summary statistics in terminal tables with `Mean`, `Std. Dev.`, `MCSE`, and `Cred. Interval` headers.
+  - Added autocompletions for prefix options and inner commands, help documentation topic, and focused integration tests.
+
 ---
 
 ## [0.18.0] — 2026-06-08

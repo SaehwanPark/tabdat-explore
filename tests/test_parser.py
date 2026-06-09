@@ -7,6 +7,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPrefixCommand,
   BinaryExpression,
   ByCommand,
   CfRegressCommand,
@@ -610,6 +611,32 @@ def test_parse_phase_19_bayes_command() -> None:
     tol=1e-5,
     include_intercept=False,
   )
+
+
+def test_parse_phase_19_bayes_prefix_command() -> None:
+  # Basic prefix without options
+  assert parse_command("bayes: regress y x") == BayesPrefixCommand(
+    command=RegressCommand(outcome="y", predictors=("x",)),
+  )
+  # Prefix with options
+  cmd1 = "bayes, draws(500) burnin(200) chains(2) thin(2) seed(123): regress y x"
+  assert parse_command(cmd1) == BayesPrefixCommand(
+    command=RegressCommand(outcome="y", predictors=("x",)),
+    draws=500,
+    burnin=200,
+    chains=2,
+    thin=2,
+    seed=123,
+  )
+  # Prefix with custom prior options
+  cmd2 = "bayes, prior(x, normal(0, 10)) prior(intercept, uniform(-5, 5)): logit y x"
+  assert parse_command(cmd2) == BayesPrefixCommand(
+    command=LogitCommand(outcome="y", predictors=("x",)),
+    priors=(("x", "normal(0,10)"), ("intercept", "uniform(-5,5)")),
+  )
+  # Invalid prefix inner command
+  with pytest.raises(ParseError, match="bayes prefix only supports regress and logit commands"):
+    parse_command("bayes: codebook")
 
 
 def test_parse_phase_13_predict_command() -> None:

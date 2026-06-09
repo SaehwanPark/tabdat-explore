@@ -10,6 +10,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPrefixCommand,
   BinaryExpression,
   ByCommand,
   CfRegressCommand,
@@ -201,6 +202,12 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_use_result(stripped)
   if command_name == "by":
     return _parse_by_result(stripped)
+  if (
+    command_name == "bayes:"
+    or command_name.startswith("bayes,")
+    or (command_name == "bayes" and ":" in stripped)
+  ):
+    return _parse_bayes_prefix_result(stripped)
   if command_name == "sql":
     return _parse_sql_result(stripped)
   if command_name == "run":
@@ -284,6 +291,77 @@ def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
   if isinstance(command, HelpCommand):
     return cast(Command, (yield Err("help is not supported inside by commands")))
   return ByCommand(groups=groups, command=command)
+
+
+@result.block
+def _parse_bayes_prefix_result(text: str) -> Generator[Result[Any, str], Any, Command]:
+  before, separator, after = text.partition(":")
+  if not separator:
+    return cast(Command, (yield Err("bayes prefix expects syntax: bayes [, options]: command")))
+
+  before_stripped = before.strip()
+  if before_stripped == "bayes":
+    draws, burnin, chains, thin, seed = None, None, None, None, None
+    priors: list[tuple[str, str]] = []
+  else:
+    if not before_stripped.startswith("bayes"):
+      return cast(Command, (yield Err("invalid bayes prefix")))
+    options_part = before_stripped[len("bayes") :].strip()
+    if not options_part.startswith(","):
+      return cast(Command, (yield Err("bayes prefix options must start with a comma")))
+
+    tokens = yield _tokenize_result(options_part[1:].strip())
+    try:
+      parsed_options = _parse_options(tokens)
+    except ParseError as exc:
+      return cast(Command, (yield Err(str(exc))))
+
+    draws, burnin, chains, thin, seed = None, None, None, None, None
+    priors = []
+    for option in parsed_options:
+      if option.name == "draws":
+        if not isinstance(option.value, (int, float)):
+          return cast(Command, (yield Err("draws must be a numeric value")))
+        draws = int(option.value)
+      elif option.name in ("burnin", "tune"):
+        if not isinstance(option.value, (int, float)):
+          return cast(Command, (yield Err("burnin must be a numeric value")))
+        burnin = int(option.value)
+      elif option.name == "chains":
+        if not isinstance(option.value, (int, float)):
+          return cast(Command, (yield Err("chains must be a numeric value")))
+        chains = int(option.value)
+      elif option.name == "thin":
+        if not isinstance(option.value, (int, float)):
+          return cast(Command, (yield Err("thin must be a numeric value")))
+        thin = int(option.value)
+      elif option.name in ("seed", "rseed"):
+        if not isinstance(option.value, (int, float)):
+          return cast(Command, (yield Err("seed must be a numeric value")))
+        seed = int(option.value)
+      elif option.name == "prior":
+        if not isinstance(option.value, tuple) or len(option.value) != 2:
+          return cast(Command, (yield Err("prior expects (variable, distribution)")))
+        priors.append((option.value[0], option.value[1]))
+      else:
+        return cast(Command, (yield Err(f"unsupported bayes option: {option.name}")))
+
+  if not after.strip():
+    return cast(Command, (yield Err("bayes expects a command after :")))
+
+  inner_command = yield _parse_command_result(after.strip())
+  if not isinstance(inner_command, (RegressCommand, LogitCommand)):
+    return cast(Command, (yield Err("bayes prefix only supports regress and logit commands")))
+
+  return BayesPrefixCommand(
+    command=inner_command,
+    draws=draws,
+    burnin=burnin,
+    chains=chains,
+    thin=thin,
+    seed=seed,
+    priors=tuple(priors),
+  )
 
 
 def _parse_sql_result(text: str) -> Result[Command, str]:
@@ -2321,11 +2399,19 @@ def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
     if not stream.at_end and stream.peek.text == "(":
       stream.consume()
       value_tokens: list[_Token] = []
-      while not stream.at_end and stream.peek.text != ")":
+      depth = 1
+      while not stream.at_end and depth > 0:
+        peek_text = stream.peek.text
+        if peek_text == "(":
+          depth += 1
+        elif peek_text == ")":
+          depth -= 1
+          if depth == 0:
+            stream.consume()
+            break
         value_tokens.append(stream.consume())
-      if stream.at_end:
+      if depth > 0:
         raise ParseError(f"option {name.text} is missing closing )")
-      stream.consume()
       if not value_tokens:
         raise ParseError(f"option {name.text} expects at least one value")
       value = _parenthesized_option_value(name.text, tuple(value_tokens))
@@ -2369,12 +2455,31 @@ def _parenthesized_option_value(
     "bootstrap",
     "seed",
     "folds",
+    "draws",
+    "burnin",
+    "tune",
+    "chains",
+    "thin",
   }:
     numeric_text = "".join(token.text for token in tokens)
     try:
       return float(numeric_text)
     except ValueError as exc:
       raise ParseError(f"option {option_name} expects a numeric value") from exc
+
+  if option_name == "prior":
+    if not tokens:
+      raise ParseError("prior option expects prior(variable, distribution)")
+    comma_index = -1
+    for i, token in enumerate(tokens):
+      if token.text == ",":
+        comma_index = i
+        break
+    if comma_index <= 0 or comma_index == len(tokens) - 1:
+      raise ParseError("prior option expects prior(variable, distribution) syntax")
+    var_name = "".join(t.text for t in tokens[:comma_index]).strip()
+    dist_expr = "".join(t.text for t in tokens[comma_index + 1 :]).strip()
+    return (var_name, dist_expr)
   if option_name == "l1_ratio":
     l1_ratio_values: list[str] = []
     index = 0
