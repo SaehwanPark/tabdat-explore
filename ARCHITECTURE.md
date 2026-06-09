@@ -255,7 +255,7 @@ display formatting.
   `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
   plus `estat dml`.
 - Phase 19 spatial predictive follow-up is executable through
-  `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, coord(<lat> <lon>) model(lag)`.
+  `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, [coord(<lat> <lon>) | weights(<path>) id(<id_var>)] model(lag)`.
 - Phase 14 IV slices are executable through
   `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
 - Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after
