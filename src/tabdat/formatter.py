@@ -5,6 +5,7 @@ from pathlib import Path
 
 from tabdat.models import (
   ActivateResult,
+  BayesMcmcResult,
   BayesRegressionResult,
   CfRegressionResult,
   CodebookResult,
@@ -341,6 +342,33 @@ def format_result(result: Result) -> str:
       for estimate in result.coefficients
     )
     body = _table(("Variable", "Coef", "Std Err", "t", "P>|t|"), coefficient_rows)
+    return "\n".join([*header, *body])
+
+  if isinstance(result, BayesMcmcResult):
+    header = [
+      f"Model: bayes: {result.command_name} {result.outcome} on {' '.join(result.predictors)}",
+      "Estimator: MCMC (bambi)",
+      f"Chains: {result.chains}",
+      f"Draws per chain: {result.draws}",
+      f"Burn-in (Tune): {result.burnin}",
+      f"Thinning: {result.thin}",
+      f"Observations: {result.observation_count}",
+      "",
+    ]
+    coefficient_rows = (
+      (
+        estimate.name,
+        _format_number(estimate.mean),
+        _format_number(estimate.sd),
+        _format_number(estimate.mcse),
+        f"[{_format_number(estimate.ci_lower)}, {_format_number(estimate.ci_upper)}]",
+      )
+      for estimate in result.estimates
+    )
+    body = _table(
+      ("Variable", "Mean", "Std. Dev.", "MCSE", f"[{int(result.ci_level * 100)}% Cred. Interval]"),
+      coefficient_rows,
+    )
     return "\n".join([*header, *body])
 
   if isinstance(result, SpatialRegressionResult):

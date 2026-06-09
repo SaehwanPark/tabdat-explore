@@ -244,6 +244,14 @@ class TabdatCompleter(Completer):
       yield from self._by_completions(stripped, word)
       return
 
+    if (
+      command_name == "bayes:"
+      or command_name.startswith("bayes,")
+      or (command_name == "bayes" and ":" in stripped)
+    ):
+      yield from self._bayes_prefix_completions(stripped, word)
+      return
+
     if command_name in {
       "tabulate",
       "collapse",
@@ -301,6 +309,37 @@ class TabdatCompleter(Completer):
         _column_names(self._executor.state.active_dataset),
         word,
       )
+
+  def _bayes_prefix_completions(self, stripped: str, word: str) -> Iterable[Completion]:
+    before_colon, separator, after_colon = stripped.partition(":")
+    if not separator:
+      if "," in before_colon:
+        mcmc_options = (
+          "draws(",
+          "burnin(",
+          "tune(",
+          "chains(",
+          "thin(",
+          "seed(",
+          "rseed(",
+          "prior(",
+        )
+        yield from _matching_completions(mcmc_options, word)
+      return
+
+    if _is_first_token(after_colon):
+      yield from _matching_completions(("regress", "logit"), word)
+      return
+
+    child_name = after_colon.strip().split(maxsplit=1)[0].lower()
+    if child_name in ("regress", "logit") and _is_after_comma(after_colon):
+      yield from _option_completions(child_name, word)
+      return
+
+    yield from _matching_completions(
+      _column_names(self._executor.state.active_dataset),
+      word,
+    )
 
 
 class TabdatLexer(Lexer):

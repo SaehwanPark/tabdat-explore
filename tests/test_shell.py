@@ -140,6 +140,25 @@ def test_completer_suggests_by_child_commands_after_compact_colon(
   assert summarize_start_positions == [-3]
 
 
+def test_completer_suggests_bayes_prefix_options_and_inner_commands(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    completer = TabdatCompleter(executor)
+    options_completions = _completion_texts(completer, "bayes, dr")
+    inner_completions = _completion_texts(completer, "bayes, draws(50): ")
+    inner_reg_completions = _completion_texts(completer, "bayes, draws(50): reg")
+    inner_reg_options = _completion_texts(completer, "bayes, draws(50): regress age, ")
+  finally:
+    executor.close()
+
+  assert "draws(" in options_completions
+  assert "regress" in inner_completions
+  assert "logit" in inner_completions
+  assert inner_reg_completions == ["regress"]
+  assert "noconstant" in inner_reg_options
+
+
 def test_completer_suggests_sql_helpers() -> None:
   executor = Executor()
   try:

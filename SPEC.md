@@ -437,6 +437,12 @@ and describe the active work with concise verification criteria.
   - case-insensitive attribute column resolution and dynamic matrix subsetting/reordering
   - predict `xb` and `spatial_lag` support after weights-file-based estimation
   - focused parser, executor/backend, CLI, autocomplete, and help topic coverage
+- Implemented the tenth Phase 19 modern-extensions slice:
+  - `bayes [, options]: <regress|logit>` general MCMC prefix command using Python-first `bambi` as the MCMC backend
+  - MCMC chain option specifications (`draws`, `burnin`/`tune`, `chains`, `thin`, `seed`/`rseed`)
+  - support custom priors (`prior(variable, distribution)`) for normal and uniform distributions
+  - MCMC stats formatting (`Mean`, `Std. Dev.`, `MCSE`, `Cred. Interval`)
+  - focused parser, executor/backend, autocomplete, help topic, and CLI coverage
 
 ## Present
 
@@ -458,7 +464,6 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - General Bayesian MCMC command prefix: implement a generic `bayes:` command prefix (e.g., `bayes: regress` or `bayes: logit`) using `bambi` or `pymc` as the MCMC backend, enabling custom priors and MCMC chain specifications.
     - Bayesian diagnostics and posterior predictive workflows: add interactive MCMC diagnostic tools (trace, density, and autocorrelation plots) and expand `predict` options to support posterior predictive distributions (`predict ..., posterior_predictive`) for interval forecasting and out-of-sample Bayesian prediction.
     - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
     - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`

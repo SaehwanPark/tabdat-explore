@@ -214,6 +214,17 @@ class ByCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesPrefixCommand:
+  command: "Command"
+  draws: int | None = None
+  burnin: int | None = None
+  chains: int | None = None
+  thin: int | None = None
+  seed: int | None = None
+  priors: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ExitCommand:
   pass
 
@@ -638,6 +649,7 @@ Command = (
   | DrDidCommand
   | DmlCommand
   | CfRegressCommand
+  | BayesPrefixCommand
   | ParsedCommand
 )
 
@@ -858,6 +870,30 @@ class BayesRegressionResult:
   include_intercept: bool
   r_squared: float | None
   coefficients: tuple[CoefficientEstimate, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesMcmcEstimate:
+  name: str
+  mean: float
+  sd: float
+  mcse: float
+  ci_lower: float
+  ci_upper: float
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesMcmcResult:
+  outcome: str
+  predictors: tuple[str, ...]
+  command_name: str
+  draws: int
+  burnin: int
+  chains: int
+  thin: int
+  observation_count: int
+  estimates: tuple[BayesMcmcEstimate, ...]
+  ci_level: float = 0.95
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1193,4 +1229,5 @@ Result = (
   | SetResult
   | SaveResult
   | ExportResult
+  | BayesMcmcResult
 )
