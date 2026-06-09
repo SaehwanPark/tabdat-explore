@@ -2,10 +2,11 @@
 
 import hashlib
 import math
+import re
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any, Literal, SupportsFloat, cast
+from typing import TYPE_CHECKING, Any, Literal, SupportsFloat, cast
 
 import numpy as np
 import statsmodels.api as sm
@@ -27,6 +28,9 @@ from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, Zero
 from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
 from statsmodels.stats.diagnostic import linear_reset
 from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
+
+if TYPE_CHECKING:
+  import arviz
 
 from tabdat.backend import DuckDBBackend
 from tabdat.config import TabDatConfig, set_config_value
@@ -250,7 +254,7 @@ class _BayesMcmcRegressionState:
   intercept: float | None
   include_intercept: bool
   command_name: str
-  idata: Any
+  idata: "arviz.InferenceData"
 
 
 @dataclass(frozen=True)
@@ -1895,6 +1899,9 @@ class Executor:
       if not outcomes:
         raise ExecutionError(f"bayes: {cmd_name} requires at least one complete observation")
 
+    if not predictors:
+      raise ExecutionError(f"bayes: {cmd_name} requires at least one predictor")
+
     formula_parts = []
     if not include_intercept:
       formula_parts.append("0")
@@ -1914,8 +1921,6 @@ class Executor:
     priors = {}
     for var_name, dist_str in command.priors:
       prior_name = "Intercept" if var_name.lower() == "intercept" else var_name
-      import re
-
       match = re.match(r"^([a-zA-Z]+)\(([^)]+)\)$", dist_str.strip())
       if not match:
         raise ExecutionError(f"invalid prior distribution: {dist_str}")
@@ -3337,6 +3342,12 @@ class Executor:
     elasticnet_regression = self.state.elasticnet_regression
     cvelasticnet_regression = self.state.cvelasticnet_regression
     bayes_regression = self.state.bayes_regression
+    bayes_mcmc_regression = self.state.bayes_mcmc_regression
+    if bayes_mcmc_regression is not None:
+      raise ExecutionError(
+        "predict is not yet supported after bayes: prefix; "
+        "use Bayesian diagnostics in a future release"
+      )
     if lasso_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after lasso")
     if cvlasso_regression is not None and command.kind != "xb":

@@ -2454,6 +2454,7 @@ def _parenthesized_option_value(
     "cv",
     "bootstrap",
     "seed",
+    "rseed",
     "folds",
     "draws",
     "burnin",

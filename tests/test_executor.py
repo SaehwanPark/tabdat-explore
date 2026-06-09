@@ -1548,6 +1548,51 @@ def test_phase_19_bayes_prefix_custom_priors(tmp_path: Path) -> None:
   assert result.predictors == ("x",)
 
 
+def test_phase_19_bayes_prefix_noconstant(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_noconst.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",), include_intercept=False),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, BayesMcmcResult)
+  names = [est.name for est in result.estimates]
+  assert "Intercept" not in names
+  assert "x" in names
+
+
+def test_phase_19_bayes_prefix_predict_raises(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_predict.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    with pytest.raises(ExecutionError, match="predict is not yet supported after bayes: prefix"):
+      executor.execute(PredictCommand(target_variable="y_hat"))
+  finally:
+    executor.close()
+
+
 def test_phase_19_failed_heckman_clears_prior_lasso_state(
   tmp_path: Path,
   monkeypatch: pytest.MonkeyPatch,
