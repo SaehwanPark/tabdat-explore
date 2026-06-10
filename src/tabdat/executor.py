@@ -4241,6 +4241,11 @@ class Executor:
       if dml_regression is None:
         raise ExecutionError("estat dml requires a prior dml model")
       return _estat_dml_table(dml_regression)
+    if command.subcommand == "bayes":
+      bayes_mcmc_regression = self.state.bayes_mcmc_regression
+      if bayes_mcmc_regression is None:
+        raise ExecutionError("estat bayes requires a prior bayes: prefix model")
+      return _estat_bayes_table(bayes_mcmc_regression)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
@@ -7503,6 +7508,13 @@ def _to_float_allow_inf(value: object) -> float | None:
   return numeric
 
 
+def _normalize_bayes_metric(value: object) -> float | int | str:
+  numeric = _to_float(value)
+  if numeric is None:
+    return "not_available"
+  return numeric
+
+
 def _root_mse(
   *,
   mse_resid: object,
@@ -8411,3 +8423,36 @@ def _estat_drdid_table(drdid_regression: _DrDidRegressionState) -> TableResult:
     rows.append(("Common Support / Overlap Check Passed", overlap_ok))
 
   return TableResult(headers=headers, rows=tuple(rows))
+
+
+def _estat_bayes_table(bayes_regression: _BayesMcmcRegressionState) -> TableResult:
+  import arviz as az
+
+  try:
+    summary = az.summary(bayes_regression.idata, ci_prob=0.95)
+    divergence_total = bayes_regression.idata.sample_stats["diverging"].sum().item()
+  except Exception as exc:
+    raise ExecutionError("estat bayes failed for current model") from exc
+
+  metric_names = ("ess_bulk", "ess_tail", "r_hat", "mcse_mean", "mcse_sd")
+  parameter_names: list[str] = []
+  if bayes_regression.include_intercept:
+    parameter_names.append("Intercept")
+  parameter_names.extend(bayes_regression.predictor_names)
+  if bayes_regression.command_name == "regress":
+    parameter_names.append("sigma")
+
+  rows: list[tuple[str, str, object]] = []
+  for parameter_name in parameter_names:
+    if parameter_name not in summary.index:
+      continue
+    for metric_name in metric_names:
+      rows.append(
+        (
+          parameter_name,
+          metric_name,
+          _normalize_bayes_metric(summary.loc[parameter_name, metric_name]),
+        )
+      )
+  rows.append(("sampler", "divergence_count", int(divergence_total)))
+  return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))

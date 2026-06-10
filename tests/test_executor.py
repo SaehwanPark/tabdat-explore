@@ -1787,6 +1787,107 @@ def test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix(
     executor.close()
 
 
+def test_phase_19_estat_bayes_after_bayes_prefix_regress(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_estat.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("Variable", "Metric", "Value")
+  assert ("Intercept", "ess_bulk", "not_available") not in result.rows
+  assert any(row[0] == "Intercept" and row[1] == "ess_bulk" for row in result.rows)
+  assert any(row[0] == "x" and row[1] == "ess_tail" for row in result.rows)
+  assert any(row[0] == "sigma" and row[1] == "mcse_mean" for row in result.rows)
+  assert any(row[0] == "sigma" and row[1] == "r_hat" and row[2] == "not_available" for row in result.rows)
+  assert any(
+    row[0] == "sampler" and row[1] == "divergence_count" and isinstance(row[2], int) and row[2] >= 0
+    for row in result.rows
+  )
+
+
+def test_phase_19_estat_bayes_after_bayes_prefix_logit(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_logit_estat.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0),
+        (1.0, 2.0),
+        (0.0, 3.0),
+        (1.0, 4.0),
+        (0.0, 5.0),
+        (1.0, 6.0)
+    ) as t(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=LogitCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert any(row[0] == "Intercept" and row[1] == "ess_bulk" for row in result.rows)
+  assert any(row[0] == "x" and row[1] == "mcse_sd" for row in result.rows)
+  assert not any(row[0] == "sigma" for row in result.rows)
+
+
+def test_phase_19_estat_bayes_requires_prior_bayes_prefix(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_estat_guard.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="estat bayes requires a prior bayes: prefix model",
+    ):
+      executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
+def test_phase_19_estat_bayes_rejects_legacy_bayes_linear_state(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_linear_estat_guard.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(BayesCommand(outcome="y", predictors=("x",), n_iter=50))
+    with pytest.raises(
+      ExecutionError,
+      match="estat bayes requires a prior bayes: prefix model",
+    ):
+      executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
 def test_phase_19_failed_heckman_clears_prior_lasso_state(
   tmp_path: Path,
   monkeypatch: pytest.MonkeyPatch,

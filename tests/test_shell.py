@@ -283,6 +283,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     estat_endogenous = _completion_texts(completer, "estat e")
     estat_margins = _completion_texts(completer, "estat m")
     estat_gof = _completion_texts(completer, "estat g")
+    estat_bayes = _completion_texts(completer, "estat b")
   finally:
     executor.close()
 
@@ -360,6 +361,7 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert predict_options == ["xb", "residuals", "pr", "spatial_lag", "posterior_predictive"]
   assert estat_command == ["estat"]
   assert estat_subcommands == ["ovtest", "overid"]
+  assert estat_bayes == ["bayes"]
   assert estat_endogenous == ["endogenous"]
   assert estat_gof == ["gof"]
   assert estat_margins == ["margins"]

@@ -722,6 +722,44 @@ def test_cli_runs_phase_19_bayes_prefix_posterior_predictive_flow(
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_bayes_prefix_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "bayes_prefix_estat.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as bayes_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "bayes, draws(20) burnin(10) chains(1) seed(42): regress y x",
+      "-c",
+      "estat bayes",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Variable" in captured.out
+  assert "ess_bulk" in captured.out
+  assert "r_hat" in captured.out
+  assert "divergence_count" in captured.out
+  assert "not_available" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_17_qreg_predict_and_estat_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "qreg.parquet"
   _write_sql_parquet(
