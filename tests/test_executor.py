@@ -1727,6 +1727,49 @@ def test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows(
   assert all(isinstance(value, float) for value in predictions[:-1])
 
 
+def test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows(
+  tmp_path: Path,
+) -> None:
+  train_path = tmp_path / "bayes_prefix_train.parquet"
+  predict_path = tmp_path / "bayes_prefix_predict_all_missing.parquet"
+  _write_regression_parquet(train_path)
+  _write_sql_parquet(
+    predict_path,
+    """
+    select * from (
+      values
+        (NULL, 12.0),
+        (NULL, 14.0)
+    ) as reg_data(x, y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(train_path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    executor.execute(UseCommand(predict_path))
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+    )
+    preview = executor.execute(HeadCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  y_pp_index = preview.columns.index("y_pp")
+  predictions = [row[y_pp_index] for row in preview.rows]
+  assert predictions == [None, None]
+
+
 def test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix(
   tmp_path: Path,
 ) -> None:

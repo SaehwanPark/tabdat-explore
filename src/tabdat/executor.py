@@ -6016,7 +6016,7 @@ def _bayes_mcmc_posterior_predictive_values(
     complete_rows.append(cast(tuple[float, ...], numeric_row))
 
   if not complete_rows:
-    raise ExecutionError("predict posterior_predictive requires at least one complete row")
+    return tuple(None for _ in rows)
 
   import pandas as pd
 
