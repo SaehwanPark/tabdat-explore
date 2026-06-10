@@ -107,6 +107,7 @@ def save_bayes_diagnostic_plot(
 
   normalized = _validate_plot_path(path)
   normalized.parent.mkdir(parents=True, exist_ok=True)
+  figure = None
   try:
     draw_map = _posterior_draws_by_variable(idata, variables)
     figure, axes = plt.subplots(
@@ -116,25 +117,35 @@ def save_bayes_diagnostic_plot(
       squeeze=False,
     )
     for axis, variable in zip(axes[:, 0], variables, strict=True):
-      draws = draw_map[variable]
+      chain_draws = draw_map[variable]
       if kind == "trace":
-        axis.plot(draws, linewidth=0.9)
+        for chain_index, draws in enumerate(chain_draws):
+          axis.plot(draws, linewidth=0.9, label=f"chain {chain_index + 1}")
+        axis.legend(loc="best")
         axis.set_ylabel(variable)
       elif kind == "density":
+        draws = chain_draws.reshape(-1)
         axis.hist(draws, bins=min(30, max(5, len(draws) // 2)), density=True)
         axis.set_ylabel(variable)
       else:
-        autocorrelation = _autocorrelation_values(draws)
-        axis.bar(np.arange(len(autocorrelation)), autocorrelation)
+        for chain_index, draws in enumerate(chain_draws):
+          autocorrelation = _autocorrelation_values(draws)
+          axis.plot(
+            np.arange(len(autocorrelation)), autocorrelation, label=f"chain {chain_index + 1}"
+          )
+        axis.legend(loc="best")
         axis.set_ylabel(variable)
         axis.set_xlabel("Lag")
     figure.suptitle(f"Bayesian {kind} diagnostics")
     figure.tight_layout()
     figure.savefig(normalized)
+  except ExecutionError:
+    raise
   except Exception as exc:
     raise ExecutionError(f"plot could not be saved: {normalized}") from exc
   finally:
-    plt.close("all")
+    if figure is not None:
+      plt.close(figure)
   return normalized
 
 
@@ -149,13 +160,15 @@ def _posterior_draws_by_variable(
   draws_by_variable: dict[str, np.ndarray[Any, np.dtype[np.float64]]] = {}
   for variable in variables:
     try:
-      values = np.asarray(posterior[variable].values, dtype=float).reshape(-1)
+      values = np.asarray(posterior[variable].values, dtype=float)
     except Exception as exc:
       message = f"plot could not be saved: missing posterior variable {variable}"
       raise ExecutionError(message) from exc
     if values.size == 0:
       raise ExecutionError(f"plot could not be saved: missing posterior variable {variable}")
-    draws_by_variable[variable] = values
+    if values.ndim < 2:
+      raise ExecutionError(f"plot could not be saved: invalid posterior variable {variable}")
+    draws_by_variable[variable] = values.reshape(values.shape[0], -1)
   return draws_by_variable
 
 

@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn>=1.7.0",
     "spreg>=1.4.0",
     "bambi>=0.18.0",
+    "matplotlib>=3.10.9",
 ]
 
 [project.scripts]
