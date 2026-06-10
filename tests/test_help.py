@@ -10,6 +10,7 @@ def test_help_topics_are_discoverable() -> None:
   assert "lasso" in topics
   assert "postlasso" in topics
   assert "dml" in topics
+  assert "bayesplot" in topics
   assert "ridge" in topics
   assert "elasticnet" in topics
   assert "poisson" in topics
@@ -37,6 +38,14 @@ def test_estat_help_mentions_bayes_diagnostics() -> None:
   text = load_help_topic("estat")
 
   assert "estat bayes" in text
+
+
+def test_bayesplot_help_mentions_diagnostic_artifacts() -> None:
+  text = load_help_topic("bayesplot")
+
+  assert "bayesplot trace" in text
+  assert "bayesplot density" in text
+  assert "bayesplot autocorrelation" in text
 
 
 def test_help_topics_cover_all_current_commands() -> None:

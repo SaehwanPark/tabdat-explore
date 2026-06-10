@@ -19,6 +19,7 @@ from tabdat.formatter import format_result
 from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
   BarCommand,
+  BayesPlotCommand,
   Command,
   ExitCommand,
   HelpCommand,
@@ -260,6 +261,9 @@ def _prepare_interactive_command(command: Command, executor: Executor) -> Comman
     return replace(command, saving=saving)
   if isinstance(command, BarCommand) and command.saving is None:
     saving = next_available_plot_path(executor._default_plot_path("bar", (command.variable,)))
+    return replace(command, saving=saving)
+  if isinstance(command, BayesPlotCommand) and command.saving is None:
+    saving = next_available_plot_path(executor._default_plot_path("bayesplot", (command.kind,)))
     return replace(command, saving=saving)
   return command
 

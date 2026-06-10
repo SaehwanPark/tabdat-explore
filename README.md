@@ -46,6 +46,9 @@ command line. The current CLI supports:
 - cross-validated hyperparameter selection with `cvlasso`, `cvridge`, and `cvelasticnet`
 - Bayesian linear regression with
   `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]`
+- Bayesian MCMC workflows with `bayes [, options]: regress|logit ...`, `estat bayes`,
+  `predict <newvar>, posterior_predictive`, and
+  `bayesplot <trace|density|autocorrelation>`
 - spatial regression with
   `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]`
 - same-sample spatial spillover prediction with
@@ -90,20 +93,20 @@ command line. The current CLI supports:
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - panel-data transforms with
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
-- prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag]`
+- prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag posterior_predictive]`
 - post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml>`
+  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml|bayes>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
   context-aware autocomplete
 
-The repository is at **v0.17.0**. It has completed Phase 1–12 core infrastructure, three Phase
+The repository is at **v0.22.0**. It has completed Phase 1–12 core infrastructure, three Phase
 13 linear-econometrics slices, thirteen Phase 14 IV/panel slices, seven Phase 15 nonlinear
 estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
 `nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven
 Phase 17 advanced-empirics slices (`qreg`, `did`, `xtabond`, `xtlogit`, `lowess`), three Phase 18
-ingestion/demo/registry slices, eight Phase 19 ML/spatial extension slices (`lasso`, `postlasso`,
-`dml`, `bayes`, `spregress`, `ridge`, `elasticnet`, `cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20
-doubly robust DID (`drdid`).
+ingestion/demo/registry slices, thirteen Phase 19 ML/Bayesian/spatial extension slices (`lasso`,
+`postlasso`, `dml`, `bayes`, `bayes:`, `bayesplot`, `spregress`, `ridge`, `elasticnet`,
+`cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20 doubly robust DID (`drdid`).
 
 
 ## Quickstart

@@ -2,6 +2,23 @@
 
 All notable project changes are tracked here.
 
+## [0.22.0] — 2026-06-10
+
+Phase 19 Bayesian MCMC diagnostic plot artifacts via `bayesplot`.
+
+### Added
+
+- Added `bayesplot <trace|density|autocorrelation>` after successful `bayes:` MCMC fits:
+  - Saves deterministic `.svg`/`.png` plot artifacts through the existing plot artifact boundary.
+  - Supports `saving(<path>)` and `noopen`, plus existing `artifact_dir`, `graph_format`, and
+    `graph_open` configuration behavior.
+  - Uses retained posterior draws from the existing Bambi/ArviZ state and rejects missing-prior
+    or legacy `bayes linear` state with explicit guards.
+  - Added parser, executor, CLI, shell-completion, and help coverage plus updated spec and
+    architecture notes.
+
+---
+
 ## [0.21.0] — 2026-06-10
 
 Phase 19 Bayesian MCMC diagnostics via `estat bayes`.

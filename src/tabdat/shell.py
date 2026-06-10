@@ -42,6 +42,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "histogram",
   "scatter",
   "bar",
+  "bayesplot",
   "run",
   "set",
   "save",
@@ -136,6 +137,8 @@ _COLLAPSE_OPTIONS = ("by(",)
 _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")
 _BAR_OPTIONS = ("saving(", "missing", "noopen")
+_BAYESPLOT_KINDS = ("trace", "density", "autocorrelation")
+_BAYESPLOT_OPTIONS = ("saving(", "noopen")
 _REGRESS_OPTIONS = ("robust", "cluster(", "noconstant", "wls(", "gls(")
 _LASSO_OPTIONS = ("alpha(", "noconstant")
 _POSTLASSO_OPTIONS = ("alpha(", "robust", "noconstant")
@@ -239,6 +242,13 @@ class TabdatCompleter(Completer):
 
     if command_name == "estat":
       yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
+      return
+
+    if command_name == "bayesplot":
+      if _is_after_comma(text):
+        yield from _matching_completions(_BAYESPLOT_OPTIONS, word)
+      else:
+        yield from _matching_completions(_BAYESPLOT_KINDS, word)
       return
 
     if command_name == "by":

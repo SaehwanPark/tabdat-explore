@@ -3,8 +3,10 @@
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, Literal
 
 import altair as alt
+import numpy as np
 
 from tabdat.errors import ExecutionError
 
@@ -94,6 +96,97 @@ def save_bar(
   return _save_chart(chart, path)
 
 
+def save_bayes_diagnostic_plot(
+  idata: object,
+  *,
+  kind: Literal["trace", "density", "autocorrelation"],
+  variables: tuple[str, ...],
+  path: Path,
+) -> Path:
+  import matplotlib.pyplot as plt
+
+  normalized = _validate_plot_path(path)
+  normalized.parent.mkdir(parents=True, exist_ok=True)
+  figure = None
+  try:
+    draw_map = _posterior_draws_by_variable(idata, variables)
+    figure, axes = plt.subplots(
+      len(variables),
+      1,
+      figsize=(8, max(2.5, 2.2 * len(variables))),
+      squeeze=False,
+    )
+    for axis, variable in zip(axes[:, 0], variables, strict=True):
+      chain_draws = draw_map[variable]
+      if kind == "trace":
+        for chain_index, draws in enumerate(chain_draws):
+          axis.plot(draws, linewidth=0.9, label=f"chain {chain_index + 1}")
+        axis.legend(loc="best")
+        axis.set_ylabel(variable)
+      elif kind == "density":
+        draws = chain_draws.reshape(-1)
+        axis.hist(draws, bins=min(30, max(5, len(draws) // 2)), density=True)
+        axis.set_ylabel(variable)
+      else:
+        for chain_index, draws in enumerate(chain_draws):
+          autocorrelation = _autocorrelation_values(draws)
+          axis.plot(
+            np.arange(len(autocorrelation)), autocorrelation, label=f"chain {chain_index + 1}"
+          )
+        axis.legend(loc="best")
+        axis.set_ylabel(variable)
+        axis.set_xlabel("Lag")
+    figure.suptitle(f"Bayesian {kind} diagnostics")
+    figure.tight_layout()
+    figure.savefig(normalized)
+  except ExecutionError:
+    raise
+  except Exception as exc:
+    raise ExecutionError(f"plot could not be saved: {normalized}") from exc
+  finally:
+    if figure is not None:
+      plt.close(figure)
+  return normalized
+
+
+def _posterior_draws_by_variable(
+  idata: object,
+  variables: tuple[str, ...],
+) -> dict[str, np.ndarray[Any, np.dtype[np.float64]]]:
+  posterior = getattr(idata, "posterior", None)
+  if posterior is None:
+    raise ExecutionError("plot could not be saved: missing posterior draws")
+
+  draws_by_variable: dict[str, np.ndarray[Any, np.dtype[np.float64]]] = {}
+  for variable in variables:
+    try:
+      values = np.asarray(posterior[variable].values, dtype=float)
+    except Exception as exc:
+      message = f"plot could not be saved: missing posterior variable {variable}"
+      raise ExecutionError(message) from exc
+    if values.size == 0:
+      raise ExecutionError(f"plot could not be saved: missing posterior variable {variable}")
+    if values.ndim < 2:
+      raise ExecutionError(f"plot could not be saved: invalid posterior variable {variable}")
+    draws_by_variable[variable] = values.reshape(values.shape[0], -1)
+  return draws_by_variable
+
+
+def _autocorrelation_values(
+  draws: np.ndarray[Any, np.dtype[np.float64]],
+) -> np.ndarray[Any, np.dtype[np.float64]]:
+  centered = draws - np.mean(draws)
+  denominator = float(np.dot(centered, centered))
+  max_lag = min(30, max(1, len(draws) - 1))
+  if denominator == 0.0:
+    return np.concatenate((np.array([1.0]), np.zeros(max_lag)))
+  values = [
+    1.0 if lag == 0 else float(np.dot(centered[:-lag], centered[lag:]) / denominator)
+    for lag in range(max_lag + 1)
+  ]
+  return np.asarray(values, dtype=float)
+
+
 def _base_chart(
   rows: tuple[tuple[object, ...], ...],
   variables: tuple[str, ...],
@@ -115,15 +208,20 @@ def _json_value(value: object) -> object:
 
 
 def _save_chart(chart: alt.Chart, path: Path) -> Path:
-  normalized = path.expanduser()
-  if normalized.suffix.lower() not in SUPPORTED_PLOT_EXTENSIONS:
-    supported = ", ".join(sorted(SUPPORTED_PLOT_EXTENSIONS))
-    raise ExecutionError(f"plot saving path must end with one of: {supported}")
+  normalized = _validate_plot_path(path)
   normalized.parent.mkdir(parents=True, exist_ok=True)
   try:
     chart.save(normalized)
   except Exception as exc:
     raise ExecutionError(f"plot could not be saved: {normalized}") from exc
+  return normalized
+
+
+def _validate_plot_path(path: Path) -> Path:
+  normalized = path.expanduser()
+  if normalized.suffix.lower() not in SUPPORTED_PLOT_EXTENSIONS:
+    supported = ", ".join(sorted(SUPPORTED_PLOT_EXTENSIONS))
+    raise ExecutionError(f"plot saving path must end with one of: {supported}")
   return normalized
 
 

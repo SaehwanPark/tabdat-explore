@@ -7,10 +7,12 @@ from collections.abc import Iterator
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import Mock
 
 import duckdb
+import numpy as np
 import polars as pl
 import pytest
 from scipy.stats import norm
@@ -33,6 +35,7 @@ from tabdat.models import (
   BarCommand,
   BayesCommand,
   BayesMcmcResult,
+  BayesPlotCommand,
   BayesPrefixCommand,
   BayesRegressionResult,
   BinaryExpression,
@@ -141,6 +144,7 @@ from tabdat.models import (
   ZipCommand,
   ZipRegressionResult,
 )
+from tabdat.visualization import _posterior_draws_by_variable, save_bayes_diagnostic_plot
 
 
 def _write_sql_parquet(path: Path, query: str) -> None:
@@ -1979,6 +1983,146 @@ def test_phase_19_estat_bayes_rejects_legacy_bayes_linear_state(tmp_path: Path) 
       match="estat bayes requires a prior bayes: prefix model",
     ):
       executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
+@pytest.mark.parametrize("kind", ("trace", "density", "autocorrelation"))
+def test_phase_19_bayesplot_writes_diagnostic_artifact(
+  tmp_path: Path,
+  kind: str,
+) -> None:
+  path = tmp_path / "bayesplot.parquet"
+  output_path = tmp_path / f"bayesplot-{kind}.svg"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(
+      BayesPlotCommand(
+        kind=kind,
+        saving=output_path,
+        open_artifact=False,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == output_path
+  assert not result.should_open
+  artifact_text = output_path.read_text().lstrip()
+  assert artifact_text.startswith("<?xml") or artifact_text.startswith("<svg")
+
+
+def test_phase_19_bayesplot_default_path_uses_graph_config(tmp_path: Path) -> None:
+  path = tmp_path / "bayesplot-default.parquet"
+  artifact_dir = tmp_path / "artifacts"
+  _write_regression_parquet(path)
+  executor = Executor(config=TabDatConfig(artifact_dir=artifact_dir, graph_format="png"))
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(BayesPlotCommand(kind="trace"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == artifact_dir / "plots" / "bayesplot-trace.png"
+  assert result.path.exists()
+
+
+def test_phase_19_bayesplot_supports_logit_state(tmp_path: Path) -> None:
+  path = tmp_path / "bayesplot-logit.parquet"
+  output_path = tmp_path / "bayesplot-logit.svg"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0),
+        (1.0, 2.0),
+        (0.0, 3.0),
+        (1.0, 4.0),
+        (0.0, 5.0),
+        (1.0, 6.0)
+    ) as t(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=LogitCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(
+      BayesPlotCommand(kind="density", saving=output_path, open_artifact=False)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == output_path
+  assert output_path.exists()
+
+
+def test_phase_19_bayesplot_preserves_chain_dimensions() -> None:
+  idata = SimpleNamespace(
+    posterior={
+      "x": SimpleNamespace(values=np.asarray([[[1.0, 2.0, 3.0]], [[4.0, 5.0, 6.0]]])),
+    }
+  )
+
+  draws = _posterior_draws_by_variable(idata, ("x",))["x"]
+
+  assert draws.shape == (2, 3)
+  assert draws.tolist() == [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
+
+
+def test_phase_19_bayesplot_preserves_posterior_state_errors(tmp_path: Path) -> None:
+  with pytest.raises(ExecutionError, match="missing posterior draws"):
+    save_bayes_diagnostic_plot(
+      SimpleNamespace(),
+      kind="trace",
+      variables=("x",),
+      path=tmp_path / "missing.svg",
+    )
+
+
+def test_phase_19_bayesplot_requires_bayes_prefix_state(tmp_path: Path) -> None:
+  path = tmp_path / "bayesplot-guard.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="bayesplot requires a prior bayes: prefix model"):
+      executor.execute(BayesPlotCommand(kind="trace"))
+    executor.execute(BayesCommand(outcome="y", predictors=("x",)))
+    with pytest.raises(ExecutionError, match="bayesplot requires a prior bayes: prefix model"):
+      executor.execute(BayesPlotCommand(kind="trace"))
   finally:
     executor.close()
 
