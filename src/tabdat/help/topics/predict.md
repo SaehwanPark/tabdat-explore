@@ -1,7 +1,7 @@
 # predict
 
 How to invoke:
-`predict newvar [, xb residuals pr spatial_lag]`
+`predict newvar [, xb residuals pr spatial_lag posterior_predictive]`
 
 What it does:
 Create fitted values, residuals, predicted probabilities, or same-sample spatial-lag predictions
@@ -14,6 +14,8 @@ Examples:
 - `predict yhat, xb`
 - `predict p, pr`
 - `predict resid, residuals`
+- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive`
+- `bayes: logit union age educ` then `predict union_pp, posterior_predictive`
 - `spregress claims age, coord(lat lon)` then `predict spillover_hat, spatial_lag`
 - `qreg claims age exposure` then `predict qhat, xb`
 - `did claims age exposure, treat(treated) post(post)` then `predict did_hat, xb`

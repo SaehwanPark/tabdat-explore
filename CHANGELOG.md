@@ -2,6 +2,23 @@
 
 All notable project changes are tracked here.
 
+## [0.20.0] — 2026-06-10
+
+Phase 19 Bayesian posterior predictive workflow support.
+
+### Added
+
+- Added `predict <newvar>, posterior_predictive` after successful `bayes:` MCMC fits:
+  - Supports both `bayes: regress` and `bayes: logit` states through the retained Bambi model and
+    ArviZ `InferenceData`.
+  - Writes row-wise posterior predictive means into the active dataset while preserving active row
+    order.
+  - Emits deterministic guards for unsupported `predict` modes after `bayes:` and for
+    `posterior_predictive` without a prior `bayes:` fit.
+  - Added parser, executor, CLI, and shell-completion coverage plus updated help documentation.
+
+---
+
 ## [0.19.0] — 2026-06-08
 
 Phase 19 general Bayesian MCMC command prefix support.

@@ -1,36 +1,42 @@
-# Phase 19 Slice 9 Command Contract: `spregress` Spatial Weights Configuration & GIS Ingestion
+# Phase 19 Command Contract: Bayesian Posterior Predictive `predict`
 
 ## Roadmap Phase
 
-- Phase 19 modern extensions
-- Spatial weight matrix configuration and GIS file ingestion
+- Phase 19 modern extensions.
+- Bayesian posterior predictive workflow after the completed `bayes:` MCMC prefix.
 
 ## Syntax
 
 ```stata
-spregress <y> <xvars>, weights(<path>) id(<id_var>) [contiguity(queen|rook)] [options...]
+bayes [, options]: regress <y> <xvars>
+predict <newvar>, posterior_predictive
+
+bayes [, options]: logit <y> <xvars>
+predict <newvar>, posterior_predictive
 ```
 
 ## Behavior
 
-- Mutual exclusivity: either `coord()` or `weights()` option is allowed, but not both.
-- `weights(path)` specifies the path to a `.gal`, `.gwt`, or `.shp` file.
-- `id(id_var)` specifies the dataset variable containing matching IDs for the spatial weights matrix.
-- `contiguity(queen|rook)` specifies shapefile contiguity (Queen by default, Rook optional); ignored for `.gal` and `.gwt` files.
-- The executor loads the spatial weights matrix from the GIS file using `libpysal.io.open` or `libpysal.weights.Queen/Rook`.
-- The loaded matrix is subsetted and reordered (aligned) to match the cleaned regression sample (handling observations dropped due to missing values).
-- The matrix is row-standardized (standard behavior).
+- `posterior_predictive` is a mutually exclusive `predict` mode.
+- The option is available only after a successful `bayes:` prefix fit.
+- The executor uses the retained Bambi model and ArviZ `InferenceData` to generate posterior
+  predictive draws for the current active dataset.
+- The output column contains the row-wise posterior predictive mean.
+- Active row order is preserved.
+- Rows with missing predictor values receive missing output rather than being dropped.
 
-## Option Rules
+## Guards
 
-- `weights` requires `id`.
-- `contiguity` requires `weights`.
-- `weights` cannot coexist with `coord` or `knn`.
+- `predict ..., posterior_predictive` without a prior `bayes:` fit raises `ExecutionError`.
+- `predict ..., xb|residuals|pr|spatial_lag` after `bayes:` raises `ExecutionError`.
+- Combining `posterior_predictive` with other `predict` modes raises `ParseError`.
+- Existing legacy `bayes linear` prediction behavior remains `xb` and `residuals` only.
 
 ## Acceptance Criteria
 
-- Parser rejects invalid combinations of `coord` and `weights`.
-- Executor supports `.gal`, `.gwt`, and `.shp` files correctly.
-- Aligns spatial weights to the active dataset's rows (matching the regression sample subset).
-- Triggers `ExecutionError` for missing files, unsupported formats, or missing/mismatching IDs.
-- Full validation suite passes.
+- Parser accepts `predict y_pp, posterior_predictive`.
+- Parser rejects combinations with other `predict` modes.
+- Executor appends posterior predictive mean columns after `bayes: regress` and `bayes: logit`.
+- Missing active predictor rows are preserved with missing predicted values.
+- CLI and shell completions expose the new option.
+- Focused tests, `basedpyright`, and `ruff` checks pass.

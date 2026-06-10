@@ -13,7 +13,8 @@ diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
 It has also completed a bounded Phase 18 extension-governance slice with a typed internal
 extension registry for ingestion and estimator adapters, plus bounded Phase 19 modern-extension
 slices for ML regularization, Bayesian starters, spatial regression, cross-validation wrappers,
-same-sample spatial-lag prediction, and post-Lasso inference.
+same-sample spatial-lag prediction, post-Lasso inference, general Bayesian MCMC, and posterior
+predictive Bayesian columns.
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -90,6 +91,7 @@ Phase 19 parsing now adds ML/spatial commands including
 `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` and
 `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`, and
 `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`.
+`predict` also accepts the Bayesian MCMC-only `posterior_predictive` mode after `bayes:` fits.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
 exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
@@ -141,6 +143,9 @@ Phase 19 currently adds bounded ML and spatial extension slices through `scikit-
 Bayesian-ridge starter estimation, post-Lasso OLS refit inference, and `spregress` lag/error
 estimation with bounded `predict ..., xb` support and same-sample `predict ..., spatial_lag`
 routing after lag-model fits only.
+The general `bayes:` MCMC prefix stores the retained Bambi model and ArviZ inference data so
+`predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns
+while preserving row order.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 
