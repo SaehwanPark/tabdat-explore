@@ -254,6 +254,7 @@ class _BayesMcmcRegressionState:
   intercept: float | None
   include_intercept: bool
   command_name: str
+  model: Any
   idata: "arviz.InferenceData"
 
 
@@ -2048,6 +2049,7 @@ class Executor:
       intercept=mean_intercept,
       include_intercept=include_intercept,
       command_name=cmd_name,
+      model=model,
       idata=idata,
     )
 
@@ -3344,9 +3346,23 @@ class Executor:
     bayes_regression = self.state.bayes_regression
     bayes_mcmc_regression = self.state.bayes_mcmc_regression
     if bayes_mcmc_regression is not None:
+      if command.kind != "posterior_predictive":
+        raise ExecutionError("predict only supports posterior_predictive after bayes: prefix")
+      predictions = _bayes_mcmc_posterior_predictive_values(
+        dataset=dataset,
+        backend=self.backend,
+        state=bayes_mcmc_regression,
+      )
+      next_dataset = self.backend.add_numeric_column_from_values(
+        dataset,
+        target_variable=command.target_variable,
+        values=predictions,
+        command_name="predict",
+      )
+      return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+    if command.kind == "posterior_predictive":
       raise ExecutionError(
-        "predict is not yet supported after bayes: prefix; "
-        "use Bayesian diagnostics in a future release"
+        "predict option posterior_predictive requires a prior bayes: prefix model"
       )
     if lasso_regression is not None and command.kind != "xb":
       raise ExecutionError("predict only supports xb after lasso")
@@ -5981,6 +5997,51 @@ def _fitted_spatial_lag_predictions(fitted_model: Any) -> tuple[float, ...]:
   except (TypeError, ValueError) as exc:
     raise ExecutionError("predict spatial_lag failed") from exc
   return tuple(float(value) for value in prediction_array)
+
+
+def _bayes_mcmc_posterior_predictive_values(
+  *,
+  dataset: DatasetInfo,
+  backend: DuckDBBackend,
+  state: _BayesMcmcRegressionState,
+) -> tuple[float | None, ...]:
+  rows = backend.regression_rows(dataset, state.predictor_names)
+  complete_indices: list[int] = []
+  complete_rows: list[tuple[float, ...]] = []
+  for index, row in enumerate(rows):
+    numeric_row = tuple(_to_float(value) for value in row)
+    if any(value is None for value in numeric_row):
+      continue
+    complete_indices.append(index)
+    complete_rows.append(cast(tuple[float, ...], numeric_row))
+
+  if not complete_rows:
+    raise ExecutionError("predict posterior_predictive requires at least one complete row")
+
+  import pandas as pd
+
+  data = pd.DataFrame(complete_rows, columns=state.predictor_names)
+  try:
+    predicted_idata = state.model.predict(
+      state.idata,
+      kind="response",
+      data=data,
+      inplace=False,
+    )
+    predictive_group = predicted_idata.posterior_predictive
+    predictive_draws = predictive_group[state.outcome_variable]
+    predictive_means = predictive_draws.mean(dim=("chain", "draw")).values
+  except Exception as exc:
+    raise ExecutionError("predict posterior_predictive failed") from exc
+
+  flattened = np.asarray(predictive_means, dtype=float).reshape(-1)
+  if len(flattened) != len(complete_indices):
+    raise ExecutionError("predict posterior_predictive failed")
+
+  values: list[float | None] = [None] * len(rows)
+  for index, value in zip(complete_indices, flattened, strict=True):
+    values[index] = float(value)
+  return tuple(values)
 
 
 def _xtabond_sample(

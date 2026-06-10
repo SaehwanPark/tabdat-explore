@@ -1587,7 +1587,10 @@ def test_phase_19_bayes_prefix_predict_raises(tmp_path: Path) -> None:
         seed=123,
       )
     )
-    with pytest.raises(ExecutionError, match="predict is not yet supported after bayes: prefix"):
+    with pytest.raises(
+      ExecutionError,
+      match="predict only supports posterior_predictive after bayes: prefix",
+    ):
       executor.execute(PredictCommand(target_variable="y_hat"))
   finally:
     executor.close()
