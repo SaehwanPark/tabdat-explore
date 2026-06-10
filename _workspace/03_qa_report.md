@@ -1,4 +1,4 @@
-# Phase 19 Bayesian Posterior Predictive QA Report
+# Phase 19 Bayesian `estat bayes` QA Report
 
 ## Status
 
@@ -6,13 +6,13 @@ pass
 
 ## Boundaries Checked
 
-- `SPEC.md` and command contract describe a thin posterior predictive slice, not full Bayesian
-  diagnostics.
-- Parser representation matches executor behavior for the new `posterior_predictive` mode.
-- Executor state stores the retained Bambi model and ArviZ inference data needed for predictions.
-- Posterior predictive values are written through the existing backend numeric-column transform.
-- CLI smoke coverage verifies user-visible command flow.
-- Shell completion and help docs expose the new option.
+- `SPEC.md` and command contract describe a thin diagnostics slice, not Bayesian plotting or
+  richer prediction workflows.
+- Parser representation matches executor behavior for the new `estat bayes` subcommand.
+- Executor reads existing retained Bambi/ArviZ state instead of introducing broader Bayesian state.
+- Diagnostics tables normalize unavailable values to `not_available` deterministically.
+- CLI smoke coverage verifies user-visible `bayes:` then `estat bayes` flow.
+- Shell completion and help docs expose the new subcommand.
 
 ## Blocking Issues
 
@@ -20,16 +20,13 @@ pass
 
 ## Non-Blocking Follow-Ups
 
-- Add posterior predictive interval columns.
-- Add MCMC diagnostic plots or tables.
-- Add explicit out-of-sample prediction syntax.
+- Add interactive MCMC diagnostic plots.
+- Add posterior predictive interval workflows.
+- Add explicit out-of-sample Bayesian prediction syntax.
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_parser.py -k "predict or bayes"`
-- `uv run pytest tests/test_executor.py -k "bayes_prefix or posterior_predictive"`
-- `uv run pytest tests/test_cli.py -k "bayes_prefix"`
-- `uv run pytest tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py tests/test_help.py`
 - `uv run basedpyright`
 - `uv run ruff check`
 - `uv run ruff format --check`

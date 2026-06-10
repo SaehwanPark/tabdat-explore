@@ -948,6 +948,7 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat gof") == EstatCommand(subcommand="gof")
   assert parse_command("estat did") == EstatCommand(subcommand="did")
   assert parse_command("estat drdid") == EstatCommand(subcommand="drdid")
+  assert parse_command("estat bayes") == EstatCommand(subcommand="bayes")
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -1500,6 +1501,7 @@ def test_parse_exit_aliases() -> None:
     "estat first",
     "estat endog",
     "estat margin",
+    "estat bayes detail",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",

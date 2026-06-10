@@ -478,6 +478,7 @@ class EstatCommand:
     "did",
     "drdid",
     "dml",
+    "bayes",
   ]
 
 

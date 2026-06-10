@@ -33,6 +33,12 @@ def test_help_topic_text_is_loaded_from_package_data() -> None:
   assert "Examples" in text
 
 
+def test_estat_help_mentions_bayes_diagnostics() -> None:
+  text = load_help_topic("estat")
+
+  assert "estat bayes" in text
+
+
 def test_help_topics_cover_all_current_commands() -> None:
   topics = set(available_help_topics())
   optional = {"help", "by", "quit"}

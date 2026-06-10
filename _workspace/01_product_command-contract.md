@@ -1,42 +1,44 @@
-# Phase 19 Command Contract: Bayesian Posterior Predictive `predict`
+# Phase 19 Command Contract: Bayesian `estat bayes` Diagnostics
 
 ## Roadmap Phase
 
 - Phase 19 modern extensions.
-- Bayesian posterior predictive workflow after the completed `bayes:` MCMC prefix.
+- Bayesian diagnostics follow-up after the completed `bayes:` MCMC prefix and posterior predictive
+  slices.
 
 ## Syntax
 
 ```stata
 bayes [, options]: regress <y> <xvars>
-predict <newvar>, posterior_predictive
+estat bayes
 
 bayes [, options]: logit <y> <xvars>
-predict <newvar>, posterior_predictive
+estat bayes
 ```
 
 ## Behavior
 
-- `posterior_predictive` is a mutually exclusive `predict` mode.
+- `bayes` is a model-specific `estat` subcommand.
 - The option is available only after a successful `bayes:` prefix fit.
-- The executor uses the retained Bambi model and ArviZ `InferenceData` to generate posterior
-  predictive draws for the current active dataset.
-- The output column contains the row-wise posterior predictive mean.
-- Active row order is preserved.
-- Rows with missing predictor values receive missing output rather than being dropped.
+- The executor reads retained ArviZ posterior state from the latest `bayes:` model.
+- Output is a deterministic table with parameter-level metrics:
+  `ess_bulk`, `ess_tail`, `r_hat`, `mcse_mean`, and `mcse_sd`.
+- Output also includes sampler-level `divergence_count`.
+- `bayes: regress` includes `sigma` rows; `bayes: logit` does not.
+- Unavailable diagnostics from short-chain runs render as `not_available`.
 
 ## Guards
 
-- `predict ..., posterior_predictive` without a prior `bayes:` fit raises `ExecutionError`.
-- `predict ..., xb|residuals|pr|spatial_lag` after `bayes:` raises `ExecutionError`.
-- Combining `posterior_predictive` with other `predict` modes raises `ParseError`.
-- Existing legacy `bayes linear` prediction behavior remains `xb` and `residuals` only.
+- `estat bayes` without a prior `bayes:` fit raises `ExecutionError`.
+- `estat bayes` after legacy `bayes linear` raises `ExecutionError`.
+- Existing `estat` subcommands remain unchanged.
+- Existing `bayes:` prediction behavior remains unchanged.
 
 ## Acceptance Criteria
 
-- Parser accepts `predict y_pp, posterior_predictive`.
-- Parser rejects combinations with other `predict` modes.
-- Executor appends posterior predictive mean columns after `bayes: regress` and `bayes: logit`.
-- Missing active predictor rows are preserved with missing predicted values.
-- CLI and shell completions expose the new option.
+- Parser accepts `estat bayes`.
+- Shell completion exposes `bayes` under `estat`.
+- Executor returns deterministic diagnostics tables after both `bayes: regress` and
+  `bayes: logit`.
+- CLI smoke coverage exercises `bayes: regress` followed by `estat bayes`.
 - Focused tests, `basedpyright`, and `ruff` checks pass.

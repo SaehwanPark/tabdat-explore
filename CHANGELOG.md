@@ -2,6 +2,24 @@
 
 All notable project changes are tracked here.
 
+## [0.21.0] — 2026-06-10
+
+Phase 19 Bayesian MCMC diagnostics via `estat bayes`.
+
+### Added
+
+- Added `estat bayes` after successful `bayes:` MCMC fits:
+  - Supports both `bayes: regress` and `bayes: logit` using retained ArviZ posterior state.
+  - Reports deterministic in-terminal diagnostics for `ess_bulk`, `ess_tail`, `r_hat`,
+    `mcse_mean`, `mcse_sd`, and sampler `divergence_count`.
+  - Normalizes unavailable diagnostics from small-chain runs to `not_available` instead of
+    surfacing raw `nan`.
+  - Rejects missing-prior and legacy `bayes linear` state with explicit guards.
+  - Added parser, executor, CLI, shell-completion, and help coverage plus updated spec and
+    architecture notes.
+
+---
+
 ## [0.20.0] — 2026-06-10
 
 Phase 19 Bayesian posterior predictive workflow support.

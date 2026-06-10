@@ -3,6 +3,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from tabdat import __version__
 from tabdat.cli import (
   _has_open_sql_triple_quote,
   _open_command_for_platform,
@@ -719,6 +720,44 @@ def test_cli_runs_phase_19_bayes_prefix_posterior_predictive_flow(
   assert "Model: bayes: regress y on x" in captured.out
   assert "Predicted y_pp: 6 rows, 3 columns" in captured.out
   assert "y_pp" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_19_bayes_prefix_estat_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "bayes_prefix_estat.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as bayes_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "bayes, draws(20) burnin(10) chains(1) seed(42): regress y x",
+      "-c",
+      "estat bayes",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Variable" in captured.out
+  assert "ess_bulk" in captured.out
+  assert "r_hat" in captured.out
+  assert "divergence_count" in captured.out
+  assert "not_available" in captured.out
   assert captured.err == ""
 
 
@@ -2003,7 +2042,7 @@ def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, caps
 
   assert exit_code == 0
   assert f"Script: {script_path}" in captured.out
-  assert "TabDat: 0.1.0" in captured.out
+  assert f"TabDat: {__version__}" in captured.out
   assert "Python:" in captured.out
   assert "Seed: none" in captured.out
   assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=on" in captured.out

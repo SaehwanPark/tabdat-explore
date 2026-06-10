@@ -179,6 +179,7 @@ _ESTAT_SUBCOMMANDS = (
   "did",
   "drdid",
   "dml",
+  "bayes",
 )
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}

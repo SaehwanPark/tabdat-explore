@@ -1,34 +1,33 @@
-# Phase 19 Bayesian Posterior Predictive Implementation Report
+# Phase 19 Bayesian `estat bayes` Implementation Report
 
 ## Scope
 
-Implemented `predict <newvar>, posterior_predictive` after `bayes:` MCMC fits on branch
-`codex/phase19-bayes-posterior-predict`.
+Implemented `estat bayes` after `bayes:` MCMC fits on branch `temp/phase19-bayes-estat`.
 
 ## What Changed
 
-- Parser/model: added `posterior_predictive` as a typed, mutually exclusive `PredictCommand`
-  mode.
-- Executor: retained the fitted Bambi model in Bayesian MCMC state and added row-preserving
-  posterior predictive mean extraction from ArViZ posterior predictive draws.
-- Backend boundary: reused `add_numeric_column_from_values` so the output column follows existing
-  active-dataset transform behavior.
-- Shell/help: added completion and help documentation for the new predict option.
-- Tests: added parser, executor, CLI, and shell coverage for the new mode and guards.
-- SDD: updated `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, workspace reports, and package
-  version metadata.
+- Parser/model: added `bayes` as a typed `EstatCommand` subcommand with existing `estat`
+  validation rules preserved.
+- Executor: added `estat bayes` routing over retained Bayesian MCMC state and a deterministic
+  `_estat_bayes_table(...)` helper that reads ArviZ summaries plus sampler divergence counts.
+- Diagnostics formatting: normalized non-finite diagnostics such as single-chain `r_hat` to
+  `not_available` instead of leaking raw `nan`.
+- Shell/help: added `estat bayes` completion and help documentation in `estat` and `bayes_prefix`
+  topics.
+- Tests: added parser, executor, CLI, shell, and help coverage for the new subcommand and guards.
+- SDD: updated `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, workspace reports, and version
+  metadata.
 
 ## Validation Commands
 
-- `uv run pytest tests/test_parser.py -k "predict or bayes"` passed.
-- `uv run pytest tests/test_executor.py -k "bayes_prefix or posterior_predictive"` passed.
-- `uv run pytest tests/test_cli.py -k "bayes_prefix"` passed.
-- `uv run pytest tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options` passed.
-- `uv run basedpyright` passed with 0 errors.
-- `uv run ruff check` passed.
-- `uv run ruff format --check` passed.
+- `uv run pytest tests/test_parser.py::test_parse_phase_13_estat_command tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options tests/test_help.py::test_estat_help_mentions_bayes_diagnostics tests/test_executor.py::test_phase_19_estat_bayes_after_bayes_prefix_regress tests/test_executor.py::test_phase_19_estat_bayes_after_bayes_prefix_logit tests/test_executor.py::test_phase_19_estat_bayes_requires_prior_bayes_prefix tests/test_executor.py::test_phase_19_estat_bayes_rejects_legacy_bayes_linear_state tests/test_cli.py::test_cli_runs_phase_19_bayes_prefix_estat_flow`
+- `uv run pytest tests/test_parser.py tests/test_executor.py tests/test_cli.py tests/test_shell.py tests/test_help.py`
+- `uv run basedpyright`
+- `uv run ruff check`
+- `uv run ruff format --check`
 
 ## Known Gaps
 
-- Posterior intervals, posterior diagnostic plots, and out-of-sample prediction syntax remain
-  future Phase 19 work.
+- Trace/density/autocorrelation plots remain future Phase 19 work.
+- Posterior predictive intervals remain future Phase 19 work.
+- Out-of-sample Bayesian prediction syntax remains future Phase 19 work.
