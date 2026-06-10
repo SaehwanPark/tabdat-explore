@@ -761,6 +761,47 @@ def test_cli_runs_phase_19_bayes_prefix_estat_flow(tmp_path: Path, capsys) -> No
   assert captured.err == ""
 
 
+def test_cli_runs_phase_19_bayesplot_flow(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "bayesplot.parquet"
+  artifact_dir = tmp_path / "artifacts"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as bayes_data(x, y)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"set artifact_dir {artifact_dir}",
+      "-c",
+      "set graph_open off",
+      "-c",
+      f"use {path}",
+      "-c",
+      "bayes, draws(20) burnin(10) chains(1) seed(42): regress y x",
+      "-c",
+      "bayesplot trace",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Saved plot:" in captured.out
+  assert "bayesplot-trace.svg" in captured.out
+  assert (artifact_dir / "plots" / "bayesplot-trace.svg").exists()
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_17_qreg_predict_and_estat_flow(tmp_path: Path, capsys) -> None:
   path = tmp_path / "qreg.parquet"
   _write_sql_parquet(

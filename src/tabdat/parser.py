@@ -10,6 +10,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPlotCommand,
   BayesPrefixCommand,
   BinaryExpression,
   ByCommand,
@@ -108,6 +109,7 @@ _EXECUTABLE_COMMANDS = {
   "histogram",
   "scatter",
   "bar",
+  "bayesplot",
   "run",
   "set",
   "save",
@@ -484,6 +486,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
 
   if parts.name == "bar":
     return _parse_bar(parts)
+
+  if parts.name == "bayesplot":
+    return _parse_bayesplot(parts)
 
   if parts.name == "set":
     return _parse_set(parts)
@@ -990,6 +995,28 @@ def _parse_bar(parts: _CommandParts) -> BarCommand:
     variable=parts.arguments[0],
     saving=_single_path_option(parts.options, "saving", "bar"),
     include_missing="missing" in option_names,
+    open_artifact="noopen" not in option_names,
+  )
+
+
+def _parse_bayesplot(parts: _CommandParts) -> BayesPlotCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("bayesplot does not accept if clauses or assignment syntax")
+  if len(parts.arguments) != 1:
+    raise ParseError("bayesplot expects syntax: bayesplot <trace|density|autocorrelation>")
+  kind = parts.arguments[0]
+  if kind not in ("trace", "density", "autocorrelation"):
+    raise ParseError("bayesplot kind must be trace, density, or autocorrelation")
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"saving", "noopen"}
+  if unsupported:
+    raise ParseError(f"bayesplot unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "bayesplot", {"noopen"})
+
+  return BayesPlotCommand(
+    kind=cast(Literal["trace", "density", "autocorrelation"], kind),
+    saving=_single_path_option(parts.options, "saving", "bayesplot"),
     open_artifact="noopen" not in option_names,
   )
 

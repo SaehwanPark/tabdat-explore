@@ -7,6 +7,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPlotCommand,
   BayesPrefixCommand,
   BinaryExpression,
   ByCommand,
@@ -1157,6 +1158,42 @@ def test_parse_phase_6_visualization_commands() -> None:
     include_missing=True,
     open_artifact=False,
   )
+
+
+def test_parse_phase_19_bayesplot_command() -> None:
+  assert parse_command("bayesplot trace") == BayesPlotCommand(kind="trace")
+  assert parse_command("bayesplot density, saving(figures/bayes-density.svg) noopen") == (
+    BayesPlotCommand(
+      kind="density",
+      saving=Path("figures/bayes-density.svg"),
+      open_artifact=False,
+    )
+  )
+  assert parse_command("bayesplot autocorrelation") == BayesPlotCommand(
+    kind="autocorrelation"
+  )
+
+
+@pytest.mark.parametrize(
+  "command, message",
+  [
+    ("bayesplot", "bayesplot expects syntax: bayesplot <trace|density|autocorrelation>"),
+    (
+      "bayesplot trace density",
+      "bayesplot expects syntax: bayesplot <trace|density|autocorrelation>",
+    ),
+    (
+      "bayesplot scatter",
+      "bayesplot kind must be trace, density, or autocorrelation",
+    ),
+    ("bayesplot trace, bins=10", "bayesplot unsupported option: bins"),
+    ("bayesplot trace, noopen(on)", "bayesplot option noopen does not accept a value"),
+    ("bayesplot trace if x > 0", "bayesplot does not accept if clauses or assignment syntax"),
+  ],
+)
+def test_parse_phase_19_bayesplot_errors(command: str, message: str) -> None:
+  with pytest.raises(ParseError, match=message):
+    parse_command(command)
 
 
 def test_parse_expression_with_precedence_and_function_call() -> None:

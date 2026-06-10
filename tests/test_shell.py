@@ -33,6 +33,7 @@ def test_completer_suggests_command_names() -> None:
   executor = Executor()
   try:
     completions = _completion_texts(TabdatCompleter(executor), "sum")
+    bayesplot_completions = _completion_texts(TabdatCompleter(executor), "bayesp")
     reshape_completions = _completion_texts(TabdatCompleter(executor), "resh")
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
@@ -40,6 +41,7 @@ def test_completer_suggests_command_names() -> None:
     executor.close()
 
   assert completions == ["summarize"]
+  assert bayesplot_completions == ["bayesplot"]
   assert reshape_completions == ["reshape"]
   assert panel_completions == ["panel"]
   assert help_completions == ["help"]
@@ -77,6 +79,21 @@ def test_completer_suggests_tabulate_options(sample_parquet: Path) -> None:
     executor.close()
 
   assert completions == ["row", "col", "missing"]
+
+
+def test_completer_suggests_bayesplot_kinds_and_options(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    kinds = _completion_texts(TabdatCompleter(executor), "bayesplot ")
+    trace_kind = _completion_texts(TabdatCompleter(executor), "bayesplot tr")
+    options = _completion_texts(TabdatCompleter(executor), "bayesplot trace, ")
+  finally:
+    executor.close()
+
+  assert kinds == ["trace", "density", "autocorrelation"]
+  assert trace_kind == ["trace"]
+  assert options == ["saving(", "noopen"]
 
 
 def test_completer_suggests_tabulate_options_after_compact_comma(

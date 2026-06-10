@@ -48,6 +48,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPlotCommand,
   BayesMcmcEstimate,
   BayesMcmcResult,
   BayesPrefixCommand,
@@ -164,7 +165,13 @@ from tabdat.models import (
   ZipCommand,
   ZipRegressionResult,
 )
-from tabdat.visualization import default_plot_path, save_bar, save_histogram, save_scatter
+from tabdat.visualization import (
+  default_plot_path,
+  save_bar,
+  save_bayes_diagnostic_plot,
+  save_histogram,
+  save_scatter,
+)
 
 
 @dataclass(frozen=True)
@@ -716,6 +723,19 @@ class Executor:
       )
       path = command.saving or self._default_plot_path("bar", (command.variable,))
       saved_path = save_bar(rows, command.variable, path)
+      return PlotResult(path=saved_path, should_open=command.open_artifact)
+
+    if isinstance(command, BayesPlotCommand):
+      bayes_mcmc_regression = self.state.bayes_mcmc_regression
+      if bayes_mcmc_regression is None:
+        raise ExecutionError("bayesplot requires a prior bayes: prefix model")
+      path = command.saving or self._default_plot_path("bayesplot", (command.kind,))
+      saved_path = save_bayes_diagnostic_plot(
+        bayes_mcmc_regression.idata,
+        kind=command.kind,
+        variables=_bayes_mcmc_parameter_names(bayes_mcmc_regression),
+        path=path,
+      )
       return PlotResult(path=saved_path, should_open=command.open_artifact)
 
     if isinstance(command, ByCommand):
@@ -8457,3 +8477,15 @@ def _estat_bayes_table(bayes_regression: _BayesMcmcRegressionState) -> TableResu
       )
   rows.append(("sampler", "divergence_count", int(divergence_total)))
   return TableResult(headers=("Variable", "Metric", "Value"), rows=tuple(rows))
+
+
+def _bayes_mcmc_parameter_names(
+  bayes_regression: _BayesMcmcRegressionState,
+) -> tuple[str, ...]:
+  parameter_names: list[str] = []
+  if bayes_regression.include_intercept:
+    parameter_names.append("Intercept")
+  parameter_names.extend(bayes_regression.predictor_names)
+  if bayes_regression.command_name == "regress":
+    parameter_names.append("sigma")
+  return tuple(parameter_names)

@@ -32,6 +32,7 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
+  BayesPlotCommand,
   BayesMcmcResult,
   BayesPrefixCommand,
   BayesRegressionResult,
@@ -1979,6 +1980,82 @@ def test_phase_19_estat_bayes_rejects_legacy_bayes_linear_state(tmp_path: Path) 
       match="estat bayes requires a prior bayes: prefix model",
     ):
       executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
+@pytest.mark.parametrize("kind", ("trace", "density", "autocorrelation"))
+def test_phase_19_bayesplot_writes_diagnostic_artifact(
+  tmp_path: Path,
+  kind: str,
+) -> None:
+  path = tmp_path / "bayesplot.parquet"
+  output_path = tmp_path / f"bayesplot-{kind}.svg"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(
+      BayesPlotCommand(
+        kind=kind,
+        saving=output_path,
+        open_artifact=False,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == output_path
+  assert not result.should_open
+  assert output_path.read_text().lstrip().startswith("<?xml") or output_path.read_text().lstrip().startswith("<svg")
+
+
+def test_phase_19_bayesplot_default_path_uses_graph_config(tmp_path: Path) -> None:
+  path = tmp_path / "bayesplot-default.parquet"
+  artifact_dir = tmp_path / "artifacts"
+  _write_regression_parquet(path)
+  executor = Executor(config=TabDatConfig(artifact_dir=artifact_dir, graph_format="png"))
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    result = executor.execute(BayesPlotCommand(kind="trace"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == artifact_dir / "plots" / "bayesplot-trace.png"
+  assert result.path.exists()
+
+
+def test_phase_19_bayesplot_requires_bayes_prefix_state(tmp_path: Path) -> None:
+  path = tmp_path / "bayesplot-guard.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(ExecutionError, match="bayesplot requires a prior bayes: prefix model"):
+      executor.execute(BayesPlotCommand(kind="trace"))
+    executor.execute(BayesCommand(outcome="y", predictors=("x",)))
+    with pytest.raises(ExecutionError, match="bayesplot requires a prior bayes: prefix model"):
+      executor.execute(BayesPlotCommand(kind="trace"))
   finally:
     executor.close()
 

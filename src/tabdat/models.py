@@ -208,6 +208,13 @@ class BarCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class BayesPlotCommand:
+  kind: Literal["trace", "density", "autocorrelation"]
+  saving: Path | None = None
+  open_artifact: bool = True
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ByCommand:
   groups: tuple[str, ...]
   command: "Command"
@@ -610,6 +617,7 @@ Command = (
   | HistogramCommand
   | ScatterCommand
   | BarCommand
+  | BayesPlotCommand
   | ByCommand
   | ExitCommand
   | RunCommand
