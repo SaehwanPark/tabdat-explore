@@ -8441,11 +8441,12 @@ def _estat_bayes_table(bayes_regression: _BayesMcmcRegressionState) -> TableResu
   parameter_names.extend(bayes_regression.predictor_names)
   if bayes_regression.command_name == "regress":
     parameter_names.append("sigma")
+  missing_parameters = [name for name in parameter_names if name not in summary.index]
+  if missing_parameters:
+    raise ExecutionError("estat bayes failed for current model")
 
   rows: list[tuple[str, str, object]] = []
   for parameter_name in parameter_names:
-    if parameter_name not in summary.index:
-      continue
     for metric_name in metric_names:
       rows.append(
         (

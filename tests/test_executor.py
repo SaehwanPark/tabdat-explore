@@ -1821,6 +1821,41 @@ def test_phase_19_estat_bayes_after_bayes_prefix_regress(tmp_path: Path) -> None
   )
 
 
+def test_phase_19_estat_bayes_after_bayes_prefix_regress_multi_chain(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_estat_multi_chain.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=100,
+        burnin=100,
+        chains=2,
+        seed=123,
+      )
+    )
+    result = executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert len(result.rows) == 16
+  assert any(
+    row[0] == "Intercept" and row[1] == "ess_bulk" and isinstance(row[2], float)
+    for row in result.rows
+  )
+  assert any(
+    row[0] == "x" and row[1] == "ess_bulk" and isinstance(row[2], float) for row in result.rows
+  )
+  assert any(
+    row[0] == "sigma" and row[1] == "ess_tail" and isinstance(row[2], float) for row in result.rows
+  )
+
+
 def test_phase_19_estat_bayes_after_bayes_prefix_logit(tmp_path: Path) -> None:
   path = tmp_path / "bayes_prefix_logit_estat.parquet"
   _write_sql_parquet(
@@ -1859,12 +1894,70 @@ def test_phase_19_estat_bayes_after_bayes_prefix_logit(tmp_path: Path) -> None:
   assert not any(row[0] == "sigma" for row in result.rows)
 
 
+def test_phase_19_estat_bayes_rejects_partial_summary(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  path = tmp_path / "bayes_prefix_estat_partial_summary.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    import arviz as az
+
+    original_summary = az.summary
+
+    def _partial_summary(*args: object, **kwargs: object) -> object:
+      frame = original_summary(*args, **kwargs)
+      return frame.drop(index=["sigma"])
+
+    monkeypatch.setattr(az, "summary", _partial_summary)
+    with pytest.raises(ExecutionError, match="estat bayes failed for current model"):
+      executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
 def test_phase_19_estat_bayes_requires_prior_bayes_prefix(tmp_path: Path) -> None:
   path = tmp_path / "bayes_prefix_estat_guard.parquet"
   _write_regression_parquet(path)
   executor = Executor()
   try:
     executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="estat bayes requires a prior bayes: prefix model",
+    ):
+      executor.execute(EstatCommand(subcommand="bayes"))
+  finally:
+    executor.close()
+
+
+def test_phase_19_estat_bayes_rejects_stale_state_after_regress(tmp_path: Path) -> None:
+  path = tmp_path / "bayes_prefix_estat_stale_state.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
     with pytest.raises(
       ExecutionError,
       match="estat bayes requires a prior bayes: prefix model",

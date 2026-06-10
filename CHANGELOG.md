@@ -2,7 +2,7 @@
 
 All notable project changes are tracked here.
 
-## [0.21.0] — 2026-06-09
+## [0.21.0] — 2026-06-10
 
 Phase 19 Bayesian MCMC diagnostics via `estat bayes`.
 
