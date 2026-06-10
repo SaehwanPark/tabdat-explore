@@ -14,7 +14,7 @@ It has also completed a bounded Phase 18 extension-governance slice with a typed
 extension registry for ingestion and estimator adapters, plus bounded Phase 19 modern-extension
 slices for ML regularization, Bayesian starters, spatial regression, cross-validation wrappers,
 same-sample spatial-lag prediction, post-Lasso inference, general Bayesian MCMC, and posterior
-predictive Bayesian columns.
+predictive Bayesian columns plus Bayesian MCMC diagnostic plot artifacts.
 This document records the
 implemented shell UX, script
 runner, command-language model, active DuckDB relation model, session-local named table registry,
@@ -145,8 +145,9 @@ estimation with bounded `predict ..., xb` support and same-sample `predict ..., 
 routing after lag-model fits only.
 The general `bayes:` MCMC prefix stores the retained Bambi model and ArviZ inference data so
 `predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns
-while preserving row order, and `estat bayes` can report bounded in-terminal MCMC diagnostics
-without introducing a separate plotting workflow.
+while preserving row order, `estat bayes` can report bounded in-terminal MCMC diagnostics, and
+`bayesplot <trace|density|autocorrelation>` can save diagnostic plot artifacts through the shared
+plot artifact boundary.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 

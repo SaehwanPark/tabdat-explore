@@ -458,6 +458,13 @@ and describe the active work with concise verification criteria.
     `not_available` formatting for unavailable diagnostics and strict guards against legacy
     `bayes linear` state reuse
   - focused parser, executor/backend, autocomplete, help topic, and CLI coverage
+- Implemented the thirteenth Phase 19 modern-extensions slice:
+  - `bayesplot <trace|density|autocorrelation>` after successful `bayes:` MCMC fits
+  - artifact-based Bayesian MCMC diagnostic plots using retained posterior draws
+  - support for existing plot artifact options and config behavior: `saving(<path>)`, `noopen`,
+    `artifact_dir`, `graph_format`, and `graph_open`
+  - deterministic guards against missing `bayes:` state and legacy `bayes linear` state reuse
+  - focused parser, executor/backend, CLI, shell, and help coverage
 
 ## Present
 
@@ -479,10 +486,10 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - Bayesian plotting and richer posterior predictive workflows: add interactive MCMC
-      diagnostic plots (trace, density, and autocorrelation), posterior predictive intervals,
-      and out-of-sample Bayesian prediction workflows beyond the current active-dataset posterior
-      predictive mean column and current in-terminal `estat bayes` diagnostics table.
+    - Richer Bayesian posterior predictive workflows: add posterior predictive intervals and
+      explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset
+      posterior predictive mean column, current in-terminal `estat bayes` diagnostics table, and
+      current `bayesplot` trace/density/autocorrelation artifacts.
     - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
     - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
       support to additional spatial prediction scopes, especially out-of-sample workflows and any
