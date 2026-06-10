@@ -1587,8 +1587,202 @@ def test_phase_19_bayes_prefix_predict_raises(tmp_path: Path) -> None:
         seed=123,
       )
     )
-    with pytest.raises(ExecutionError, match="predict is not yet supported after bayes: prefix"):
+    with pytest.raises(
+      ExecutionError,
+      match="predict only supports posterior_predictive after bayes: prefix",
+    ):
       executor.execute(PredictCommand(target_variable="y_hat"))
+  finally:
+    executor.close()
+
+
+def test_phase_19_bayes_prefix_predict_supports_posterior_predictive(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+    )
+    preview = executor.execute(HeadCommand(6))
+
+    with pytest.raises(
+      ExecutionError,
+      match="predict only supports posterior_predictive after bayes: prefix",
+    ):
+      executor.execute(PredictCommand(target_variable="y_xb", kind="xb"))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "y_pp" in preview.columns
+  y_pp_index = preview.columns.index("y_pp")
+  predictions = [row[y_pp_index] for row in preview.rows]
+  assert len(predictions) == 6
+  assert all(isinstance(value, float) for value in predictions)
+
+
+def test_phase_19_bayes_prefix_logit_predict_supports_posterior_predictive(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_logit_posterior_predictive.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0),
+        (1.0, 2.0),
+        (0.0, 3.0),
+        (1.0, 4.0),
+        (0.0, 5.0),
+        (1.0, 6.0)
+    ) as t(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=LogitCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+    )
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  y_pp_index = preview.columns.index("y_pp")
+  predictions = [row[y_pp_index] for row in preview.rows]
+  assert all(isinstance(value, float) for value in predictions)
+  assert all(0.0 <= value <= 1.0 for value in predictions if isinstance(value, float))
+
+
+def test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_missing.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5),
+        (NULL, 24.0)
+    ) as reg_data(x, y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+    )
+    preview = executor.execute(HeadCommand(7))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  y_pp_index = preview.columns.index("y_pp")
+  predictions = [row[y_pp_index] for row in preview.rows]
+  assert len(predictions) == 7
+  assert predictions[-1] is None
+  assert all(isinstance(value, float) for value in predictions[:-1])
+
+
+def test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows(
+  tmp_path: Path,
+) -> None:
+  train_path = tmp_path / "bayes_prefix_train.parquet"
+  predict_path = tmp_path / "bayes_prefix_predict_all_missing.parquet"
+  _write_regression_parquet(train_path)
+  _write_sql_parquet(
+    predict_path,
+    """
+    select * from (
+      values
+        (NULL, 12.0),
+        (NULL, 14.0)
+    ) as reg_data(x, y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(train_path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    executor.execute(UseCommand(predict_path))
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+    )
+    preview = executor.execute(HeadCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  y_pp_index = preview.columns.index("y_pp")
+  predictions = [row[y_pp_index] for row in preview.rows]
+  assert predictions == [None, None]
+
+
+def test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_guard.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    with pytest.raises(
+      ExecutionError,
+      match="predict option posterior_predictive requires a prior bayes: prefix model",
+    ):
+      executor.execute(PredictCommand(target_variable="y_pp", kind="posterior_predictive"))
   finally:
     executor.close()
 

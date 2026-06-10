@@ -1,31 +1,24 @@
-# Request Summary: Phase 19 Slice 9 Spatial Weights Configuration & GIS Ingestion
+# Request Summary: Phase 19 Bayesian Posterior Predictive Slice
 
 ## Goal
 
-Resume development from the latest checkpoint on `main` and implement the Phase 19 spatial weight matrix configuration and GIS file ingestion in `spregress` to support `.gal`, `.gwt`, and `.shp` files (Rook/Queen polygon contiguity weights) alongside matching `predict xb` and `predict spatial_lag` functionality.
+Resume from the latest checkpoint and implement the next coherent Phase 19 slice using TDD,
+documentation updates, PR publication, and independent code review.
 
-## Checkpoint
+## Selected Scope
 
-- Branch base: `main` at latest (`e9d1f1d3f5d747db71980995b407f2c5e3a7ece0`)
-- Working branch: `temp/phase19-slice9-spatial-weights-ingestion`
-- Prior completed slice: Phase 19 slice 8 (`dml`)
+- Add `predict <newvar>, posterior_predictive` after successful `bayes:` MCMC fits.
+- Support both `bayes: regress` and `bayes: logit`.
+- Write row-wise posterior predictive means into the active dataset.
 
-## Touched Surfaces
+## Phase Fit
 
-- Parser (options: `weights()`, `id()`, `contiguity()`)
-- Models (`SpregressCommand`, `_SpatialRegressionState`)
-- Executor (GIS file reading via libpysal, row/ID alignment, subsetting, prediction routing)
-- Formatter, shell completions, help, registry
-- Tests and SDD docs (`SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `pyproject.toml`)
+- Roadmap phase: Phase 19 modern extensions.
+- This is the smallest Bayesian follow-up after the completed `bayes:` MCMC prefix slice.
 
-## Assumptions
+## Non-Goals
 
-- The ID variable supplied via `id(<id_var>)` maps to keys in `.gal`/`.gwt` files or the shapefile's DBF.
-- ID comparison/resolution is case-insensitive for shapefile attributes.
-- Missing values in regression sample must trigger subsetting/reordering of the spatial weight matrix to align rows.
-- Unsupported formats, missing files, or mismatching IDs raise `ExecutionError`.
-
-## Non-goals
-
-- Out-of-sample prediction.
-- resid Moran's I or Lagrange Multiplier diagnostics.
+- No trace, density, or autocorrelation diagnostic plots.
+- No posterior interval columns.
+- No out-of-sample prediction syntax.
+- No changes to legacy `bayes linear` prediction behavior.

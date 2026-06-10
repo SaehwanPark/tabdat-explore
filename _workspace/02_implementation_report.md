@@ -1,27 +1,34 @@
-# Phase 19 Slice 9 Implementation Report
+# Phase 19 Bayesian Posterior Predictive Implementation Report
 
 ## Scope
 
-Implemented spatial weights matrix configuration and GIS file ingestion in `spregress` on branch `temp/phase19-slice9-spatial-weights-ingestion`.
+Implemented `predict <newvar>, posterior_predictive` after `bayes:` MCMC fits on branch
+`codex/phase19-bayes-posterior-predict`.
 
 ## What Changed
 
-- **Parser**: Updated `_parse_spregress` in `src/tabdat/parser.py` to support `weights(<path>)`, `id(<id_var>)`, and `contiguity(queen|rook)` options with appropriate syntax validation and guards.
-- **Models**: Updated `SpregressCommand` and `_SpatialRegressionState` in `src/tabdat/models.py` and `src/tabdat/executor.py` to store the new weight configuration properties.
-- **Executor**: Updated `_execute_spregress` in `src/tabdat/executor.py` to:
-  - Check file existence and load spatial weights from `.gal`, `.gwt`, and `.shp` files.
-  - Dynamically match shapefile DBF attributes case-insensitively.
-  - Correctly subset and reorder the spatial weights matrix to match the regression sample order.
-  - Row-standardize the weights matrix.
-- **Prediction**: Updated `predict xb` and `predict spatial_lag` to correctly resolve ID-based weights aligning with the estimation state.
-- **Formatter**: Updated `src/tabdat/formatter.py` to output the correct descriptive header for file-based weights.
-- **Shell & Help**: Updated completions in `src/tabdat/shell.py` and documented the new options in `src/tabdat/help/topics/spregress.md`.
-- **Tests**: Added comprehensive unit and integration tests in `tests/test_spregress.py` covering all files, formats, error cases, and predict functionality.
-- **SDD**: Updated `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md` and bumped version to `0.18.0` in `pyproject.toml`.
+- Parser/model: added `posterior_predictive` as a typed, mutually exclusive `PredictCommand`
+  mode.
+- Executor: retained the fitted Bambi model in Bayesian MCMC state and added row-preserving
+  posterior predictive mean extraction from ArViZ posterior predictive draws.
+- Backend boundary: reused `add_numeric_column_from_values` so the output column follows existing
+  active-dataset transform behavior.
+- Shell/help: added completion and help documentation for the new predict option.
+- Tests: added parser, executor, CLI, and shell coverage for the new mode and guards.
+- SDD: updated `SPEC.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, workspace reports, and package
+  version metadata.
 
 ## Validation Commands
 
-- `uv run pytest tests/test_spregress.py`
-- `uv run basedpyright`
-- `uv run ruff check`
-- `uv run ruff format --check`
+- `uv run pytest tests/test_parser.py -k "predict or bayes"` passed.
+- `uv run pytest tests/test_executor.py -k "bayes_prefix or posterior_predictive"` passed.
+- `uv run pytest tests/test_cli.py -k "bayes_prefix"` passed.
+- `uv run pytest tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options` passed.
+- `uv run basedpyright` passed with 0 errors.
+- `uv run ruff check` passed.
+- `uv run ruff format --check` passed.
+
+## Known Gaps
+
+- Posterior intervals, posterior diagnostic plots, and out-of-sample prediction syntax remain
+  future Phase 19 work.

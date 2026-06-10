@@ -1,18 +1,35 @@
-# Phase 19 Slice 9 QA Report
+# Phase 19 Bayesian Posterior Predictive QA Report
 
-## Verdict
+## Status
 
-`pass`
+pass
 
-## Evidence
+## Boundaries Checked
 
-- **Parser/Executor Coherence**: Options parsed correctly and validated for exclusivity.
-- **Weights Loading & Alignment**: Verified that `.gal`, `.gwt`, and `.shp` weights load correctly, align correctly to dataset rows (even when rows are dropped due to missing values), and handle case-insensitive attribute lookups.
-- **Prediction Alignment**: Same-sample prediction works correctly matching IDs.
-- **CLI/Formatter Coherence**: Display format correctly captures the file name and options.
-- **Test suite**: `uv run pytest tests/test_spregress.py` passes.
-- **Lint/Type-checks**: `basedpyright` and `ruff check` both pass with 0 errors/warnings.
+- `SPEC.md` and command contract describe a thin posterior predictive slice, not full Bayesian
+  diagnostics.
+- Parser representation matches executor behavior for the new `posterior_predictive` mode.
+- Executor state stores the retained Bambi model and ArviZ inference data needed for predictions.
+- Posterior predictive values are written through the existing backend numeric-column transform.
+- CLI smoke coverage verifies user-visible command flow.
+- Shell completion and help docs expose the new option.
 
-## Residual Risk
+## Blocking Issues
 
-- Shapefile polygon contiguity weights extraction requires a local `.shp` file accompanied by a `.dbf` file in the same directory.
+- None found.
+
+## Non-Blocking Follow-Ups
+
+- Add posterior predictive interval columns.
+- Add MCMC diagnostic plots or tables.
+- Add explicit out-of-sample prediction syntax.
+
+## Validation Evidence
+
+- `uv run pytest tests/test_parser.py -k "predict or bayes"`
+- `uv run pytest tests/test_executor.py -k "bayes_prefix or posterior_predictive"`
+- `uv run pytest tests/test_cli.py -k "bayes_prefix"`
+- `uv run pytest tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options`
+- `uv run basedpyright`
+- `uv run ruff check`
+- `uv run ruff format --check`
