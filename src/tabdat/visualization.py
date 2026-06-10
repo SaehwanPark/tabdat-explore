@@ -151,7 +151,8 @@ def _posterior_draws_by_variable(
     try:
       values = np.asarray(posterior[variable].values, dtype=float).reshape(-1)
     except Exception as exc:
-      raise ExecutionError(f"plot could not be saved: missing posterior variable {variable}") from exc
+      message = f"plot could not be saved: missing posterior variable {variable}"
+      raise ExecutionError(message) from exc
     if values.size == 0:
       raise ExecutionError(f"plot could not be saved: missing posterior variable {variable}")
     draws_by_variable[variable] = values

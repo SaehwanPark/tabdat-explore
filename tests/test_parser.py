@@ -1169,9 +1169,7 @@ def test_parse_phase_19_bayesplot_command() -> None:
       open_artifact=False,
     )
   )
-  assert parse_command("bayesplot autocorrelation") == BayesPlotCommand(
-    kind="autocorrelation"
-  )
+  assert parse_command("bayesplot autocorrelation") == BayesPlotCommand(kind="autocorrelation")
 
 
 @pytest.mark.parametrize(

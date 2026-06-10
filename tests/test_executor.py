@@ -32,8 +32,8 @@ from tabdat.models import (
   AppendCommand,
   BarCommand,
   BayesCommand,
-  BayesPlotCommand,
   BayesMcmcResult,
+  BayesPlotCommand,
   BayesPrefixCommand,
   BayesRegressionResult,
   BinaryExpression,
@@ -2017,7 +2017,8 @@ def test_phase_19_bayesplot_writes_diagnostic_artifact(
   assert isinstance(result, PlotResult)
   assert result.path == output_path
   assert not result.should_open
-  assert output_path.read_text().lstrip().startswith("<?xml") or output_path.read_text().lstrip().startswith("<svg")
+  artifact_text = output_path.read_text().lstrip()
+  assert artifact_text.startswith("<?xml") or artifact_text.startswith("<svg")
 
 
 def test_phase_19_bayesplot_default_path_uses_graph_config(tmp_path: Path) -> None:
