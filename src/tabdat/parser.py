@@ -1751,7 +1751,8 @@ def _parse_streg(parts: _CommandParts) -> StregCommand:
 def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
-    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml|bayes>"
+    "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|"
+    "dml|bayes>"
   )
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(expected_estat_syntax)

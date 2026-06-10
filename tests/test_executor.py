@@ -1812,7 +1812,9 @@ def test_phase_19_estat_bayes_after_bayes_prefix_regress(tmp_path: Path) -> None
   assert any(row[0] == "Intercept" and row[1] == "ess_bulk" for row in result.rows)
   assert any(row[0] == "x" and row[1] == "ess_tail" for row in result.rows)
   assert any(row[0] == "sigma" and row[1] == "mcse_mean" for row in result.rows)
-  assert any(row[0] == "sigma" and row[1] == "r_hat" and row[2] == "not_available" for row in result.rows)
+  assert any(
+    row[0] == "sigma" and row[1] == "r_hat" and row[2] == "not_available" for row in result.rows
+  )
   assert any(
     row[0] == "sampler" and row[1] == "divergence_count" and isinstance(row[2], int) and row[2] >= 0
     for row in result.rows

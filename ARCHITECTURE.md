@@ -145,7 +145,8 @@ estimation with bounded `predict ..., xb` support and same-sample `predict ..., 
 routing after lag-model fits only.
 The general `bayes:` MCMC prefix stores the retained Bambi model and ArviZ inference data so
 `predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns
-while preserving row order.
+while preserving row order, and `estat bayes` can report bounded in-terminal MCMC diagnostics
+without introducing a separate plotting workflow.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
 

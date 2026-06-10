@@ -3,6 +3,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
+from tabdat import __version__
 from tabdat.cli import (
   _has_open_sql_triple_quote,
   _open_command_for_platform,
@@ -2041,7 +2042,7 @@ def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, caps
 
   assert exit_code == 0
   assert f"Script: {script_path}" in captured.out
-  assert "TabDat: 0.1.0" in captured.out
+  assert f"TabDat: {__version__}" in captured.out
   assert "Python:" in captured.out
   assert "Seed: none" in captured.out
   assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=on" in captured.out
