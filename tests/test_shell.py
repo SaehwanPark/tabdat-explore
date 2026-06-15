@@ -375,7 +375,15 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert did_columns == ["cost"]
   assert did_options == ["treat(", "post(", "robust"]
   assert predict_command == ["predict"]
-  assert predict_options == ["xb", "residuals", "pr", "spatial_lag", "posterior_predictive"]
+  assert predict_options == [
+    "xb",
+    "residuals",
+    "pr",
+    "spatial_lag",
+    "posterior_predictive",
+    "interval",
+    "level(",
+  ]
   assert estat_command == ["estat"]
   assert estat_subcommands == ["ovtest", "overid"]
   assert estat_bayes == ["bayes"]

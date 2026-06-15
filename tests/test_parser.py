@@ -696,6 +696,17 @@ def test_parse_phase_13_predict_command() -> None:
     target_variable="y_pp",
     kind="posterior_predictive",
   )
+  assert parse_command("predict y_pp, posterior_predictive interval") == PredictCommand(
+    target_variable="y_pp",
+    kind="posterior_predictive",
+    interval=True,
+  )
+  assert parse_command("predict y_pp, posterior_predictive interval level(90)") == PredictCommand(
+    target_variable="y_pp",
+    kind="posterior_predictive",
+    interval=True,
+    level=90.0,
+  )
 
 
 def test_parse_phase_15_logit_command() -> None:
@@ -1407,6 +1418,11 @@ def test_parse_exit_aliases() -> None:
     "predict cost_hat, residuals posterior_predictive",
     "predict cost_hat, spatial_lag posterior_predictive",
     "predict cost_hat, residuals=true",
+    "predict cost_hat, xb interval",
+    "predict cost_hat, posterior_predictive level(90)",
+    "predict cost_hat, posterior_predictive level(0)",
+    "predict cost_hat, posterior_predictive level(100)",
+    "predict cost_hat, posterior_predictive interval=true",
     "tobit",
     "tobit y",
     "tobit y x",

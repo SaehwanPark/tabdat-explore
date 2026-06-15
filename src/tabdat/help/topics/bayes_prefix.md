@@ -6,7 +6,8 @@ How to invoke:
 What it does:
 Fit a Bayesian model using MCMC sampling via Bambi and PyMC backends.
 After fitting, `predict <newvar>, posterior_predictive` adds row-wise posterior predictive means
-to the active dataset, `estat bayes` reports bounded in-terminal MCMC diagnostics, and
+to the active dataset. Add `interval [level(<num>)]` to also create lower and upper posterior
+predictive interval columns. `estat bayes` reports bounded in-terminal MCMC diagnostics, and
 `bayesplot <trace|density|autocorrelation>` saves diagnostic plot artifacts.
 
 What problem it answers:
@@ -23,6 +24,7 @@ Options:
 Examples:
 - `bayes: regress wage educ exper`
 - `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive`
+- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive interval`
 - `bayes: regress wage educ exper` then `estat bayes`
 - `bayes: regress wage educ exper` then `bayesplot trace`
 - `bayes, draws(2000) burnin(1000) chains(4) seed(42): regress wage educ exper`

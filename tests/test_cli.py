@@ -711,7 +711,7 @@ def test_cli_runs_phase_19_bayes_prefix_posterior_predictive_flow(
       "-c",
       "bayes, draws(20) burnin(10) chains(1) seed(42): regress y x",
       "-c",
-      "predict y_pp, posterior_predictive",
+      "predict y_pp, posterior_predictive interval level(90)",
       "-c",
       "head 2",
     ],
@@ -721,8 +721,10 @@ def test_cli_runs_phase_19_bayes_prefix_posterior_predictive_flow(
 
   assert exit_code == 0
   assert "Model: bayes: regress y on x" in captured.out
-  assert "Predicted y_pp: 6 rows, 3 columns" in captured.out
+  assert "Predicted y_pp: 6 rows, 5 columns" in captured.out
   assert "y_pp" in captured.out
+  assert "y_pp_lower" in captured.out
+  assert "y_pp_upper" in captured.out
   assert captured.err == ""
 
 

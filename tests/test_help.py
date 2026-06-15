@@ -48,6 +48,13 @@ def test_bayesplot_help_mentions_diagnostic_artifacts() -> None:
   assert "bayesplot autocorrelation" in text
 
 
+def test_predict_help_mentions_bayes_posterior_intervals() -> None:
+  text = load_help_topic("predict")
+
+  assert "posterior_predictive interval" in text
+  assert "level(<num>)" in text
+
+
 def test_help_topics_cover_all_current_commands() -> None:
   topics = set(available_help_topics())
   optional = {"help", "by", "quit"}

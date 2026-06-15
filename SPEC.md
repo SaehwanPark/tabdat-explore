@@ -471,6 +471,11 @@ and describe the active work with concise verification criteria.
   - added command-level `if`, `by: tabulate`, sorted wide matrix output, and `missing` handling
   - added single-value aggregate cells through `values()` plus `stat(count|mean|sum|min|max)`
   - focused parser, executor/backend, CLI, shell, help, and docs coverage
+- Extended the Phase 19 Bayesian posterior predictive workflow:
+  - `predict <newvar>, posterior_predictive interval [level(<num>)]` after `bayes:` MCMC fits
+  - deterministic mean, `<newvar>_lower`, and `<newvar>_upper` active-dataset columns
+  - preserved mean-only `posterior_predictive` behavior and missing-row propagation
+  - focused parser, executor/backend, CLI, shell, help, and docs coverage
 
 ## Present
 
@@ -492,10 +497,10 @@ and describe the active work with concise verification criteria.
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
   - remaining meaningful slices in this phase:
-    - Richer Bayesian posterior predictive workflows: add posterior predictive intervals and
-      explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset
-      posterior predictive mean column, current in-terminal `estat bayes` diagnostics table, and
-      current `bayesplot` trace/density/autocorrelation artifacts.
+    - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian
+      prediction workflows beyond the current active-dataset posterior predictive mean and
+      interval columns, current in-terminal `estat bayes` diagnostics table, and current
+      `bayesplot` trace/density/autocorrelation artifacts.
     - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
     - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
       support to additional spatial prediction scopes, especially out-of-sample workflows and any

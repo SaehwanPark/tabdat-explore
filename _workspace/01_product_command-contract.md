@@ -1,46 +1,55 @@
-# Command Contract: Enhanced `tabulate`
+# Command Contract: Bayesian Posterior Predictive Intervals
+
+## Request Summary
+
+Add optional posterior predictive interval columns after a successful `bayes:` MCMC fit while
+preserving existing mean-only posterior predictive prediction.
 
 ## Roadmap Phase
 
-- Core EDA refinement.
-- Expands the existing Phase 3 `tabulate` command without adding a new command family.
+Phase 19 modern extensions: richer Bayesian posterior predictive workflows.
 
-## Syntax
+## Command Syntax
 
-```stata
-tabulate <row_var> [column_var] [if <expr>] [, row col missing]
-tabulate [if <expr>], rows(<row_vars>) [columns(<column_vars>)] [row col missing]
-tabulate [if <expr>], rows(<row_vars>) [columns(<column_vars>)] values(<var>) stat(count|mean|sum|min|max) [missing]
-by <group_vars>: tabulate ...
+```text
+predict <newvar>, posterior_predictive
+predict <newvar>, posterior_predictive interval
+predict <newvar>, posterior_predictive interval level(<num>)
 ```
 
-## Behavior
+## Examples
 
-- Legacy one-way and two-way frequency forms remain valid.
-- `rows()` and `columns()` support multi-level row/index and column dimensions.
-- `if` filters rows before counting or aggregation.
-- `missing` includes null row and column dimension values; null dimensions are excluded by default.
-- `values()` and `stat()` must appear together and support exactly one value variable and one stat.
-- Frequency is the default when `values()` is omitted.
-- `stat(count)` with `values(x)` counts non-null `x`; `mean`, `sum`, `min`, and `max` require a
-  numeric value variable.
-- `row` and `col` percentages apply only to frequency tabulations with column variables.
-- Wide output uses row/index variables on the left and sorted observed column-category
-  combinations as flattened headers.
-- `by:` prepends by variables and scopes frequency percentages within each by group.
+- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive`
+  - Adds `wage_pp` with row-wise posterior predictive means.
+- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive interval`
+  - Adds `wage_pp`, `wage_pp_lower`, and `wage_pp_upper` using the default 95% interval.
+- `bayes: logit union age educ` then `predict union_pp, posterior_predictive interval level(90)`
+  - Adds probability-scale mean/lower/upper columns using a 90% central interval.
 
-## Non-Goals
+## Data Assumptions
 
-- No `by(...)` option form.
-- No multiple value variables or multiple stats per command.
-- No margins, totals, weights, statistical tests, plotting, or export-specific formatting.
+- Requires an active dataset and a prior `bayes:` prefix model state.
+- Predictor rows with missing values receive missing output values in every generated column.
+- `level(<num>)` must be greater than 0 and less than 100.
+- All target columns must be absent before mutation; any collision rejects the whole prediction.
+
+## Execution Semantics
+
+- Reuse the retained Bambi model and ArviZ inference data from `bayes:`.
+- Generate posterior predictive draws over complete active rows with `kind="response"`.
+- Mean-only mode writes one numeric column.
+- Interval mode writes the mean column plus central quantile lower/upper numeric columns.
+- Active dataset row order must be preserved.
 
 ## Acceptance Criteria
 
-- Existing `tabulate sex` and `tabulate sex outcome` still parse and execute.
-- `tabulate sex if age >= 18` filters before tabulating.
-- `tabulate, rows(region sex) columns(outcome year), row col` renders a wide frequency matrix.
-- `tabulate, rows(region) columns(sex) values(cost) stat(mean)` renders mean `cost` per cell.
-- `by region: tabulate, rows(sex) columns(outcome) values(cost) stat(sum)` executes without
-  mutating the active dataset.
-- Parser, executor/backend, CLI/help, shell completion, `basedpyright`, and `ruff` checks pass.
+- Existing `predict <newvar>, posterior_predictive` tests and output remain valid.
+- Interval mode adds exactly `<newvar>`, `<newvar>_lower`, and `<newvar>_upper`.
+- Logit interval outputs remain within `[0, 1]`.
+- Missing predictor rows propagate missing values across all interval output columns.
+- Parser rejects invalid levels and interval options without `posterior_predictive`.
+- CLI smoke output shows the new interval columns.
+
+## Open Questions
+
+- None for this slice.

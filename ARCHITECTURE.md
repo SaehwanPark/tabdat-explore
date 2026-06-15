@@ -144,8 +144,9 @@ Bayesian-ridge starter estimation, post-Lasso OLS refit inference, and `spregres
 estimation with bounded `predict ..., xb` support and same-sample `predict ..., spatial_lag`
 routing after lag-model fits only.
 The general `bayes:` MCMC prefix stores the retained Bambi model and ArviZ inference data so
-`predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns
-while preserving row order, `estat bayes` can report bounded in-terminal MCMC diagnostics, and
+`predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns,
+optionally with lower and upper interval columns through `interval [level(<num>)]`, while
+preserving row order. `estat bayes` can report bounded in-terminal MCMC diagnostics, and
 `bayesplot <trace|density|autocorrelation>` can save diagnostic plot artifacts through the shared
 plot artifact boundary.
 Estimation-family state is explicit: running one family clears stale state from the others to

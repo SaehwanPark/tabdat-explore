@@ -266,6 +266,13 @@ class _BayesMcmcRegressionState:
 
 
 @dataclass(frozen=True)
+class _PosteriorPredictiveSummary:
+  mean: tuple[float | None, ...]
+  lower: tuple[float | None, ...] | None = None
+  upper: tuple[float | None, ...] | None = None
+
+
+@dataclass(frozen=True)
 class _SpatialRegressionState:
   outcome_variable: str
   predictor_names: tuple[str, ...]
@@ -3371,15 +3378,25 @@ class Executor:
     if bayes_mcmc_regression is not None:
       if command.kind != "posterior_predictive":
         raise ExecutionError("predict only supports posterior_predictive after bayes: prefix")
-      predictions = _bayes_mcmc_posterior_predictive_values(
+      predictions = _bayes_mcmc_posterior_predictive_summary(
         dataset=dataset,
         backend=self.backend,
         state=bayes_mcmc_regression,
+        include_interval=command.interval,
+        level=command.level,
       )
-      next_dataset = self.backend.add_numeric_column_from_values(
+      columns: tuple[tuple[str, tuple[float | None, ...]], ...] = (
+        (command.target_variable, predictions.mean),
+      )
+      if predictions.lower is not None and predictions.upper is not None:
+        columns = (
+          *columns,
+          (f"{command.target_variable}_lower", predictions.lower),
+          (f"{command.target_variable}_upper", predictions.upper),
+        )
+      next_dataset = self.backend.add_numeric_columns_from_values(
         dataset,
-        target_variable=command.target_variable,
-        values=predictions,
+        columns=columns,
         command_name="predict",
       )
       return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
@@ -6046,12 +6063,14 @@ def _fitted_spatial_lag_predictions(fitted_model: Any) -> tuple[float, ...]:
   return tuple(float(value) for value in prediction_array)
 
 
-def _bayes_mcmc_posterior_predictive_values(
+def _bayes_mcmc_posterior_predictive_summary(
   *,
   dataset: DatasetInfo,
   backend: DuckDBBackend,
   state: _BayesMcmcRegressionState,
-) -> tuple[float | None, ...]:
+  include_interval: bool,
+  level: float,
+) -> _PosteriorPredictiveSummary:
   rows = backend.regression_rows(dataset, state.predictor_names)
   complete_indices: list[int] = []
   complete_rows: list[tuple[float, ...]] = []
@@ -6063,7 +6082,14 @@ def _bayes_mcmc_posterior_predictive_values(
     complete_rows.append(cast(tuple[float, ...], numeric_row))
 
   if not complete_rows:
-    return tuple(None for _ in rows)
+    missing_values = tuple(None for _ in rows)
+    if include_interval:
+      return _PosteriorPredictiveSummary(
+        mean=missing_values,
+        lower=missing_values,
+        upper=missing_values,
+      )
+    return _PosteriorPredictiveSummary(mean=missing_values)
 
   import pandas as pd
 
@@ -6077,7 +6103,8 @@ def _bayes_mcmc_posterior_predictive_values(
     )
     predictive_group = predicted_idata.posterior_predictive
     predictive_draws = predictive_group[state.outcome_variable]
-    predictive_means = predictive_draws.mean(dim=("chain", "draw")).values
+    predictive_samples = predictive_draws.stack(__sample=("chain", "draw"))
+    predictive_means = predictive_samples.mean(dim="__sample").values
   except Exception as exc:
     raise ExecutionError("predict posterior_predictive failed") from exc
 
@@ -6088,7 +6115,38 @@ def _bayes_mcmc_posterior_predictive_values(
   values: list[float | None] = [None] * len(rows)
   for index, value in zip(complete_indices, flattened, strict=True):
     values[index] = float(value)
-  return tuple(values)
+  if not include_interval:
+    return _PosteriorPredictiveSummary(mean=tuple(values))
+
+  try:
+    alpha = (1.0 - (level / 100.0)) / 2.0
+    flattened_lower = np.asarray(
+      predictive_samples.quantile(alpha, dim="__sample").values,
+      dtype=float,
+    ).reshape(-1)
+    flattened_upper = np.asarray(
+      predictive_samples.quantile(1.0 - alpha, dim="__sample").values,
+      dtype=float,
+    ).reshape(-1)
+  except Exception as exc:
+    raise ExecutionError("predict posterior_predictive failed") from exc
+  if len(flattened_lower) != len(complete_indices) or len(flattened_upper) != len(complete_indices):
+    raise ExecutionError("predict posterior_predictive failed")
+  lower_values: list[float | None] = [None] * len(rows)
+  upper_values: list[float | None] = [None] * len(rows)
+  for index, lower_value, upper_value in zip(
+    complete_indices,
+    flattened_lower,
+    flattened_upper,
+    strict=True,
+  ):
+    lower_values[index] = float(lower_value)
+    upper_values[index] = float(upper_value)
+  return _PosteriorPredictiveSummary(
+    mean=tuple(values),
+    lower=tuple(lower_values),
+    upper=tuple(upper_values),
+  )
 
 
 def _xtabond_sample(

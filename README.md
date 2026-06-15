@@ -48,7 +48,7 @@ command line. The current CLI supports:
 - Bayesian linear regression with
   `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]`
 - Bayesian MCMC workflows with `bayes [, options]: regress|logit ...`, `estat bayes`,
-  `predict <newvar>, posterior_predictive`, and
+  `predict <newvar>, posterior_predictive [interval level(<num>)]`, and
   `bayesplot <trace|density|autocorrelation>`
 - spatial regression with
   `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]`
@@ -94,7 +94,8 @@ command line. The current CLI supports:
   `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
 - panel-data transforms with
   `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
-- prediction workflows with `predict <newvar>[, xb residuals pr spatial_lag posterior_predictive]`
+- prediction workflows with
+  `predict <newvar>[, xb residuals pr spatial_lag posterior_predictive interval level(<num>)]`
 - post-estimation diagnostics with
   `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml|bayes>`
 - interactive shell UX with command history, inline history suggestions, syntax highlighting, and
