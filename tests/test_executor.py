@@ -5884,8 +5884,8 @@ def test_tabulate_one_way_and_two_way(sample_parquet: Path) -> None:
     executor.close()
 
   assert isinstance(one_way, TableResult)
-  assert one_way.headers == ("sex", "Count")
-  assert one_way.rows == (("F", 2), ("M", 1))
+  assert one_way.headers == ("sex", "Count", "Percent")
+  assert one_way.rows == (("F", 2, pytest.approx(66.666666)), ("M", 1, pytest.approx(33.333333)))
   assert isinstance(two_way, TableResult)
   assert two_way.headers == (
     "sex",

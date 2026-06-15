@@ -823,7 +823,9 @@ class DuckDBBackend:
       by_variables=by_variables,
     )
     if not column_variables:
-      value_header = "Count" if value_variable is None else statistic or "Value"
+      if value_variable is None:
+        return by_variables + row_variables + ("Count", "Percent"), long_rows
+      value_header = statistic or "Value"
       return by_variables + row_variables + (value_header,), long_rows
     return _tabulate_wide_result(
       long_rows,
@@ -1146,6 +1148,24 @@ class DuckDBBackend:
     where_sql = "" if not predicates else f"where {' and '.join(predicates)}"
     aggregate_sql = _tabulate_aggregate_sql(value_variable, statistic)
     if not column_variables:
+      if value_variable is None:
+        percent_partition = _partition_alias_sql(tuple(range(0, len(by_variables))))
+        sql = f"""
+          with cells as (
+            select {select_dimensions}, {aggregate_sql} as cell_value
+            from {ACTIVE_TABLE}
+            {where_sql}
+            group by {group_dimensions}
+          )
+          select
+            {group_dimensions},
+            cell_value,
+            100.0 * cell_value / sum(cell_value) over (partition by {percent_partition})
+              as percent
+          from cells
+          order by {order_dimensions}
+        """
+        return self._fetch_table(sql, "tabulate")
       sql = f"""
         select {select_dimensions}, {aggregate_sql} as cell_value
         from {ACTIVE_TABLE}
