@@ -597,6 +597,26 @@ class CfRegressCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class TestCommand:
+  __test__ = False
+  constraints: tuple[Expression, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class LincomCommand:
+  expression: Expression
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class TtestCommand:
+  varname1: str
+  varname2: str | None = None
+  value: float | None = None
+  by_variable: str | None = None
+  welch: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -671,6 +691,9 @@ Command = (
   | DmlCommand
   | CfRegressCommand
   | BayesPrefixCommand
+  | TestCommand
+  | LincomCommand
+  | TtestCommand
   | ParsedCommand
 )
 
@@ -1205,6 +1228,60 @@ class ExportResult:
   dataset: DatasetInfo
 
 
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class TestResult:
+  __test__ = False
+  constraints: tuple[str, ...]
+  statistic: float
+  p_value: float
+  df: int
+  df_residual: int | None = None
+  is_chi2: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class LincomResult:
+  label: str
+  estimate: float
+  standard_error: float
+  statistic: float
+  p_value: float
+  ci_lower: float
+  ci_upper: float
+  ci_level: float = 95.0
+  df_residual: int | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class TtestGroupStats:
+  name: str
+  obs: int
+  mean: float
+  std_err: float
+  std_dev: float
+  ci_lower: float
+  ci_upper: float
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class TtestResult:
+  varname1: str
+  varname2: str | None
+  by_variable: str | None
+  is_paired: bool
+  is_welch: bool
+  null_value: float
+  group1_stats: TtestGroupStats
+  group2_stats: TtestGroupStats | None
+  combined_stats: TtestGroupStats | None
+  difference_stats: TtestGroupStats
+  t_statistic: float
+  df: float
+  p_left: float
+  p_two: float
+  p_right: float
+
+
 Result = (
   LoadResult
   | ActivateResult
@@ -1251,4 +1328,7 @@ Result = (
   | SaveResult
   | ExportResult
   | BayesMcmcResult
+  | TestResult
+  | LincomResult
+  | TtestResult
 )

@@ -44,6 +44,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
+  LincomCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -73,7 +74,9 @@ from tabdat.models import (
   SummarizeCommand,
   TabulateCommand,
   TailCommand,
+  TestCommand,
   TobitCommand,
+  TtestCommand,
   UnaryExpression,
   UseCommand,
   XtAbondCommand,
@@ -147,6 +150,9 @@ _EXECUTABLE_COMMANDS = {
   "dml",
   "cfregress",
   "spregress",
+  "test",
+  "lincom",
+  "ttest",
   "exit",
   "quit",
 }
@@ -205,6 +211,12 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_use_result(stripped)
   if command_name == "by":
     return _parse_by_result(stripped)
+  if command_name == "test":
+    return _parse_test_result(stripped)
+  if command_name == "lincom":
+    return _parse_lincom_result(stripped)
+  if command_name == "ttest":
+    return _parse_ttest_result(stripped)
   if (
     command_name == "bayes:"
     or command_name.startswith("bayes,")
@@ -273,6 +285,27 @@ def _raise_parse_error(message: str) -> NoReturn:
 def _parse_use_result(text: str) -> Result[Command, str]:
   try:
     return Ok[Command, str](_parse_use(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_test_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_test(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_lincom_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_lincom(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_ttest_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_ttest(text))
   except ParseError as exc:
     return Err(str(exc))
 
@@ -2910,3 +2943,157 @@ class _TokenStream:
 
   def advance_to_end(self) -> None:
     self._position = len(self._tokens)
+
+
+def _parse_test(text: str) -> TestCommand:
+  body = text.strip()[4:].strip()
+  if not body:
+    raise ParseError("test command expects a list of variables or constraints")
+
+  tokens = _tokenize(body)
+  has_parens = any(t.text == "(" for t in tokens)
+  constraints: list[Expression] = []
+
+  if has_parens:
+    groups: list[tuple[_Token, ...]] = []
+    current_group: list[_Token] = []
+    depth = 0
+    for token in tokens:
+      if token.text == "(":
+        if depth == 0:
+          current_group = []
+        else:
+          current_group.append(token)
+        depth += 1
+      elif token.text == ")":
+        depth -= 1
+        if depth == 0:
+          groups.append(tuple(current_group))
+        else:
+          current_group.append(token)
+      else:
+        if depth > 0:
+          current_group.append(token)
+        else:
+          raise ParseError("test command: unexpected tokens outside parentheses")
+    if depth != 0:
+      raise ParseError("test command: mismatched parentheses")
+
+    for group_tokens in groups:
+      if not group_tokens:
+        raise ParseError("test command: empty constraint inside parentheses")
+      constraints.append(_parse_single_constraint(group_tokens))
+  else:
+    equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+    if equal_indices:
+      if len(equal_indices) > 1:
+        raise ParseError(
+          "test command: multiple '=' in a single constraint "
+          "(use parentheses for multiple constraints)"
+        )
+      eq_idx = equal_indices[0]
+      lhs_tokens = tokens[:eq_idx]
+      rhs_tokens = tokens[eq_idx + 1 :]
+      if not lhs_tokens:
+        raise ParseError("test command: missing left-hand side of constraint")
+      if not rhs_tokens:
+        raise ParseError("test command: missing right-hand side of constraint")
+      lhs = _ExpressionParser(lhs_tokens).parse_all()
+      rhs = _ExpressionParser(rhs_tokens).parse_all()
+      constraints.append(BinaryExpression(left=lhs, operator="-", right=rhs))
+    else:
+      for token in tokens:
+        if token.kind != "identifier":
+          raise ParseError(f"test command: expected variable name, got '{token.text}'")
+        constraints.append(IdentifierExpression(token.text))
+
+  return TestCommand(constraints=tuple(constraints))
+
+
+def _parse_single_constraint(tokens: tuple[_Token, ...]) -> Expression:
+  equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+  if equal_indices:
+    if len(equal_indices) > 1:
+      raise ParseError("test command: multiple '=' in a constraint")
+    eq_idx = equal_indices[0]
+    lhs_tokens = tokens[:eq_idx]
+    rhs_tokens = tokens[eq_idx + 1 :]
+    if not lhs_tokens or not rhs_tokens:
+      raise ParseError("test command: malformed constraint")
+    lhs = _ExpressionParser(lhs_tokens).parse_all()
+    rhs = _ExpressionParser(rhs_tokens).parse_all()
+    return BinaryExpression(left=lhs, operator="-", right=rhs)
+  else:
+    return _ExpressionParser(tokens).parse_all()
+
+
+def _parse_lincom(text: str) -> LincomCommand:
+  body = text.strip()[6:].strip()
+  if not body:
+    raise ParseError("lincom command expects a linear combination expression")
+  tokens = _tokenize(body)
+  expression = _ExpressionParser(tokens).parse_all()
+  return LincomCommand(expression=expression)
+
+
+def _parse_ttest(text: str) -> TtestCommand:
+  body = text.strip()[5:].strip()
+  if not body:
+    raise ParseError("ttest command expects a variable comparison or a variable with by() option")
+
+  tokens = _tokenize(body)
+  comma_indices = [i for i, t in enumerate(tokens) if t.text == ","]
+
+  if comma_indices:
+    if len(comma_indices) > 1:
+      raise ParseError("ttest command: duplicate comma")
+    c_idx = comma_indices[0]
+    var_tokens = tokens[:c_idx]
+    opt_tokens = tokens[c_idx + 1 :]
+
+    if len(var_tokens) != 1 or var_tokens[0].kind != "identifier":
+      raise ParseError("ttest command: expects a single variable name before comma")
+    varname1 = var_tokens[0].text
+
+    options = _parse_options(opt_tokens)
+    by_values = _single_tuple_option(options, "by", "ttest")
+    if by_values is None or len(by_values) != 1:
+      raise ParseError("ttest command requires option by(<variable>)")
+    by_variable = by_values[0]
+
+    option_names = {opt.name for opt in options}
+    unsupported = option_names - {"by", "welch", "unequal"}
+    if unsupported:
+      raise ParseError(f"ttest unsupported option: {', '.join(sorted(unsupported))}")
+
+    _require_flag_options(options, "ttest", {"welch", "unequal"})
+    welch = "welch" in option_names or "unequal" in option_names
+
+    return TtestCommand(varname1=varname1, by_variable=by_variable, welch=welch)
+
+  else:
+    equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+    if not equal_indices:
+      raise ParseError("ttest command expects comparison (e.g. ttest var == value) or by() option")
+    if len(equal_indices) > 1:
+      raise ParseError("ttest command: multiple comparisons")
+
+    eq_idx = equal_indices[0]
+    lhs_tokens = tokens[:eq_idx]
+    rhs_tokens = tokens[eq_idx + 1 :]
+
+    if len(lhs_tokens) != 1 or lhs_tokens[0].kind != "identifier":
+      raise ParseError("ttest command: LHS must be a single variable name")
+    varname1 = lhs_tokens[0].text
+
+    if len(rhs_tokens) != 1:
+      raise ParseError("ttest command: RHS must be a single variable name or a numeric value")
+
+    rhs_token = rhs_tokens[0]
+    if rhs_token.kind == "number":
+      val = float(rhs_token.text)
+      return TtestCommand(varname1=varname1, value=val)
+    elif rhs_token.kind == "identifier":
+      return TtestCommand(varname1=varname1, varname2=rhs_token.text)
+    else:
+      raise ParseError("ttest command: RHS must be a variable name or a numeric value")
