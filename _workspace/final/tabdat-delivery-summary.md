@@ -22,6 +22,16 @@ Implemented enhanced tabulation on `feat/tabulate-multilevel`.
 - `uv run ruff format --check`
 - `uv run basedpyright`
 
+## Review
+
+- Opened PR #74 against `main`.
+- Ran three code-reviewer passes on the PR diff.
+- Fixed three review findings:
+  - restored legacy one-way `Percent`
+  - preserved absent non-count aggregate cells as `.`
+  - kept absent `stat(count)` aggregate cells as `0`
+- PR is mergeable; GitHub reports no configured status checks.
+
 ## Deferred
 
 - Multiple value variables or multiple stats per command.

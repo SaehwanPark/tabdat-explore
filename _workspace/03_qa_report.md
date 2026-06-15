@@ -19,6 +19,16 @@ pass
 
 - None found in focused validation.
 
+## PR Review Loop
+
+- Pass 1 found a compatibility regression: legacy one-way `tabulate` no longer returned
+  `Percent`. Fixed in `Preserve one-way tabulate percentages`.
+- Pass 2 found absent aggregate pivot cells rendering as `0`, which could fabricate values for
+  `mean`, `sum`, `min`, and `max`. Fixed in `Preserve absent aggregate tabulate cells`.
+- Pass 3 found `values(x) stat(count)` should keep absent combinations as `0` because it counts
+  non-null values. Fixed in `Clarify tabulate count aggregate gaps`.
+- Follow-up review after fixes found no remaining Critical or High issues.
+
 ## Non-Blocking Follow-Ups
 
 - Add margins/totals and weighted tabulations when the product contract is defined.
