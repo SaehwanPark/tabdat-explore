@@ -5957,6 +5957,14 @@ def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None
         statistic="mean",
       )
     )
+    counted_cost = executor.execute(
+      TabulateCommand(
+        ("region",),
+        column_variables=("sex",),
+        value_variable="cost",
+        statistic="count",
+      )
+    )
     grouped_sum = executor.execute(
       ByCommand(
         ("region",),
@@ -5987,6 +5995,9 @@ def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None
   assert isinstance(mean_cost, TableResult)
   assert mean_cost.headers == ("region", "F mean", "M mean")
   assert mean_cost.rows == (("north", 15.0, 30.0), ("south", 40.0, None))
+  assert isinstance(counted_cost, TableResult)
+  assert counted_cost.headers == ("region", "F count", "M count")
+  assert counted_cost.rows == (("north", 2, 1), ("south", 1, 0))
   assert isinstance(grouped_sum, TableResult)
   assert grouped_sum.headers == ("region", "sex", "no sum", "yes sum")
   assert grouped_sum.rows == (

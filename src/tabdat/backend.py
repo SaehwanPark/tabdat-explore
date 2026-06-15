@@ -835,7 +835,7 @@ class DuckDBBackend:
       include_row_percent=row_percent,
       include_column_percent=column_percent,
       value_header="Count" if value_variable is None else statistic or "Value",
-      missing_cell_value=0 if value_variable is None else None,
+      missing_cell_value=0 if value_variable is None or statistic == "count" else None,
     )
 
   def collapse(
