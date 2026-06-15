@@ -476,6 +476,11 @@ and describe the active work with concise verification criteria.
   - deterministic mean, `<newvar>_lower`, and `<newvar>_upper` active-dataset columns
   - preserved mean-only `posterior_predictive` behavior and missing-row propagation
   - focused parser, executor/backend, CLI, shell, help, and docs coverage
+- Implemented standard spatial autocorrelation diagnostics on OLS residuals:
+  - `estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]` and `estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]` after OLS `regress`
+  - computes Moran's I test (`MoranRes`) and Lagrange Multiplier tests (`LMtests` for simple and robust lag/error and SARMA)
+  - robust sample alignment and size validation between regression estimation sample and spatial weights
+  - focused parser, executor/backend, shell completion, help, and docs coverage
 
 ## Present
 
@@ -492,7 +497,7 @@ and describe the active work with concise verification criteria.
     3. only then add focused lower-level implementations on top of `numpy`/`scipy` and the Phase 12
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
-    Phase 12 estimation result contract
+     Phase 12 estimation result contract
 - Phase 19 modern extensions:
   - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
     late-stage extensions
@@ -501,7 +506,7 @@ and describe the active work with concise verification criteria.
       prediction workflows beyond the current active-dataset posterior predictive mean and
       interval columns, current in-terminal `estat bayes` diagnostics table, and current
       `bayesplot` trace/density/autocorrelation artifacts.
-    - Advanced spatial autoregressive models & diagnostics: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models and standard spatial autocorrelation diagnostics on OLS residuals (e.g., Moran's I and Lagrange Multiplier tests).
+    - Advanced spatial autoregressive models: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models.
     - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
       support to additional spatial prediction scopes, especially out-of-sample workflows and any
       future spatial model families beyond the current lag-model path.

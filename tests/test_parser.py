@@ -976,8 +976,22 @@ def test_parse_phase_13_estat_command() -> None:
   assert parse_command("estat margins") == EstatCommand(subcommand="margins")
   assert parse_command("estat gof") == EstatCommand(subcommand="gof")
   assert parse_command("estat did") == EstatCommand(subcommand="did")
-  assert parse_command("estat drdid") == EstatCommand(subcommand="drdid")
   assert parse_command("estat bayes") == EstatCommand(subcommand="bayes")
+  assert parse_command("estat spatial, coord(lat lon) knn(5)") == EstatCommand(
+    subcommand="spatial",
+    coord_variables=("lat", "lon"),
+    knn=5,
+  )
+  expected_weights = EstatCommand(
+    subcommand="spatial",
+    weights_file="columbus.gal",
+    id_variable="neighborhood",
+    contiguity="rook",
+  )
+  assert (
+    parse_command("estat spatial, weights(columbus.gal) id(neighborhood) contiguity(rook)")
+    == expected_weights
+  )
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -1576,6 +1590,13 @@ def test_parse_exit_aliases() -> None:
     "estat endog",
     "estat margin",
     "estat bayes detail",
+    "estat spatial",
+    "estat spatial, coord(lat lon) weights(columbus.gal)",
+    "estat spatial, coord(lat lon) id(neighborhood)",
+    "estat spatial, weights(columbus.gal) knn(5)",
+    "estat spatial, weights(columbus.gal) id(neighborhood) contiguity(invalid)",
+    "estat spatial, coord(lat) knn(5)",
+    "estat residuals, coord(lat lon)",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",

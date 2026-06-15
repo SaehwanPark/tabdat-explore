@@ -1,54 +1,53 @@
-# Command Contract: Bayesian Posterior Predictive Intervals
+# Command Contract: Spatial Autocorrelation Diagnostics (`estat spatial`)
 
 ## Request Summary
 
-Add optional posterior predictive interval columns after a successful `bayes:` MCMC fit while
-preserving existing mean-only posterior predictive prediction.
+Add `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals (Moran's I and Lagrange Multiplier tests) after a successful `regress` command.
 
 ## Roadmap Phase
 
-Phase 19 modern extensions: richer Bayesian posterior predictive workflows.
+Phase 19 modern extensions: advanced spatial autoregressive models & diagnostics.
 
 ## Command Syntax
 
 ```text
-predict <newvar>, posterior_predictive
-predict <newvar>, posterior_predictive interval
-predict <newvar>, posterior_predictive interval level(<num>)
+estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]
+estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]
 ```
 
 ## Examples
 
-- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive`
-  - Adds `wage_pp` with row-wise posterior predictive means.
-- `bayes: regress wage educ exper` then `predict wage_pp, posterior_predictive interval`
-  - Adds `wage_pp`, `wage_pp_lower`, and `wage_pp_upper` using the default 95% interval.
-- `bayes: logit union age educ` then `predict union_pp, posterior_predictive interval level(90)`
-  - Adds probability-scale mean/lower/upper columns using a 90% central interval.
+- `regress wage educ exper` then `estat spatial, coord(lat lon) knn(5)`
+  - Computes spatial diagnostics using on-the-fly KNN weights.
+- `regress wage educ exper` then `estat spatial, weights(columbus.gal) id(neighborhood)`
+  - Computes spatial diagnostics using pre-computed spatial weights.
 
 ## Data Assumptions
 
-- Requires an active dataset and a prior `bayes:` prefix model state.
-- Predictor rows with missing values receive missing output values in every generated column.
-- `level(<num>)` must be greater than 0 and less than 100.
-- All target columns must be absent before mutation; any collision rejects the whole prediction.
+- Requires an active dataset and a prior `regress` OLS model state.
+- Raises `ExecutionError` if `self.state.regression` is None.
+- Reuses weights construction logic from `spregress` (case-insensitive column names, shapefile kontiguity, gal/gwt matrix alignment).
+- Excludes observations with missing values in regression variables or coordinate/id variables.
+- Ensures the number of complete observations matches the OLS model's `nobs`.
 
 ## Execution Semantics
 
-- Reuse the retained Bambi model and ArviZ inference data from `bayes:`.
-- Generate posterior predictive draws over complete active rows with `kind="response"`.
-- Mean-only mode writes one numeric column.
-- Interval mode writes the mean column plus central quantile lower/upper numeric columns.
-- Active dataset row order must be preserved.
+- Reconstructs OLS model using PySAL `spreg.BaseOLS(y, x)` on the complete estimation sample aligned with weights matrix `w`.
+- Computes Moran's I on residuals using `spreg.MoranRes(ols, w, z=True)`.
+- Computes Lagrange Multiplier (LM) tests using `spreg.LMtests(ols, w, tests=['lme', 'lml', 'rlme', 'rlml', 'sarma'])`.
+- Formats outputs in a clean terminal table.
 
 ## Acceptance Criteria
 
-- Existing `predict <newvar>, posterior_predictive` tests and output remain valid.
-- Interval mode adds exactly `<newvar>`, `<newvar>_lower`, and `<newvar>_upper`.
-- Logit interval outputs remain within `[0, 1]`.
-- Missing predictor rows propagate missing values across all interval output columns.
-- Parser rejects invalid levels and interval options without `posterior_predictive`.
-- CLI smoke output shows the new interval columns.
+- Moran's I results table shows `Moran's I (residual)`, `Expectation`, `Variance`, `z-statistic`, and `p-value`.
+- LM tests table shows statistic value and p-value for:
+  - Spatial error (LM error)
+  - Spatial lag (LM lag)
+  - Robust spatial error (Robust LM error)
+  - Robust spatial lag (Robust LM lag)
+  - Spatial SARMA (LM SARMA)
+- Parser rejects options (like `weights`, `coord`, `knn`) on all other `estat` subcommands.
+- Formatter prints clear headers and aligned columns.
 
 ## Open Questions
 
