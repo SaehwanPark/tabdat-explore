@@ -5979,8 +5979,10 @@ class Executor:
       )
 
     if names is not None and len(params) == len(names):
-      params_series = pd.Series(params, index=names)
-      cov_df = pd.DataFrame(cov, index=names, columns=names)
+      params_arr = np.asarray(params)
+      cov_arr = np.asarray(cov)
+      params_series = pd.Series(params_arr, index=names)
+      cov_df = pd.DataFrame(cov_arr, index=names, columns=names)
     else:
       params_series = pd.Series(params)
       cov_df = pd.DataFrame(cov)

@@ -3086,14 +3086,23 @@ def _parse_ttest(text: str) -> TtestCommand:
       raise ParseError("ttest command: LHS must be a single variable name")
     varname1 = lhs_tokens[0].text
 
-    if len(rhs_tokens) != 1:
-      raise ParseError("ttest command: RHS must be a single variable name or a numeric value")
+    is_signed_number = False
+    if len(rhs_tokens) == 2:
+      if rhs_tokens[0].text in {"-", "+"} and rhs_tokens[1].kind == "number":
+        is_signed_number = True
 
-    rhs_token = rhs_tokens[0]
-    if rhs_token.kind == "number":
-      val = float(rhs_token.text)
+    if len(rhs_tokens) == 1:
+      rhs_token = rhs_tokens[0]
+      if rhs_token.kind == "number":
+        val = float(rhs_token.text)
+        return TtestCommand(varname1=varname1, value=val)
+      elif rhs_token.kind == "identifier":
+        return TtestCommand(varname1=varname1, varname2=rhs_token.text)
+      else:
+        raise ParseError("ttest command: RHS must be a variable name or a numeric value")
+    elif is_signed_number:
+      sign = -1.0 if rhs_tokens[0].text == "-" else 1.0
+      val = sign * float(rhs_tokens[1].text)
       return TtestCommand(varname1=varname1, value=val)
-    elif rhs_token.kind == "identifier":
-      return TtestCommand(varname1=varname1, varname2=rhs_token.text)
     else:
-      raise ParseError("ttest command: RHS must be a variable name or a numeric value")
+      raise ParseError("ttest command: RHS must be a single variable name or a numeric value")

@@ -9,6 +9,7 @@ from tabdat.executor import Executor
 from tabdat.models import (
   BinaryExpression,
   IdentifierExpression,
+  IvRegressCommand,
   LincomCommand,
   LincomResult,
   NumberExpression,
@@ -275,6 +276,62 @@ def test_nonlinear_constraints_rejected(tmp_path: Path) -> None:
     expr_scalar_right = BinaryExpression(IdentifierExpression("x1"), "*", NumberExpression(2.0))
     res2 = executor.execute(LincomCommand(expr_scalar_right))
     assert isinstance(res2, LincomResult)
+
+  finally:
+    executor.close()
+
+
+def test_ttest_signed_null_values() -> None:
+  from tabdat.parser import parse_command
+
+  cmd1 = parse_command("ttest x == -1")
+  assert isinstance(cmd1, TtestCommand)
+  assert cmd1.value == -1.0
+
+  cmd2 = parse_command("ttest x == +2.5")
+  assert isinstance(cmd2, TtestCommand)
+  assert cmd2.value == 2.5
+
+
+def test_ivregress_post_estimation(tmp_path: Path) -> None:
+  path = tmp_path / "data_iv.parquet"
+  _write_sql_parquet(
+    path,
+    """
+      select * from (
+        values
+          (1.0, 10.0, 5.0, 2.0),
+          (2.0, 12.0, 6.0, 3.0),
+          (3.0, 15.0, 8.0, 4.0),
+          (4.0, 18.0, 9.0, 5.0),
+          (5.0, 20.0, 11.0, 6.0),
+          (6.0, 25.0, 12.0, 7.0)
+      ) as test_data(x1, x2, y, z)
+      """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    # Run ivregress 2sls y, endog(x1) iv(z) predictors(x2)
+    executor.execute(
+      IvRegressCommand(
+        outcome="y",
+        exogenous=("x2",),
+        endogenous="x1",
+        instruments=("z",),
+      )
+    )
+
+    # Test coefficient for x1 (endogenous) and x2
+    res_x1 = executor.execute(LincomCommand(IdentifierExpression("x1")))
+    assert isinstance(res_x1, LincomResult)
+    assert not math.isnan(res_x1.estimate)
+    assert not math.isnan(res_x1.standard_error)
+
+    res_x2 = executor.execute(LincomCommand(IdentifierExpression("x2")))
+    assert isinstance(res_x2, LincomResult)
+    assert not math.isnan(res_x2.estimate)
+    assert not math.isnan(res_x2.standard_error)
 
   finally:
     executor.close()
