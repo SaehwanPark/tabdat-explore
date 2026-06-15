@@ -391,6 +391,8 @@ class ProbitCommand:
 class PredictCommand:
   target_variable: str
   kind: Literal["xb", "residuals", "pr", "spatial_lag", "posterior_predictive"] = "xb"
+  interval: bool = False
+  level: float = 95.0
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

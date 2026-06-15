@@ -6,6 +6,12 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added Bayesian posterior predictive intervals for `bayes:` MCMC models:
+  - `predict <newvar>, posterior_predictive interval [level(<num>)]` now adds mean, lower, and
+    upper posterior predictive columns.
+  - Existing `predict <newvar>, posterior_predictive` mean-only behavior is preserved.
+  - Interval predictions validate target collisions atomically before replacing the active
+    dataset.
 - Enhanced `tabulate` with explicit `rows()`/`columns()` multi-level crosstabs, command-level `if`,
   `by:` support, and single-value cell aggregation through `values()` plus
   `stat(count|mean|sum|min|max)`.

@@ -1016,14 +1016,41 @@ class DuckDBBackend:
     values: Sequence[float | None],
     command_name: str,
   ) -> DatasetInfo:
+    return self.add_numeric_columns_from_values(
+      dataset,
+      columns=((target_variable, values),),
+      command_name=command_name,
+    )
+
+  def add_numeric_columns_from_values(
+    self,
+    dataset: DatasetInfo,
+    *,
+    columns: Sequence[tuple[str, Sequence[float | None]]],
+    command_name: str,
+  ) -> DatasetInfo:
     column_types = {column.name: column.data_type for column in dataset.columns}
-    if target_variable in column_types:
-      raise ExecutionError(f"{command_name} target already exists: {target_variable}")
-    expected_count = self.active_row_count()
-    if expected_count != len(values):
+    target_variables = tuple(name for name, _values in columns)
+    if not target_variables:
       raise ExecutionError(f"{command_name} failed")
+    seen_targets: set[str] = set()
+    for target_variable in target_variables:
+      if target_variable in column_types or target_variable in seen_targets:
+        raise ExecutionError(f"{command_name} target already exists: {target_variable}")
+      seen_targets.add(target_variable)
+    expected_count = self.active_row_count()
+    for _target_variable, values in columns:
+      if expected_count != len(values):
+        raise ExecutionError(f"{command_name} failed")
     row_table = "__tabdat_pred_rows"
     value_table = "__tabdat_pred_values"
+    value_columns = tuple(f"__value_{index}" for index in range(len(columns)))
+    value_column_sql = ", ".join(f"{column} double" for column in value_columns)
+    insert_placeholders = ", ".join("?" for _ in range(len(columns) + 1))
+    selected_values_sql = ",\n          ".join(
+      f"values_data.{value_column} as {_quote_identifier(target_variable)}"
+      for value_column, target_variable in zip(value_columns, target_variables, strict=True)
+    )
     try:
       self._connection.execute(
         f"""
@@ -1032,20 +1059,20 @@ class DuckDBBackend:
         """
       )
       self._connection.execute(
-        f"create or replace temp table {value_table} (__row_id bigint, __value double)"
+        f"create or replace temp table {value_table} (__row_id bigint, {value_column_sql})"
       )
       self._connection.executemany(
-        f"insert into {value_table} values (?, ?)",
+        f"insert into {value_table} values ({insert_placeholders})",
         tuple(
-          (index + 1, (None if value is None else float(value)))
-          for index, value in enumerate(values)
+          (index + 1,) + tuple(_nullable_float(values[index]) for _name, values in columns)
+          for index in range(expected_count)
         ),
       )
       self._replace_active(
         f"""
         select
           row_data.* exclude (__row_id),
-          values_data.__value as {_quote_identifier(target_variable)}
+          {selected_values_sql}
         from {row_table} as row_data
         inner join {value_table} as values_data
         on row_data.__row_id = values_data.__row_id
@@ -1904,6 +1931,12 @@ def _polars_dtype_name(dtype: pl.DataType) -> str:
 
 def resolve_parquet_source(path: Path | str) -> LoadSource:
   return resolve_load_source(path)
+
+
+def _nullable_float(value: float | None) -> float | None:
+  if value is None:
+    return None
+  return float(value)
 
 
 def resolve_load_source(path: Path | str) -> LoadSource:

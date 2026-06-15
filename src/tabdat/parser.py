@@ -1544,10 +1544,12 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
     raise ParseError("predict expects syntax: predict <newvar>")
   option_names = {option.name for option in parts.options}
   predict_kinds = {"xb", "residuals", "pr", "spatial_lag", "posterior_predictive"}
-  unsupported = option_names - predict_kinds
+  predict_aux_options = {"interval", "level"}
+  unsupported = option_names - predict_kinds - predict_aux_options
   if unsupported:
     raise ParseError(f"predict unsupported option: {', '.join(sorted(unsupported))}")
   _require_flag_options(parts.options, "predict", predict_kinds)
+  _require_flag_options(parts.options, "predict", {"interval"})
   selected_kinds = predict_kinds & option_names
   if len(selected_kinds) > 1:
     raise ParseError(
@@ -1562,9 +1564,21 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
     kind = "spatial_lag"
   if "posterior_predictive" in option_names:
     kind = "posterior_predictive"
+  interval = "interval" in option_names
+  level = _single_float_option(parts.options, "level", "predict")
+  if level is None:
+    level = 95.0
+  if (interval or "level" in option_names) and kind != "posterior_predictive":
+    raise ParseError("predict interval options require posterior_predictive")
+  if "level" in option_names and not interval:
+    raise ParseError("predict option level requires interval")
+  if level <= 0.0 or level >= 100.0:
+    raise ParseError("predict option level must be between 0 and 100")
   return PredictCommand(
     target_variable=parts.arguments[0],
     kind=kind,
+    interval=interval,
+    level=level,
   )
 
 
@@ -2585,6 +2599,7 @@ def _parenthesized_option_value(
     "seed",
     "rseed",
     "folds",
+    "level",
     "draws",
     "burnin",
     "tune",

@@ -1639,6 +1639,53 @@ def test_phase_19_bayes_prefix_predict_supports_posterior_predictive(
   assert all(isinstance(value, float) for value in predictions)
 
 
+def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_intervals(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_interval.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(
+        target_variable="y_pp",
+        kind="posterior_predictive",
+        interval=True,
+        level=90.0,
+      )
+    )
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "y_pp" in preview.columns
+  assert "y_pp_lower" in preview.columns
+  assert "y_pp_upper" in preview.columns
+  mean_index = preview.columns.index("y_pp")
+  lower_index = preview.columns.index("y_pp_lower")
+  upper_index = preview.columns.index("y_pp_upper")
+  for row in preview.rows:
+    mean = row[mean_index]
+    lower = row[lower_index]
+    upper = row[upper_index]
+    assert isinstance(mean, float)
+    assert isinstance(lower, float)
+    assert isinstance(upper, float)
+    assert lower <= mean <= upper
+
+
 def test_phase_19_bayes_prefix_logit_predict_supports_posterior_predictive(
   tmp_path: Path,
 ) -> None:
@@ -1684,6 +1731,52 @@ def test_phase_19_bayes_prefix_logit_predict_supports_posterior_predictive(
   assert all(0.0 <= value <= 1.0 for value in predictions if isinstance(value, float))
 
 
+def test_phase_19_bayes_prefix_logit_predict_intervals_are_probabilities(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_logit_posterior_predictive_interval.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (0.0, 1.0),
+        (1.0, 2.0),
+        (0.0, 3.0),
+        (1.0, 4.0),
+        (0.0, 5.0),
+        (1.0, 6.0)
+    ) as t(y, x)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=LogitCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive", interval=True)
+    )
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  for column in ("y_pp", "y_pp_lower", "y_pp_upper"):
+    column_index = preview.columns.index(column)
+    values = [row[column_index] for row in preview.rows]
+    assert all(isinstance(value, float) for value in values)
+    assert all(0.0 <= value <= 1.0 for value in values if isinstance(value, float))
+
+
 def test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows(
   tmp_path: Path,
 ) -> None:
@@ -1716,7 +1809,7 @@ def test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows(
       )
     )
     predicted = executor.execute(
-      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive", interval=True)
     )
     preview = executor.execute(HeadCommand(7))
   finally:
@@ -1724,11 +1817,12 @@ def test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows(
 
   assert isinstance(predicted, TransformResult)
   assert isinstance(preview, PreviewResult)
-  y_pp_index = preview.columns.index("y_pp")
-  predictions = [row[y_pp_index] for row in preview.rows]
-  assert len(predictions) == 7
-  assert predictions[-1] is None
-  assert all(isinstance(value, float) for value in predictions[:-1])
+  for column in ("y_pp", "y_pp_lower", "y_pp_upper"):
+    column_index = preview.columns.index(column)
+    predictions = [row[column_index] for row in preview.rows]
+    assert len(predictions) == 7
+    assert predictions[-1] is None
+    assert all(isinstance(value, float) for value in predictions[:-1])
 
 
 def test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows(
@@ -1761,7 +1855,7 @@ def test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows(
     )
     executor.execute(UseCommand(predict_path))
     predicted = executor.execute(
-      PredictCommand(target_variable="y_pp", kind="posterior_predictive")
+      PredictCommand(target_variable="y_pp", kind="posterior_predictive", interval=True)
     )
     preview = executor.execute(HeadCommand(2))
   finally:
@@ -1769,9 +1863,54 @@ def test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows(
 
   assert isinstance(predicted, TransformResult)
   assert isinstance(preview, PreviewResult)
-  y_pp_index = preview.columns.index("y_pp")
-  predictions = [row[y_pp_index] for row in preview.rows]
-  assert predictions == [None, None]
+  for column in ("y_pp", "y_pp_lower", "y_pp_upper"):
+    column_index = preview.columns.index(column)
+    predictions = [row[column_index] for row in preview.rows]
+    assert predictions == [None, None]
+
+
+def test_phase_19_bayes_prefix_posterior_predictive_interval_collision_is_atomic(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_collision.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0, 0.0),
+        (2.0, 14.0, 0.0),
+        (3.0, 16.5, 0.0),
+        (4.0, 19.0, 0.0),
+        (5.0, 21.0, 0.0),
+        (6.0, 23.5, 0.0)
+    ) as reg_data(x, y, y_pp_lower)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    with pytest.raises(ExecutionError, match="predict target already exists: y_pp_lower"):
+      executor.execute(
+        PredictCommand(target_variable="y_pp", kind="posterior_predictive", interval=True)
+      )
+    preview = executor.execute(HeadCommand(1))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert "y_pp_lower" in preview.columns
+  assert "y_pp" not in preview.columns
+  assert "y_pp_upper" not in preview.columns
 
 
 def test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix(
