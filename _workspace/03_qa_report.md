@@ -1,4 +1,4 @@
-# Bayesian Posterior Predictive Intervals QA Report
+# Spatial Residual Diagnostics (`estat spatial`) QA Report
 
 ## Status
 
@@ -6,40 +6,35 @@ pass
 
 ## Boundaries Checked
 
-- Contract to parser: valid interval syntax, invalid levels, and invalid option combinations are
-  covered by parser tests.
-- Parser to executor: `PredictCommand.interval` and `level` are consumed only by the
-  `posterior_predictive` execution path.
-- Executor to backend: posterior predictive draw summaries map to atomic multi-column active
-  dataset replacement.
-- CLI/help/docs to contract: CLI smoke, shell completion, help, README, SPEC, architecture, and
-  changelog all expose the implemented interval surface.
+- **Contract to parser**: Validated that `estat spatial` option syntax, mutual exclusivity (e.g., `coord` vs `weights`), and subcommand-specific options are verified by the parser and throw `ParseError` when violated. Other `estat` subcommands correctly reject these options.
+- **Parser representation to executor**: Verified that parsed `EstatCommand` fields (`coord_variables`, `knn`, `weights_file`, `id_variable`, `contiguity`) are correctly passed to and consumed by the execution path.
+- **Executor to backend**: Verified that row extraction for coordinates or IDs filters out incomplete observations and ensures that the final estimation sample size matches the prior OLS regression's `nobs`.
+- **Backend result to formatter & CLI**: Verified that OLS residuals are calculated on the reconstructed `BaseOLS` model, and spatial autocorrelation diagnostics (Moran's I, LM tests) are formatted into a clean `TableResult` conforming to the output design.
+- **CLI/help/docs to contract**: Verified that help documentation `estat.md` and shell autocomplete completions correctly support the new subcommand and its options.
 
 ## Blocking Issues
 
-- None currently known.
+- None.
 
 ## PR Review Loop
 
-- PR: https://github.com/SaehwanPark/tabdat-explore-dev/pull/75
-- Pass 1 found a contract mismatch: `level(<num>)` was accepted without `interval`, making the
-  level silently unused. Fixed by requiring `interval` whenever `level(...)` is supplied.
-- Pass 2 found no actionable backend/executor issues.
-- Pass 3 found no actionable parser/docs/CLI compatibility issues.
-- No Critical or High findings remain.
+- PR: (Local repository feature branch `feat/estat-spatial`)
+- Pass 1 verified option constraints and mutual exclusivity in parser logic.
+- Pass 2 verified OLS estimation sample alignment constraints and PySAL weights handling.
+- Pass 3 verified autocomplete integration in `src/tabdat/shell.py`.
 
 ## Non-Blocking Follow-Ups
 
-- Define out-of-sample Bayesian prediction syntax in a future product contract.
+- None.
 
 ## Validation Evidence
 
-- Targeted validation passed:
-  `uv run pytest tests/test_parser.py tests/test_executor.py::test_phase_19_bayes_prefix_predict_supports_posterior_predictive tests/test_executor.py::test_phase_19_bayes_prefix_predict_supports_posterior_predictive_intervals tests/test_executor.py::test_phase_19_bayes_prefix_logit_predict_supports_posterior_predictive tests/test_executor.py::test_phase_19_bayes_prefix_logit_predict_intervals_are_probabilities tests/test_executor.py::test_phase_19_bayes_prefix_posterior_predictive_preserves_missing_rows tests/test_executor.py::test_phase_19_bayes_prefix_posterior_predictive_all_missing_rows tests/test_executor.py::test_phase_19_bayes_prefix_posterior_predictive_interval_collision_is_atomic tests/test_executor.py::test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix tests/test_cli.py::test_cli_runs_phase_19_bayes_prefix_posterior_predictive_flow tests/test_shell.py::test_completer_suggests_phase_13_and_phase_14_commands_and_options tests/test_help.py`
-- Static validation passed: `uv run ruff check`, `uv run ruff format --check`, and
-  `uv run basedpyright`.
-- Full validation passed: `uv run pytest` (`905 passed`).
+- Target parser tests passed: `uv run pytest tests/test_parser.py -k spatial`
+- Target executor tests passed: `uv run pytest tests/test_spregress.py -k spatial`
+- Full suite validation passed: `uv run pytest` (917 passed)
+- Static validation passed: `uv run basedpyright` (0 errors, 0 warnings)
+- Lint validation passed: `uv run ruff check` and `uv run ruff format --check`
 
 ## Recommended Next Action
 
-Merge when ready.
+- Merge branch `feat/estat-spatial` and proceed with PR handoff.

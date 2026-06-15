@@ -191,7 +191,9 @@ _ESTAT_SUBCOMMANDS = (
   "drdid",
   "dml",
   "bayes",
+  "spatial",
 )
+_ESTAT_SPATIAL_OPTIONS = ("coord(", "knn(", "weights(", "id(", "contiguity(")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
 _KEYWORDS = {"by", "if", "into"}
 _PREFIX_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$|by\($")
@@ -249,7 +251,11 @@ class TabdatCompleter(Completer):
       return
 
     if command_name == "estat":
-      yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
+      if _is_after_comma(text):
+        if "spatial" in text.lower():
+          yield from _matching_completions(_ESTAT_SPATIAL_OPTIONS, word)
+      else:
+        yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
       return
 
     if command_name == "bayesplot":

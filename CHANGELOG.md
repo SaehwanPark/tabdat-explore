@@ -4,8 +4,12 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
-### Added
-
+- Added standard spatial autocorrelation diagnostics on OLS residuals via `estat spatial`:
+  - Supports both `estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]` and
+    `estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]` subcommands.
+  - Computes Moran's I statistic, expectation, variance, z-statistic, and p-value.
+  - Computes Lagrange Multiplier (LM) tests for simple and robust lag/error, plus spatial SARMA.
+  - Validates and aligns spatial weight matrices with the regression estimation sample.
 - Added Bayesian posterior predictive intervals for `bayes:` MCMC models:
   - `predict <newvar>, posterior_predictive interval [level(<num>)]` now adds mean, lower, and
     upper posterior predictive columns.

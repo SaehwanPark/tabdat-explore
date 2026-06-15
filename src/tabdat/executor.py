@@ -22,7 +22,7 @@ from sklearn.linear_model import (
   Ridge,
 )
 from sklearn.model_selection import KFold
-from spreg import GM_Error_Het, GM_Lag, ML_Error, ML_Lag
+from spreg import BaseOLS, GM_Error_Het, GM_Lag, LMtests, ML_Error, ML_Lag, MoranRes
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
@@ -4286,7 +4286,312 @@ class Executor:
       if bayes_mcmc_regression is None:
         raise ExecutionError("estat bayes requires a prior bayes: prefix model")
       return _estat_bayes_table(bayes_mcmc_regression)
+    if command.subcommand == "spatial":
+      return self._execute_estat_spatial(command, dataset)
     raise ExecutionError(f"estat unsupported subcommand: {command.subcommand}")
+
+  def _execute_estat_spatial(self, command: EstatCommand, dataset: DatasetInfo) -> TableResult:
+    regression = self.state.regression
+    if regression is None:
+      raise ExecutionError("estat spatial requires a prior regress model")
+
+    outcomes: list[float] = []
+    predictors_list: list[tuple[float, ...]] = []
+    complete_row_indices: list[int] = []
+    w = None
+
+    if command.weights_file is not None:
+      from pathlib import Path
+
+      id_var = command.id_variable
+      if id_var is None:
+        raise ExecutionError("id variable is required when weights file is specified")
+      if id_var not in [col.name for col in dataset.columns]:
+        raise ExecutionError(f"id variable '{id_var}' not found in active dataset")
+
+      numeric_variables: tuple[str, ...] = (
+        regression.outcome_variable,
+        *regression.predictor_names,
+      )
+      _require_numeric_columns("estat spatial", dataset, numeric_variables)
+
+      all_variables = (*numeric_variables, id_var)
+      rows = self.backend.regression_rows(dataset, all_variables)
+      ids_list: list[Any] = []
+
+      for index, row in enumerate(rows):
+        if len(row) != len(all_variables):
+          raise ExecutionError("estat spatial failed")
+        raw_outcome = row[0]
+        raw_predictors = row[1 : 1 + len(regression.predictor_names)]
+        raw_id = row[-1]
+
+        if raw_outcome is None or any(val is None for val in raw_predictors) or raw_id is None:
+          continue
+
+        outcome_val = _coerce_float(raw_outcome)
+        coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+
+        if outcome_val is None or any(val is None for val in coerced_predictors):
+          continue
+
+        predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+        outcomes.append(outcome_val)
+        predictors_list.append(predictor_vals)
+        ids_list.append(raw_id)
+        complete_row_indices.append(index)
+
+      if not outcomes:
+        raise ExecutionError("estat spatial requires at least one complete observation")
+
+      if len(set(ids_list)) != len(ids_list):
+        raise ExecutionError(
+          f"id variable '{id_var}' contains duplicate values in the estimation sample"
+        )
+
+      weights_path = Path(command.weights_file)
+      if not weights_path.exists():
+        raise ExecutionError("weights file not found")
+
+      ext = weights_path.suffix.lower()
+      if ext not in (".gal", ".gwt", ".shp"):
+        raise ExecutionError(f"unsupported weights file format: {ext}")
+
+      import libpysal
+      from libpysal.weights import Queen, Rook, w_subset
+
+      w_original: Any = None
+      try:
+        if ext == ".shp":
+          resolved_id_var = id_var
+          shp_path_lower = weights_path.with_suffix(".shp")
+          symlinked_shp = False
+          if not shp_path_lower.exists():
+            shp_path_upper = weights_path.with_suffix(".SHP")
+            if shp_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(shp_path_upper.name, shp_path_lower)
+                symlinked_shp = True
+              except Exception:
+                pass
+
+          db_path = weights_path.with_suffix(".dbf")
+          symlinked_dbf = False
+          if not db_path.exists():
+            db_path_upper = weights_path.with_suffix(".DBF")
+            if db_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(db_path_upper.name, db_path)
+                symlinked_dbf = True
+              except Exception:
+                pass
+
+          shx_path = weights_path.with_suffix(".shx")
+          symlinked_shx = False
+          if not shx_path.exists():
+            shx_path_upper = weights_path.with_suffix(".SHX")
+            if shx_path_upper.exists():
+              import os
+
+              try:
+                os.symlink(shx_path_upper.name, shx_path)
+                symlinked_shx = True
+              except Exception:
+                pass
+
+          actual_db_path = db_path if db_path.exists() else weights_path.with_suffix(".DBF")
+          if actual_db_path.exists():
+            try:
+              db: Any = libpysal.io.open(str(actual_db_path))
+              for col in db.header:
+                if col.lower() == id_var.lower():
+                  resolved_id_var = col
+                  break
+              db.close()
+            except Exception:
+              pass
+
+          try:
+            if command.contiguity == "rook":
+              w_original = Rook.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+            else:
+              w_original = Queen.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+          finally:
+            if symlinked_shp and shp_path_lower.is_symlink():
+              try:
+                shp_path_lower.unlink()
+              except Exception:
+                pass
+            if symlinked_dbf and db_path.is_symlink():
+              try:
+                db_path.unlink()
+              except Exception:
+                pass
+            if symlinked_shx and shx_path.is_symlink():
+              try:
+                shx_path.unlink()
+              except Exception:
+                pass
+        else:
+          w_original = libpysal.io.open(str(weights_path)).read()
+      except Exception as exc:
+        raise ExecutionError(f"failed to load spatial weights file: {exc}") from exc
+
+      # Align the type of ids_list to the type of keys in w_original
+      if ids_list and hasattr(w_original, "neighbors") and w_original.neighbors:
+        sample_key = next(iter(w_original.neighbors.keys()))
+        if isinstance(sample_key, str) and not isinstance(ids_list[0], str):
+          ids_list = [
+            str(int(x)) if isinstance(x, float) and x.is_integer() else str(x) for x in ids_list
+          ]
+        elif isinstance(sample_key, int) and not isinstance(ids_list[0], int):
+          try:
+            ids_list = [int(float(x)) if isinstance(x, str) else int(x) for x in ids_list]
+          except ValueError:
+            pass
+
+      w_keys = set(w_original.neighbors.keys())
+      missing_ids = [str(r_id) for r_id in ids_list if r_id not in w_keys]
+      if missing_ids:
+        raise ExecutionError(
+          "some regression sample IDs are missing from the spatial weights matrix: "
+          f"{', '.join(missing_ids[:5])}"
+        )
+
+      try:
+        w = w_subset(w_original, ids_list)
+        w.id_order = ids_list
+        w.transform = "r"
+      except Exception as exc:
+        raise ExecutionError("spatial diagnostics weight matrix construction failed") from exc
+
+    else:
+      # KNN coord variables path
+      if command.coord_variables is None or command.knn is None:
+        raise ExecutionError(
+          "coord variables and knn are required if weights file is not specified"
+        )
+
+      numeric_variables = (
+        regression.outcome_variable,
+        *regression.predictor_names,
+        *command.coord_variables,
+      )
+      _require_numeric_columns("estat spatial", dataset, numeric_variables)
+
+      rows = self.backend.regression_rows(dataset, numeric_variables)
+      coords_list: list[tuple[float, float]] = []
+
+      for index, row in enumerate(rows):
+        if len(row) != len(numeric_variables):
+          raise ExecutionError("estat spatial failed")
+        raw_outcome = row[0]
+        raw_predictors = row[1 : 1 + len(regression.predictor_names)]
+        raw_lat = row[1 + len(regression.predictor_names)]
+        raw_lon = row[2 + len(regression.predictor_names)]
+
+        if (
+          raw_outcome is None
+          or any(val is None for val in raw_predictors)
+          or raw_lat is None
+          or raw_lon is None
+        ):
+          continue
+
+        outcome_val = _coerce_float(raw_outcome)
+        coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+        lat_val = _coerce_float(raw_lat)
+        lon_val = _coerce_float(raw_lon)
+
+        if (
+          outcome_val is None
+          or any(val is None for val in coerced_predictors)
+          or lat_val is None
+          or lon_val is None
+        ):
+          continue
+
+        predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+        outcomes.append(outcome_val)
+        predictors_list.append(predictor_vals)
+        coords_list.append((lat_val, lon_val))
+        complete_row_indices.append(index)
+
+      if not outcomes:
+        raise ExecutionError("estat spatial requires at least one complete observation")
+
+      if len(outcomes) <= command.knn:
+        raise ExecutionError(
+          "estat spatial requires more complete observations than the number of "
+          f"neighbors (knn={command.knn})"
+        )
+
+      from libpysal.weights import KNN
+
+      coords_arr = np.array(coords_list, dtype=float)
+      try:
+        w = KNN.from_array(coords_arr, k=command.knn)
+        w.transform = "r"
+      except Exception as exc:
+        raise ExecutionError("spatial diagnostics weight matrix construction failed") from exc
+
+    nobs = getattr(regression.fitted_model, "nobs", None)
+    if nobs is None:
+      raise ExecutionError("estat spatial failed to retrieve sample size from prior model")
+    if len(outcomes) != int(nobs):
+      raise ExecutionError(
+        f"estat spatial sample size ({len(outcomes)}) does not match "
+        f"OLS estimation sample size ({int(nobs)})"
+      )
+
+    design = np.array(predictors_list, dtype=float)
+    if regression.include_intercept:
+      design = np.hstack((np.ones((design.shape[0], 1)), design))
+    outcome_array = np.array(outcomes, dtype=float).reshape(-1, 1)
+
+    try:
+      ols_model = BaseOLS(outcome_array, design)
+    except Exception as exc:
+      raise ExecutionError("BaseOLS model reconstruction failed") from exc
+
+    try:
+      m_res = MoranRes(ols_model, w, z=True)
+      lm_res = LMtests(ols_model, w, tests=["lme", "lml", "rlme", "rlml", "sarma"])
+    except Exception as exc:
+      raise ExecutionError(f"spatial diagnostics calculation failed: {exc}") from exc
+
+    def _clean_float(val: Any) -> float | None:
+      if val is None:
+        return None
+      try:
+        f_val = float(val)
+        import math
+
+        return f_val if math.isfinite(f_val) else None
+      except (TypeError, ValueError):
+        return None
+
+    headers = ("Test", "Statistic", "df / z-value", "p-value")
+    rows = (
+      (
+        "Moran's I (residual)",
+        _clean_float(m_res.I),
+        _clean_float(m_res.zI),
+        _clean_float(m_res.p_norm),
+      ),
+      ("LM error", _clean_float(lm_res.lme[0]), 1, _clean_float(lm_res.lme[1])),
+      ("LM lag", _clean_float(lm_res.lml[0]), 1, _clean_float(lm_res.lml[1])),
+      ("Robust LM error", _clean_float(lm_res.rlme[0]), 1, _clean_float(lm_res.rlme[1])),
+      ("Robust LM lag", _clean_float(lm_res.rlml[0]), 1, _clean_float(lm_res.rlml[1])),
+      ("LM SARMA", _clean_float(lm_res.sarma[0]), 2, _clean_float(lm_res.sarma[1])),
+    )
+    return TableResult(headers=headers, rows=rows)
 
   def _execute_xtreg(self, command: XtRegCommand) -> XtRegressionResult:
     dataset = self._require_active_dataset("xtreg")

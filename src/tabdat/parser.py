@@ -1887,9 +1887,9 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
     "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|"
-    "dml|bayes>"
+    "dml|bayes|spatial>"
   )
-  if parts.condition is not None or parts.options or parts.expression is not None:
+  if parts.condition is not None or parts.expression is not None:
     raise ParseError(expected_estat_syntax)
   if len(parts.arguments) != 1:
     raise ParseError(expected_estat_syntax)
@@ -1908,31 +1908,96 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "drdid",
     "dml",
     "bayes",
+    "spatial",
   }:
     raise ParseError(
       "estat subcommand must be residuals, ovtest, vif, firststage, "
-      "overid, hausman, endogenous, margins, gof, did, drdid, dml, or bayes"
+      "overid, hausman, endogenous, margins, gof, did, drdid, dml, bayes, or spatial"
     )
-  return EstatCommand(
-    subcommand=cast(
-      Literal[
-        "residuals",
-        "ovtest",
-        "vif",
-        "firststage",
-        "overid",
-        "hausman",
-        "endogenous",
-        "margins",
-        "gof",
-        "did",
-        "drdid",
-        "dml",
-        "bayes",
-      ],
-      subcommand,
+
+  if subcommand != "spatial":
+    if parts.options:
+      raise ParseError(f"estat {subcommand} does not support options")
+    return EstatCommand(
+      subcommand=cast(
+        Literal[
+          "residuals",
+          "ovtest",
+          "vif",
+          "firststage",
+          "overid",
+          "hausman",
+          "endogenous",
+          "margins",
+          "gof",
+          "did",
+          "drdid",
+          "dml",
+          "bayes",
+        ],
+        subcommand,
+      )
     )
-  )
+
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"coord", "knn", "weights", "id", "contiguity"}
+  if unsupported:
+    raise ParseError(f"estat spatial unsupported option: {', '.join(sorted(unsupported))}")
+
+  has_coord = "coord" in option_names
+  has_weights = "weights" in option_names
+
+  if has_coord and has_weights:
+    raise ParseError("estat spatial option coord and weights are mutually exclusive")
+  elif not has_coord and not has_weights:
+    raise ParseError("estat spatial requires either coord() or weights() option")
+
+  if has_coord:
+    if "id" in option_names:
+      raise ParseError("estat spatial option id can only be used with weights() option")
+    if "contiguity" in option_names:
+      raise ParseError("estat spatial option contiguity can only be used with weights() option")
+
+    coord_values = _single_tuple_option(parts.options, "coord", "estat spatial")
+    if coord_values is None or len(coord_values) != 2:
+      raise ParseError(
+        "estat spatial option coord expects exactly two variables representing "
+        "latitude and longitude coordinates"
+      )
+
+    knn_val = _single_integer_option(parts.options, "knn", "estat spatial", minimum=1)
+    if knn_val is None:
+      knn_val = 5
+
+    return EstatCommand(
+      subcommand="spatial",
+      coord_variables=coord_values,
+      knn=knn_val,
+    )
+  else:
+    # weights is specified
+    if "knn" in option_names or "coord" in option_names:
+      raise ParseError("estat spatial option knn/coord can only be used with coord() option")
+
+    weights_path = _single_path_option(parts.options, "weights", "estat spatial")
+    if weights_path is None:
+      raise ParseError("estat spatial option weights() expects a path")
+
+    id_var = _single_text_option(parts.options, "id", "estat spatial")
+    if id_var is None:
+      raise ParseError("estat spatial option id() is required when weights() is specified")
+
+    contiguity_val = _single_text_option(parts.options, "contiguity", "estat spatial") or "queen"
+    if contiguity_val not in ("queen", "rook"):
+      raise ParseError("estat spatial option contiguity must be 'queen' or 'rook'")
+    contiguity: Literal["queen", "rook"] = contiguity_val
+
+    return EstatCommand(
+      subcommand="spatial",
+      weights_file=str(weights_path),
+      id_variable=id_var,
+      contiguity=contiguity,
+    )
 
 
 def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:

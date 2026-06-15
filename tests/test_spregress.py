@@ -8,12 +8,15 @@ from tabdat.executor import Executor
 from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
   BinaryExpression,
+  EstatCommand,
   IdentifierExpression,
   NumberExpression,
   PredictCommand,
+  RegressCommand,
   RidgeCommand,
   SpatialRegressionResult,
   SpregressCommand,
+  TableResult,
   UseCommand,
 )
 from tabdat.parser import parse_command
@@ -766,3 +769,160 @@ def test_spregress_shell_autocomplete_updated() -> None:
   assert "weights(" in completion_texts
   assert "id(" in completion_texts
   assert "contiguity(" in completion_texts
+
+
+def test_execute_estat_spatial_preconditions(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data.parquet"
+  df = pd.DataFrame({"y": [1.0, 2.0], "x": [3.0, 4.0], "lat": [0.0, 1.0], "lon": [1.0, 0.0]})  # noqa: F841
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    # No prior regress model
+    with pytest.raises(ExecutionError, match="estat spatial requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="spatial", coord_variables=("lat", "lon"), knn=1))
+  finally:
+    executor.close()
+
+
+def test_execute_estat_spatial_knn(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data.parquet"
+  df = pd.DataFrame(  # noqa: F841
+    {
+      "y": [1.0, 2.0, 3.0, 4.0, 5.0],
+      "x": [2.0, 3.0, 4.0, 5.0, 6.0],
+      "lat": [0.0, 0.0, 1.0, 1.0, 0.5],
+      "lon": [0.0, 1.0, 0.0, 1.0, 0.5],
+    }
+  )
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+
+    result = executor.execute(
+      EstatCommand(subcommand="spatial", coord_variables=("lat", "lon"), knn=2)
+    )
+    assert isinstance(result, TableResult)
+    assert result.headers == ("Test", "Statistic", "df / z-value", "p-value")
+    assert len(result.rows) == 6
+
+    # Moran's I
+    assert result.rows[0][0] == "Moran's I (residual)"
+    # LM error
+    assert result.rows[1][0] == "LM error"
+    assert result.rows[1][2] == 1
+    # LM lag
+    assert result.rows[2][0] == "LM lag"
+    assert result.rows[2][2] == 1
+    # Robust LM error
+    assert result.rows[3][0] == "Robust LM error"
+    assert result.rows[3][2] == 1
+    # Robust LM lag
+    assert result.rows[4][0] == "Robust LM lag"
+    assert result.rows[4][2] == 1
+    # LM SARMA
+    assert result.rows[5][0] == "LM SARMA"
+    assert result.rows[5][2] == 2
+
+    # Check that values are finite float or None
+    for row in result.rows:
+      assert row[1] is None or isinstance(row[1], float)
+      assert isinstance(row[2], (int, float))
+      assert row[3] is None or isinstance(row[3], float)
+  finally:
+    executor.close()
+
+
+def test_execute_estat_spatial_weights_file(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data.parquet"
+  df = pd.DataFrame(  # noqa: F841
+    {"y": [10.0, 12.0, 15.0, 18.0], "x": [1.0, 2.0, 3.0, 4.0], "id": ["A", "B", "C", "D"]}
+  )
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  gal_path = tmp_path / "w.gal"
+  gal_path.write_text("0 4 test GAL\nA 2\nB C\nB 2\nA D\nC 2\nA D\nD 2\nB C\n")
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+
+    result = executor.execute(
+      EstatCommand(
+        subcommand="spatial",
+        weights_file=str(gal_path),
+        id_variable="id",
+        contiguity="queen",
+      )
+    )
+    assert isinstance(result, TableResult)
+    assert result.headers == ("Test", "Statistic", "df / z-value", "p-value")
+    assert len(result.rows) == 6
+  finally:
+    executor.close()
+
+
+def test_execute_estat_spatial_sample_alignment_error(tmp_path: Path) -> None:
+  import duckdb
+  import pandas as pd
+
+  data_path = tmp_path / "data.parquet"
+  # One missing coordinate row
+  df = pd.DataFrame(  # noqa: F841
+    {
+      "y": [1.0, 2.0, 3.0, 4.0, 5.0],
+      "x": [2.0, 3.0, 4.0, 5.0, 6.0],
+      "lat": [0.0, 0.0, 1.0, 1.0, None],
+      "lon": [0.0, 1.0, 0.0, 1.0, 0.5],
+    }
+  )
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+
+    # Since the last row has a missing lat coordinate, estat spatial will only
+    # find 4 complete cases, but regress estimated on 5 cases. This sample size
+    # mismatch should trigger an error.
+    with pytest.raises(
+      ExecutionError,
+      match="estat spatial sample size \\(4\\) does not match OLS estimation sample size \\(5\\)",
+    ):
+      executor.execute(EstatCommand(subcommand="spatial", coord_variables=("lat", "lon"), knn=2))
+  finally:
+    executor.close()
+
+
+def test_estat_spatial_shell_autocomplete() -> None:
+
+  from tabdat.shell import _ESTAT_SPATIAL_OPTIONS, _ESTAT_SUBCOMMANDS
+
+  # Check that "spatial" is in the subcommands list
+  assert "spatial" in _ESTAT_SUBCOMMANDS
+
+  # Check options completion list
+  assert "coord(" in _ESTAT_SPATIAL_OPTIONS
+  assert "knn(" in _ESTAT_SPATIAL_OPTIONS
+  assert "weights(" in _ESTAT_SPATIAL_OPTIONS
+  assert "id(" in _ESTAT_SPATIAL_OPTIONS
+  assert "contiguity(" in _ESTAT_SPATIAL_OPTIONS
