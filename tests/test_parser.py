@@ -39,6 +39,7 @@ from tabdat.models import (
   JoinCommand,
   KeepCommand,
   LassoCommand,
+  LincomCommand,
   LogitCommand,
   LowessCommand,
   NbregCommand,
@@ -67,7 +68,9 @@ from tabdat.models import (
   SummarizeCommand,
   TabulateCommand,
   TailCommand,
+  TestCommand,
   TobitCommand,
+  TtestCommand,
   UseCommand,
   XtAbondCommand,
   XtDataCommand,
@@ -1682,3 +1685,39 @@ def test_parse_exit_aliases() -> None:
 def test_parse_invalid_commands(text: str) -> None:
   with pytest.raises(ParseError):
     parse_command(text)
+
+
+def test_parse_statistical_testing_commands() -> None:
+  # test command parsing
+  assert parse_command("test x1") == TestCommand((IdentifierExpression("x1"),))
+  assert parse_command("test x1 x2") == TestCommand(
+    (
+      IdentifierExpression("x1"),
+      IdentifierExpression("x2"),
+    )
+  )
+  assert parse_command("test x1 = x2") == TestCommand(
+    (BinaryExpression(IdentifierExpression("x1"), "-", IdentifierExpression("x2")),)
+  )
+  assert parse_command("test (x1 = x2) (x3 = 0)") == TestCommand(
+    (
+      BinaryExpression(IdentifierExpression("x1"), "-", IdentifierExpression("x2")),
+      BinaryExpression(IdentifierExpression("x3"), "-", NumberExpression(0.0)),
+    )
+  )
+
+  # lincom command parsing
+  assert parse_command("lincom x1 - x2") == LincomCommand(
+    BinaryExpression(IdentifierExpression("x1"), "-", IdentifierExpression("x2"))
+  )
+
+  # ttest command parsing
+  assert parse_command("ttest x == 10") == TtestCommand(varname1="x", value=10.0)
+  assert parse_command("ttest x == y") == TtestCommand(varname1="x", varname2="y")
+  assert parse_command("ttest x, by(g)") == TtestCommand(varname1="x", by_variable="g")
+  assert parse_command("ttest x, by(g) welch") == TtestCommand(
+    varname1="x", by_variable="g", welch=True
+  )
+  assert parse_command("ttest x, by(g) unequal") == TtestCommand(
+    varname1="x", by_variable="g", welch=True
+  )

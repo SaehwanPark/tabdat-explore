@@ -498,21 +498,16 @@ and describe the active work with concise verification criteria.
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
      Phase 12 estimation result contract
-- Phase 19 modern extensions:
-  - add machine-learning integration, Bayesian workflows, and spatial models as explicitly
-    late-stage extensions
-  - remaining meaningful slices in this phase:
-    - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian
-      prediction workflows beyond the current active-dataset posterior predictive mean and
-      interval columns, current in-terminal `estat bayes` diagnostics table, and current
-      `bayesplot` trace/density/autocorrelation artifacts.
-    - Advanced spatial autoregressive models: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models.
-    - Spatial predictive workflows: expand the current same-sample `predict ..., spatial_lag`
-      support to additional spatial prediction scopes, especially out-of-sample workflows and any
-      future spatial model families beyond the current lag-model path.
+- Phase 21 — Classical Statistical & Hypothesis Testing:
+  - `test` command: performs Wald tests of linear restrictions ($R \beta = r$) or joint significance tests over model parameters.
+  - `lincom` command: estimates and computes standard errors, t/z stats, p-values, and confidence intervals for linear combinations of coefficients.
+  - `ttest` command: conducts one-sample, two-sample (equal/unequal variance), and paired t-tests on active variables.
+- Deferred Phase 19 modern extensions:
+  - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset posterior predictive mean and interval columns.
+  - Advanced spatial autoregressive models: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models.
+  - Spatial predictive workflows: expand same-sample `predict ..., spatial_lag` to out-of-sample workflows.
   - library strategy:
-    - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and
-      `pysal` (`spreg`) for spatial econometrics
-    - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger
-      coverage
+    - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and `pysal` (`spreg`) for spatial econometrics
+    - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger coverage
     - approach (3): narrow `numpy`/`scipy` custom implementations only when no mature backend fits
+

@@ -9,12 +9,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, SupportsFloat, cast
 
 import numpy as np
+import pandas as pd
 import statsmodels.api as sm
 from libpysal.weights import KNN
 from linearmodels.iv import IV2SLS, IVGMM
 from linearmodels.panel import PanelOLS, RandomEffects
 from scipy.optimize import least_squares, minimize
-from scipy.stats import chi2, norm
+from scipy.stats import chi2, f, norm, t
 from sklearn.linear_model import (
   BayesianRidge,
   ElasticNet,
@@ -99,6 +100,8 @@ from tabdat.models import (
   KeepCommand,
   LassoCommand,
   LassoRegressionResult,
+  LincomCommand,
+  LincomResult,
   LoadResult,
   LogitCommand,
   LogitRegressionResult,
@@ -148,9 +151,14 @@ from tabdat.models import (
   TableResult,
   TabulateCommand,
   TailCommand,
+  TestCommand,
+  TestResult,
   TobitCommand,
   TobitRegressionResult,
   TransformResult,
+  TtestCommand,
+  TtestGroupStats,
+  TtestResult,
   UnaryExpression,
   UseCommand,
   XtAbondCommand,
@@ -312,6 +320,7 @@ class _QregRegressionState:
 @dataclass(frozen=True)
 class _IvRegressionState:
   estimator: Literal["2sls", "gmm"]
+  parameter_names: tuple[str, ...]
   fitted_model: object
 
 
@@ -876,6 +885,15 @@ class Executor:
 
     if isinstance(command, DmlCommand):
       return self._execute_dml(command)
+
+    if isinstance(command, TestCommand):
+      return self._execute_test(command)
+
+    if isinstance(command, LincomCommand):
+      return self._execute_lincom(command)
+
+    if isinstance(command, TtestCommand):
+      return self._execute_ttest(command)
 
     if isinstance(command, PredictCommand):
       return self._execute_predict(command)
@@ -2761,6 +2779,7 @@ class Executor:
     self.state.streg_regression = None
     self.state.iv_regression = _IvRegressionState(
       estimator=command.estimator,
+      parameter_names=parameter_names,
       fitted_model=fitted,
     )
     self.state.cf_regression = None
@@ -5374,6 +5393,8 @@ class Executor:
         CountCommand,
         HeadCommand,
         TailCommand,
+        TestCommand,
+        TestResult,
         KeepCommand,
         DropCommand,
         SelectCommand,
@@ -5389,6 +5410,584 @@ class Executor:
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
     self.state.active_dataset = materialized
+
+  def _execute_test(self, command: TestCommand) -> TestResult:
+    params_series, cov_df, df_resid = self._get_active_estimation_results()
+    parameter_names = tuple(str(name) for name in params_series.index)
+    beta_hat = params_series.values
+    V = cov_df.values
+
+    q = len(command.constraints)
+    R_rows = []
+    r_vals = []
+    constraint_strings = []
+
+    for constraint in command.constraints:
+      constraint_strings.append(_format_constraint_eq(constraint))
+
+      zero_dict = {name: 0.0 for name in parameter_names}
+      try:
+        c_0 = _evaluate_linear_expression(constraint, zero_dict)
+      except ExecutionError as exc:
+        raise exc
+      except Exception as exc:
+        raise ExecutionError(f"failed to evaluate constraint: {exc}") from exc
+
+      row_R = []
+      for name in parameter_names:
+        e_dict = {n: 1.0 if n == name else 0.0 for n in parameter_names}
+        c_i = _evaluate_linear_expression(constraint, e_dict) - c_0
+        row_R.append(c_i)
+
+      R_rows.append(row_R)
+      r_vals.append(-c_0)
+
+    R = np.array(R_rows)
+    r = np.array(r_vals)
+
+    try:
+      rvr = R @ V @ R.T
+      rvr_inv = np.linalg.inv(rvr)
+    except np.linalg.LinAlgError as exc:
+      raise ExecutionError("constraints are collinear or singular") from exc
+
+    diff = R @ beta_hat - r
+    W = float(diff.T @ rvr_inv @ diff)
+
+    if df_resid is not None and df_resid > 0:
+      F = W / q
+      p_val = float(1.0 - f.cdf(F, q, df_resid))
+      return TestResult(
+        constraints=tuple(constraint_strings),
+        statistic=F,
+        p_value=p_val,
+        df=q,
+        df_residual=df_resid,
+        is_chi2=False,
+      )
+    else:
+      p_val = float(1.0 - chi2.cdf(W, q))
+      return TestResult(
+        constraints=tuple(constraint_strings),
+        statistic=W,
+        p_value=p_val,
+        df=q,
+        df_residual=None,
+        is_chi2=True,
+      )
+
+  def _execute_lincom(self, command: LincomCommand) -> LincomResult:
+    params_series, cov_df, df_resid = self._get_active_estimation_results()
+    parameter_names = tuple(str(name) for name in params_series.index)
+    beta_hat = params_series.values
+    V = cov_df.values
+
+    coef_dict = {name: float(val) for name, val in zip(parameter_names, beta_hat, strict=True)}
+    try:
+      estimate = _evaluate_linear_expression(command.expression, coef_dict)
+    except ExecutionError as exc:
+      raise exc
+    except Exception as exc:
+      raise ExecutionError(f"failed to evaluate linear combination: {exc}") from exc
+
+    zero_dict = {name: 0.0 for name in parameter_names}
+    c_0 = _evaluate_linear_expression(command.expression, zero_dict)
+    c_list = []
+    for name in parameter_names:
+      e_dict = {n: 1.0 if n == name else 0.0 for n in parameter_names}
+      c_i = _evaluate_linear_expression(command.expression, e_dict) - c_0
+      c_list.append(c_i)
+
+    c = np.array(c_list)
+    variance = float(c.T @ V @ c)
+    if variance < 0.0:
+      standard_error = 0.0
+    else:
+      standard_error = math.sqrt(variance)
+
+    if standard_error == 0.0:
+      statistic = math.nan
+      p_val = math.nan
+      ci_lower = estimate
+      ci_upper = estimate
+    else:
+      statistic = estimate / standard_error
+      if df_resid is not None and df_resid > 0:
+        p_val = float(2.0 * (1.0 - t.cdf(abs(statistic), df_resid)))
+        t_crit = t.ppf(0.975, df_resid)
+        ci_lower = float(estimate - t_crit * standard_error)
+        ci_upper = float(estimate + t_crit * standard_error)
+      else:
+        p_val = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
+        z_crit = norm.ppf(0.975)
+        ci_lower = float(estimate - z_crit * standard_error)
+        ci_upper = float(estimate + z_crit * standard_error)
+
+    label = _format_expression(command.expression)
+    return LincomResult(
+      label=label,
+      estimate=estimate,
+      standard_error=standard_error,
+      statistic=statistic,
+      p_value=p_val,
+      ci_lower=ci_lower,
+      ci_upper=ci_upper,
+      df_residual=df_resid,
+    )
+
+  def _execute_ttest(self, command: TtestCommand) -> TtestResult:
+    dataset = self._require_active_dataset("ttest")
+
+    if command.value is not None:
+      variables = (command.varname1,)
+      _require_numeric_columns("ttest", dataset, variables)
+      rows = self.backend.regression_rows(dataset, variables)
+      clean_data = [
+        float(cast(Any, r[0]))
+        for r in rows
+        if r[0] is not None and np.isfinite(float(cast(Any, r[0])))
+      ]
+
+      n = len(clean_data)
+      if n == 0:
+        raise ExecutionError("ttest: no valid numeric observations found")
+
+      mean_val = float(np.mean(clean_data))
+      std_dev = float(np.std(clean_data, ddof=1)) if n > 1 else math.nan
+      std_err = std_dev / math.sqrt(n) if n > 1 else math.nan
+
+      if n > 1:
+        if std_err == 0.0 or math.isnan(std_err):
+          ci_lower = mean_val
+          ci_upper = mean_val
+          t_stat = math.nan
+          df_val = float(n - 1)
+          p_left = math.nan
+          p_two = math.nan
+          p_right = math.nan
+        else:
+          t_crit = t.ppf(0.975, n - 1)
+          ci_lower = float(mean_val - t_crit * std_err)
+          ci_upper = float(mean_val + t_crit * std_err)
+          t_stat = (mean_val - command.value) / std_err
+          df_val = float(n - 1)
+          p_left = float(t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - t.cdf(t_stat, n - 1))
+      else:
+        ci_lower = math.nan
+        ci_upper = math.nan
+        t_stat = math.nan
+        df_val = 0.0
+        p_left = math.nan
+        p_two = math.nan
+        p_right = math.nan
+
+      group1 = TtestGroupStats(
+        name=command.varname1,
+        obs=n,
+        mean=mean_val,
+        std_err=std_err,
+        std_dev=std_dev,
+        ci_lower=ci_lower,
+        ci_upper=ci_upper,
+      )
+
+      diff_stats = TtestGroupStats(
+        name="mean",
+        obs=n,
+        mean=mean_val,
+        std_err=std_err,
+        std_dev=std_dev,
+        ci_lower=ci_lower,
+        ci_upper=ci_upper,
+      )
+
+      return TtestResult(
+        varname1=command.varname1,
+        varname2=None,
+        by_variable=None,
+        is_paired=False,
+        is_welch=False,
+        null_value=command.value,
+        group1_stats=group1,
+        group2_stats=None,
+        combined_stats=None,
+        difference_stats=diff_stats,
+        t_statistic=t_stat,
+        df=df_val,
+        p_left=p_left,
+        p_two=p_two,
+        p_right=p_right,
+      )
+
+    elif command.varname2 is not None:
+      variables = (command.varname1, command.varname2)
+      _require_numeric_columns("ttest", dataset, variables)
+      rows = self.backend.regression_rows(dataset, variables)
+      clean_pairs = [
+        (float(cast(Any, r[0])), float(cast(Any, r[1])))
+        for r in rows
+        if r[0] is not None
+        and r[1] is not None
+        and np.isfinite(float(cast(Any, r[0])))
+        and np.isfinite(float(cast(Any, r[1])))
+      ]
+
+      n = len(clean_pairs)
+      if n == 0:
+        raise ExecutionError("ttest: no valid paired numeric observations found")
+
+      x1 = [p[0] for p in clean_pairs]
+      x2 = [p[1] for p in clean_pairs]
+      diffs = [p[0] - p[1] for p in clean_pairs]
+
+      mean1 = float(np.mean(x1))
+      sd1 = float(np.std(x1, ddof=1)) if n > 1 else math.nan
+      se1 = sd1 / math.sqrt(n) if n > 1 else math.nan
+
+      mean2 = float(np.mean(x2))
+      sd2 = float(np.std(x2, ddof=1)) if n > 1 else math.nan
+      se2 = sd2 / math.sqrt(n) if n > 1 else math.nan
+
+      mean_diff = float(np.mean(diffs))
+      sd_diff = float(np.std(diffs, ddof=1)) if n > 1 else math.nan
+      se_diff = sd_diff / math.sqrt(n) if n > 1 else math.nan
+
+      if n > 1:
+        t_crit = t.ppf(0.975, n - 1)
+        if se1 == 0.0 or math.isnan(se1):
+          ci1_l = mean1
+          ci1_u = mean1
+        else:
+          ci1_l = float(mean1 - t_crit * se1)
+          ci1_u = float(mean1 + t_crit * se1)
+
+        if se2 == 0.0 or math.isnan(se2):
+          ci2_l = mean2
+          ci2_u = mean2
+        else:
+          ci2_l = float(mean2 - t_crit * se2)
+          ci2_u = float(mean2 + t_crit * se2)
+
+        if se_diff == 0.0 or math.isnan(se_diff):
+          cid_l = mean_diff
+          cid_u = mean_diff
+          t_stat = math.nan
+          df_val = float(n - 1)
+          p_left = math.nan
+          p_two = math.nan
+          p_right = math.nan
+        else:
+          cid_l = float(mean_diff - t_crit * se_diff)
+          cid_u = float(mean_diff + t_crit * se_diff)
+          t_stat = mean_diff / se_diff
+          df_val = float(n - 1)
+          p_left = float(t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - t.cdf(t_stat, n - 1))
+      else:
+        ci1_l, ci1_u = math.nan, math.nan
+        ci2_l, ci2_u = math.nan, math.nan
+        cid_l, cid_u = math.nan, math.nan
+        t_stat = math.nan
+        df_val = 0.0
+        p_left = math.nan
+        p_two = math.nan
+        p_right = math.nan
+
+      group1 = TtestGroupStats(command.varname1, n, mean1, se1, sd1, ci1_l, ci1_u)
+      group2 = TtestGroupStats(command.varname2, n, mean2, se2, sd2, ci2_l, ci2_u)
+      diff_stats = TtestGroupStats("diff", n, mean_diff, se_diff, sd_diff, cid_l, cid_u)
+
+      return TtestResult(
+        varname1=command.varname1,
+        varname2=command.varname2,
+        by_variable=None,
+        is_paired=True,
+        is_welch=False,
+        null_value=0.0,
+        group1_stats=group1,
+        group2_stats=group2,
+        combined_stats=None,
+        difference_stats=diff_stats,
+        t_statistic=t_stat,
+        df=df_val,
+        p_left=p_left,
+        p_two=p_two,
+        p_right=p_right,
+      )
+
+    elif command.by_variable is not None:
+      variables = (command.varname1, command.by_variable)
+      column_types = {column.name: column.data_type for column in dataset.columns}
+      if command.by_variable not in column_types:
+        raise UnknownVariableError(f"ttest unknown variable: {command.by_variable}")
+      _require_numeric_columns("ttest", dataset, (command.varname1,))
+
+      rows = self.backend.regression_rows(dataset, variables)
+      clean_data = [
+        (float(cast(Any, r[0])), str(r[1]))
+        for r in rows
+        if r[0] is not None and r[1] is not None and np.isfinite(float(cast(Any, r[0])))
+      ]
+
+      groups = set(g for _, g in clean_data)
+      if len(groups) != 2:
+        raise ExecutionError(
+          f"ttest: by() variable must define exactly two groups (found {len(groups)})"
+        )
+
+      grp1_name, grp2_name = sorted(list(groups))
+      x1 = [val for val, g in clean_data if g == grp1_name]
+      x2 = [val for val, g in clean_data if g == grp2_name]
+
+      n1 = len(x1)
+      n2 = len(x2)
+      if n1 == 0 or n2 == 0:
+        raise ExecutionError("ttest: one or both groups have zero valid observations")
+
+      mean1 = float(np.mean(x1))
+      sd1 = float(np.std(x1, ddof=1)) if n1 > 1 else math.nan
+      se1 = sd1 / math.sqrt(n1) if n1 > 1 else math.nan
+
+      mean2 = float(np.mean(x2))
+      sd2 = float(np.std(x2, ddof=1)) if n2 > 1 else math.nan
+      se2 = sd2 / math.sqrt(n2) if n2 > 1 else math.nan
+
+      x_comb = x1 + x2
+      n_comb = len(x_comb)
+      mean_comb = float(np.mean(x_comb))
+      sd_comb = float(np.std(x_comb, ddof=1)) if n_comb > 1 else math.nan
+      se_comb = sd_comb / math.sqrt(n_comb) if n_comb > 1 else math.nan
+
+      mean_diff = mean1 - mean2
+
+      if command.welch:
+        term1 = (sd1**2 / n1) if (n1 > 1 and not math.isnan(sd1)) else 0.0
+        term2 = (sd2**2 / n2) if (n2 > 1 and not math.isnan(sd2)) else 0.0
+        sum_terms = term1 + term2
+        if sum_terms == 0.0:
+          se_diff = 0.0
+          df_val = 0.0
+        else:
+          se_diff = math.sqrt(sum_terms)
+          denom = 0.0
+          if n1 > 1 and not math.isnan(sd1) and term1 > 0:
+            denom += (term1**2) / (n1 - 1)
+          if n2 > 1 and not math.isnan(sd2) and term2 > 0:
+            denom += (term2**2) / (n2 - 1)
+          if denom == 0.0:
+            df_val = 0.0
+          else:
+            df_val = (sum_terms**2) / denom
+      else:
+        if n1 > 1 and n2 > 1:
+          sd1_val = 0.0 if math.isnan(sd1) else sd1
+          sd2_val = 0.0 if math.isnan(sd2) else sd2
+          pooled_var = ((n1 - 1) * sd1_val**2 + (n2 - 1) * sd2_val**2) / (n1 + n2 - 2)
+          se_diff = math.sqrt(pooled_var * (1.0 / n1 + 1.0 / n2))
+          df_val = float(n1 + n2 - 2)
+        else:
+          se_diff = math.nan
+          df_val = 0.0
+
+      if not math.isnan(se_diff) and se_diff > 0.0 and df_val > 0.0:
+        t_crit = t.ppf(0.975, df_val)
+        cid_l = float(mean_diff - t_crit * se_diff)
+        cid_u = float(mean_diff + t_crit * se_diff)
+
+        t_stat = mean_diff / se_diff
+        p_left = float(t.cdf(t_stat, df_val))
+        p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), df_val)))
+        p_right = float(1.0 - t.cdf(t_stat, df_val))
+      elif se_diff == 0.0:
+        cid_l = mean_diff
+        cid_u = mean_diff
+        t_stat = math.nan
+        p_left = math.nan
+        p_two = math.nan
+        p_right = math.nan
+      else:
+        cid_l, cid_u = math.nan, math.nan
+        t_stat = math.nan
+        p_left = math.nan
+        p_two = math.nan
+        p_right = math.nan
+
+      grp1_df = n1 - 1
+      if n1 > 1:
+        if se1 == 0.0 or math.isnan(se1):
+          ci1_l = mean1
+          ci1_u = mean1
+        else:
+          t_crit1 = t.ppf(0.975, grp1_df)
+          ci1_l = float(mean1 - t_crit1 * se1)
+          ci1_u = float(mean1 + t_crit1 * se1)
+      else:
+        ci1_l, ci1_u = math.nan, math.nan
+
+      grp2_df = n2 - 1
+      if n2 > 1:
+        if se2 == 0.0 or math.isnan(se2):
+          ci2_l = mean2
+          ci2_u = mean2
+        else:
+          t_crit2 = t.ppf(0.975, grp2_df)
+          ci2_l = float(mean2 - t_crit2 * se2)
+          ci2_u = float(mean2 + t_crit2 * se2)
+      else:
+        ci2_l, ci2_u = math.nan, math.nan
+
+      if n_comb > 1:
+        if se_comb == 0.0 or math.isnan(se_comb):
+          ci_comb_l = mean_comb
+          ci_comb_u = mean_comb
+        else:
+          t_crit_comb = t.ppf(0.975, n_comb - 1)
+          ci_comb_l = float(mean_comb - t_crit_comb * se_comb)
+          ci_comb_u = float(mean_comb + t_crit_comb * se_comb)
+      else:
+        ci_comb_l, ci_comb_u = math.nan, math.nan
+
+      group1 = TtestGroupStats(grp1_name, n1, mean1, se1, sd1, ci1_l, ci1_u)
+      group2 = TtestGroupStats(grp2_name, n2, mean2, se2, sd2, ci2_l, ci2_u)
+      combined = TtestGroupStats(
+        "combined", n_comb, mean_comb, se_comb, sd_comb, ci_comb_l, ci_comb_u
+      )
+      diff_df = grp1_df + grp2_df if not command.welch else 0
+      diff_stats = TtestGroupStats("diff", diff_df, mean_diff, se_diff, math.nan, cid_l, cid_u)
+
+      return TtestResult(
+        varname1=command.varname1,
+        varname2=None,
+        by_variable=command.by_variable,
+        is_paired=False,
+        is_welch=command.welch,
+        null_value=0.0,
+        group1_stats=group1,
+        group2_stats=group2,
+        combined_stats=combined,
+        difference_stats=diff_stats,
+        t_statistic=t_stat,
+        df=df_val,
+        p_left=p_left,
+        p_two=p_two,
+        p_right=p_right,
+      )
+    else:
+      raise ExecutionError("ttest: invalid state")
+
+  def _get_active_estimation_results(self) -> tuple[pd.Series, pd.DataFrame, int | None]:
+    fitted = None
+    df_residual = None
+
+    if self.state.regression is not None:
+      fitted = self.state.regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.iv_regression is not None:
+      fitted = self.state.iv_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.binary_regression is not None:
+      fitted = self.state.binary_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.poisson_regression is not None:
+      fitted = self.state.poisson_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.nbreg_regression is not None:
+      fitted = self.state.nbreg_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.zip_regression is not None:
+      fitted = self.state.zip_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.zinb_regression is not None:
+      fitted = self.state.zinb_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.xt_regressions.fe is not None:
+      fitted = self.state.xt_regressions.fe.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.xt_regressions.re is not None:
+      fitted = self.state.xt_regressions.re.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.qreg_regression is not None:
+      fitted = self.state.qreg_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.did_regression is not None:
+      fitted = self.state.did_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+    elif self.state.xtabond_regression is not None:
+      fitted = self.state.xtabond_regression.fitted_model
+      df_residual = getattr(fitted, "df_resid", None)
+
+    if fitted is None:
+      raise ExecutionError("no active estimation results found")
+
+    fitted_any = cast(Any, fitted)
+    params = getattr(fitted_any, "params", None)
+    if params is None:
+      raise ExecutionError("active model does not expose parameter estimates")
+
+    cov = None
+    if hasattr(fitted_any, "cov"):
+      cov = fitted_any.cov
+    elif hasattr(fitted_any, "cov_params"):
+      cov_val = fitted_any.cov_params
+      if callable(cov_val):
+        cov = cov_val()
+      else:
+        cov = cov_val
+
+    if cov is None:
+      raise ExecutionError("active model does not expose covariance matrix")
+
+    if df_residual is not None:
+      try:
+        df_residual = int(df_residual)
+      except (ValueError, TypeError):
+        df_residual = None
+
+    names = None
+    if self.state.regression is not None:
+      state = self.state.regression
+      names = (
+        ["intercept"] + list(state.predictor_names)
+        if state.include_intercept
+        else list(state.predictor_names)
+      )
+    elif self.state.iv_regression is not None:
+      names = list(self.state.iv_regression.parameter_names)
+    elif self.state.binary_regression is not None:
+      state = self.state.binary_regression
+      names = (
+        ["intercept"] + list(state.predictor_names)
+        if state.include_intercept
+        else list(state.predictor_names)
+      )
+    elif self.state.poisson_regression is not None:
+      state = self.state.poisson_regression
+      names = (
+        ["intercept"] + list(state.predictor_names)
+        if state.include_intercept
+        else list(state.predictor_names)
+      )
+    elif self.state.nbreg_regression is not None:
+      state = self.state.nbreg_regression
+      names = (
+        ["intercept"] + list(state.predictor_names)
+        if state.include_intercept
+        else list(state.predictor_names)
+      )
+
+    if names is not None and len(params) == len(names):
+      params_arr = np.asarray(params)
+      cov_arr = np.asarray(cov)
+      params_series = pd.Series(params_arr, index=names)
+      cov_df = pd.DataFrame(cov_arr, index=names, columns=names)
+    else:
+      params_series = pd.Series(params)
+      cov_df = pd.DataFrame(cov)
+
+    return params_series, cov_df, df_residual
 
 
 def _estat_residuals_table(fitted_model: object) -> TableResult:
@@ -8873,3 +9472,60 @@ def _bayes_mcmc_parameter_names(
   if bayes_regression.command_name == "regress":
     parameter_names.append("sigma")
   return tuple(parameter_names)
+
+
+def _depends_on_coefficients(expression: Expression) -> bool:
+  if isinstance(expression, IdentifierExpression):
+    return True
+  if isinstance(expression, UnaryExpression):
+    return _depends_on_coefficients(expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _depends_on_coefficients(expression.left) or _depends_on_coefficients(expression.right)
+  if isinstance(expression, FunctionCallExpression):
+    return any(_depends_on_coefficients(arg) for arg in expression.arguments)
+  return False
+
+
+def _evaluate_linear_expression(expression: Expression, coef_dict: dict[str, float]) -> float:
+  if isinstance(expression, NumberExpression):
+    return float(expression.value)
+  if isinstance(expression, IdentifierExpression):
+    if expression.name not in coef_dict:
+      raise ExecutionError(f"variable '{expression.name}' not found in active model coefficients")
+    return coef_dict[expression.name]
+  if isinstance(expression, UnaryExpression):
+    if expression.operator == "-":
+      return -_evaluate_linear_expression(expression.operand, coef_dict)
+    raise ExecutionError(f"unsupported unary operator: {expression.operator}")
+  if isinstance(expression, BinaryExpression):
+    if expression.operator == "*":
+      if _depends_on_coefficients(expression.left) and _depends_on_coefficients(expression.right):
+        raise ExecutionError(
+          "nonlinear coefficient multiplication is not supported in linear testing"
+        )
+    elif expression.operator == "/":
+      if _depends_on_coefficients(expression.right):
+        raise ExecutionError("nonlinear coefficient division is not supported in linear testing")
+
+    left = _evaluate_linear_expression(expression.left, coef_dict)
+    right = _evaluate_linear_expression(expression.right, coef_dict)
+    if expression.operator == "+":
+      return left + right
+    if expression.operator == "-":
+      return left - right
+    if expression.operator == "*":
+      return left * right
+    if expression.operator == "/":
+      if right == 0.0:
+        raise ExecutionError("division by zero in expression")
+      return left / right
+    raise ExecutionError(f"unsupported binary operator: {expression.operator}")
+  if isinstance(expression, FunctionCallExpression):
+    raise ExecutionError("functions are not supported in linear testing")
+  raise ExecutionError("unsupported expression type in linear testing")
+
+
+def _format_constraint_eq(constraint: Expression) -> str:
+  if isinstance(constraint, BinaryExpression) and constraint.operator == "-":
+    return f"{_format_expression(constraint.left)} = {_format_expression(constraint.right)}"
+  return f"{_format_expression(constraint)} = 0"

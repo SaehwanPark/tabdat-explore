@@ -22,6 +22,7 @@ from tabdat.models import (
   HeckmanRegressionResult,
   IvRegressionResult,
   LassoRegressionResult,
+  LincomResult,
   LoadResult,
   LogitRegressionResult,
   NbregRegressionResult,
@@ -43,8 +44,11 @@ from tabdat.models import (
   StregRegressionResult,
   SummarizeResult,
   TableResult,
+  TestResult,
   TobitRegressionResult,
   TransformResult,
+  TtestGroupStats,
+  TtestResult,
   XtAbondRegressionResult,
   XtLogitRegressionResult,
   XtRegressionResult,
@@ -102,6 +106,126 @@ def format_result(result: Result) -> str:
       for row in result.rows
     )
     return "\n".join(_table(("Variable", "Count", "Mean", "Std Dev", "Min", "Max"), summary_rows))
+
+  if isinstance(result, TestResult):
+    lines = []
+    for index, constraint in enumerate(result.constraints, 1):
+      lines.append(f" ({index:2d})  {constraint}")
+    lines.append("")
+
+    if result.is_chi2:
+      lines.append(f"       chi2({result.df:3d})    =   {_format_number(result.statistic)}")
+      lines.append(f"       Prob > chi2  =    {_format_number(result.p_value)}")
+    else:
+      df_resid = result.df_residual or 0
+      f_stat = _format_number(result.statistic)
+      lines.append(f"       F({result.df:3d}, {df_resid:4d}) =   {f_stat}")
+      lines.append(f"       Prob > F     =    {_format_number(result.p_value)}")
+    return "\n".join(lines)
+
+  if isinstance(result, LincomResult):
+    stat_header = "t" if result.df_residual is not None else "z"
+    p_header = f"P>|{stat_header}|"
+    level = result.ci_level
+    ci_header = f"[{level:.0f}% Conf. Interval]"
+
+    rows = (
+      (
+        result.label,
+        _format_number(result.estimate),
+        _format_number(result.standard_error),
+        _format_number(result.statistic),
+        _format_number(result.p_value),
+        f"[{_format_number(result.ci_lower)}, {_format_number(result.ci_upper)}]",
+      ),
+    )
+    table_lines = _table(
+      ("Variable", "Coef", "Std Err", stat_header, p_header, ci_header),
+      rows,
+    )
+    return "\n".join(table_lines)
+
+  if isinstance(result, TtestResult):
+    lines = []
+
+    if result.is_paired:
+      title = "Paired t test"
+    elif result.by_variable is not None:
+      var_type = "unequal" if result.is_welch else "equal"
+      title = f"Two-sample t test with {var_type} variances"
+    else:
+      title = "One-sample t test"
+    lines.append(title)
+
+    col_name = "Group" if (result.by_variable is not None) else "Variable"
+    headers = (col_name, "Obs", "Mean", "Std Err", "Std Dev", "Lower CI", "Upper CI")
+
+    rows_data = []
+    if result.is_paired:
+      rows_data.append(_format_group_stats(result.group1_stats))
+      if result.group2_stats is not None:
+        rows_data.append(_format_group_stats(result.group2_stats))
+      rows_data.append(_format_group_stats(result.difference_stats))
+    elif result.by_variable is not None:
+      rows_data.append(_format_group_stats(result.group1_stats))
+      if result.group2_stats is not None:
+        rows_data.append(_format_group_stats(result.group2_stats))
+      if result.combined_stats is not None:
+        rows_data.append(_format_group_stats(result.combined_stats))
+      rows_data.append(_format_diff_row(result.difference_stats))
+    else:
+      rows_data.append(_format_group_stats(result.group1_stats))
+
+    table_lines = _table(headers, rows_data)
+    lines.extend(table_lines)
+
+    t_str = _format_number(result.t_statistic)
+    import math
+
+    if result.is_welch:
+      df_str = f"{result.df:.4f}"
+    else:
+      df_str = str(int(result.df)) if not math.isnan(result.df) else "."
+
+    if result.is_paired:
+      ha_desc = "mean(diff)"
+    elif result.by_variable is not None:
+      ha_desc = "diff"
+    else:
+      ha_desc = "mean"
+
+    null_val = result.null_value if result.by_variable is None and not result.is_paired else 0.0
+    ha_left = f"Ha: {ha_desc} < {null_val}"
+    ha_two = f"Ha: {ha_desc} != {null_val}"
+    ha_right = f"Ha: {ha_desc} > {null_val}"
+
+    p_left_str = f"Pr(T < t) = {_format_number(result.p_left)}"
+    p_two_str = f"Pr(|T| > |t|) = {_format_number(result.p_two)}"
+    p_right_str = f"Pr(T > t) = {_format_number(result.p_right)}"
+
+    test_header_line = f"    {ha_left:<26}  {ha_two:<26}  {ha_right:<26}"
+    p_value_line = f" {p_left_str:<26}  {p_two_str:<26}  {p_right_str:<26}"
+
+    lines.append("")
+    if result.is_paired:
+      lines.append(f"    mean(diff) = mean({result.varname1} - {result.varname2})")
+      lines.append(f"Ho: mean(diff) = 0                                     df = {df_str}")
+    elif result.by_variable is not None:
+      g1_name = result.group1_stats.name
+      g2_name = result.group2_stats.name if result.group2_stats is not None else ""
+      lines.append(f"    diff = mean({g1_name}) - mean({g2_name})")
+      lines.append(f"Ho: diff = 0                                           df = {df_str}")
+    else:
+      lines.append(f"    mean = mean({result.varname1})")
+      ho_str = f"Ho: mean = {result.null_value}"
+      lines.append(f"{ho_str:<54}df = {df_str}")
+
+    lines.append(f"    t = {t_str}")
+    lines.append("")
+    lines.append(test_header_line)
+    lines.append(p_value_line)
+
+    return "\n".join(lines)
 
   if isinstance(result, CodebookResult):
     codebook_rows = (
@@ -998,3 +1122,27 @@ def _display_path(path: Path | str) -> str:
     return str(path.relative_to(Path.cwd()))
   except ValueError:
     return str(path)
+
+
+def _format_group_stats(stats: TtestGroupStats) -> tuple[str, str, str, str, str, str, str]:
+  return (
+    stats.name,
+    str(stats.obs),
+    _format_number(stats.mean),
+    _format_number(stats.std_err),
+    _format_number(stats.std_dev),
+    _format_number(stats.ci_lower),
+    _format_number(stats.ci_upper),
+  )
+
+
+def _format_diff_row(stats: TtestGroupStats) -> tuple[str, str, str, str, str, str, str]:
+  return (
+    stats.name,
+    "",
+    _format_number(stats.mean),
+    _format_number(stats.std_err),
+    "",
+    _format_number(stats.ci_lower),
+    _format_number(stats.ci_upper),
+  )
