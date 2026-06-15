@@ -77,7 +77,8 @@ Phase 3 focus after expression parsing exists.
 
 ### `tabulate`
 
-Produce one-way or two-way frequency tables.
+Produce one-way, two-way, or multi-level frequency tables. Enhanced tabulations can fill cells
+with one aggregate value via `values(<var>) stat(count|mean|sum|min|max)`.
 
 Phase 3 focus.
 

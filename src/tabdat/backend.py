@@ -2,7 +2,7 @@
 
 import math
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Literal, cast
 from urllib.error import URLError
@@ -788,22 +788,54 @@ class DuckDBBackend:
   def tabulate(
     self,
     dataset: DatasetInfo,
-    variables: tuple[str, ...],
+    row_variables: tuple[str, ...],
+    column_variables: tuple[str, ...] = (),
     *,
+    condition: Expression | None = None,
+    value_variable: str | None = None,
+    statistic: Literal["count", "mean", "sum", "min", "max"] | None = None,
     row_percent: bool,
     column_percent: bool,
     include_missing: bool,
-  ) -> tuple[tuple[object, ...], ...]:
+    by_variables: tuple[str, ...] = (),
+  ) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
     column_types = {column.name: column.data_type for column in dataset.columns}
-    _require_columns("tabulate", column_types, variables)
-    if len(variables) == 1:
-      return self._tabulate_one_way(variables[0], include_missing=include_missing)
-    return self._tabulate_two_way(
-      variables[0],
-      variables[1],
+    dimensions = by_variables + row_variables + column_variables
+    _require_columns("tabulate", column_types, dimensions)
+    if value_variable is not None:
+      _require_columns("tabulate", column_types, (value_variable,))
+      if statistic in {"mean", "sum", "min", "max"} and not _is_numeric_type(
+        column_types[value_variable]
+      ):
+        raise TypeMismatchExecutionError(
+          f"tabulate {statistic} requires numeric variable: {value_variable}"
+        )
+    long_rows = self._tabulate_long(
+      dataset,
+      row_variables,
+      column_variables,
+      condition=condition,
+      value_variable=value_variable,
+      statistic=statistic,
       row_percent=row_percent,
       column_percent=column_percent,
       include_missing=include_missing,
+      by_variables=by_variables,
+    )
+    if not column_variables:
+      if value_variable is None:
+        return by_variables + row_variables + ("Count", "Percent"), long_rows
+      value_header = statistic or "Value"
+      return by_variables + row_variables + (value_header,), long_rows
+    return _tabulate_wide_result(
+      long_rows,
+      by_variables=by_variables,
+      row_variables=row_variables,
+      column_variables=column_variables,
+      include_row_percent=row_percent,
+      include_column_percent=column_percent,
+      value_header="Count" if value_variable is None else statistic or "Value",
+      missing_cell_value=0 if value_variable is None or statistic == "count" else None,
     )
 
   def collapse(
@@ -1088,64 +1120,93 @@ class DuckDBBackend:
       examples=examples,
     )
 
-  def _tabulate_one_way(
+  def _tabulate_long(
     self,
-    variable: str,
+    dataset: DatasetInfo,
+    row_variables: tuple[str, ...],
+    column_variables: tuple[str, ...],
     *,
-    include_missing: bool,
-  ) -> tuple[tuple[object, ...], ...]:
-    quoted = _quote_identifier(variable)
-    where_sql = "" if include_missing else f"where {quoted} is not null"
-    sql = f"""
-      select
-        {quoted} as value,
-        count(*) as count,
-        100.0 * count(*) / sum(count(*)) over () as percent
-      from {ACTIVE_TABLE}
-      {where_sql}
-      group by {quoted}
-      order by {quoted}
-    """
-    return self._fetch_table(sql, "tabulate")
-
-  def _tabulate_two_way(
-    self,
-    first: str,
-    second: str,
-    *,
+    condition: Expression | None,
+    value_variable: str | None,
+    statistic: Literal["count", "mean", "sum", "min", "max"] | None,
     row_percent: bool,
     column_percent: bool,
     include_missing: bool,
+    by_variables: tuple[str, ...],
   ) -> tuple[tuple[object, ...], ...]:
-    first_sql = _quote_identifier(first)
-    second_sql = _quote_identifier(second)
-    predicates = (
-      () if include_missing else (f"{first_sql} is not null", f"{second_sql} is not null")
+    dimensions = by_variables + row_variables + column_variables
+    select_dimensions = _select_alias_sql(dimensions)
+    group_dimensions = _group_alias_sql(dimensions)
+    order_dimensions = _order_alias_sql(dimensions)
+    predicates = _tabulate_predicates(
+      dataset,
+      dimensions,
+      condition=condition,
+      value_variable=value_variable,
+      include_missing=include_missing,
+      compile_expression=self._compile_expression,
     )
     where_sql = "" if not predicates else f"where {' and '.join(predicates)}"
+    aggregate_sql = _tabulate_aggregate_sql(value_variable, statistic)
+    if not column_variables:
+      if value_variable is None:
+        percent_partition = _partition_alias_sql(tuple(range(0, len(by_variables))))
+        sql = f"""
+          with cells as (
+            select {select_dimensions}, {aggregate_sql} as cell_value
+            from {ACTIVE_TABLE}
+            {where_sql}
+            group by {group_dimensions}
+          )
+          select
+            {group_dimensions},
+            cell_value,
+            100.0 * cell_value / sum(cell_value) over (partition by {percent_partition})
+              as percent
+          from cells
+          order by {order_dimensions}
+        """
+        return self._fetch_table(sql, "tabulate")
+      sql = f"""
+        select {select_dimensions}, {aggregate_sql} as cell_value
+        from {ACTIVE_TABLE}
+        {where_sql}
+        group by {group_dimensions}
+        order by {order_dimensions}
+      """
+      return self._fetch_table(sql, "tabulate")
+
+    row_partition = _partition_alias_sql(tuple(range(0, len(by_variables) + len(row_variables))))
+    column_partition = _partition_alias_sql(
+      tuple(range(0, len(by_variables)))
+      + tuple(
+        range(
+          len(by_variables) + len(row_variables),
+          len(by_variables) + len(row_variables) + len(column_variables),
+        )
+      )
+    )
     extra_columns: list[str] = []
     if row_percent:
       extra_columns.append(
-        "100.0 * count / sum(count) over (partition by first_value) as row_percent"
+        f"100.0 * cell_value / sum(cell_value) over (partition by {row_partition}) as row_percent"
       )
     if column_percent:
       extra_columns.append(
-        "100.0 * count / sum(count) over (partition by second_value) as column_percent"
+        f"100.0 * cell_value / sum(cell_value) over (partition by {column_partition}) "
+        "as column_percent"
       )
     extra_sql = "" if not extra_columns else ", " + ", ".join(extra_columns)
     sql = f"""
-      with counts as (
-        select
-          {first_sql} as first_value,
-          {second_sql} as second_value,
-          count(*) as count
+      with cells as (
+        select {select_dimensions}, {aggregate_sql} as cell_value
         from {ACTIVE_TABLE}
         {where_sql}
-        group by {first_sql}, {second_sql}
+        group by {group_dimensions}
       )
-      select first_value, second_value, count{extra_sql}
-      from counts
-      order by first_value, second_value
+      select {group_dimensions}, cell_value{extra_sql}
+      from cells
+      order by {order_dimensions}
     """
     return self._fetch_table(sql, "tabulate")
 
@@ -1407,6 +1468,201 @@ class DuckDBBackend:
 def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper()
   return normalized.startswith(NUMERIC_TYPES)
+
+
+def _select_alias_sql(variables: tuple[str, ...]) -> str:
+  return ", ".join(
+    f"{_quote_identifier(variable)} as {_tabulate_alias(index)}"
+    for index, variable in enumerate(variables)
+  )
+
+
+def _group_alias_sql(variables: tuple[str, ...]) -> str:
+  return ", ".join(_tabulate_alias(index) for index, _ in enumerate(variables))
+
+
+def _order_alias_sql(variables: tuple[str, ...]) -> str:
+  return ", ".join(f"{_tabulate_alias(index)} nulls last" for index, _ in enumerate(variables))
+
+
+def _partition_alias_sql(alias_indexes: tuple[int, ...]) -> str:
+  if not alias_indexes:
+    return "1"
+  return ", ".join(_tabulate_alias(index) for index in alias_indexes)
+
+
+def _tabulate_alias(index: int) -> str:
+  return f"d{index}"
+
+
+def _tabulate_predicates(
+  dataset: DatasetInfo,
+  dimensions: tuple[str, ...],
+  *,
+  condition: Expression | None,
+  value_variable: str | None,
+  include_missing: bool,
+  compile_expression: Callable[[DatasetInfo, Expression], str],
+) -> tuple[str, ...]:
+  predicates: list[str] = []
+  if not include_missing:
+    predicates.extend(f"{_quote_identifier(variable)} is not null" for variable in dimensions)
+  if value_variable is not None:
+    predicates.append(f"{_quote_identifier(value_variable)} is not null")
+  if condition is not None:
+    predicates.append(f"({compile_expression(dataset, condition)})")
+  return tuple(predicates)
+
+
+def _tabulate_aggregate_sql(
+  value_variable: str | None,
+  statistic: Literal["count", "mean", "sum", "min", "max"] | None,
+) -> str:
+  if value_variable is None:
+    return "count(*)"
+  quoted = _quote_identifier(value_variable)
+  if statistic == "count":
+    return f"count({quoted})"
+  if statistic == "mean":
+    return f"avg(cast({quoted} as double))"
+  if statistic == "sum":
+    return f"sum(cast({quoted} as double))"
+  if statistic == "min":
+    return f"min(cast({quoted} as double))"
+  if statistic == "max":
+    return f"max(cast({quoted} as double))"
+  raise ExecutionError("tabulate values() and stat() must be specified together")
+
+
+def _tabulate_wide_result(
+  long_rows: tuple[tuple[object, ...], ...],
+  *,
+  by_variables: tuple[str, ...],
+  row_variables: tuple[str, ...],
+  column_variables: tuple[str, ...],
+  include_row_percent: bool,
+  include_column_percent: bool,
+  value_header: str,
+  missing_cell_value: object,
+) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+  index_width = len(by_variables) + len(row_variables)
+  column_width = len(column_variables)
+  column_start = index_width
+  value_index = column_start + column_width
+  row_percent_index = value_index + 1
+  column_percent_index = row_percent_index + (1 if include_row_percent else 0)
+
+  column_keys = tuple(
+    sorted(
+      _unique_tuple_values(tuple(row[column_start:value_index] for row in long_rows)),
+      key=_tabulate_sort_key,
+    )
+  )
+  index_keys = _unique_tuple_values(tuple(row[:index_width] for row in long_rows))
+  cell_values = {
+    (row[:index_width], row[column_start:value_index]): row[value_index] for row in long_rows
+  }
+  row_percent_values = (
+    {
+      (row[:index_width], row[column_start:value_index]): row[row_percent_index]
+      for row in long_rows
+    }
+    if include_row_percent
+    else {}
+  )
+  column_percent_values = (
+    {
+      (row[:index_width], row[column_start:value_index]): row[column_percent_index]
+      for row in long_rows
+    }
+    if include_column_percent
+    else {}
+  )
+
+  headers = (
+    by_variables
+    + row_variables
+    + _wide_value_headers(
+      column_keys,
+      value_header=value_header,
+      include_row_percent=include_row_percent,
+      include_column_percent=include_column_percent,
+    )
+  )
+  rows = tuple(
+    index_key
+    + _wide_row_cells(
+      index_key,
+      column_keys,
+      cell_values=cell_values,
+      row_percent_values=row_percent_values,
+      column_percent_values=column_percent_values,
+      include_row_percent=include_row_percent,
+      include_column_percent=include_column_percent,
+      missing_cell_value=missing_cell_value,
+    )
+    for index_key in index_keys
+  )
+  return headers, rows
+
+
+def _unique_tuple_values(rows: tuple[tuple[object, ...], ...]) -> tuple[tuple[object, ...], ...]:
+  seen: set[tuple[object, ...]] = set()
+  values: list[tuple[object, ...]] = []
+  for row in rows:
+    if row in seen:
+      continue
+    seen.add(row)
+    values.append(row)
+  return tuple(values)
+
+
+def _tabulate_sort_key(row: tuple[object, ...]) -> tuple[tuple[int, str], ...]:
+  return tuple((1, "") if value is None else (0, str(value)) for value in row)
+
+
+def _wide_value_headers(
+  column_keys: tuple[tuple[object, ...], ...],
+  *,
+  value_header: str,
+  include_row_percent: bool,
+  include_column_percent: bool,
+) -> tuple[str, ...]:
+  headers: list[str] = []
+  for column_key in column_keys:
+    label = _column_key_label(column_key)
+    headers.append(f"{label} {value_header}")
+    if include_row_percent:
+      headers.append(f"{label} Row %")
+    if include_column_percent:
+      headers.append(f"{label} Col %")
+  return tuple(headers)
+
+
+def _wide_row_cells(
+  index_key: tuple[object, ...],
+  column_keys: tuple[tuple[object, ...], ...],
+  *,
+  cell_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
+  row_percent_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
+  column_percent_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
+  include_row_percent: bool,
+  include_column_percent: bool,
+  missing_cell_value: object,
+) -> tuple[object, ...]:
+  cells: list[object] = []
+  for column_key in column_keys:
+    key = (index_key, column_key)
+    cells.append(cell_values.get(key, missing_cell_value))
+    if include_row_percent:
+      cells.append(row_percent_values.get(key, 0.0))
+    if include_column_percent:
+      cells.append(column_percent_values.get(key, 0.0))
+  return tuple(cells)
+
+
+def _column_key_label(column_key: tuple[object, ...]) -> str:
+  return " | ".join("missing" if value is None else str(value) for value in column_key)
 
 
 def _linear_prediction_sql(

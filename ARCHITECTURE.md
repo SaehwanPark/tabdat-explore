@@ -222,7 +222,10 @@ display formatting.
 - Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
 - Phase 3 commands are executable: `codebook`, `count`, `head`, `tail`, `keep`, `drop`, `select`,
   `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
-- The supported `by:` child commands are `summarize` and `count`.
+- `tabulate` supports legacy one-way/two-way frequency tables plus explicit multi-level
+  `rows()`/`columns()` crosstabs, command-level `if`, and single-value cell aggregation with
+  `values()`/`stat()`.
+- The supported `by:` child commands are `summarize`, `count`, and `tabulate`.
 - Phase 4 SQL is executable for result-producing `select` and `with` queries through `sql`.
 - Multiline SQL can be entered with `sql """..."""`.
 - `sql ... into <table>` creates a session-local named table and makes it active.

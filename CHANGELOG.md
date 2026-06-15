@@ -2,6 +2,14 @@
 
 All notable project changes are tracked here.
 
+## Unreleased
+
+### Added
+
+- Enhanced `tabulate` with explicit `rows()`/`columns()` multi-level crosstabs, command-level `if`,
+  `by:` support, and single-value cell aggregation through `values()` plus
+  `stat(count|mean|sum|min|max)`.
+
 ## [0.22.0] — 2026-06-10
 
 Phase 19 Bayesian MCMC diagnostic plot artifacts via `bayesplot`.

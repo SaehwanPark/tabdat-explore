@@ -465,6 +465,12 @@ and describe the active work with concise verification criteria.
     `artifact_dir`, `graph_format`, and `graph_open`
   - deterministic guards against missing `bayes:` state and legacy `bayes linear` state reuse
   - focused parser, executor/backend, CLI, shell, and help coverage
+- Enhanced the Phase 3 `tabulate` command surface:
+  - preserved legacy one-way and two-way frequency forms
+  - added explicit multi-level `rows()` and `columns()` crosstab syntax
+  - added command-level `if`, `by: tabulate`, sorted wide matrix output, and `missing` handling
+  - added single-value aggregate cells through `values()` plus `stat(count|mean|sum|min|max)`
+  - focused parser, executor/backend, CLI, shell, help, and docs coverage
 
 ## Present
 

@@ -5878,7 +5878,7 @@ def test_tabulate_one_way_and_two_way(sample_parquet: Path) -> None:
     executor.execute(UseCommand(sample_parquet))
     one_way = executor.execute(TabulateCommand(("sex",)))
     two_way = executor.execute(
-      TabulateCommand(("sex", "age"), row_percent=True, column_percent=True)
+      TabulateCommand(("sex",), column_variables=("age",), row_percent=True, column_percent=True)
     )
   finally:
     executor.close()
@@ -5887,8 +5887,124 @@ def test_tabulate_one_way_and_two_way(sample_parquet: Path) -> None:
   assert one_way.headers == ("sex", "Count", "Percent")
   assert one_way.rows == (("F", 2, pytest.approx(66.666666)), ("M", 1, pytest.approx(33.333333)))
   assert isinstance(two_way, TableResult)
-  assert two_way.headers == ("sex", "age", "Count", "Row %", "Col %")
-  assert two_way.rows[0] == ("F", 30, 1, pytest.approx(50.0), pytest.approx(100.0))
+  assert two_way.headers == (
+    "sex",
+    "30 Count",
+    "30 Row %",
+    "30 Col %",
+    "42 Count",
+    "42 Row %",
+    "42 Col %",
+    "54 Count",
+    "54 Row %",
+    "54 Col %",
+  )
+  assert two_way.rows[0] == (
+    "F",
+    1,
+    pytest.approx(50.0),
+    pytest.approx(100.0),
+    0,
+    0.0,
+    0.0,
+    1,
+    pytest.approx(50.0),
+    pytest.approx(100.0),
+  )
+
+
+def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None:
+  path = tmp_path / "tabulate-rich.parquet"
+  connection = duckdb.connect(database=":memory:")
+  try:
+    connection.execute(
+      """
+      copy (
+        select * from (
+          values
+            ('north', 'F', 'yes', 2024, 10.0, 1),
+            ('north', 'F', 'no', 2024, 20.0, 1),
+            ('north', 'M', 'yes', 2025, 30.0, 1),
+            ('south', 'F', 'yes', 2024, 40.0, 1),
+            ('south', 'M', 'no', 2025, null, 0)
+        ) as observations(region, sex, outcome, year, cost, eligible)
+      ) to ? (format parquet)
+      """,
+      [str(path)],
+    )
+  finally:
+    connection.close()
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    frequency = executor.execute(
+      TabulateCommand(
+        ("region", "sex"),
+        column_variables=("outcome", "year"),
+        condition=BinaryExpression(
+          left=IdentifierExpression("eligible"),
+          operator="==",
+          right=NumberExpression(1),
+        ),
+      )
+    )
+    mean_cost = executor.execute(
+      TabulateCommand(
+        ("region",),
+        column_variables=("sex",),
+        value_variable="cost",
+        statistic="mean",
+      )
+    )
+    counted_cost = executor.execute(
+      TabulateCommand(
+        ("region",),
+        column_variables=("sex",),
+        value_variable="cost",
+        statistic="count",
+      )
+    )
+    grouped_sum = executor.execute(
+      ByCommand(
+        ("region",),
+        TabulateCommand(
+          ("sex",),
+          column_variables=("outcome",),
+          value_variable="cost",
+          statistic="sum",
+        ),
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(frequency, TableResult)
+  assert frequency.headers == (
+    "region",
+    "sex",
+    "no | 2024 Count",
+    "yes | 2024 Count",
+    "yes | 2025 Count",
+  )
+  assert frequency.rows == (
+    ("north", "F", 1, 1, 0),
+    ("north", "M", 0, 0, 1),
+    ("south", "F", 0, 1, 0),
+  )
+  assert isinstance(mean_cost, TableResult)
+  assert mean_cost.headers == ("region", "F mean", "M mean")
+  assert mean_cost.rows == (("north", 15.0, 30.0), ("south", 40.0, None))
+  assert isinstance(counted_cost, TableResult)
+  assert counted_cost.headers == ("region", "F count", "M count")
+  assert counted_cost.rows == (("north", 2, 1), ("south", 1, 0))
+  assert isinstance(grouped_sum, TableResult)
+  assert grouped_sum.headers == ("region", "sex", "no sum", "yes sum")
+  assert grouped_sum.rows == (
+    ("north", "F", 20.0, 10.0),
+    ("north", "M", None, 30.0),
+    ("south", "F", None, 40.0),
+  )
 
 
 def test_by_summarize_and_count_do_not_change_active_dataset(sample_parquet: Path) -> None:

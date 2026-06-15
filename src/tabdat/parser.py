@@ -152,6 +152,7 @@ _EXECUTABLE_COMMANDS = {
 }
 _PARSED_ONLY_COMMANDS: set[str] = set()
 _COLLAPSE_STATS = {"count", "mean", "sum", "min", "max"}
+_TABULATE_STATS = {"count", "mean", "sum", "min", "max"}
 _BINARY_PRECEDENCE = {
   "==": 1,
   "!=": 1,
@@ -790,28 +791,121 @@ def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand 
 
 
 def _parse_tabulate(parts: _CommandParts) -> TabulateCommand:
-  if parts.condition is not None or parts.expression is not None:
-    raise ParseError("tabulate does not accept if clauses or assignment syntax")
-  if len(parts.arguments) not in {1, 2}:
-    raise ParseError("tabulate expects one or two variables")
+  if parts.expression is not None:
+    raise ParseError("tabulate does not accept assignment syntax")
 
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"row", "col", "missing"}
+  unsupported = option_names - {"row", "col", "missing", "rows", "columns", "values", "stat"}
   if unsupported:
     raise ParseError(f"tabulate unsupported option: {', '.join(sorted(unsupported))}")
   for option in parts.options:
-    if option.value is not True:
+    if option.name in {"row", "col", "missing"} and option.value is not True:
       raise ParseError(f"tabulate option {option.name} does not accept a value")
 
-  if len(parts.arguments) == 1 and option_names & {"row", "col"}:
+  explicit_rows = _single_identifier_tuple_option(parts.options, "rows", "tabulate")
+  explicit_columns = _single_identifier_tuple_option(parts.options, "columns", "tabulate")
+  values = _single_identifier_option(parts.options, "values", "tabulate")
+  statistic = _single_stat_option(parts.options)
+
+  if explicit_rows is not None or explicit_columns is not None:
+    if parts.arguments:
+      raise ParseError("tabulate cannot combine positional variables with rows() or columns()")
+    if not explicit_rows:
+      raise ParseError("tabulate rows() expects at least one variable")
+    row_variables = explicit_rows
+    column_variables = explicit_columns or ()
+  else:
+    if len(parts.arguments) not in {1, 2}:
+      raise ParseError("tabulate expects one or two variables or rows()/columns() options")
+    row_variables = (parts.arguments[0],)
+    column_variables = parts.arguments[1:]
+
+  if (values is None) != (statistic is None):
+    raise ParseError("tabulate values() and stat() must be specified together")
+
+  if values is not None and option_names & {"row", "col"}:
+    raise ParseError("tabulate row and col percentages are only supported for frequencies")
+
+  if not column_variables and option_names & {"row", "col"}:
     raise ParseError("one-way tabulate does not accept row or col options")
 
+  dimension_variables = row_variables + column_variables
+  duplicate_dimensions = _duplicate_names(dimension_variables)
+  if duplicate_dimensions:
+    raise ParseError(f"tabulate duplicate variable: {duplicate_dimensions[0]}")
+  if values is not None and values in dimension_variables:
+    raise ParseError("tabulate values() variable cannot also be a row or column variable")
+
   return TabulateCommand(
-    variables=parts.arguments,
+    row_variables=row_variables,
+    column_variables=column_variables,
+    condition=parts.condition,
+    value_variable=values,
+    statistic=statistic,
     row_percent="row" in option_names,
     column_percent="col" in option_names,
     include_missing="missing" in option_names,
   )
+
+
+def _single_identifier_tuple_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> tuple[str, ...] | None:
+  matching = tuple(option for option in options if option.name == name)
+  if len(matching) == 0:
+    return None
+  if len(matching) > 1:
+    raise ParseError(f"{command_name} option {name} can only be specified once")
+  (option,) = matching
+  value = option.value
+  if not isinstance(value, tuple) or not all(isinstance(item, str) for item in value):
+    raise ParseError(f"{command_name} option {name} expects identifiers in parentheses")
+  if not value:
+    raise ParseError(f"{command_name} option {name} expects at least one variable")
+  return value
+
+
+def _single_identifier_option(
+  options: tuple[CommandOption, ...],
+  name: str,
+  command_name: str,
+) -> str | None:
+  values = _single_identifier_tuple_option(options, name, command_name)
+  if values is None:
+    return None
+  if len(values) != 1:
+    raise ParseError(f"{command_name} option {name} expects exactly one variable")
+  return values[0]
+
+
+def _single_stat_option(
+  options: tuple[CommandOption, ...],
+) -> Literal["count", "mean", "sum", "min", "max"] | None:
+  matching = tuple(option for option in options if option.name == "stat")
+  if len(matching) == 0:
+    return None
+  if len(matching) > 1:
+    raise ParseError("tabulate option stat can only be specified once")
+  (option,) = matching
+  value = option.value
+  if not isinstance(value, tuple) or len(value) != 1 or not isinstance(value[0], str):
+    raise ParseError("tabulate option stat expects exactly one statistic")
+  statistic = value[0].lower()
+  if statistic not in _TABULATE_STATS:
+    raise ParseError(f"tabulate unsupported stat: {statistic}")
+  return cast(Literal["count", "mean", "sum", "min", "max"], statistic)
+
+
+def _duplicate_names(names: tuple[str, ...]) -> tuple[str, ...]:
+  seen: set[str] = set()
+  duplicates: list[str] = []
+  for name in names:
+    if name in seen:
+      duplicates.append(name)
+    seen.add(name)
+  return tuple(duplicates)
 
 
 def _parse_collapse(parts: _CommandParts) -> CollapseCommand:

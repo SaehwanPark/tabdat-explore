@@ -132,7 +132,7 @@ _COLUMN_COMMANDS = {
   "lowess",
   "spregress",
 }
-_TABULATE_OPTIONS = ("row", "col", "missing")
+_TABULATE_OPTIONS = ("rows(", "columns(", "values(", "stat(", "row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
 _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")
