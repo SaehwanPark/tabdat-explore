@@ -276,10 +276,27 @@ def test_parse_phase_3_generate_and_replace_commands() -> None:
 def test_parse_phase_3_grouping_commands() -> None:
   assert parse_command("tabulate sex") == TabulateCommand(("sex",))
   assert parse_command("tabulate sex age, row col missing") == TabulateCommand(
-    variables=("sex", "age"),
+    row_variables=("sex",),
+    column_variables=("age",),
     row_percent=True,
     column_percent=True,
     include_missing=True,
+  )
+  assert parse_command("tabulate sex if age >= 18") == TabulateCommand(
+    ("sex",),
+    condition=BinaryExpression(
+      left=IdentifierExpression("age"),
+      operator=">=",
+      right=NumberExpression(18),
+    ),
+  )
+  assert parse_command(
+    "tabulate, rows(region sex) columns(outcome year) values(cost) stat(mean)"
+  ) == TabulateCommand(
+    ("region", "sex"),
+    column_variables=("outcome", "year"),
+    value_variable="cost",
+    statistic="mean",
   )
   assert parse_command("collapse mean age cost, by(sex)") == CollapseCommand(
     statistic="mean",
@@ -1308,6 +1325,12 @@ def test_parse_exit_aliases() -> None:
     "tabulate age bmi sex",
     "tabulate age, row",
     "tabulate age bmi, exact",
+    "tabulate age bmi, values(cost)",
+    "tabulate age bmi, stat(mean)",
+    "tabulate age bmi, values(cost) stat(mean) row",
+    "tabulate, rows(age age)",
+    "tabulate, rows(age) columns(age)",
+    "tabulate, rows(age) values(age) stat(mean)",
     "collapse median age, by(sex)",
     "collapse mean age",
     "collapse mean age, by()",

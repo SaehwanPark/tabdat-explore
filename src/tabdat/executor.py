@@ -663,14 +663,17 @@ class Executor:
 
     if isinstance(command, TabulateCommand):
       dataset = self._require_active_dataset("tabulate")
-      table_rows = self.backend.tabulate(
+      headers, table_rows = self.backend.tabulate(
         dataset,
-        command.variables,
+        command.row_variables,
+        command.column_variables,
+        condition=command.condition,
+        value_variable=command.value_variable,
+        statistic=command.statistic,
         row_percent=command.row_percent,
         column_percent=command.column_percent,
         include_missing=command.include_missing,
       )
-      headers: tuple[str, ...] = _tabulate_headers(command)
       return TableResult(headers=headers, rows=table_rows)
 
     if isinstance(command, CollapseCommand):
@@ -5018,7 +5021,26 @@ class Executor:
       table_rows = self.backend.grouped_count(dataset, command.groups)
       count_headers: tuple[str, ...] = command.groups + ("Count",)
       return TableResult(headers=count_headers, rows=table_rows)
-    raise ExecutionError("by only supports summarize and count in Phase 3")
+    if isinstance(command.command, TabulateCommand):
+      duplicate_dimensions = _duplicate_names(
+        command.groups + command.command.row_variables + command.command.column_variables
+      )
+      if duplicate_dimensions:
+        raise ExecutionError(f"by tabulate duplicate variable: {duplicate_dimensions[0]}")
+      headers, table_rows = self.backend.tabulate(
+        dataset,
+        command.command.row_variables,
+        command.command.column_variables,
+        condition=command.command.condition,
+        value_variable=command.command.value_variable,
+        statistic=command.command.statistic,
+        row_percent=command.command.row_percent,
+        column_percent=command.command.column_percent,
+        include_missing=command.command.include_missing,
+        by_variables=command.groups,
+      )
+      return TableResult(headers=headers, rows=table_rows)
+    raise ExecutionError("by only supports summarize, count, and tabulate")
 
   def _materialize_polars_lazy_if_needed(self, command: Command) -> None:
     if not self.backend.is_polars_lazy_active():
@@ -7858,15 +7880,14 @@ def _format_expression(expression: Expression) -> str:
   return "<expr>"
 
 
-def _tabulate_headers(command: TabulateCommand) -> tuple[str, ...]:
-  if len(command.variables) == 1:
-    return (command.variables[0], "Count", "Percent")
-  headers: tuple[str, ...] = (command.variables[0], command.variables[1], "Count")
-  if command.row_percent:
-    headers += ("Row %",)
-  if command.column_percent:
-    headers += ("Col %",)
-  return headers
+def _duplicate_names(names: tuple[str, ...]) -> tuple[str, ...]:
+  seen: set[str] = set()
+  duplicates: list[str] = []
+  for name in names:
+    if name in seen:
+      duplicates.append(name)
+    seen.add(name)
+  return tuple(duplicates)
 
 
 def _default_grouped_summary_variables(

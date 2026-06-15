@@ -162,6 +162,8 @@ def test_cli_runs_full_phase_3_eda_flow(sample_parquet: Path, capsys) -> None:
       "-c",
       "tabulate sex",
       "-c",
+      "tabulate, rows(sex) columns(age) values(cost) stat(mean)",
+      "-c",
       "by sex: summarize age",
       "-c",
       "collapse mean age cost, by(sex)",
@@ -176,8 +178,9 @@ def test_cli_runs_full_phase_3_eda_flow(sample_parquet: Path, capsys) -> None:
   assert "Kept matching rows: 2 rows, 4 columns" in captured.out
   assert "Generated age2: 2 rows, 5 columns" in captured.out
   assert "Replaced cost: 2 rows, 5 columns" in captured.out
-  assert "sex  Count  Percent" in captured.out
-  assert "F    1      50" in captured.out
+  assert "sex  Count" in captured.out
+  assert "F    1" in captured.out
+  assert "42 mean  54 mean" in captured.out
   assert "sex  mean_age" in captured.out
   assert "Collapsed dataset: 2 rows, 3 columns" in captured.out
   assert "sex  mean_age  mean_cost" in captured.out

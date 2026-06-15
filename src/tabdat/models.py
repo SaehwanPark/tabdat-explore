@@ -136,7 +136,11 @@ class ReplaceCommand:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class TabulateCommand:
-  variables: tuple[str, ...]
+  row_variables: tuple[str, ...]
+  column_variables: tuple[str, ...] = ()
+  condition: Expression | None = None
+  value_variable: str | None = None
+  statistic: Literal["count", "mean", "sum", "min", "max"] | None = None
   row_percent: bool = False
   column_percent: bool = False
   include_missing: bool = False

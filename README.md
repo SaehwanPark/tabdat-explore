@@ -18,9 +18,10 @@ command line. The current CLI supports:
 - row previews with `head` and `tail`
 - column selection and row filtering with `keep`, `drop`, and `select`
 - renaming and deriving columns with `rename`, `generate`, and `replace`
-- frequency tables with `tabulate`
+- frequency and aggregate crosstabs with `tabulate`
 - grouped aggregation with `collapse`
-- grouped commands with `by <vars>: summarize ...` and `by <vars>: count`
+- grouped commands with `by <vars>: summarize ...`, `by <vars>: count`, and
+  `by <vars>: tabulate ...`
 - SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
 - session-local named tables with `sql ... into <table>` and `use <table>`
 - session-local panel metadata with `panel <id_var> <time_var>`, `panel`, and `panel clear`

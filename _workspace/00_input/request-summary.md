@@ -1,24 +1,21 @@
-# Request Summary: Phase 19 Bayesian `estat bayes` Slice
+# Request Summary: Enhanced `tabulate`
 
 ## Goal
 
-Resume from the latest checkpoint and implement the next coherent Phase 19 slice using TDD,
-documentation updates, PR publication, and independent code review.
+Implement enhanced tabulation for one-way and two-way use cases, multi-level row/index and column
+dimensions, command-level `if`, `by:` grouping, and cells populated by a single aggregate of a
+value variable instead of only frequencies.
 
 ## Selected Scope
 
-- Add `estat bayes` after successful `bayes:` MCMC fits.
-- Support both `bayes: regress` and `bayes: logit`.
-- Report deterministic in-terminal MCMC diagnostics from retained ArviZ posterior state.
-
-## Phase Fit
-
-- Roadmap phase: Phase 19 modern extensions.
-- This is the smallest Bayesian follow-up after the completed posterior predictive slice.
+- Preserve existing `tabulate sex` and `tabulate sex outcome` syntax.
+- Add explicit `rows()` and `columns()` syntax for multi-level crosstabs.
+- Add `values(<var>) stat(count|mean|sum|min|max)` for aggregate cells.
+- Support `if`, `missing`, row/column percentages for frequency tabulations, and
+  `by <vars>: tabulate ...`.
 
 ## Non-Goals
 
-- No trace, density, or autocorrelation plots.
-- No posterior interval output columns.
-- No out-of-sample Bayesian prediction syntax.
-- No changes to legacy `bayes linear` execution or prediction behavior.
+- No `by(...)` option form.
+- No multiple value variables or multiple statistics.
+- No margins, totals, weights, statistical tests, plotting, or export-specific formatting.

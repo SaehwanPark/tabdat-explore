@@ -1,14 +1,22 @@
 # tabulate
 
 How to invoke:
-`tabulate varlist [, row col missing]`
+`tabulate varlist [if expr] [, row col missing]`
+
+`tabulate [if expr], rows(varlist) [columns(varlist)] [values(var) stat(count|mean|sum|min|max)] [row col missing]`
 
 What it does:
-Show one-way or two-way frequency tables.
+Show one-way, two-way, and multi-level frequency tables. With `values()` and `stat()`, fill
+cells with an aggregate instead of a frequency count.
 
 What problem it answers:
-How are categorical values distributed?
+How are categorical values distributed, or how does a numeric value aggregate across row and
+column categories?
 
 Examples:
 - `tabulate sex`
 - `tabulate sex outcome, row col`
+- `tabulate sex if age >= 18`
+- `tabulate, rows(region sex) columns(outcome year)`
+- `tabulate, rows(region) columns(sex) values(cost) stat(mean)`
+- `by region: tabulate, rows(sex) columns(outcome) values(cost) stat(sum)`
