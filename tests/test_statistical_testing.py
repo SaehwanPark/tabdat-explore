@@ -184,3 +184,97 @@ def test_testing_unsupported_state_fails(tmp_path: Path) -> None:
 
   finally:
     executor.close()
+
+
+def test_ttest_zero_variance(tmp_path: Path) -> None:
+  path = tmp_path / "const_data.parquet"
+  # Write all constant values so standard errors are 0
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (2.0, 2.0, 'group1'),
+        (2.0, 2.0, 'group1'),
+        (2.0, 2.0, 'group2'),
+        (2.0, 2.0, 'group2')
+    ) as test_data(x1, x2, grp)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+
+    # 1. One-sample t-test with zero variance
+    res_one = executor.execute(TtestCommand(varname1="x1", value=2.0))
+    assert isinstance(res_one, TtestResult)
+    assert math.isnan(res_one.t_statistic)
+    assert math.isnan(res_one.p_two)
+    assert res_one.group1_stats.mean == 2.0
+    assert res_one.group1_stats.ci_lower == 2.0
+    assert res_one.group1_stats.ci_upper == 2.0
+
+    # 2. Paired t-test with zero variance
+    res_paired = executor.execute(TtestCommand(varname1="x1", varname2="x2"))
+    assert isinstance(res_paired, TtestResult)
+    assert math.isnan(res_paired.t_statistic)
+    assert res_paired.difference_stats.mean == 0.0
+    assert res_paired.difference_stats.ci_lower == 0.0
+    assert res_paired.difference_stats.ci_upper == 0.0
+
+    # 3. Two-sample t-test (equal variance) with zero variance
+    res_two = executor.execute(TtestCommand(varname1="x1", by_variable="grp", welch=False))
+    assert isinstance(res_two, TtestResult)
+    assert math.isnan(res_two.t_statistic)
+    assert res_two.difference_stats.mean == 0.0
+    assert res_two.difference_stats.ci_lower == 0.0
+    assert res_two.difference_stats.ci_upper == 0.0
+
+    # 4. Two-sample t-test (Welch) with zero variance
+    res_welch = executor.execute(TtestCommand(varname1="x1", by_variable="grp", welch=True))
+    assert isinstance(res_welch, TtestResult)
+    assert math.isnan(res_welch.t_statistic)
+    assert res_welch.difference_stats.mean == 0.0
+    assert res_welch.difference_stats.ci_lower == 0.0
+    assert res_welch.difference_stats.ci_upper == 0.0
+
+  finally:
+    executor.close()
+
+
+def test_nonlinear_constraints_rejected(tmp_path: Path) -> None:
+  path = tmp_path / "data.parquet"
+  _write_testing_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x1", "x2")))
+
+    # x1 * x2 is nonlinear coefficient product, should fail
+    expr_mult = BinaryExpression(IdentifierExpression("x1"), "*", IdentifierExpression("x2"))
+    with pytest.raises(
+      ExecutionError, match="nonlinear coefficient multiplication is not supported"
+    ):
+      executor.execute(LincomCommand(expr_mult))
+
+    with pytest.raises(
+      ExecutionError, match="nonlinear coefficient multiplication is not supported"
+    ):
+      executor.execute(TestCommand((expr_mult,)))
+
+    # x1 / x2 is nonlinear coefficient division, should fail
+    expr_div = BinaryExpression(IdentifierExpression("x1"), "/", IdentifierExpression("x2"))
+    with pytest.raises(ExecutionError, match="nonlinear coefficient division is not supported"):
+      executor.execute(LincomCommand(expr_div))
+
+    # Scalar multiplication (e.g. 2 * x1 or x1 * 2) is linear and should succeed
+    expr_scalar = BinaryExpression(NumberExpression(2.0), "*", IdentifierExpression("x1"))
+    res = executor.execute(LincomCommand(expr_scalar))
+    assert isinstance(res, LincomResult)
+
+    expr_scalar_right = BinaryExpression(IdentifierExpression("x1"), "*", NumberExpression(2.0))
+    res2 = executor.execute(LincomCommand(expr_scalar_right))
+    assert isinstance(res2, LincomResult)
+
+  finally:
+    executor.close()

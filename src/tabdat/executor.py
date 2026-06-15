@@ -5557,14 +5557,23 @@ class Executor:
       std_err = std_dev / math.sqrt(n) if n > 1 else math.nan
 
       if n > 1:
-        t_crit = t.ppf(0.975, n - 1)
-        ci_lower = float(mean_val - t_crit * std_err)
-        ci_upper = float(mean_val + t_crit * std_err)
-        t_stat = (mean_val - command.value) / std_err
-        df_val = float(n - 1)
-        p_left = float(t.cdf(t_stat, n - 1))
-        p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
-        p_right = float(1.0 - t.cdf(t_stat, n - 1))
+        if std_err == 0.0 or math.isnan(std_err):
+          ci_lower = mean_val
+          ci_upper = mean_val
+          t_stat = math.nan
+          df_val = float(n - 1)
+          p_left = math.nan
+          p_two = math.nan
+          p_right = math.nan
+        else:
+          t_crit = t.ppf(0.975, n - 1)
+          ci_lower = float(mean_val - t_crit * std_err)
+          ci_upper = float(mean_val + t_crit * std_err)
+          t_stat = (mean_val - command.value) / std_err
+          df_val = float(n - 1)
+          p_left = float(t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - t.cdf(t_stat, n - 1))
       else:
         ci_lower = math.nan
         ci_upper = math.nan
@@ -5647,18 +5656,36 @@ class Executor:
 
       if n > 1:
         t_crit = t.ppf(0.975, n - 1)
-        ci1_l = float(mean1 - t_crit * se1)
-        ci1_u = float(mean1 + t_crit * se1)
-        ci2_l = float(mean2 - t_crit * se2)
-        ci2_u = float(mean2 + t_crit * se2)
-        cid_l = float(mean_diff - t_crit * se_diff)
-        cid_u = float(mean_diff + t_crit * se_diff)
+        if se1 == 0.0 or math.isnan(se1):
+          ci1_l = mean1
+          ci1_u = mean1
+        else:
+          ci1_l = float(mean1 - t_crit * se1)
+          ci1_u = float(mean1 + t_crit * se1)
 
-        t_stat = mean_diff / se_diff
-        df_val = float(n - 1)
-        p_left = float(t.cdf(t_stat, n - 1))
-        p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
-        p_right = float(1.0 - t.cdf(t_stat, n - 1))
+        if se2 == 0.0 or math.isnan(se2):
+          ci2_l = mean2
+          ci2_u = mean2
+        else:
+          ci2_l = float(mean2 - t_crit * se2)
+          ci2_u = float(mean2 + t_crit * se2)
+
+        if se_diff == 0.0 or math.isnan(se_diff):
+          cid_l = mean_diff
+          cid_u = mean_diff
+          t_stat = math.nan
+          df_val = float(n - 1)
+          p_left = math.nan
+          p_two = math.nan
+          p_right = math.nan
+        else:
+          cid_l = float(mean_diff - t_crit * se_diff)
+          cid_u = float(mean_diff + t_crit * se_diff)
+          t_stat = mean_diff / se_diff
+          df_val = float(n - 1)
+          p_left = float(t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - t.cdf(t_stat, n - 1))
       else:
         ci1_l, ci1_u = math.nan, math.nan
         ci2_l, ci2_u = math.nan, math.nan
@@ -5737,23 +5764,35 @@ class Executor:
       mean_diff = mean1 - mean2
 
       if command.welch:
-        se_diff = math.sqrt((sd1**2 / n1) + (sd2**2 / n2)) if (n1 > 1 and n2 > 1) else math.nan
-        if n1 > 1 and n2 > 1:
-          df_val = (sd1**2 / n1 + sd2**2 / n2) ** 2 / (
-            (sd1**2 / n1) ** 2 / (n1 - 1) + (sd2**2 / n2) ** 2 / (n2 - 1)
-          )
-        else:
+        term1 = (sd1**2 / n1) if (n1 > 1 and not math.isnan(sd1)) else 0.0
+        term2 = (sd2**2 / n2) if (n2 > 1 and not math.isnan(sd2)) else 0.0
+        sum_terms = term1 + term2
+        if sum_terms == 0.0:
+          se_diff = 0.0
           df_val = 0.0
+        else:
+          se_diff = math.sqrt(sum_terms)
+          denom = 0.0
+          if n1 > 1 and not math.isnan(sd1) and term1 > 0:
+            denom += (term1**2) / (n1 - 1)
+          if n2 > 1 and not math.isnan(sd2) and term2 > 0:
+            denom += (term2**2) / (n2 - 1)
+          if denom == 0.0:
+            df_val = 0.0
+          else:
+            df_val = (sum_terms**2) / denom
       else:
         if n1 > 1 and n2 > 1:
-          pooled_var = ((n1 - 1) * sd1**2 + (n2 - 1) * sd2**2) / (n1 + n2 - 2)
+          sd1_val = 0.0 if math.isnan(sd1) else sd1
+          sd2_val = 0.0 if math.isnan(sd2) else sd2
+          pooled_var = ((n1 - 1) * sd1_val**2 + (n2 - 1) * sd2_val**2) / (n1 + n2 - 2)
           se_diff = math.sqrt(pooled_var * (1.0 / n1 + 1.0 / n2))
           df_val = float(n1 + n2 - 2)
         else:
           se_diff = math.nan
           df_val = 0.0
 
-      if not math.isnan(se_diff) and df_val > 0.0:
+      if not math.isnan(se_diff) and se_diff > 0.0 and df_val > 0.0:
         t_crit = t.ppf(0.975, df_val)
         cid_l = float(mean_diff - t_crit * se_diff)
         cid_u = float(mean_diff + t_crit * se_diff)
@@ -5762,6 +5801,13 @@ class Executor:
         p_left = float(t.cdf(t_stat, df_val))
         p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), df_val)))
         p_right = float(1.0 - t.cdf(t_stat, df_val))
+      elif se_diff == 0.0:
+        cid_l = mean_diff
+        cid_u = mean_diff
+        t_stat = math.nan
+        p_left = math.nan
+        p_two = math.nan
+        p_right = math.nan
       else:
         cid_l, cid_u = math.nan, math.nan
         t_stat = math.nan
@@ -5771,24 +5817,36 @@ class Executor:
 
       grp1_df = n1 - 1
       if n1 > 1:
-        t_crit1 = t.ppf(0.975, grp1_df)
-        ci1_l = float(mean1 - t_crit1 * se1)
-        ci1_u = float(mean1 + t_crit1 * se1)
+        if se1 == 0.0 or math.isnan(se1):
+          ci1_l = mean1
+          ci1_u = mean1
+        else:
+          t_crit1 = t.ppf(0.975, grp1_df)
+          ci1_l = float(mean1 - t_crit1 * se1)
+          ci1_u = float(mean1 + t_crit1 * se1)
       else:
         ci1_l, ci1_u = math.nan, math.nan
 
       grp2_df = n2 - 1
       if n2 > 1:
-        t_crit2 = t.ppf(0.975, grp2_df)
-        ci2_l = float(mean2 - t_crit2 * se2)
-        ci2_u = float(mean2 + t_crit2 * se2)
+        if se2 == 0.0 or math.isnan(se2):
+          ci2_l = mean2
+          ci2_u = mean2
+        else:
+          t_crit2 = t.ppf(0.975, grp2_df)
+          ci2_l = float(mean2 - t_crit2 * se2)
+          ci2_u = float(mean2 + t_crit2 * se2)
       else:
         ci2_l, ci2_u = math.nan, math.nan
 
       if n_comb > 1:
-        t_crit_comb = t.ppf(0.975, n_comb - 1)
-        ci_comb_l = float(mean_comb - t_crit_comb * se_comb)
-        ci_comb_u = float(mean_comb + t_crit_comb * se_comb)
+        if se_comb == 0.0 or math.isnan(se_comb):
+          ci_comb_l = mean_comb
+          ci_comb_u = mean_comb
+        else:
+          t_crit_comb = t.ppf(0.975, n_comb - 1)
+          ci_comb_l = float(mean_comb - t_crit_comb * se_comb)
+          ci_comb_u = float(mean_comb + t_crit_comb * se_comb)
       else:
         ci_comb_l, ci_comb_u = math.nan, math.nan
 
@@ -9414,6 +9472,18 @@ def _bayes_mcmc_parameter_names(
   return tuple(parameter_names)
 
 
+def _depends_on_coefficients(expression: Expression) -> bool:
+  if isinstance(expression, IdentifierExpression):
+    return True
+  if isinstance(expression, UnaryExpression):
+    return _depends_on_coefficients(expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _depends_on_coefficients(expression.left) or _depends_on_coefficients(expression.right)
+  if isinstance(expression, FunctionCallExpression):
+    return any(_depends_on_coefficients(arg) for arg in expression.arguments)
+  return False
+
+
 def _evaluate_linear_expression(expression: Expression, coef_dict: dict[str, float]) -> float:
   if isinstance(expression, NumberExpression):
     return float(expression.value)
@@ -9426,6 +9496,15 @@ def _evaluate_linear_expression(expression: Expression, coef_dict: dict[str, flo
       return -_evaluate_linear_expression(expression.operand, coef_dict)
     raise ExecutionError(f"unsupported unary operator: {expression.operator}")
   if isinstance(expression, BinaryExpression):
+    if expression.operator == "*":
+      if _depends_on_coefficients(expression.left) and _depends_on_coefficients(expression.right):
+        raise ExecutionError(
+          "nonlinear coefficient multiplication is not supported in linear testing"
+        )
+    elif expression.operator == "/":
+      if _depends_on_coefficients(expression.right):
+        raise ExecutionError("nonlinear coefficient division is not supported in linear testing")
+
     left = _evaluate_linear_expression(expression.left, coef_dict)
     right = _evaluate_linear_expression(expression.right, coef_dict)
     if expression.operator == "+":
