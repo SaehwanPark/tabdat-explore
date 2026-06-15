@@ -835,6 +835,7 @@ class DuckDBBackend:
       include_row_percent=row_percent,
       include_column_percent=column_percent,
       value_header="Count" if value_variable is None else statistic or "Value",
+      missing_cell_value=0 if value_variable is None else None,
     )
 
   def collapse(
@@ -1542,6 +1543,7 @@ def _tabulate_wide_result(
   include_row_percent: bool,
   include_column_percent: bool,
   value_header: str,
+  missing_cell_value: object,
 ) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
   index_width = len(by_variables) + len(row_variables)
   column_width = len(column_variables)
@@ -1597,6 +1599,7 @@ def _tabulate_wide_result(
       column_percent_values=column_percent_values,
       include_row_percent=include_row_percent,
       include_column_percent=include_column_percent,
+      missing_cell_value=missing_cell_value,
     )
     for index_key in index_keys
   )
@@ -1645,11 +1648,12 @@ def _wide_row_cells(
   column_percent_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
   include_row_percent: bool,
   include_column_percent: bool,
+  missing_cell_value: object,
 ) -> tuple[object, ...]:
   cells: list[object] = []
   for column_key in column_keys:
     key = (index_key, column_key)
-    cells.append(cell_values.get(key, 0))
+    cells.append(cell_values.get(key, missing_cell_value))
     if include_row_percent:
       cells.append(row_percent_values.get(key, 0.0))
     if include_column_percent:

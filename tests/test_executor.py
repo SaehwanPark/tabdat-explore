@@ -5986,13 +5986,13 @@ def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None
   )
   assert isinstance(mean_cost, TableResult)
   assert mean_cost.headers == ("region", "F mean", "M mean")
-  assert mean_cost.rows == (("north", 15.0, 30.0), ("south", 40.0, 0))
+  assert mean_cost.rows == (("north", 15.0, 30.0), ("south", 40.0, None))
   assert isinstance(grouped_sum, TableResult)
   assert grouped_sum.headers == ("region", "sex", "no sum", "yes sum")
   assert grouped_sum.rows == (
     ("north", "F", 20.0, 10.0),
-    ("north", "M", 0, 30.0),
-    ("south", "F", 0, 40.0),
+    ("north", "M", None, 30.0),
+    ("south", "F", None, 40.0),
   )
 
 
