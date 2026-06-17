@@ -4,6 +4,11 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+- Added Classical Hypothesis Testing commands (`test`, `lincom`, `ttest`):
+  - `test` performs Wald/F tests of linear restrictions ($R \beta = r$) or joint significance tests over parameters after active regressions (`regress` or `ivregress`).
+  - `lincom` computes standard errors, stats, p-values, and confidence intervals for linear combinations of coefficients.
+  - `ttest` conducts one-sample, two-sample (equal/unequal variance), and paired t-tests on active variables.
+  - Formats all testing outputs into Stata-style aligned tables.
 - Added standard spatial autocorrelation diagnostics on OLS residuals via `estat spatial`:
   - Supports both `estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]` and
     `estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]` subcommands.

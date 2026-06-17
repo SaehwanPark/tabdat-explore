@@ -1,33 +1,31 @@
-# Delivery Summary: Spatial Autocorrelation Diagnostics (`estat spatial`)
+# Delivery Summary: Classical Hypothesis Testing (`test`, `lincom`, `ttest`)
 
 ## Result
 
-Implemented on `feat/estat-spatial`.
+Implemented on `main` (branch `feat/hypothesis-testing-alignment` created for workspace synchronization).
 
 ## Delivered
 
-- Added `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals after a linear regression (`regress`).
-- Supports option parsing and validation for coordinate-based weights (`coord(lat lon) [knn(k)]`) and file-based weights (`weights(w.gal) id(neighborhood) [contiguity(queen|rook)]`).
-- Handles OLS estimation sample size verification and alignment check, raising an `ExecutionError` on mismatch.
-- Computes Moran's I (`MoranRes`) and 5 LM tests (`LMtests` for simple/robust error/lag and SARMA).
-- Formats outputs in a clean terminal `TableResult`.
-- Updated parser, executor, help files, shell autocompletions, `SPEC.md`, `ARCHITECTURE.md`, and `CHANGELOG.md`.
+- Added `test` command for Wald/F post-estimation joint restrictions testing.
+- Added `lincom` command for linear combinations of coefficients and confidence intervals.
+- Added `ttest` command for one-sample, paired-sample, and group-grouped (Welch/equal variance) t-tests.
+- Added tokenizer and constraint equation parser supporting parenthesis constraints: `test (x1 = x2) (x3 = 0)`.
+- Integrated SciPy distributions for robust hypothesis testing (degrees of freedom, stats, and p-values).
+- Formatted tables to Stata style and checked them against 100-character line-length restrictions.
+- Added unit tests in `tests/test_parser.py` and integration tests in `tests/test_statistical_testing.py`.
 
 ## Validation
 
-- `uv run pytest tests/test_parser.py -k spatial`
-- `uv run pytest tests/test_spregress.py -k spatial`
-- `uv run ruff check`
-- `uv run ruff format --check`
-- `uv run basedpyright`
-- `uv run pytest` (917 passed)
+- `uv run pytest tests/test_statistical_testing.py` (8 passed)
+- `uv run basedpyright` (0 errors)
+- `uv run ruff check` (passed)
+- `uv run pytest` (922 passed)
 
 ## Review
 
 - QA status: `pass` (recorded in `_workspace/03_qa_report.md`).
-- All boundaries (contract-to-parser, parser-to-executor, executor-to-backend, CLI) verified.
+- Verified parser-to-executor and executor-to-backend boundaries.
 
 ## Deferred
 
-- Out-of-sample spatial predictive workflows.
-- Joint LM tests (like LM for WX, SDM joint tests).
+- Non-linear constraint post-estimation testing (`testnl`, `nlcom`).

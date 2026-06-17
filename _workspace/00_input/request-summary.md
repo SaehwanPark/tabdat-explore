@@ -1,28 +1,32 @@
-# Request Summary: Spatial Diagnostics on OLS Residuals (`estat spatial`)
+# Request Summary: Classical Hypothesis Testing (`test`, `lincom`, `ttest`)
 
 ## Goal
 
-Continue Phase 19/20 developments by implementing `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals (Moran's I and Lagrange Multiplier tests) after a linear regression model.
+Add post-estimation hypothesis testing and classical sample t-tests to TabDat-Explore:
+- `test` for Wald and F constraint testing over regression coefficients.
+- `lincom` for estimating and computing inference properties on linear combinations of coefficients.
+- `ttest` for standard one-sample, paired-sample, and two-sample (Welch/equal variance) t-tests.
 
 ## Phase Fit
 
-- Phase 19 modern extension: advanced spatial autoregressive models & diagnostics.
-- Builds on existing `spregress` spatial weight configuration (weights file and KNN coordinates).
+- Phase 21: Classical Statistical & Hypothesis Testing.
+- Interacts with active estimation results (`regress`, `ivregress`).
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: add `spatial` subcommand and weights/coordinates configuration parameters to `EstatCommand`.
-- `src/tabdat/parser.py`: parse `estat spatial` options.
-- `src/tabdat/executor.py`: execute `estat spatial` and format the resulting diagnostics table.
-- `tests/`: add focused parser, executor, and CLI tests.
+- `src/tabdat/models.py`: Register commands and their respective results.
+- `src/tabdat/parser.py`: Parse constraint syntax, linear combination expressions, and t-test group/variance options.
+- `src/tabdat/executor.py`: Compute Wald/F test statistics, calculate linear combination properties (std err, confidence intervals), and run t-tests using SciPy.
+- `src/tabdat/formatter.py`: Create Stata-style text tables for results.
+- `tests/test_statistical_testing.py` and `tests/test_parser.py`: Verify parsing correctness and execution accuracy.
 
 ## Assumptions
 
-- Standard Moran's I and five LM tests (`lme`, `lml`, `rlme`, `rlml`, `sarma`) are sufficient.
-- The spatial weight matrix construction and alignment logic from `spregress` is reused.
-- The OLS model must be the prior estimated model.
+- Multiple constraints are grouped in parentheses: `test (x1 = x2) (x3 = 0)`.
+- `lincom` expressions are linear combinations of predictors.
+- `ttest` options include `by(group_var)` and `welch`/`unequal`.
 
 ## Non-Goals
 
-- No out-of-sample prediction scope in this slice.
-- No general spatial regressions in this slice (keeps focus on `estat spatial` diagnostics).
+- Non-linear constraint post-estimation testing (`testnl`, `nlcom`) is out of scope.
+- ANOVA and non-parametric tests are out of scope.

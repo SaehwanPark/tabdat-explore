@@ -1,54 +1,40 @@
-# Command Contract: Spatial Autocorrelation Diagnostics (`estat spatial`)
+# Command Contract: Classical Hypothesis Testing (`test`, `lincom`, `ttest`)
 
 ## Request Summary
 
-Add `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals (Moran's I and Lagrange Multiplier tests) after a successful `regress` command.
-
-## Roadmap Phase
-
-Phase 19 modern extensions: advanced spatial autoregressive models & diagnostics.
+Add hypothesis testing and statistical t-tests over active datasets and regression states.
 
 ## Command Syntax
 
 ```text
-estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]
-estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]
+test (constraint1) [(constraint2) ...]
+lincom expression [, level(num)]
+ttest varname == exp [if exp]
+ttest var1 == var2 [if exp]
+ttest varname [if exp], by(groupvar) [welch|unequal]
 ```
 
 ## Examples
 
-- `regress wage educ exper` then `estat spatial, coord(lat lon) knn(5)`
-  - Computes spatial diagnostics using on-the-fly KNN weights.
-- `regress wage educ exper` then `estat spatial, weights(columbus.gal) id(neighborhood)`
-  - Computes spatial diagnostics using pre-computed spatial weights.
+- `test (educ = 0) (exper = 0)`
+- `lincom educ + 2*exper`
+- `ttest wage == 15`
+- `ttest wage, by(sex) unequal`
 
 ## Data Assumptions
 
-- Requires an active dataset and a prior `regress` OLS model state.
-- Raises `ExecutionError` if `self.state.regression` is None.
-- Reuses weights construction logic from `spregress` (case-insensitive column names, shapefile kontiguity, gal/gwt matrix alignment).
-- Excludes observations with missing values in regression variables or coordinate/id variables.
-- Ensures the number of complete observations matches the OLS model's `nobs`.
+- `test` and `lincom` require an active regression state (`self.state.regression` is not None).
+- `ttest` operates on the active dataset variables.
+- Excludes observations with missing values during estimation/testing.
 
 ## Execution Semantics
 
-- Reconstructs OLS model using PySAL `spreg.BaseOLS(y, x)` on the complete estimation sample aligned with weights matrix `w`.
-- Computes Moran's I on residuals using `spreg.MoranRes(ols, w, z=True)`.
-- Computes Lagrange Multiplier (LM) tests using `spreg.LMtests(ols, w, tests=['lme', 'lml', 'rlme', 'rlml', 'sarma'])`.
-- Formats outputs in a clean terminal table.
+- `test` computes F-statistics (or Wald chi-squared if robust/clustered is used) under restriction $R \beta = r$.
+- `lincom` estimates linear combinations using delta method/covariance propagation.
+- `ttest` uses SciPy's standard distributions (`scipy.stats.t` / `scipy.stats.ttest_ind` / `scipy.stats.ttest_rel`).
 
 ## Acceptance Criteria
 
-- Moran's I results table shows `Moran's I (residual)`, `Expectation`, `Variance`, `z-statistic`, and `p-value`.
-- LM tests table shows statistic value and p-value for:
-  - Spatial error (LM error)
-  - Spatial lag (LM lag)
-  - Robust spatial error (Robust LM error)
-  - Robust spatial lag (Robust LM lag)
-  - Spatial SARMA (LM SARMA)
-- Parser rejects options (like `weights`, `coord`, `knn`) on all other `estat` subcommands.
-- Formatter prints clear headers and aligned columns.
-
-## Open Questions
-
-- None for this slice.
+- `test` outputs restriction constraints, F-statistic, degrees of freedom, and p-value.
+- `lincom` displays coefficient estimate, standard error, t-statistic, p-value, and confidence interval.
+- `ttest` displays summary statistics per group/variable, mean difference, standard error of difference, and p-values for left-tailed, two-sided, and right-tailed hypotheses.
