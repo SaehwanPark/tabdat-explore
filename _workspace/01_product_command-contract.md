@@ -1,54 +1,46 @@
-# Command Contract: Spatial Autocorrelation Diagnostics (`estat spatial`)
+# Command Contract: Spatial Autoregressive with Spatial Errors (`spregress ..., model(sarar)`)
 
 ## Request Summary
 
-Add `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals (Moran's I and Lagrange Multiplier tests) after a successful `regress` command.
+Add `model(sarar)` support to the `spregress` spatial regression command. SARAR (also known as SAC or GMM Combo) estimates models with spatial lag and spatial autoregressive error structures.
 
 ## Roadmap Phase
 
-Phase 19 modern extensions: advanced spatial autoregressive models & diagnostics.
+Phase 22: Advanced Spatial Autoregressive Models.
 
 ## Command Syntax
 
 ```text
-estat spatial, weights(<path>) id(<id_var>) [contiguity(queen|rook)]
-estat spatial, coord(<lat_var> <lon_var>) [knn(<k>)]
+spregress <y> <xvars>, coord(<lat_var> <lon_var>) [knn(<k>)] model(sarar) [robust]
+spregress <y> <xvars>, weights(<path>) id(<id_var>) model(sarar) [robust]
 ```
 
 ## Examples
 
-- `regress wage educ exper` then `estat spatial, coord(lat lon) knn(5)`
-  - Computes spatial diagnostics using on-the-fly KNN weights.
-- `regress wage educ exper` then `estat spatial, weights(columbus.gal) id(neighborhood)`
-  - Computes spatial diagnostics using pre-computed spatial weights.
+- `spregress wage educ exper, coord(lat lon) model(sarar)`
+- `spregress wage educ exper, weights(columbus.gal) id(neighborhood) model(sarar) robust`
 
 ## Data Assumptions
 
-- Requires an active dataset and a prior `regress` OLS model state.
-- Raises `ExecutionError` if `self.state.regression` is None.
-- Reuses weights construction logic from `spregress` (case-insensitive column names, shapefile kontiguity, gal/gwt matrix alignment).
-- Excludes observations with missing values in regression variables or coordinate/id variables.
-- Ensures the number of complete observations matches the OLS model's `nobs`.
+- Requires an active dataset and valid spatial configuration (either `coord` or `weights`).
+- Excludes observations with missing values in regression or coordinate/id variables.
+- Raises `ExecutionError` if estimation sample cannot be constructed or aligned.
 
 ## Execution Semantics
 
-- Reconstructs OLS model using PySAL `spreg.BaseOLS(y, x)` on the complete estimation sample aligned with weights matrix `w`.
-- Computes Moran's I on residuals using `spreg.MoranRes(ols, w, z=True)`.
-- Computes Lagrange Multiplier (LM) tests using `spreg.LMtests(ols, w, tests=['lme', 'lml', 'rlme', 'rlml', 'sarma'])`.
-- Formats outputs in a clean terminal table.
+- Reconstructs sample and weights matrix `w` using existing alignment logic.
+- Executes `spreg.GM_Combo(y, x, w=w, robust='white')` if `robust` option is passed, otherwise `spreg.GM_Combo(y, x, w=w)`.
+- Extract coefficients:
+  - Intercept and predictors.
+  - Spatial lag coefficient ($\rho$ or `rho_` / `lambda_` in PySAL).
+  - Spatial error coefficient ($\lambda$ or `rho_` / `lambda_` in PySAL).
+- Format the output into a clean terminal table showing both spatial coefficients and their standard errors, stats, and p-values.
 
 ## Acceptance Criteria
 
-- Moran's I results table shows `Moran's I (residual)`, `Expectation`, `Variance`, `z-statistic`, and `p-value`.
-- LM tests table shows statistic value and p-value for:
-  - Spatial error (LM error)
-  - Spatial lag (LM lag)
-  - Robust spatial error (Robust LM error)
-  - Robust spatial lag (Robust LM lag)
-  - Spatial SARMA (LM SARMA)
-- Parser rejects options (like `weights`, `coord`, `knn`) on all other `estat` subcommands.
-- Formatter prints clear headers and aligned columns.
-
-## Open Questions
-
-- None for this slice.
+- `spregress` parses `model(sarar)` correctly.
+- Rejects invalid models via `ParseError`.
+- Table shows spatial coefficients cleanly labeled (e.g., `W_wage` for spatial lag, and `lambda` or similar for spatial error).
+- Standard errors, z-stats, and p-values are correctly populated.
+- Autocomplete and help pages are updated.
+- Existing tests for `model(lag)` and `model(error)` continue to pass.

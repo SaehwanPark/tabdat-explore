@@ -481,6 +481,11 @@ and describe the active work with concise verification criteria.
   - computes Moran's I test (`MoranRes`) and Lagrange Multiplier tests (`LMtests` for simple and robust lag/error and SARMA)
   - robust sample alignment and size validation between regression estimation sample and spatial weights
   - focused parser, executor/backend, shell completion, help, and docs coverage
+- Implemented Phase 21 — Classical Statistical & Hypothesis Testing:
+  - `test` command: performs Wald/F tests of linear restrictions ($R \beta = r$) or joint significance tests over model parameters.
+  - `lincom` command: estimates and computes standard errors, t/z stats, p-values, and confidence intervals for linear combinations of coefficients.
+  - `ttest` command: conducts one-sample, two-sample (equal/unequal variance), and paired t-tests on active variables.
+  - focused parser, executor, formatter, autocompletions, help topic, and CLI integration tests.
 
 ## Present
 
@@ -498,10 +503,6 @@ and describe the active work with concise verification criteria.
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
      Phase 12 estimation result contract
-- Phase 21 — Classical Statistical & Hypothesis Testing:
-  - `test` command: performs Wald tests of linear restrictions ($R \beta = r$) or joint significance tests over model parameters.
-  - `lincom` command: estimates and computes standard errors, t/z stats, p-values, and confidence intervals for linear combinations of coefficients.
-  - `ttest` command: conducts one-sample, two-sample (equal/unequal variance), and paired t-tests on active variables.
 - Deferred Phase 19 modern extensions:
   - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset posterior predictive mean and interval columns.
   - Advanced spatial autoregressive models: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models.

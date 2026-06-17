@@ -1,28 +1,30 @@
-# Request Summary: Spatial Diagnostics on OLS Residuals (`estat spatial`)
+# Request Summary: Spatial Autoregressive with Spatial Errors (SARAR / SAC) Support
 
 ## Goal
 
-Continue Phase 19/20 developments by implementing `estat spatial` post-estimation diagnostics for spatial autocorrelation on OLS residuals (Moran's I and Lagrange Multiplier tests) after a linear regression model.
+Extend the `spregress` command to support the SARAR/SAC model type (`model(sarar)`), which estimates spatial models with both spatial lag and spatial autoregressive errors using generalized moments (GMM).
 
 ## Phase Fit
 
-- Phase 19 modern extension: advanced spatial autoregressive models & diagnostics.
-- Builds on existing `spregress` spatial weight configuration (weights file and KNN coordinates).
+- Phase 22: Advanced Spatial Autoregressive Models.
+- Fits the priority of utilizing `pysal` (`spreg`) for spatial econometrics.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: add `spatial` subcommand and weights/coordinates configuration parameters to `EstatCommand`.
-- `src/tabdat/parser.py`: parse `estat spatial` options.
-- `src/tabdat/executor.py`: execute `estat spatial` and format the resulting diagnostics table.
-- `tests/`: add focused parser, executor, and CLI tests.
+- `src/tabdat/models.py`: Update `SpregressCommand.model_type` to include `"sarar"`.
+- `src/tabdat/parser.py`: Parse `model(sarar)` and validate option exclusivity/constraints.
+- `src/tabdat/executor.py`: Call PySAL's GMM combo model estimator (`spreg.GM_Combo` or similar) and format both spatial lag and spatial error coefficients in the regression table.
+- `src/tabdat/shell.py`: Update autocompletions for the `model(...)` option.
+- `src/tabdat/help/topics/spregress.md`: Update help files.
+- `tests/test_spregress.py`: Add syntax and integration tests.
 
 ## Assumptions
 
-- Standard Moran's I and five LM tests (`lme`, `lml`, `rlme`, `rlml`, `sarma`) are sufficient.
-- The spatial weight matrix construction and alignment logic from `spregress` is reused.
-- The OLS model must be the prior estimated model.
+- We will estimate the GMM/IV-based combo model using `spreg.GM_Combo` from PySAL.
+- Both spatial coefficients (rho for spatial lag, lambda for spatial error) will be displayed.
+- Robust standard errors are supported if GMM is used (GM_Combo handles spatial heteroscedasticity if configured, or standard errors as reported by GMM combo).
 
 ## Non-Goals
 
-- No out-of-sample prediction scope in this slice.
-- No general spatial regressions in this slice (keeps focus on `estat spatial` diagnostics).
+- No out-of-sample prediction scope for `sarar` in this slice.
+- No other spatial models (e.g., SEM/SAR with MLE, or other combo variants) in this slice.

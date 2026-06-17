@@ -23,7 +23,17 @@ from sklearn.linear_model import (
   Ridge,
 )
 from sklearn.model_selection import KFold
-from spreg import BaseOLS, GM_Error_Het, GM_Lag, LMtests, ML_Error, ML_Lag, MoranRes
+from spreg import (
+  BaseOLS,
+  GM_Combo,
+  GM_Combo_Het,
+  GM_Error_Het,
+  GM_Lag,
+  LMtests,
+  ML_Error,
+  ML_Lag,
+  MoranRes,
+)
 from statsmodels.discrete.conditional_models import ConditionalLogit
 from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
 from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
@@ -287,7 +297,7 @@ class _SpatialRegressionState:
   predictor_coefficients: tuple[float, ...]
   intercept: float | None
   include_intercept: bool
-  model_type: Literal["lag", "error"]
+  model_type: Literal["lag", "error", "sarar"]
   spatial_coefficient: float
   spatial_coefficient_name: str
   sample_fingerprint: str
@@ -2368,56 +2378,127 @@ class Executor:
       if command.robust:
         if command.model_type == "lag":
           fitted = GM_Lag(outcome_array, design, w=w, robust="white")
-        else:
+        elif command.model_type == "error":
           fitted = GM_Error_Het(outcome_array, design, w=w)
+        else:
+          fitted = GM_Combo_Het(outcome_array, design, w=w)
       else:
         if command.model_type == "lag":
           fitted = ML_Lag(outcome_array, design, w=w)
-        else:
+        elif command.model_type == "error":
           fitted = ML_Error(outcome_array, design, w=w)
+        else:
+          fitted = GM_Combo(outcome_array, design, w=w)
     except Exception as exc:
       raise ExecutionError(f"spregress {command.model_type} estimation failed") from exc
 
     fitted_any: Any = fitted
 
-    intercept = float(fitted_any.betas[0][0])
-    predictor_coefficients = tuple(float(val[0]) for val in fitted_any.betas[1:-1])
-    spatial_coef = float(fitted_any.betas[-1][0])
-    spatial_se = float(fitted_any.std_err[-1])
-    spatial_stat = float(fitted_any.z_stat[-1][0])
-    spatial_pval = float(fitted_any.z_stat[-1][1])
+    if command.model_type == "sarar":
+      intercept = float(fitted_any.betas[0][0])
+      predictor_coefficients = tuple(float(val[0]) for val in fitted_any.betas[1:-2])
 
-    coef_estimates = [
-      CoefficientEstimate(
-        name=name,
-        value=float(fitted_any.betas[i + 1][0]),
-        standard_error=float(fitted_any.std_err[i + 1]),
-        statistic=float(fitted_any.z_stat[i + 1][0]),
-        p_value=float(fitted_any.z_stat[i + 1][1]),
+      coef_estimates = [
+        CoefficientEstimate(
+          name=name,
+          value=float(fitted_any.betas[i + 1][0]),
+          standard_error=float(fitted_any.std_err[i + 1]),
+          statistic=float(fitted_any.z_stat[i + 1][0]),
+          p_value=float(fitted_any.z_stat[i + 1][1]),
+        )
+        for i, name in enumerate(command.predictors)
+      ]
+      coef_estimates.insert(
+        0,
+        CoefficientEstimate(
+          name="intercept",
+          value=intercept,
+          standard_error=float(fitted_any.std_err[0]),
+          statistic=float(fitted_any.z_stat[0][0]),
+          p_value=float(fitted_any.z_stat[0][1]),
+        ),
       )
-      for i, name in enumerate(command.predictors)
-    ]
-    coef_estimates.insert(
-      0,
-      CoefficientEstimate(
-        name="intercept",
-        value=intercept,
-        standard_error=float(fitted_any.std_err[0]),
-        statistic=float(fitted_any.z_stat[0][0]),
-        p_value=float(fitted_any.z_stat[0][1]),
-      ),
-    )
 
-    spatial_coef_name = "rho" if command.model_type == "lag" else "lambda"
-    coef_estimates.append(
-      CoefficientEstimate(
-        name=spatial_coef_name,
-        value=spatial_coef,
-        standard_error=spatial_se,
-        statistic=spatial_stat,
-        p_value=spatial_pval,
+      rho_val = float(fitted_any.betas[-2][0])
+      lambda_val = float(fitted_any.betas[-1][0])
+
+      if len(fitted_any.std_err) == len(fitted_any.betas):
+        rho_se = float(fitted_any.std_err[-2])
+        rho_stat = float(fitted_any.z_stat[-2][0])
+        rho_pval = float(fitted_any.z_stat[-2][1])
+
+        lambda_se = float(fitted_any.std_err[-1])
+        lambda_stat = float(fitted_any.z_stat[-1][0])
+        lambda_pval = float(fitted_any.z_stat[-1][1])
+      else:
+        rho_se = float(fitted_any.std_err[-1])
+        rho_stat = float(fitted_any.z_stat[-1][0])
+        rho_pval = float(fitted_any.z_stat[-1][1])
+
+        lambda_se = None
+        lambda_stat = None
+        lambda_pval = None
+
+      coef_estimates.append(
+        CoefficientEstimate(
+          name="rho",
+          value=rho_val,
+          standard_error=rho_se,
+          statistic=rho_stat,
+          p_value=rho_pval,
+        )
       )
-    )
+      coef_estimates.append(
+        CoefficientEstimate(
+          name="lambda",
+          value=lambda_val,
+          standard_error=lambda_se,
+          statistic=lambda_stat,
+          p_value=lambda_pval,
+        )
+      )
+
+      spatial_coef = rho_val
+      spatial_coef_name = "rho"
+    else:
+      intercept = float(fitted_any.betas[0][0])
+      predictor_coefficients = tuple(float(val[0]) for val in fitted_any.betas[1:-1])
+      spatial_coef = float(fitted_any.betas[-1][0])
+      spatial_se = float(fitted_any.std_err[-1])
+      spatial_stat = float(fitted_any.z_stat[-1][0])
+      spatial_pval = float(fitted_any.z_stat[-1][1])
+
+      coef_estimates = [
+        CoefficientEstimate(
+          name=name,
+          value=float(fitted_any.betas[i + 1][0]),
+          standard_error=float(fitted_any.std_err[i + 1]),
+          statistic=float(fitted_any.z_stat[i + 1][0]),
+          p_value=float(fitted_any.z_stat[i + 1][1]),
+        )
+        for i, name in enumerate(command.predictors)
+      ]
+      coef_estimates.insert(
+        0,
+        CoefficientEstimate(
+          name="intercept",
+          value=intercept,
+          standard_error=float(fitted_any.std_err[0]),
+          statistic=float(fitted_any.z_stat[0][0]),
+          p_value=float(fitted_any.z_stat[0][1]),
+        ),
+      )
+
+      spatial_coef_name = "rho" if command.model_type == "lag" else "lambda"
+      coef_estimates.append(
+        CoefficientEstimate(
+          name=spatial_coef_name,
+          value=spatial_coef,
+          standard_error=spatial_se,
+          statistic=spatial_stat,
+          p_value=spatial_pval,
+        )
+      )
 
     sample_fingerprint = _spatial_sample_fingerprint(rows=rows)
     full_prediction_values: list[float | None] = [None] * len(rows)

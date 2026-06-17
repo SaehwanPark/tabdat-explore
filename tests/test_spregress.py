@@ -73,6 +73,18 @@ def test_parse_spregress_command() -> None:
     robust=True,
   )
 
+  # Custom model(sarar), knn, robust
+  assert parse_command(
+    "spregress y x, coord(lat lon) model(sarar) knn(3) robust"
+  ) == SpregressCommand(
+    outcome="y",
+    predictors=("x",),
+    model_type="sarar",
+    coord_variables=("lat", "lon"),
+    knn=3,
+    robust=True,
+  )
+
 
 def test_parse_spregress_errors() -> None:
   # Missing coord / weights option
@@ -90,7 +102,7 @@ def test_parse_spregress_errors() -> None:
     parse_command("spregress y x, coord(lat lon alt)")
 
   # Invalid model type
-  with pytest.raises(ParseError, match="spregress option model must be 'lag' or 'error'"):
+  with pytest.raises(ParseError, match="spregress option model must be 'lag', 'error', or 'sarar'"):
     parse_command("spregress y x, coord(lat lon) model(invalid)")
 
   # Invalid knn type/value
@@ -135,6 +147,80 @@ def test_execute_spregress_lag(tmp_path: Path) -> None:
   assert result.spatial_coefficient_name == "rho"
   assert isinstance(result.spatial_coefficient, float)
   assert isinstance(result.r_squared, float)
+
+
+def test_execute_spregress_sarar(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_sarar.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="sarar",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, SpatialRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.model_type == "sarar"
+  assert result.coord_variables == ("lat", "lon")
+  assert result.knn == 3
+  assert result.observation_count == 8
+  assert len(result.coefficients) == 4  # intercept, x, rho, lambda
+  assert result.coefficients[0].name == "intercept"
+  assert result.coefficients[1].name == "x"
+  assert result.coefficients[2].name == "rho"
+  assert result.coefficients[3].name == "lambda"
+  assert result.spatial_coefficient_name == "rho"
+  assert isinstance(result.spatial_coefficient, float)
+  assert result.coefficients[3].standard_error is None  # GMM non-robust combo omits lambda std err
+
+
+def test_execute_spregress_sarar_robust(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_sarar_robust.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="sarar",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, SpatialRegressionResult)
+  assert result.outcome == "y"
+  assert result.predictors == ("x",)
+  assert result.model_type == "sarar"
+  assert result.coord_variables == ("lat", "lon")
+  assert result.knn == 3
+  assert result.observation_count == 8
+  assert len(result.coefficients) == 4  # intercept, x, rho, lambda
+  assert result.coefficients[0].name == "intercept"
+  assert result.coefficients[1].name == "x"
+  assert result.coefficients[2].name == "rho"
+  assert result.coefficients[3].name == "lambda"
+  assert result.spatial_coefficient_name == "rho"
+  assert isinstance(result.spatial_coefficient, float)
+  assert isinstance(
+    result.coefficients[3].standard_error, float
+  )  # GM_Combo_Het computes lambda std err
 
 
 def test_execute_spregress_error(tmp_path: Path) -> None:
