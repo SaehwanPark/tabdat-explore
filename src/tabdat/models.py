@@ -351,7 +351,7 @@ class BayesCommand:
 class SpregressCommand:
   outcome: str
   predictors: tuple[str, ...]
-  model_type: Literal["lag", "error"]
+  model_type: Literal["lag", "error", "sarar"]
   coord_variables: tuple[str, str] | None = None
   knn: int | None = None
   weights_file: str | None = None
@@ -944,7 +944,7 @@ class BayesMcmcResult:
 class SpatialRegressionResult:
   outcome: str
   predictors: tuple[str, ...]
-  model_type: Literal["lag", "error"]
+  model_type: Literal["lag", "error", "sarar"]
   robust: bool
   observation_count: int
   r_squared: float | None

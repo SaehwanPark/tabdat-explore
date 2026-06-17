@@ -1462,12 +1462,14 @@ def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
   if parts.condition is not None or parts.expression is not None:
     raise ParseError(
       "spregress expects syntax: spregress <y> <xvars>, [coord(<lat_var> <lon_var>) [knn(<k>)] | "
-      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] [model(<lag|error>) robust]"
+      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] "
+      "[model(<lag|error|sarar>) robust]"
     )
   if len(parts.arguments) < 2:
     raise ParseError(
       "spregress expects syntax: spregress <y> <xvars>, [coord(<lat_var> <lon_var>) [knn(<k>)] | "
-      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] [model(<lag|error>) robust]"
+      "weights(<path_to_file>) id(<id_var>) [contiguity(queen|rook)]] "
+      "[model(<lag|error|sarar>) robust]"
     )
 
   option_names = {option.name for option in parts.options}
@@ -1485,12 +1487,12 @@ def _parse_spregress(parts: _CommandParts) -> SpregressCommand:
   elif not has_coord and not has_weights:
     raise ParseError("spregress requires either coord() or weights() option")
 
-  model_type_val: Literal["lag", "error"] | str = (
+  model_type_val: Literal["lag", "error", "sarar"] | str = (
     _single_text_option(parts.options, "model", "spregress") or "lag"
   )
-  if model_type_val not in ("lag", "error"):
-    raise ParseError("spregress option model must be 'lag' or 'error'")
-  model_type: Literal["lag", "error"] = model_type_val
+  if model_type_val not in ("lag", "error", "sarar"):
+    raise ParseError("spregress option model must be 'lag', 'error', or 'sarar'")
+  model_type: Literal["lag", "error", "sarar"] = model_type_val
 
   if has_coord:
     if "id" in option_names:

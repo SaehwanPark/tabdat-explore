@@ -1,32 +1,30 @@
-# Request Summary: Classical Hypothesis Testing (`test`, `lincom`, `ttest`)
+# Request Summary: Spatial Autoregressive with Spatial Errors (SARAR / SAC) Support
 
 ## Goal
 
-Add post-estimation hypothesis testing and classical sample t-tests to TabDat-Explore:
-- `test` for Wald and F constraint testing over regression coefficients.
-- `lincom` for estimating and computing inference properties on linear combinations of coefficients.
-- `ttest` for standard one-sample, paired-sample, and two-sample (Welch/equal variance) t-tests.
+Extend the `spregress` command to support the SARAR/SAC model type (`model(sarar)`), which estimates spatial models with both spatial lag and spatial autoregressive errors using generalized moments (GMM).
 
 ## Phase Fit
 
-- Phase 21: Classical Statistical & Hypothesis Testing.
-- Interacts with active estimation results (`regress`, `ivregress`).
+- Phase 22: Advanced Spatial Autoregressive Models.
+- Fits the priority of utilizing `pysal` (`spreg`) for spatial econometrics.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: Register commands and their respective results.
-- `src/tabdat/parser.py`: Parse constraint syntax, linear combination expressions, and t-test group/variance options.
-- `src/tabdat/executor.py`: Compute Wald/F test statistics, calculate linear combination properties (std err, confidence intervals), and run t-tests using SciPy.
-- `src/tabdat/formatter.py`: Create Stata-style text tables for results.
-- `tests/test_statistical_testing.py` and `tests/test_parser.py`: Verify parsing correctness and execution accuracy.
+- `src/tabdat/models.py`: Update `SpregressCommand.model_type` to include `"sarar"`.
+- `src/tabdat/parser.py`: Parse `model(sarar)` and validate option exclusivity/constraints.
+- `src/tabdat/executor.py`: Call PySAL's GMM combo model estimator (`spreg.GM_Combo` or similar) and format both spatial lag and spatial error coefficients in the regression table.
+- `src/tabdat/shell.py`: Update autocompletions for the `model(...)` option.
+- `src/tabdat/help/topics/spregress.md`: Update help files.
+- `tests/test_spregress.py`: Add syntax and integration tests.
 
 ## Assumptions
 
-- Multiple constraints are grouped in parentheses: `test (x1 = x2) (x3 = 0)`.
-- `lincom` expressions are linear combinations of predictors.
-- `ttest` options include `by(group_var)` and `welch`/`unequal`.
+- We will estimate the GMM/IV-based combo model using `spreg.GM_Combo` from PySAL.
+- Both spatial coefficients (rho for spatial lag, lambda for spatial error) will be displayed.
+- Robust standard errors are supported if GMM is used (GM_Combo handles spatial heteroscedasticity if configured, or standard errors as reported by GMM combo).
 
 ## Non-Goals
 
-- Non-linear constraint post-estimation testing (`testnl`, `nlcom`) is out of scope.
-- ANOVA and non-parametric tests are out of scope.
+- No out-of-sample prediction scope for `sarar` in this slice.
+- No other spatial models (e.g., SEM/SAR with MLE, or other combo variants) in this slice.
