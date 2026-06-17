@@ -1,40 +1,46 @@
-# Command Contract: Classical Hypothesis Testing (`test`, `lincom`, `ttest`)
+# Command Contract: Spatial Autoregressive with Spatial Errors (`spregress ..., model(sarar)`)
 
 ## Request Summary
 
-Add hypothesis testing and statistical t-tests over active datasets and regression states.
+Add `model(sarar)` support to the `spregress` spatial regression command. SARAR (also known as SAC or GMM Combo) estimates models with spatial lag and spatial autoregressive error structures.
+
+## Roadmap Phase
+
+Phase 22: Advanced Spatial Autoregressive Models.
 
 ## Command Syntax
 
 ```text
-test (constraint1) [(constraint2) ...]
-lincom expression [, level(num)]
-ttest varname == exp [if exp]
-ttest var1 == var2 [if exp]
-ttest varname [if exp], by(groupvar) [welch|unequal]
+spregress <y> <xvars>, coord(<lat_var> <lon_var>) [knn(<k>)] model(sarar) [robust]
+spregress <y> <xvars>, weights(<path>) id(<id_var>) model(sarar) [robust]
 ```
 
 ## Examples
 
-- `test (educ = 0) (exper = 0)`
-- `lincom educ + 2*exper`
-- `ttest wage == 15`
-- `ttest wage, by(sex) unequal`
+- `spregress wage educ exper, coord(lat lon) model(sarar)`
+- `spregress wage educ exper, weights(columbus.gal) id(neighborhood) model(sarar) robust`
 
 ## Data Assumptions
 
-- `test` and `lincom` require an active regression state (`self.state.regression` is not None).
-- `ttest` operates on the active dataset variables.
-- Excludes observations with missing values during estimation/testing.
+- Requires an active dataset and valid spatial configuration (either `coord` or `weights`).
+- Excludes observations with missing values in regression or coordinate/id variables.
+- Raises `ExecutionError` if estimation sample cannot be constructed or aligned.
 
 ## Execution Semantics
 
-- `test` computes F-statistics (or Wald chi-squared if robust/clustered is used) under restriction $R \beta = r$.
-- `lincom` estimates linear combinations using delta method/covariance propagation.
-- `ttest` uses SciPy's standard distributions (`scipy.stats.t` / `scipy.stats.ttest_ind` / `scipy.stats.ttest_rel`).
+- Reconstructs sample and weights matrix `w` using existing alignment logic.
+- Executes `spreg.GM_Combo(y, x, w=w, robust='white')` if `robust` option is passed, otherwise `spreg.GM_Combo(y, x, w=w)`.
+- Extract coefficients:
+  - Intercept and predictors.
+  - Spatial lag coefficient ($\rho$ or `rho_` / `lambda_` in PySAL).
+  - Spatial error coefficient ($\lambda$ or `rho_` / `lambda_` in PySAL).
+- Format the output into a clean terminal table showing both spatial coefficients and their standard errors, stats, and p-values.
 
 ## Acceptance Criteria
 
-- `test` outputs restriction constraints, F-statistic, degrees of freedom, and p-value.
-- `lincom` displays coefficient estimate, standard error, t-statistic, p-value, and confidence interval.
-- `ttest` displays summary statistics per group/variable, mean difference, standard error of difference, and p-values for left-tailed, two-sided, and right-tailed hypotheses.
+- `spregress` parses `model(sarar)` correctly.
+- Rejects invalid models via `ParseError`.
+- Table shows spatial coefficients cleanly labeled (e.g., `W_wage` for spatial lag, and `lambda` or similar for spatial error).
+- Standard errors, z-stats, and p-values are correctly populated.
+- Autocomplete and help pages are updated.
+- Existing tests for `model(lag)` and `model(error)` continue to pass.

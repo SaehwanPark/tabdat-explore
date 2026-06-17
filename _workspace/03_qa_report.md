@@ -1,4 +1,4 @@
-# Classical Statistical & Hypothesis Testing (`test`, `lincom`, `ttest`) QA Report
+# Spatial Combo Regression (`model(sarar)`) QA Report
 
 ## Status
 
@@ -6,10 +6,10 @@ pass
 
 ## Boundaries Checked
 
-- **Contract to parser**: Validated that constraints syntax, parentheses grouping, linear combination formulas, and t-test option permutations parse correctly. Checked that unsupported combinations raise `ParseError`.
-- **Parser representation to executor**: Verified that `TestCommand`, `LincomCommand`, and `TtestCommand` representations carry all necessary fields into execution logic.
-- **Executor to backend**: Verified that parameter values, standard errors, and covariance matrices are correctly extracted from estimation results. Checked that sample observations are correctly subsetted.
-- **Backend result to formatter & CLI**: Verified that results are mapped to clean Stata-style text formatters and print properly.
+- **Contract to parser**: Validated that `model(sarar)` parses correctly and rejects invalid model types.
+- **Parser representation to executor**: Verified that `model_type` is correctly forwarded to the GMM estimators.
+- **Executor to backend**: Verified GMM estimations with PySAL `GM_Combo` and `GM_Combo_Het` and standard error extraction.
+- **Backend result to formatter & CLI**: Verified that the formatter prints both spatial coefficients (`rho` and `lambda`), representing missing standard errors safely as `.`.
 
 ## Blocking Issues
 
@@ -17,15 +17,14 @@ pass
 
 ## PR Review Loop
 
-- PR: (Local repository branch `feat/hypothesis-testing-alignment`)
-- Pass 1 verified parser syntax handling for equations and constraints.
-- Pass 2 verified Wald matrix arithmetic and degrees of freedom handling.
-- Pass 3 verified equal vs unequal variance SciPy t-test calculations.
+- PR: (Local repository feature branch `feat/spregress-sarar`)
+- Pass 1 verified parser syntax and model literal extensions.
+- Pass 2 verified PySAL combo model estimators convergence and robust vs non-robust standard error extraction.
+- Pass 3 verified formatter handling of optional standard error values.
 
 ## Validation Evidence
 
-- Target parser tests passed: `uv run pytest tests/test_parser.py -k statistical_testing`
-- Target executor tests passed: `uv run pytest tests/test_statistical_testing.py`
-- Full suite validation passed: `uv run pytest` (922 passed)
-- Static validation passed: `uv run basedpyright` (0 errors)
-- Lint validation passed: `uv run ruff check`
+- Target tests passed: `uv run pytest tests/test_spregress.py` (25 passed)
+- Full suite passed: `uv run pytest` (928 passed)
+- Static validation: `uv run basedpyright` (0 errors)
+- Lint validation: `uv run ruff check` (passed)

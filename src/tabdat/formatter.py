@@ -496,7 +496,12 @@ def format_result(result: Result) -> str:
     return "\n".join([*header, *body])
 
   if isinstance(result, SpatialRegressionResult):
-    estimator_label = "Spatial Lag (SAR)" if result.model_type == "lag" else "Spatial Error (SEM)"
+    if result.model_type == "lag":
+      estimator_label = "Spatial Lag (SAR)"
+    elif result.model_type == "error":
+      estimator_label = "Spatial Error (SEM)"
+    else:
+      estimator_label = "Spatial Combo (SARAR)"
     if result.robust:
       estimator_label += " (Robust)"
 
