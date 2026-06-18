@@ -10,6 +10,9 @@ from tabdat.extension_registry import (
 def test_ingestion_registry_contracts() -> None:
   parquet = ingestion_adapter_for("parquet")
   stata = ingestion_adapter_for("stata")
+  csv = ingestion_adapter_for("csv")
+  feather = ingestion_adapter_for("feather")
+  arrow = ingestion_adapter_for("arrow")
 
   assert parquet.adapter_backend == "duckdb"
   assert parquet.supported_remote_schemes == ("http", "https", "s3")
@@ -17,6 +20,15 @@ def test_ingestion_registry_contracts() -> None:
   assert stata.adapter_backend == "pandas"
   assert stata.supported_remote_schemes == ("http", "https")
   assert stata.supports_lazy is False
+  assert csv.adapter_backend == "duckdb"
+  assert csv.supported_remote_schemes == ("http", "https")
+  assert csv.supports_lazy is False
+  assert feather.adapter_backend == "pyarrow"
+  assert feather.supported_remote_schemes == ("http", "https")
+  assert feather.supports_lazy is False
+  assert arrow.adapter_backend == "pyarrow"
+  assert arrow.supported_remote_schemes == ("http", "https")
+  assert arrow.supports_lazy is False
 
 
 def test_ingestion_registry_lazy_engine_guards() -> None:
@@ -34,6 +46,12 @@ def test_ingestion_registry_remote_scheme_guards() -> None:
   assert remote_scheme_supported("parquet", "ftp") is False
   assert remote_scheme_supported("stata", "https") is True
   assert remote_scheme_supported("stata", "s3") is False
+  assert remote_scheme_supported("csv", "http") is True
+  assert remote_scheme_supported("csv", "s3") is False
+  assert remote_scheme_supported("feather", "https") is True
+  assert remote_scheme_supported("feather", "s3") is False
+  assert remote_scheme_supported("arrow", "http") is True
+  assert remote_scheme_supported("arrow", "s3") is False
 
 
 def test_estimator_registry_contracts() -> None:

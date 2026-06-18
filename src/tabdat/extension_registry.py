@@ -67,13 +67,13 @@ _INGESTION_SPECS: tuple[IngestionAdapterSpec, ...] = (
   ),
   IngestionAdapterSpec(
     data_format="feather",
-    adapter_backend="pandas",
+    adapter_backend="pyarrow",
     supports_lazy=False,
     supported_remote_schemes=("http", "https"),
   ),
   IngestionAdapterSpec(
     data_format="arrow",
-    adapter_backend="pandas",
+    adapter_backend="pyarrow",
     supports_lazy=False,
     supported_remote_schemes=("http", "https"),
   ),

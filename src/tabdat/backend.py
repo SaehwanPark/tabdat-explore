@@ -981,6 +981,31 @@ class DuckDBBackend:
       raise
     return next_dataset
 
+  def recode_variables_with_panel_validation(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    rules: tuple[RecodeRule, ...],
+    generate_variables: tuple[str, ...] | None,
+    replace: bool,
+    metadata: PanelMetadata,
+  ) -> DatasetInfo:
+    try:
+      self._connection.execute("begin transaction")
+      next_dataset = self.recode_variables(
+        dataset,
+        variables=variables,
+        rules=rules,
+        generate_variables=generate_variables,
+        replace=replace,
+      )
+      self.validate_panel_metadata(next_dataset, metadata)
+      self._connection.execute("commit")
+    except Exception:
+      self._rollback_transaction()
+      raise
+    return next_dataset
+
   def xtdata_transform(
     self,
     dataset: DatasetInfo,
@@ -2176,7 +2201,9 @@ def resolve_load_source(path: Path | str) -> LoadSource:
             raise ExecutionError("use remote Stata files support http and https URLs")
           else:
             schemes = list(ingestion_adapter_for(fmt).supported_remote_schemes)
-            if len(schemes) > 1:
+            if len(schemes) == 2:
+              schemes_str = f"{schemes[0]} and {schemes[1]}"
+            elif len(schemes) > 2:
               schemes_str = ", ".join(schemes[:-1]) + ", and " + schemes[-1]
             else:
               schemes_str = schemes[0]
