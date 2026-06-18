@@ -34,7 +34,23 @@ def result_either[T, E, U](
   error_fn: Callable[[E], U],
   success_fn: Callable[[T], U],
 ) -> U:
-  """Fold a Result into one value at an impure edge."""
+  """Fold a Result into one value at an impure boundary edge.
+
+  Avoids repetitive pattern-matching blocks at application boundaries (e.g., CLI,
+  shell, or I/O entry points) where functional monadic structures must be translated
+  into user-facing output or system exceptions.
+
+  Args:
+    value: The monadic Result container (either Ok or Err).
+    error_fn: Callable mapping the error value E to the return type U.
+    success_fn: Callable mapping the success value T to the return type U.
+
+  Returns:
+    The mapped value of type U.
+
+  Raises:
+    TypeError: If the value is not an instance of Ok or Err.
+  """
   match value:
     case Ok(success):
       return success_fn(success)
@@ -48,7 +64,22 @@ def option_maybe[T, U](
   default: U,
   some_fn: Callable[[T], U],
 ) -> U:
-  """Fold an Option into one value at an impure edge."""
+  """Fold an Option into one value at an impure boundary edge.
+
+  Standardizes resolving optional states at boundaries by providing a fallback value
+  for Nothing or applying a transform function for Some(T).
+
+  Args:
+    value: The Option container (Some or Nothing).
+    default: The fallback value of type U to return if the Option is Nothing.
+    some_fn: Callable mapping the wrapped value T to the return type U.
+
+  Returns:
+    The mapped value or the default fallback value.
+
+  Raises:
+    TypeError: If the value is not Some or Nothing.
+  """
   match value:
     case Some(present):
       return some_fn(present)
@@ -58,7 +89,21 @@ def option_maybe[T, U](
 
 
 def option_to_result[T, E](value: Option[T], error: E) -> Result[T, E]:
-  """Convert expected absence into a recoverable failure value."""
+  """Convert expected absence (Option) into a recoverable failure (Result).
+
+  Translates an expected/allowed missing state (Nothing) into an explicit error
+  condition (Err) when a value is strictly required downstream.
+
+  Args:
+    value: The Option container to convert.
+    error: The error value E to wrap in Err if the Option is Nothing.
+
+  Returns:
+    Ok containing the wrapped value, or Err containing the provided error.
+
+  Raises:
+    TypeError: If the value is not Some or Nothing.
+  """
   match value:
     case Some(present):
       return Ok(present)
@@ -68,6 +113,17 @@ def option_to_result[T, E](value: Option[T], error: E) -> Result[T, E]:
 
 
 def maybe_from_optional[T](value: T | None) -> MaybeValue[T]:
+  """Convert a standard Python Optional (T | None) to a monadic Option (MaybeValue[T]).
+
+  Bridges standard Python APIs returning None with the repository's functional
+  monadic constructs to preserve pipeline purity.
+
+  Args:
+    value: The value which may be None.
+
+  Returns:
+    Some(value) if the value is not None, otherwise Nothing.
+  """
   if value is None:
     return Nothing
   return Some(value)
