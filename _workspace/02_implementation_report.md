@@ -16,6 +16,7 @@
   - Updated `_parse_use` to utilize `_parse_options` for extraction of parenthesized options `delimiter` and `has_header`.
 - [src/tabdat/backend.py](file:///home/saehwan/repos/tabdat-explore-dev/src/tabdat/backend.py):
   - Implemented `recode_variables` backend method, translating recode rules to DuckDB SQL `CASE WHEN` statements with appropriate type casts for strings.
+  - Resolved implicit mixed-type DuckDB binder errors by enforcing consistent `VARCHAR` casting on outputs and fallbacks when recoding string columns or mixing string output types.
   - Integrated `read_csv_auto` inside `inspect_and_load_source` for `.csv` eager loading using options `delimiter` and `has_header`.
   - Integrated `pyarrow.feather.read_table` inside `inspect_and_load_source` to handle `.feather` and `.arrow` datasets.
   - Added strict type annotations to `resolve_load_source` and type-hinted `args` inside CSV loader for robust type-safety.
@@ -31,7 +32,7 @@
   - Added syntax parsing tests `test_parse_recode_command`.
 - [tests/test_executor.py](file:///home/saehwan/repos/tabdat-explore-dev/tests/test_executor.py):
   - Updated remote scheme tests to handle custom error formatting.
-  - Appended `test_execute_recode`, `test_execute_recode_validation_errors`, and `test_execute_ingestion_csv_feather_arrow` to verify end-to-end execution.
+  - Appended `test_execute_recode` (including mixed type string-numeric coercion), `test_execute_recode_validation_errors`, and `test_execute_ingestion_csv_feather_arrow` to verify end-to-end execution.
 
 ## Validation Commands and Outcomes
 
@@ -40,7 +41,7 @@
    - Outcome: `0 errors, 0 warnings, 0 notes`
 2. **Pytest Target Integration Tests**:
    - Command: `uv run pytest tests/test_executor.py -k "recode or ingestion"`
-   - Outcome: `8 passed`
+   - Outcome: `9 passed`
 3. **Full Test Suite Validation**:
    - Command: `uv run pytest`
    - Outcome: `936 passed`
