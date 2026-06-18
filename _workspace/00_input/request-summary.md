@@ -1,30 +1,26 @@
-# Request Summary: Spatial Autoregressive with Spatial Errors (SARAR / SAC) Support
+# Request Summary: Spatial Out-of-Sample Prediction Workflows
 
 ## Goal
 
-Extend the `spregress` command to support the SARAR/SAC model type (`model(sarar)`), which estimates spatial models with both spatial lag and spatial autoregressive errors using generalized moments (GMM).
+Extend the `predict ..., spatial_lag` command after spatial regressions (`spregress`) to support out-of-sample datasets, allowing users to predict spatial lag values on active datasets that differ from the estimation sample.
 
 ## Phase Fit
 
-- Phase 22: Advanced Spatial Autoregressive Models.
+- Phase 22: Advanced Spatial Autoregressive Models (Predictive Workflows extension).
 - Fits the priority of utilizing `pysal` (`spreg`) for spatial econometrics.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: Update `SpregressCommand.model_type` to include `"sarar"`.
-- `src/tabdat/parser.py`: Parse `model(sarar)` and validate option exclusivity/constraints.
-- `src/tabdat/executor.py`: Call PySAL's GMM combo model estimator (`spreg.GM_Combo` or similar) and format both spatial lag and spatial error coefficients in the regression table.
-- `src/tabdat/shell.py`: Update autocompletions for the `model(...)` option.
-- `src/tabdat/help/topics/spregress.md`: Update help files.
-- `tests/test_spregress.py`: Add syntax and integration tests.
+- `src/tabdat/executor.py`: Modify `_execute_predict` to remove the strict same-sample fingerprint check for `spatial_lag` prediction, and implement out-of-sample weights reconstruction and solver equations.
+- `tests/test_spregress.py`: Update tests to assert that out-of-sample predict works, and add validation tests for coordinate/weights variable mismatches.
 
 ## Assumptions
 
-- We will estimate the GMM/IV-based combo model using `spreg.GM_Combo` from PySAL.
-- Both spatial coefficients (rho for spatial lag, lambda for spatial error) will be displayed.
-- Robust standard errors are supported if GMM is used (GM_Combo handles spatial heteroscedasticity if configured, or standard errors as reported by GMM combo).
+- Out-of-sample prediction for spatial lag models solves:
+  $$\hat{y}_{\text{new}} = (I - \hat{\rho} W_{\text{new}})^{-1} (X_{\text{new}} \hat{\beta})$$
+- We build $W_{\text{new}}$ dynamically from the target dataset (using either coords or loading and subsetting the weights file).
+- The same-sample prediction check remains active and optimized to reuse precomputed values.
 
 ## Non-Goals
 
-- No out-of-sample prediction scope for `sarar` in this slice.
-- No other spatial models (e.g., SEM/SAR with MLE, or other combo variants) in this slice.
+- No out-of-sample spatial error residuals prediction.

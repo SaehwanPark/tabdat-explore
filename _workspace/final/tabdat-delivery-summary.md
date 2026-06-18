@@ -1,28 +1,24 @@
-# Delivery Summary: Spatial Autoregressive with Spatial Errors (`spregress ..., model(sarar)`)
+# Delivery Summary: Spatial Out-of-Sample Prediction Workflows
 
 ## Result
 
-Implemented on branch `feat/spregress-sarar`.
+Implemented on branch `feat/spatial-oos-prediction`.
 
 ## Delivered
 
-- Added `model(sarar)` GMM estimation support to the `spregress` command.
-- Integrated PySAL's `GM_Combo` (non-robust combo) and `GM_Combo_Het` (heteroscedastic robust combo) estimators.
-- Extracted and displayed both spatial parameters (`rho` for spatial lag, `lambda` for spatial error) in the regression output table.
-- Handled GMM standard error omission by safely formatting unavailable statistics as `.`.
-- Updated syntax validation, help topics, parser, executor, formatter, and tests.
+- Extended `predict ..., spatial_lag` after spatial regressions (`spregress`) to support out-of-sample datasets.
+- Implemented same-sample optimization by verifying fingerprint matches.
+- Dynamically reconstructs spatial weight matrices ($W_{\text{new}}$) for out-of-sample data.
+- Solves $(I - \hat{\rho} W_{\text{new}}) y = X_{\text{new}}\hat{\beta}$ using dense solvers.
+- Added comprehensive unit and integration tests.
+- Documented changes in SPEC, CHANGELOG, and workspace.
 
 ## Validation
 
-- `uv run pytest tests/test_spregress.py` (25 passed)
+- `uv run pytest tests/test_spregress.py` (27 passed)
 - `uv run basedpyright` (0 errors)
-- `uv run ruff check` (passed)
-- `uv run pytest` (928 passed)
+- `uv run pytest` (930 passed)
 
 ## Review
 
 - QA status: `pass` (recorded in `_workspace/03_qa_report.md`).
-
-## Deferred
-
-- Out-of-sample combo model predictions.

@@ -1,46 +1,41 @@
-# Command Contract: Spatial Autoregressive with Spatial Errors (`spregress ..., model(sarar)`)
+# Command Contract: Spatial Out-of-Sample Prediction Workflows
 
 ## Request Summary
 
-Add `model(sarar)` support to the `spregress` spatial regression command. SARAR (also known as SAC or GMM Combo) estimates models with spatial lag and spatial autoregressive error structures.
+Extend the `predict ..., spatial_lag` command to support out-of-sample datasets after spatial regressions (`spregress`).
 
 ## Roadmap Phase
 
-Phase 22: Advanced Spatial Autoregressive Models.
+Phase 22: Advanced Spatial Autoregressive Models (Predictive Workflows extension).
 
 ## Command Syntax
 
-```text
-spregress <y> <xvars>, coord(<lat_var> <lon_var>) [knn(<k>)] model(sarar) [robust]
-spregress <y> <xvars>, weights(<path>) id(<id_var>) model(sarar) [robust]
-```
+No change to syntax. The existing syntax `predict <newvar>, spatial_lag` is used.
 
 ## Examples
 
-- `spregress wage educ exper, coord(lat lon) model(sarar)`
-- `spregress wage educ exper, weights(columbus.gal) id(neighborhood) model(sarar) robust`
+- `spregress wage educ exper, coord(lat lon) model(lag)`
+- `use validation_data.parquet`
+- `predict wage_lag_pred, spatial_lag`
 
 ## Data Assumptions
 
-- Requires an active dataset and valid spatial configuration (either `coord` or `weights`).
-- Excludes observations with missing values in regression or coordinate/id variables.
-- Raises `ExecutionError` if estimation sample cannot be constructed or aligned.
+- The active dataset must contain all predictors from the regression model.
+- The active dataset must contain the coordinates (`coord_variables` / `knn` matrix) or ID variable (`weights_file` matrix) used in the regression.
+- Raises `ExecutionError` if variables are missing or if the weight matrix cannot be aligned/constructed.
 
 ## Execution Semantics
 
-- Reconstructs sample and weights matrix `w` using existing alignment logic.
-- Executes `spreg.GM_Combo(y, x, w=w, robust='white')` if `robust` option is passed, otherwise `spreg.GM_Combo(y, x, w=w)`.
-- Extract coefficients:
-  - Intercept and predictors.
-  - Spatial lag coefficient ($\rho$ or `rho_` / `lambda_` in PySAL).
-  - Spatial error coefficient ($\lambda$ or `rho_` / `lambda_` in PySAL).
-- Format the output into a clean terminal table showing both spatial coefficients and their standard errors, stats, and p-values.
+- If the active sample fingerprint matches the estimation sample, reuse `spatial_regression.full_predictions`.
+- Otherwise:
+  - Dynamically construct a new spatial weights matrix $W_{\text{new}}$ for the target sample.
+  - Form the linear predictor $X_{\text{new}}\hat{\beta}$.
+  - Calculate $(I - \hat{\rho} W_{\text{new}})^{-1} X_{\text{new}}\hat{\beta}$ using linear solvers.
+  - Add the prediction column to the active dataset.
 
 ## Acceptance Criteria
 
-- `spregress` parses `model(sarar)` correctly.
-- Rejects invalid models via `ParseError`.
-- Table shows spatial coefficients cleanly labeled (e.g., `W_wage` for spatial lag, and `lambda` or similar for spatial error).
-- Standard errors, z-stats, and p-values are correctly populated.
-- Autocomplete and help pages are updated.
-- Existing tests for `model(lag)` and `model(error)` continue to pass.
+- Out-of-sample `predict ..., spatial_lag` runs successfully.
+- Rejects missing coordinates or predictor columns with `ExecutionError`.
+- Same-sample predictions remain fast and correct.
+- Existing tests continue to pass.

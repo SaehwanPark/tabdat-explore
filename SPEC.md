@@ -486,6 +486,11 @@ and describe the active work with concise verification criteria.
   - `lincom` command: estimates and computes standard errors, t/z stats, p-values, and confidence intervals for linear combinations of coefficients.
   - `ttest` command: conducts one-sample, two-sample (equal/unequal variance), and paired t-tests on active variables.
   - focused parser, executor, formatter, autocompletions, help topic, and CLI integration tests.
+- Implemented Phase 22 — Advanced Spatial Autoregressive Models:
+  - `spregress` command supports `model(sarar)` for GMM Combo estimation.
+  - Computes and prints spatial lag `rho` and spatial error `lambda` coefficients.
+  - Supported out-of-sample prediction workflow for `spatial_lag` by dynamically constructing weight matrices ($W_{\text{new}}$).
+  - focused parser, executor, formatter, CLI, shell autocomplete, and integration tests.
 
 ## Present
 
@@ -505,8 +510,6 @@ and describe the active work with concise verification criteria.
      Phase 12 estimation result contract
 - Deferred Phase 19 modern extensions:
   - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset posterior predictive mean and interval columns.
-  - Advanced spatial autoregressive models: support Spatial Autoregressive with Spatial Autoregressive Errors (SARAR / SAC) models.
-  - Spatial predictive workflows: expand same-sample `predict ..., spatial_lag` to out-of-sample workflows.
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and `pysal` (`spreg`) for spatial econometrics
     - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger coverage
