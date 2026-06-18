@@ -16,6 +16,7 @@ from tabdat.models import (
   RidgeCommand,
   SpatialRegressionResult,
   SpregressCommand,
+  StringExpression,
   TableResult,
   UseCommand,
 )
@@ -1081,5 +1082,96 @@ def test_execute_spregress_predict_sarar_out_of_sample(tmp_path: Path) -> None:
     assert predict_res is not None
     active_ds = executor.state.active_dataset
     assert "y_full" in [col.name for col in active_ds.columns]
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_predict_weights_file_out_of_sample(tmp_path: Path) -> None:
+  import pandas as pd
+
+  data_path = tmp_path / "data_oos.parquet"
+  df = pd.DataFrame(
+    {"y": [10.0, 12.0, 15.0, 18.0], "x": [1.0, 2.0, 3.0, 4.0], "id": ["A", "B", "C", "D"]}
+  )
+  assert len(df) == 4
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  gal_path = tmp_path / "w_oos.gal"
+  gal_path.write_text("0 4 test GAL\nA 2\nB C\nB 2\nA D\nC 2\nA D\nD 2\nB C\n")
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        weights_file=str(gal_path),
+        id_variable="id",
+      )
+    )
+
+    # Filter rows to B, C, D (out-of-sample subset)
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    next_dataset = executor.backend.filter_rows(
+      dataset,
+      BinaryExpression(
+        left=IdentifierExpression("id"),
+        operator="!=",
+        right=StringExpression("A"),
+      ),
+      keep=True,
+    )
+    executor.state.active_dataset = next_dataset
+    predict_res = executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+    assert predict_res is not None
+    assert "y_full" in [col.name for col in executor.state.active_dataset.columns]
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_predict_duplicate_ids_fails(tmp_path: Path) -> None:
+  import pandas as pd
+
+  data_path = tmp_path / "data_dup.parquet"
+  df = pd.DataFrame(
+    {"y": [10.0, 12.0, 15.0, 18.0], "x": [1.0, 2.0, 3.0, 4.0], "id": ["A", "B", "C", "D"]}
+  )
+  assert len(df) == 4
+  con = duckdb.connect()
+  con.execute("copy df to ? (format parquet)", [str(data_path)])
+
+  gal_path = tmp_path / "w_dup.gal"
+  gal_path.write_text("0 4 test GAL\nA 2\nB C\nB 2\nA D\nC 2\nA D\nD 2\nB C\n")
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(data_path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        weights_file=str(gal_path),
+        id_variable="id",
+      )
+    )
+
+    dup_df = pd.DataFrame(
+      {"y": [12.0, 12.0, 15.0, 18.0], "x": [2.0, 2.0, 3.0, 4.0], "id": ["B", "B", "C", "D"]}
+    )
+    assert len(dup_df) == 4
+    dup_path = tmp_path / "data_dup_target.parquet"
+    con.execute("copy dup_df to ? (format parquet)", [str(dup_path)])
+
+    executor.execute(UseCommand(dup_path))
+    with pytest.raises(
+      ExecutionError,
+      match="id variable 'id' contains duplicate values in the prediction sample",
+    ):
+      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
   finally:
     executor.close()

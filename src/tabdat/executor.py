@@ -2502,7 +2502,7 @@ class Executor:
 
     sample_fingerprint = _spatial_sample_fingerprint(rows=rows)
     full_prediction_values: list[float | None] = [None] * len(rows)
-    if command.model_type == "lag":
+    if command.model_type in ("lag", "sarar"):
       reduced_form_predictions = _fitted_spatial_lag_predictions(fitted_any)
       for row_index, predicted_value in zip(
         complete_row_indices,
@@ -3679,7 +3679,10 @@ class Executor:
           )
           try:
             same_sample_rows = self.backend.regression_rows(dataset, same_sample_cols)
-            if _spatial_sample_fingerprint(rows=same_sample_rows) == spatial_regression.sample_fingerprint:
+            if (
+              _spatial_sample_fingerprint(rows=same_sample_rows)
+              == spatial_regression.sample_fingerprint
+            ):
               is_same_sample = True
           except Exception:
             pass
@@ -3711,7 +3714,7 @@ class Executor:
           if len(row) != len(required_columns):
             raise ExecutionError("predict spatial_lag failed")
           raw_predictors = row[0 : len(spatial_regression.predictor_names)]
-          raw_extra = row[len(spatial_regression.predictor_names):]
+          raw_extra = row[len(spatial_regression.predictor_names) :]
 
           if any(val is None for val in raw_predictors) or any(val is None for val in raw_extra):
             continue
@@ -3762,6 +3765,7 @@ class Executor:
             raise ExecutionError("spregress weight matrix construction failed") from exc
         else:
           from pathlib import Path
+
           import libpysal
           from libpysal.weights import Queen, Rook, w_subset
 
@@ -3789,6 +3793,7 @@ class Executor:
                 shp_path_upper = weights_path.with_suffix(".SHP")
                 if shp_path_upper.exists():
                   import os
+
                   try:
                     os.symlink(shp_path_upper.name, shp_path_lower)
                     symlinked_shp = True
@@ -3801,6 +3806,7 @@ class Executor:
                 db_path_upper = weights_path.with_suffix(".DBF")
                 if db_path_upper.exists():
                   import os
+
                   try:
                     os.symlink(db_path_upper.name, db_path)
                     symlinked_dbf = True
@@ -3813,6 +3819,7 @@ class Executor:
                 shx_path_upper = weights_path.with_suffix(".SHX")
                 if shx_path_upper.exists():
                   import os
+
                   try:
                     os.symlink(shx_path_upper.name, shx_path)
                     symlinked_shx = True
@@ -3866,7 +3873,7 @@ class Executor:
             elif isinstance(sample_key, int) and not isinstance(ids_list[0], int):
               try:
                 ids_list = [int(float(x)) if isinstance(x, str) else int(x) for x in ids_list]
-              except ValueError:
+              except (ValueError, TypeError):
                 pass
 
           w_keys = set(w_original.neighbors.keys())
@@ -3875,6 +3882,12 @@ class Executor:
             raise ExecutionError(
               "some predict sample IDs are missing from the spatial weights matrix: "
               f"{', '.join(missing_ids[:5])}"
+            )
+
+          if len(set(ids_list)) != len(ids_list):
+            id_var_label = spatial_regression.id_variable or "id"
+            raise ExecutionError(
+              f"id variable '{id_var_label}' contains duplicate values in the prediction sample"
             )
 
           try:
@@ -3887,7 +3900,10 @@ class Executor:
         design = np.array(predictors_list, dtype=float)
         if spatial_regression.intercept is not None:
           design = np.hstack([np.ones((len(design), 1)), design])
-          betas = np.array([spatial_regression.intercept, *spatial_regression.predictor_coefficients], dtype=float)
+          betas = np.array(
+            [spatial_regression.intercept, *spatial_regression.predictor_coefficients],
+            dtype=float,
+          )
         else:
           betas = np.array(spatial_regression.predictor_coefficients, dtype=float)
 
@@ -3895,15 +3911,18 @@ class Executor:
         rho = spatial_regression.spatial_coefficient
 
         try:
-          W_dense = w.full()[0]
-          A = np.eye(len(design)) - rho * W_dense
-          predy_e = np.linalg.solve(A, xb)
+          import scipy.sparse as sp
+          from scipy.sparse.linalg import spsolve
+
+          W_sparse = w.sparse
+          A = sp.eye(len(design), format="csr") - rho * W_sparse
+          predy_e: Any = spsolve(A, xb)
         except Exception as exc:
           raise ExecutionError("predict spatial_lag calculation failed") from exc
 
         values = [None] * len(rows)
         for idx, val in zip(complete_row_indices, predy_e, strict=True):
-          values[idx] = float(val)
+          values[idx] = float(cast(Any, val))
 
         next_dataset = self.backend.add_numeric_column_from_values(
           dataset,
