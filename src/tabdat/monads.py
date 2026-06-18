@@ -1,7 +1,7 @@
 """Functional helper boundary for explicit failure and absence handling.
 
 TabDat imports computational helpers through this module so the pure core has a
-stable repo-local vocabulary while the implementation delegates to comp-builders.
+stable repo-local vocabulary while the implementation delegates to comp_builders.
 """
 
 from __future__ import annotations
@@ -26,6 +26,8 @@ from comp_builders import (
   validation,
 )
 
+# Option[NoReturn] is explicitly used for the Nothing variant because comp_builders.Option
+# is invariant. This union design matches type checks under basedpyright for empty options.
 type MaybeValue[T] = Some[T] | Option[NoReturn]
 
 

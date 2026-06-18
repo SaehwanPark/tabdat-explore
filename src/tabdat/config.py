@@ -41,8 +41,8 @@ class TabDatConfig:
 def load_config(path: Path) -> TabDatConfig:
   """Load and parse configuration values from a specific TOML file.
 
-  Resolves standard environment paths and decodes TOML contents. Validates configuration
-  keys and values against the allowed set.
+  Expands user home directory shortcuts (e.g., `~`) and decodes TOML contents.
+  Validates configuration keys and values against the allowed set.
 
   Args:
     path: The file path to the TOML configuration.
@@ -153,9 +153,13 @@ def set_config_value(config: TabDatConfig, name: str, value: object) -> TabDatCo
     graph_format = cast(Literal["svg", "png"], value)
     return TabDatConfig(graph_format, config.artifact_dir, config.graph_open)
   if name == "artifact_dir":
-    if not isinstance(value, str) or not value:
+    if isinstance(value, Path):
+      resolved_value = value
+    elif isinstance(value, str) and value:
+      resolved_value = Path(value)
+    else:
       raise TabDatError("artifact_dir must be a non-empty path")
-    return TabDatConfig(config.graph_format, Path(value), config.graph_open)
+    return TabDatConfig(config.graph_format, resolved_value, config.graph_open)
   if name == "graph_open":
     # Parse string representations (e.g., standard 'on'/'off') into a boolean state.
     if isinstance(value, str):
@@ -165,11 +169,11 @@ def set_config_value(config: TabDatConfig, name: str, value: object) -> TabDatCo
       elif normalized == "off":
         parsed = False
       else:
-        raise TabDatError("graph_open must be on or off")
+        raise TabDatError("graph_open must be a boolean or 'on'/'off' string")
     elif isinstance(value, bool):
       parsed = value
     else:
-      raise TabDatError("graph_open must be on or off")
+      raise TabDatError("graph_open must be a boolean or 'on'/'off' string")
     return TabDatConfig(config.graph_format, config.artifact_dir, parsed)
   raise TabDatError(f"unknown config key: {name}")
 
@@ -178,7 +182,7 @@ def _xdg_config_path() -> Path:
   """Resolve the standard user-level XDG configuration path for TabDat.
 
   Utilizes the `XDG_CONFIG_HOME` environment variable if defined, defaulting
-  to standard unix `~/.config/tabdat/config.toml` structure.
+  to standard Unix `~/.config/tabdat/config.toml` structure.
 
   Returns:
     The target Path where the global config file is expected.

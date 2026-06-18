@@ -63,9 +63,9 @@ class EstimatorAdapterSpec:
 
   Attributes:
     command: The Stata-inspired command identifier (e.g., 'xtabond', 'tobit').
-    primary_backend: Canonical Python class or module path to invoke.
-    fallback_backend: Optional alternative backend (e.g., R library path via rpy2) if the
-      primary Python engine is missing or unsupported.
+    primary_backend: The primary execution backend path or module to invoke.
+    fallback_backend: Optional alternative backend path or module if the primary engine
+      is missing or unsupported.
   """
 
   command: EstimatorCommand
@@ -199,7 +199,7 @@ def lazy_mode_supported(data_format: DataFormat) -> bool:
   """Check if lazy loading / query pushdown is supported for a format.
 
   Args:
-    data_format: The format class to check.
+    data_format: The tabular format to check.
 
   Returns:
     True if lazy operations are supported, otherwise False.
@@ -211,8 +211,8 @@ def remote_scheme_supported(data_format: DataFormat, scheme: str) -> bool:
   """Verify if a remote URI protocol (e.g., 's3', 'http') is supported for a format.
 
   Args:
-    data_format: The format class to query.
-    scheme: The remote URI scheme (e.g. 's3').
+    data_format: The tabular format to query.
+    scheme: The remote URI scheme (e.g., 's3').
 
   Returns:
     True if the protocol is supported, otherwise False.
@@ -229,7 +229,7 @@ def lazy_engine_supported(
   """Determine if a query pushdown engine is supported for local/remote access of a format.
 
   Args:
-    data_format: The format class (e.g., 'parquet').
+    data_format: The tabular format (e.g., 'parquet').
     engine: The engine to evaluate ('duckdb' or 'polars').
     is_remote: True if querying remote storage/URIs, False for local filesystem.
 

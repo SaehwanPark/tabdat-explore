@@ -18,8 +18,8 @@ class TabDatError(Exception):
 class ParseError(TabDatError):
   """Raised during the lexical analysis or parsing phase.
 
-  Indicates that the user input command violates the syntax grammar or lacks
-  mandatory positional/keyword options.
+  Indicates that the user input command violates the grammar or lacks
+  mandatory arguments or options.
   """
 
 
@@ -34,7 +34,7 @@ class ExecutionError(TabDatError):
 class NoActiveDatasetError(ExecutionError):
   """Raised when a dataset-dependent command is executed without a loaded active dataset.
 
-  Commands such as `describe`, `summarize`, or `regress` require an active table
+  Commands such as `describe`, `summarize`, or `regress` require an active dataset
   in the session context.
   """
 
