@@ -624,13 +624,13 @@ class RecodeRange:
   end: float | Literal["max"]
 
 
-RecodeInput = float | int | str | RecodeRange | Literal["missing", "nonmissing", "else"]
+RecodeInput = int | float | str | RecodeRange | Literal["missing", "nonmissing", "else"]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class RecodeRule:
   inputs: tuple[RecodeInput, ...]
-  output: float | int | str
+  output: int | float | str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

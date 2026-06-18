@@ -491,6 +491,15 @@ and describe the active work with concise verification criteria.
   - Computes and prints spatial lag `rho` and spatial error `lambda` coefficients.
   - Supported out-of-sample prediction workflow for `spatial_lag` by dynamically constructing weight matrices ($W_{\text{new}}$).
   - focused parser, executor, formatter, CLI, shell autocomplete, and integration tests.
+- Implemented Phase 23 — Data Recoding & Ingestion Expansion:
+  - `recode` command: recodes numeric and categorical variable values/ranges using a sequence of rules (`inputs = output`).
+    - Supports exact values, value lists, ranges (`min/max` keywords), and special cases (`missing`, `nonmissing`, `else`).
+    - Supports writing to new variables via `generate(<new_varlist>)` or replacing in-place via `replace`.
+    - Implemented typecast safety to prevent DuckDB binder errors during string recodes or mixed type coercions.
+  - Expanded `use` command ingestion format support:
+    - Loads `.csv` datasets with `delimiter(<char>)` and `has_header(true|false)` option parameters.
+    - Loads `.feather` and `.arrow` datasets by registering them as temporary views via PyArrow.
+  - focused parser, executor, backend, CLI autocomplete, help topics, and integration tests.
 
 ## Present
 

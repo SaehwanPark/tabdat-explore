@@ -999,24 +999,32 @@ class Executor:
         if gen_var in col_names:
           raise ExecutionError(f"generate variable already exists: {gen_var}")
 
-    next_dataset = self.backend.recode_variables(
-      dataset,
-      variables=command.variables,
-      rules=command.rules,
-      generate_variables=command.generate_variables,
-      replace=command.replace,
-    )
-
     metadata = dataset.panel_metadata
+    use_panel_validation = False
     if command.replace and metadata is not None:
-      touched = False
       for var in command.variables:
         if _touches_panel_metadata(metadata, var):
-          touched = True
+          use_panel_validation = True
           break
-      if touched:
-        self.backend.validate_panel_metadata(next_dataset, metadata)
 
+    if use_panel_validation:
+      assert metadata is not None
+      next_dataset = self.backend.recode_variables_with_panel_validation(
+        dataset,
+        variables=command.variables,
+        rules=command.rules,
+        generate_variables=command.generate_variables,
+        replace=command.replace,
+        metadata=metadata,
+      )
+    else:
+      next_dataset = self.backend.recode_variables(
+        dataset,
+        variables=command.variables,
+        rules=command.rules,
+        generate_variables=command.generate_variables,
+        replace=command.replace,
+      )
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     msg = f"Recoded variables: {', '.join(command.variables)}"
     return self._record_transform(msg, next_dataset)

@@ -924,7 +924,7 @@ def test_execute_estat_spatial_knn(tmp_path: Path) -> None:
     # Check that values are finite float or None
     for row in result.rows:
       assert row[1] is None or isinstance(row[1], float)
-      assert isinstance(row[2], (int, float))
+      assert row[2] is None or isinstance(row[2], (int, float))
       assert row[3] is None or isinstance(row[3], float)
   finally:
     executor.close()

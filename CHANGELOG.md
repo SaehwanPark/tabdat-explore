@@ -4,6 +4,19 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+## [0.23.0] — 2026-06-18
+
+Phase 23 Data Recoding & Ingestion Expansion, Classical Hypothesis Testing, Advanced Spatial Models, and Bayesian Predictive Intervals.
+
+### Added
+
+- Added data value/range-based recoding via the `recode` command:
+  - Supports exact values, value lists, numeric ranges, and special keywords (`min`, `max`, `missing`, `nonmissing`, `else`).
+  - Supports writing outputs to new variables via `generate(<new_varlist>)` or replacing in-place via `replace`.
+  - Implements typecast safety to prevent DuckDB binder errors during string recodes or mixed type coercions.
+- Expanded `use` command ingestion format support:
+  - Loads `.csv` datasets with `delimiter(<char>)` and `has_header(true|false)` option parameters.
+  - Loads `.feather` and `.arrow` datasets by registering them as temporary views via PyArrow.
 - Added out-of-sample prediction support for `predict ..., spatial_lag` after spatial regressions (`spregress`):
   - Dynamically builds a new $K$-Nearest Neighbors (KNN) weights matrix or subsets/aligns a pre-computed spatial weights file for the new active dataset sample.
   - Computes spatial lag reduced-form predictions via matrix solvers: $\hat{y}_{\text{new}} = (I - \hat{\rho} W_{\text{new}})^{-1} X_{\text{new}} \hat{\beta}$.
@@ -28,6 +41,8 @@ All notable project changes are tracked here.
 - Enhanced `tabulate` with explicit `rows()`/`columns()` multi-level crosstabs, command-level `if`,
   `by:` support, and single-value cell aggregation through `values()` plus
   `stat(count|mean|sum|min|max)`.
+
+---
 
 ## [0.22.0] — 2026-06-10
 
