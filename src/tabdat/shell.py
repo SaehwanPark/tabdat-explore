@@ -19,6 +19,7 @@ from tabdat.models import DatasetInfo
 
 COMMAND_NAMES: tuple[str, ...] = (
   "use",
+  "recode",
   "help",
   "describe",
   "summarize",
@@ -87,6 +88,7 @@ COMMAND_NAMES: tuple[str, ...] = (
 _BY_CHILD_COMMAND_NAMES = tuple(name for name in COMMAND_NAMES if name != "help")
 
 _COLUMN_COMMANDS = {
+  "recode",
   "summarize",
   "codebook",
   "keep",
@@ -132,6 +134,8 @@ _COLUMN_COMMANDS = {
   "lowess",
   "spregress",
 }
+_USE_OPTIONS = ("lazy", "engine(", "delimiter(", "has_header(")
+_RECODE_OPTIONS = ("generate(", "replace")
 _TABULATE_OPTIONS = ("rows(", "columns(", "values(", "stat(", "row", "col", "missing")
 _COLLAPSE_OPTIONS = ("by(",)
 _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
@@ -414,6 +418,10 @@ def _is_after_comma(text: str) -> bool:
 
 
 def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
+  if command_name == "use":
+    yield from _matching_completions(_USE_OPTIONS, word)
+  if command_name == "recode":
+    yield from _matching_completions(_RECODE_OPTIONS, word)
   if command_name == "tabulate":
     yield from _matching_completions(_TABULATE_OPTIONS, word)
   if command_name == "collapse":

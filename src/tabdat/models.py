@@ -66,6 +66,8 @@ class UseCommand:
   path: Path | str
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
+  delimiter: str | None = None
+  has_header: bool | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -617,6 +619,29 @@ class TtestCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class RecodeRange:
+  start: float | Literal["min"]
+  end: float | Literal["max"]
+
+
+RecodeInput = float | int | str | RecodeRange | Literal["missing", "nonmissing", "else"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class RecodeRule:
+  inputs: tuple[RecodeInput, ...]
+  output: float | int | str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class RecodeCommand:
+  variables: tuple[str, ...]
+  rules: tuple[RecodeRule, ...]
+  generate_variables: tuple[str, ...] | None = None
+  replace: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class ParsedCommand:
   name: str
   arguments: tuple[str, ...] = ()
@@ -627,6 +652,7 @@ class ParsedCommand:
 
 Command = (
   UseCommand
+  | RecodeCommand
   | DescribeCommand
   | SummarizeCommand
   | CodebookCommand

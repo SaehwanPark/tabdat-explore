@@ -105,6 +105,9 @@ from tabdat.models import (
   ProbitRegressionResult,
   QregCommand,
   QregRegressionResult,
+  RecodeCommand,
+  RecodeRange,
+  RecodeRule,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -683,8 +686,11 @@ def test_resolve_remote_parquet_source_rejects_unsupported_scheme() -> None:
 
 
 def test_resolve_remote_parquet_source_rejects_non_parquet() -> None:
-  with pytest.raises(ExecutionError, match="use only supports .parquet and .dta files"):
-    resolve_parquet_source("https://example.com/data.csv")
+  with pytest.raises(
+    ExecutionError,
+    match="use only supports .parquet, .dta, .csv, .feather, and .arrow files",
+  ):
+    resolve_parquet_source("https://example.com/data.xlsx")
 
 
 def test_resolve_remote_stata_source_rejects_unsupported_scheme() -> None:
@@ -6610,13 +6616,13 @@ def test_executor_rejects_unsupported_by_child_command() -> None:
     executor.close()
 
 
-def test_use_rejects_non_parquet(tmp_path: Path) -> None:
+def test_use_lazy_rejects_non_parquet(tmp_path: Path) -> None:
   csv_path = tmp_path / "patients.csv"
   csv_path.write_text("age\n42\n")
   executor = Executor()
   try:
-    with pytest.raises(ExecutionError, match=r"\.parquet"):
-      executor.execute(UseCommand(csv_path))
+    with pytest.raises(ExecutionError, match=r"lazy mode"):
+      executor.execute(UseCommand(csv_path, execution_mode="lazy"))
   finally:
     executor.close()
 
@@ -6890,5 +6896,166 @@ def test_phase_20_estat_drdid(tmp_path: Path) -> None:
     formatted = format_result(result)
     assert "Estimation Method" in formatted
     assert "AIPW" in formatted
+  finally:
+    executor.close()
+
+
+def test_execute_recode(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+
+    # Happy path 1: generate with ranges and else
+    cmd = RecodeCommand(
+      variables=("age",),
+      rules=(
+        RecodeRule(inputs=(RecodeRange(start="min", end=35.0),), output=1.0),
+        RecodeRule(inputs=(RecodeRange(start=36.0, end=50.0),), output=2.0),
+        RecodeRule(inputs=(RecodeRange(start=51.0, end="max"),), output=3.0),
+        RecodeRule(inputs=("else",), output=-1.0),
+      ),
+      generate_variables=("age_group",),
+    )
+    res = executor.execute(cmd)
+    assert isinstance(res, TransformResult)
+    assert res.dataset.row_count == 3
+    assert "age_group" in [col.name for col in res.dataset.columns]
+
+    preview = executor.execute(HeadCommand(3))
+    assert isinstance(preview, PreviewResult)
+    age_groups = [r[4] for r in preview.rows]
+    assert age_groups == [1.0, 2.0, 3.0]
+
+    # Happy path 2: replace with missing/nonmissing keywords
+    cmd2 = RecodeCommand(
+      variables=("cost",),
+      rules=(
+        RecodeRule(inputs=("missing",), output=999.0),
+        RecodeRule(inputs=("nonmissing",), output=100.0),
+      ),
+      replace=True,
+    )
+    res2 = executor.execute(cmd2)
+    assert isinstance(res2, TransformResult)
+
+    preview2 = executor.execute(HeadCommand(3))
+    assert isinstance(preview2, PreviewResult)
+    costs = [r[3] for r in preview2.rows]
+    assert costs == [100.0, 100.0, 999.0]
+
+    # Happy path 3: recode string column to numeric output
+    # (requires implicit VARCHAR cast to avoid binder error)
+    cmd3 = RecodeCommand(
+      variables=("sex",),
+      rules=(
+        RecodeRule(inputs=("F",), output=1.0),
+        RecodeRule(inputs=("M",), output=2.0),
+      ),
+      generate_variables=("sex_num",),
+    )
+    res3 = executor.execute(cmd3)
+    assert isinstance(res3, TransformResult)
+
+    preview3 = executor.execute(HeadCommand(3))
+    assert isinstance(preview3, PreviewResult)
+    sex_nums = [r[5] for r in preview3.rows]
+    assert sex_nums == ["1.0", "2.0", "1.0"]
+
+  finally:
+    executor.close()
+
+
+def test_execute_recode_validation_errors(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+
+    # 1. Unknown variable
+    with pytest.raises(UnknownVariableError, match="variable not found"):
+      executor.execute(RecodeCommand(variables=("invalid_col",), rules=(), replace=True))
+
+    # 2. Number of variables vs generate_variables mismatch
+    with pytest.raises(ExecutionError, match="number of generate variables must match"):
+      executor.execute(
+        RecodeCommand(
+          variables=("age", "bmi"),
+          rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+          generate_variables=("age_cat",),
+        )
+      )
+
+    # 3. Generate variable already exists (collision)
+    with pytest.raises(ExecutionError, match="generate variable already exists"):
+      executor.execute(
+        RecodeCommand(
+          variables=("age",),
+          rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+          generate_variables=("bmi",),
+        )
+      )
+
+    # 4. Range recode rule on non-numeric column (sex is categorical/string)
+    with pytest.raises(ExecutionError, match="range recode rule not allowed on non-numeric column"):
+      executor.execute(
+        RecodeCommand(
+          variables=("sex",),
+          rules=(RecodeRule(inputs=(RecodeRange(start=1.0, end=10.0),), output="other"),),
+          replace=True,
+        )
+      )
+
+  finally:
+    executor.close()
+
+
+def test_execute_ingestion_csv_feather_arrow(tmp_path: Path) -> None:
+  executor = Executor()
+  try:
+    # 1. CSV loading with delimiter and has_header
+    csv_path = tmp_path / "test.csv"
+    csv_path.write_text("id;val\n1;foo\n2;bar\n")
+
+    res = executor.execute(UseCommand(csv_path, delimiter=";", has_header=True))
+    assert isinstance(res, LoadResult)
+    assert res.dataset.row_count == 2
+    assert [col.name for col in res.dataset.columns] == ["id", "val"]
+
+    preview = executor.execute(HeadCommand(2))
+    assert isinstance(preview, PreviewResult)
+    assert preview.rows == ((1, "foo"), (2, "bar"))
+
+    # 2. Feather loading using pandas/pyarrow
+    import pandas as pd
+
+    df = pd.DataFrame({"x": [10, 20], "y": ["a", "b"]})
+    feather_path = tmp_path / "test.feather"
+    df.to_feather(feather_path)
+
+    res_f = executor.execute(UseCommand(feather_path))
+    assert isinstance(res_f, LoadResult)
+    assert res_f.dataset.row_count == 2
+    assert [col.name for col in res_f.dataset.columns] == ["x", "y"]
+
+    preview_f = executor.execute(HeadCommand(2))
+    assert isinstance(preview_f, PreviewResult)
+    assert preview_f.rows == ((10, "a"), (20, "b"))
+
+    # 3. Arrow loading
+    arrow_path = tmp_path / "test.arrow"
+    import pyarrow as pa
+    import pyarrow.feather as pf
+
+    table = pa.table({"a": [1.5, 2.5], "b": ["x", "y"]})
+    pf.write_feather(table, arrow_path)
+
+    res_a = executor.execute(UseCommand(arrow_path))
+    assert isinstance(res_a, LoadResult)
+    assert res_a.dataset.row_count == 2
+    assert [col.name for col in res_a.dataset.columns] == ["a", "b"]
+
+    preview_a = executor.execute(HeadCommand(2))
+    assert isinstance(preview_a, PreviewResult)
+    assert preview_a.rows == ((1.5, "x"), (2.5, "y"))
+
   finally:
     executor.close()

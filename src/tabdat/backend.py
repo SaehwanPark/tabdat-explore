@@ -22,6 +22,8 @@ from tabdat.errors import (
   UnknownVariableError,
 )
 from tabdat.extension_registry import (
+  DataFormat,
+  ingestion_adapter_for,
   lazy_engine_supported,
   lazy_mode_supported,
   remote_scheme_supported,
@@ -37,6 +39,8 @@ from tabdat.models import (
   NumberExpression,
   PanelMetadata,
   PanelStructureSummary,
+  RecodeRange,
+  RecodeRule,
   StringExpression,
   SummaryRow,
   UnaryExpression,
@@ -65,7 +69,7 @@ NEXT_ACTIVE_VIEW = "__tabdat_next_view"
 
 @dataclass(frozen=True)
 class LoadSource:
-  format: Literal["parquet", "stata"]
+  format: Literal["parquet", "stata", "csv", "feather", "arrow"]
   read_path: str
   display_path: Path | str
   is_remote: bool
@@ -83,21 +87,28 @@ class DuckDBBackend:
   def close(self) -> None:
     self._connection.close()
 
-  def inspect_parquet(
+  def inspect_and_load_source(
     self,
     path: Path | str,
     *,
     execution_mode: Literal["eager", "lazy"] = "eager",
     lazy_engine: Literal["duckdb", "polars"] | None = None,
+    delimiter: str | None = None,
+    has_header: bool | None = None,
   ) -> DatasetInfo:
     source = resolve_load_source(path)
 
+    if source.format != "csv" and (delimiter is not None or has_header is not None):
+      raise ExecutionError("options delimiter and has_header are only supported for CSV files")
+
+    if execution_mode == "lazy" and not lazy_mode_supported(source.format):
+      raise ExecutionError("use lazy mode only supports Parquet files")
+
     try:
       if source.format == "stata":
-        if execution_mode == "lazy" and not lazy_mode_supported(source.format):
-          raise ExecutionError("use lazy mode only supports Parquet files")
+        import os
+
         if source.is_remote:
-          import os
           import urllib.request
 
           try:
@@ -112,7 +123,7 @@ class DuckDBBackend:
             except OSError:
               pass
           except Exception as exc:
-            message = f"use could not read {source.format.title()} file: {source.read_path}"
+            message = f"use could not read Stata file: {source.read_path}"
             raise ExecutionError(message) from exc
         else:
           frame = pd.read_stata(source.read_path)
@@ -134,6 +145,107 @@ class DuckDBBackend:
         self._active_storage = "table"
         self._polars_lazy_frame = None
         return self.active_dataset_info(source.display_path)
+
+      elif source.format in {"feather", "arrow"}:
+        import os
+
+        if source.is_remote:
+          import urllib.request
+
+          try:
+            req = urllib.request.Request(source.read_path, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req) as response:
+              with tempfile.NamedTemporaryFile(
+                suffix=f".{source.format}", delete=False
+              ) as tmp_file:
+                tmp_file.write(response.read())
+                temp_path = tmp_file.name
+            import pyarrow.feather as pf
+
+            table = pf.read_table(temp_path)
+            try:
+              os.unlink(temp_path)
+            except OSError:
+              pass
+          except Exception as exc:
+            raise ExecutionError(
+              f"use could not read {source.format.upper()} file: {source.read_path}"
+            ) from exc
+        else:
+          import pyarrow.feather as pf
+
+          table = pf.read_table(source.read_path)
+
+        stage_name = f"__tabdat_{source.format}_source"
+        self._connection.register(stage_name, table)
+        try:
+          stage_identifier = _quote_identifier(stage_name)
+          self._connection.execute(
+            f"create or replace temp table {NEXT_ACTIVE_TABLE} as select * from {stage_identifier}"
+          )
+        finally:
+          self._connection.unregister(stage_name)
+        self._drop_active_relation()
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
+        )
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+        self._lazy_engine = None
+        self._active_storage = "table"
+        self._polars_lazy_frame = None
+        return self.active_dataset_info(source.display_path)
+
+      elif source.format == "csv":
+        import os
+
+        if source.is_remote:
+          import urllib.request
+
+          try:
+            req = urllib.request.Request(source.read_path, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req) as response:
+              with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp_file:
+                tmp_file.write(response.read())
+                temp_path = tmp_file.name
+            csv_read_path = temp_path
+          except Exception as exc:
+            raise ExecutionError(f"use could not read CSV file: {source.read_path}") from exc
+        else:
+          csv_read_path = source.read_path
+
+        try:
+          options_sql = []
+          args: list[str | bool] = [csv_read_path]
+          if delimiter is not None:
+            options_sql.append("delim=?")
+            args.append(delimiter)
+          if has_header is not None:
+            options_sql.append("header=?")
+            args.append(has_header)
+
+          options_str = f", {', '.join(options_sql)}" if options_sql else ""
+          self._connection.execute(
+            f"create or replace temp table {NEXT_ACTIVE_TABLE} "
+            f"as select * from read_csv_auto(?{options_str})",
+            args,
+          )
+        finally:
+          if source.is_remote:
+            try:
+              os.unlink(csv_read_path)
+            except OSError:
+              pass
+
+        self._drop_active_relation()
+        self._connection.execute(
+          f"create or replace temp table {ACTIVE_TABLE} as select * from {NEXT_ACTIVE_TABLE}"
+        )
+        self._connection.execute(f"drop table {NEXT_ACTIVE_TABLE}")
+        self._lazy_engine = None
+        self._active_storage = "table"
+        self._polars_lazy_frame = None
+        return self.active_dataset_info(source.display_path)
+
       elif execution_mode == "lazy" and lazy_engine == "polars":
         if not lazy_engine_supported(source.format, "polars", is_remote=source.is_remote):
           raise ExecutionError("use lazy engine=polars only supports local Parquet paths")
@@ -744,6 +856,111 @@ class DuckDBBackend:
       for column in dataset.columns
     )
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "replace")
+    return self.active_dataset_info(dataset.path)
+
+  def recode_variables(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    rules: tuple[RecodeRule, ...],
+    generate_variables: tuple[str, ...] | None,
+    replace: bool,
+  ) -> DatasetInfo:
+    recode_map = {}
+    var_targets = list(generate_variables) if generate_variables is not None else list(variables)
+
+    for src_var, target_var in zip(variables, var_targets):
+      src_col_info = next(col for col in dataset.columns if col.name == src_var)
+      col_type = src_col_info.data_type
+      col_ident = _quote_identifier(src_var)
+
+      upper_col_type = col_type.upper()
+      is_src_num = any(upper_col_type.startswith(nt) for nt in NUMERIC_TYPES)
+      any_string_output = any(isinstance(rule.output, str) for rule in rules)
+      to_string_column = any_string_output or not is_src_num
+
+      def format_literal(val):
+        if to_string_column:
+          return _quote_literal(str(val))
+        if isinstance(val, (int, float)):
+          return str(val)
+        elif isinstance(val, str):
+          return _quote_literal(val)
+        else:
+          return _quote_literal(str(val))
+
+      case_clauses = []
+      has_else = False
+      else_val = None
+
+      for rule in rules:
+        if "else" in rule.inputs:
+          has_else = True
+          else_val = format_literal(rule.output)
+          continue
+
+        conditions = []
+        for inp in rule.inputs:
+          if isinstance(inp, RecodeRange):
+            upper_col_type = col_type.upper()
+            is_num = any(upper_col_type.startswith(nt) for nt in NUMERIC_TYPES)
+            if not is_num:
+              raise ExecutionError(
+                f"range recode rule not allowed on non-numeric column: {src_var}"
+              )
+
+            if inp.start == "min" and inp.end == "max":
+              conditions.append(f"{col_ident} IS NOT NULL")
+            elif inp.start == "min":
+              conditions.append(f"{col_ident} <= {format_literal(inp.end)}")
+            elif inp.end == "max":
+              conditions.append(f"{col_ident} >= {format_literal(inp.start)}")
+            else:
+              conditions.append(
+                f"{col_ident} >= {format_literal(inp.start)} "
+                f"AND {col_ident} <= {format_literal(inp.end)}"
+              )
+          elif inp == "missing":
+            conditions.append(f"{col_ident} IS NULL")
+          elif inp == "nonmissing":
+            conditions.append(f"{col_ident} IS NOT NULL")
+          else:
+            conditions.append(f"{col_ident} = {format_literal(inp)}")
+
+        if conditions:
+          or_cond = f"({') OR ('.join(conditions)})" if len(conditions) > 1 else conditions[0]
+          case_clauses.append(f"WHEN {or_cond} THEN {format_literal(rule.output)}")
+
+      if to_string_column:
+        fallback_sql = f"CAST({col_ident} AS VARCHAR)"
+      else:
+        fallback_sql = col_ident
+
+      if has_else:
+        final_fallback = else_val
+      else:
+        final_fallback = fallback_sql
+
+      case_sql = f"CASE {' '.join(case_clauses)} ELSE {final_fallback} END"
+      recode_map[target_var] = case_sql
+
+    select_items = []
+    existing_cols = [col.name for col in dataset.columns]
+
+    if replace:
+      for col in existing_cols:
+        if col in recode_map:
+          select_items.append(f"{recode_map[col]} as {_quote_identifier(col)}")
+        else:
+          select_items.append(_quote_identifier(col))
+    else:
+      for col in existing_cols:
+        select_items.append(_quote_identifier(col))
+      for gen_var in var_targets:
+        select_items.append(f"{recode_map[gen_var]} as {_quote_identifier(gen_var)}")
+
+    select_sql = ", ".join(select_items)
+    self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "recode")
     return self.active_dataset_info(dataset.path)
 
   def replace_column_with_panel_validation(
@@ -1943,33 +2160,49 @@ def resolve_load_source(path: Path | str) -> LoadSource:
   if isinstance(path, str) and "://" in path:
     parsed = urlparse(path)
     suffix = parsed.path.lower()
-    if suffix.endswith(".parquet"):
-      if not remote_scheme_supported("parquet", parsed.scheme):
-        raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
-      return LoadSource(format="parquet", read_path=path, display_path=path, is_remote=True)
-    if suffix.endswith(".dta"):
-      if not remote_scheme_supported("stata", parsed.scheme):
-        raise ExecutionError("use remote Stata files support http and https URLs")
-      return LoadSource(format="stata", read_path=path, display_path=path, is_remote=True)
-    raise ExecutionError("use only supports .parquet and .dta files")
+    fmt_items: list[tuple[str, DataFormat]] = [
+      (".parquet", "parquet"),
+      (".dta", "stata"),
+      (".csv", "csv"),
+      (".feather", "feather"),
+      (".arrow", "arrow"),
+    ]
+    for ext, fmt in fmt_items:
+      if suffix.endswith(ext):
+        if not remote_scheme_supported(fmt, parsed.scheme):
+          if fmt == "parquet":
+            raise ExecutionError("use remote Parquet supports http, https, and s3 URLs")
+          elif fmt == "stata":
+            raise ExecutionError("use remote Stata files support http and https URLs")
+          else:
+            schemes = list(ingestion_adapter_for(fmt).supported_remote_schemes)
+            if len(schemes) > 1:
+              schemes_str = ", ".join(schemes[:-1]) + ", and " + schemes[-1]
+            else:
+              schemes_str = schemes[0]
+            fmt_cap = fmt.capitalize()
+            raise ExecutionError(f"use remote {fmt_cap} files support {schemes_str} URLs")
+        return LoadSource(format=fmt, read_path=path, display_path=path, is_remote=True)
+    raise ExecutionError("use only supports .parquet, .dta, .csv, .feather, and .arrow files")
 
   normalized = Path(path).expanduser()
   suffix = normalized.suffix.lower()
-  if suffix not in {".parquet", ".dta"}:
-    raise ExecutionError("use only supports .parquet and .dta files")
+  format_map: dict[str, DataFormat] = {
+    ".parquet": "parquet",
+    ".dta": "stata",
+    ".csv": "csv",
+    ".feather": "feather",
+    ".arrow": "arrow",
+  }
+  if suffix not in format_map:
+    raise ExecutionError("use only supports .parquet, .dta, .csv, .feather, and .arrow files")
   if not normalized.exists():
     raise ExecutionError(f"use could not find file: {path}")
   if not normalized.is_file():
     raise ExecutionError(f"use expected a file path: {path}")
-  if suffix == ".parquet":
-    return LoadSource(
-      format="parquet",
-      read_path=str(normalized),
-      display_path=normalized,
-      is_remote=False,
-    )
+  fmt = format_map[suffix]
   return LoadSource(
-    format="stata",
+    format=fmt,
     read_path=str(normalized),
     display_path=normalized,
     is_remote=False,

@@ -9,7 +9,7 @@ from pydantic.dataclasses import dataclass
 
 _MODEL_CONFIG = ConfigDict(strict=True, frozen=True)
 
-DataFormat = Literal["parquet", "stata"]
+DataFormat = Literal["parquet", "stata", "csv", "feather", "arrow"]
 EstimatorCommand = Literal[
   "xtabond",
   "tobit",
@@ -55,6 +55,24 @@ _INGESTION_SPECS: tuple[IngestionAdapterSpec, ...] = (
   ),
   IngestionAdapterSpec(
     data_format="stata",
+    adapter_backend="pandas",
+    supports_lazy=False,
+    supported_remote_schemes=("http", "https"),
+  ),
+  IngestionAdapterSpec(
+    data_format="csv",
+    adapter_backend="duckdb",
+    supports_lazy=False,
+    supported_remote_schemes=("http", "https"),
+  ),
+  IngestionAdapterSpec(
+    data_format="feather",
+    adapter_backend="pandas",
+    supports_lazy=False,
+    supported_remote_schemes=("http", "https"),
+  ),
+  IngestionAdapterSpec(
+    data_format="arrow",
     adapter_backend="pandas",
     supports_lazy=False,
     supported_remote_schemes=("http", "https"),

@@ -57,6 +57,9 @@ from tabdat.models import (
   PredictCommand,
   ProbitCommand,
   QregCommand,
+  RecodeCommand,
+  RecodeRange,
+  RecodeRule,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -90,6 +93,7 @@ from tabdat.monads import Err, Ok, Result, result, result_either
 
 _EXECUTABLE_COMMANDS = {
   "use",
+  "recode",
   "describe",
   "summarize",
   "codebook",
@@ -209,6 +213,8 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_help_result(stripped[4:].strip())
   if command_name == "use":
     return _parse_use_result(stripped)
+  if command_name == "recode":
+    return _parse_recode_result(stripped)
   if command_name == "by":
     return _parse_by_result(stripped)
   if command_name == "test":
@@ -292,6 +298,13 @@ def _parse_use_result(text: str) -> Result[Command, str]:
 def _parse_test_result(text: str) -> Result[Command, str]:
   try:
     return Ok[Command, str](_parse_test(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_recode_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_recode(text))
   except ParseError as exc:
     return Err(str(exc))
 
@@ -673,18 +686,49 @@ def _parse_use(text: str) -> UseCommand:
   if not separator:
     return UseCommand(path=_parse_use_path(path_parts[0]))
 
-  options = _parse_use_options(option_text)
-  is_lazy = "lazy" in options
-  engine = options.get("engine")
+  opt_tokens = _tokenize(option_text)
+  options = _parse_options(opt_tokens)
+
+  opt_names = [opt.name for opt in options]
+  if len(opt_names) != len(set(opt_names)):
+    raise ParseError("use option specified more than once")
+
+  is_lazy = "lazy" in {opt.name for opt in options}
+  engine = None
+  delimiter = None
+  has_header = None
+
+  for opt in options:
+    if opt.name == "engine":
+      if not isinstance(opt.value, str):
+        raise ParseError("use engine option expects a string value")
+      engine = opt.value.lower()
+    elif opt.name == "delimiter":
+      if not isinstance(opt.value, str):
+        raise ParseError("use delimiter option expects a string value")
+      delimiter = opt.value
+    elif opt.name == "has_header":
+      if not isinstance(opt.value, bool):
+        raise ParseError("use has_header option expects a boolean value")
+      has_header = opt.value
+    elif opt.name == "lazy":
+      if opt.value is not True:
+        raise ParseError("use lazy option does not accept a value")
+    else:
+      raise ParseError(f"unknown use option: {opt.name}")
+
   if engine is not None and engine not in {"duckdb", "polars"}:
     raise ParseError("use engine must be duckdb or polars")
   if engine is not None and not is_lazy:
     raise ParseError("use engine option requires lazy mode")
   lazy_engine = cast(Literal["duckdb", "polars"] | None, engine)
+
   return UseCommand(
     path=_parse_use_path(path_parts[0]),
     execution_mode="lazy" if is_lazy else "eager",
     lazy_engine=lazy_engine or ("duckdb" if is_lazy else None),
+    delimiter=delimiter,
+    has_header=has_header,
   )
 
 
@@ -696,32 +740,6 @@ def _parse_use_path(path_text: str) -> Path | str:
 
 def _is_remote_uri(path_text: str) -> bool:
   return "://" in path_text
-
-
-def _parse_use_options(option_text: str) -> dict[str, str | bool]:
-  if not option_text.strip():
-    raise ParseError("use options cannot be empty")
-
-  parsed: dict[str, str | bool] = {}
-  for raw_option in option_text.split():
-    name, separator, value = raw_option.partition("=")
-    normalized = name.lower()
-    if not normalized:
-      raise ParseError("use options cannot be empty")
-    if normalized in parsed:
-      raise ParseError(f"use option specified more than once: {normalized}")
-    if normalized == "lazy":
-      if separator:
-        raise ParseError("use lazy option does not accept a value")
-      parsed[normalized] = True
-      continue
-    if normalized == "engine":
-      if not separator or not value:
-        raise ParseError("use engine option expects a value")
-      parsed[normalized] = value.lower()
-      continue
-    raise ParseError(f"unknown use option: {normalized}")
-  return parsed
 
 
 def _parse_sql(text: str) -> SqlCommand:
@@ -2681,9 +2699,24 @@ def _option_value(token: _Token) -> str | int | float:
 def _parenthesized_option_value(
   option_name: str,
   tokens: tuple[_Token, ...],
-) -> str | float | tuple[str, ...]:
+) -> str | float | bool | tuple[str, ...]:
   if option_name in {"saving", "weights"}:
     return "".join(token.text for token in tokens)
+
+  if option_name == "delimiter":
+    if len(tokens) != 1 or tokens[0].kind not in {"string", "identifier"}:
+      raise ParseError("option delimiter expects a single string or identifier value")
+    return tokens[0].text
+
+  if option_name == "has_header":
+    if (
+      len(tokens) != 1
+      or tokens[0].kind != "identifier"
+      or tokens[0].text.lower() not in {"true", "false"}
+    ):
+      raise ParseError("option has_header expects true or false")
+    # Return bool value directly since _parenthesized_option_value return type supports bool.
+    return tokens[0].text.lower() == "true"
   if option_name in {
     "alpha",
     "ll",
@@ -3108,3 +3141,219 @@ def _parse_ttest(text: str) -> TtestCommand:
       return TtestCommand(varname1=varname1, value=val)
     else:
       raise ParseError("ttest command: RHS must be a single variable name or a numeric value")
+
+
+def _parse_recode(text: str) -> RecodeCommand:
+  stripped = text.strip()
+  if not stripped.startswith("recode"):
+    raise ParseError("recode command must start with recode")
+
+  body = stripped[6:].strip()
+  if not body:
+    raise ParseError("recode command: missing variable list and rules")
+
+  tokens = _tokenize(body)
+
+  # Find options by scanning for a top-level comma
+  depth = 0
+  comma_idx = -1
+  for idx, token in enumerate(tokens):
+    if token.text == "(":
+      depth += 1
+    elif token.text == ")":
+      depth -= 1
+    elif token.text == "," and depth == 0:
+      comma_idx = idx
+      break
+
+  if comma_idx != -1:
+    body_tokens = tokens[:comma_idx]
+    opt_tokens = tokens[comma_idx + 1 :]
+  else:
+    body_tokens = tokens
+    opt_tokens = ()
+
+  # Parse options
+  generate_variables: tuple[str, ...] | None = None
+  replace = False
+  if opt_tokens:
+    options = _parse_options(opt_tokens)
+    generate_vals = _single_tuple_option(options, "generate", "recode")
+    replace_flag = "replace" in {opt.name for opt in options}
+    _require_flag_options(options, "recode", {"replace"})
+
+    unsupported = {opt.name for opt in options} - {"generate", "replace"}
+    if unsupported:
+      raise ParseError(f"recode unsupported option: {', '.join(sorted(unsupported))}")
+
+    if generate_vals is not None and replace_flag:
+      raise ParseError("recode command: cannot specify both generate() and replace")
+    if generate_vals is None and not replace_flag:
+      raise ParseError("recode command requires either generate() or replace option")
+
+    if generate_vals is not None:
+      generate_variables = generate_vals
+    replace = replace_flag
+  else:
+    raise ParseError("recode command requires either generate() or replace option")
+
+  # Find variables and rules
+  first_paren_idx = -1
+  for idx, token in enumerate(body_tokens):
+    if token.text == "(":
+      first_paren_idx = idx
+      break
+
+  if first_paren_idx == -1:
+    raise ParseError("recode command: no rules specified")
+  if first_paren_idx == 0:
+    raise ParseError("recode command: no variables specified")
+
+  var_tokens = body_tokens[:first_paren_idx]
+  rule_tokens = body_tokens[first_paren_idx:]
+
+  variables = []
+  for tok in var_tokens:
+    if tok.kind != "identifier":
+      raise ParseError(f"invalid variable name in recode list: {tok.text}")
+    variables.append(tok.text)
+  variables = tuple(variables)
+
+  # Parse rules
+  rules = []
+  i = 0
+  while i < len(rule_tokens):
+    if rule_tokens[i].text != "(":
+      raise ParseError(f"expected '(' at start of rule, got: {rule_tokens[i].text}")
+
+    # Matching parenthesis
+    paren_depth = 1
+    j = i + 1
+    while j < len(rule_tokens) and paren_depth > 0:
+      if rule_tokens[j].text == "(":
+        paren_depth += 1
+      elif rule_tokens[j].text == ")":
+        paren_depth -= 1
+      if paren_depth == 0:
+        break
+      j += 1
+
+    if paren_depth > 0:
+      raise ParseError("unterminated rule parenthesis")
+
+    block_tokens = rule_tokens[i + 1 : j]
+
+    eq_indices = [idx for idx, t in enumerate(block_tokens) if t.text == "="]
+    if not eq_indices:
+      raise ParseError("recode rule expects '=' between inputs and output")
+    if len(eq_indices) > 1:
+      raise ParseError("recode rule contains multiple '=' symbols")
+
+    eq_idx = eq_indices[0]
+    lhs_toks = block_tokens[:eq_idx]
+    rhs_toks = block_tokens[eq_idx + 1 :]
+
+    if not lhs_toks:
+      raise ParseError("recode rule: missing inputs before '='")
+    if not rhs_toks:
+      raise ParseError("recode rule: missing output after '='")
+
+    # LHS Pass 1: parsed primitives and slashes
+    class _Slash:
+      pass
+
+    lhs_primitives = []
+    k = 0
+    while k < len(lhs_toks):
+      tok = lhs_toks[k]
+      if tok.text in {"-", "+"} and k + 1 < len(lhs_toks) and lhs_toks[k + 1].kind == "number":
+        val = (
+          float(lhs_toks[k + 1].text) if "." in lhs_toks[k + 1].text else int(lhs_toks[k + 1].text)
+        )
+        if tok.text == "-":
+          val = -val
+        lhs_primitives.append(val)
+        k += 2
+      elif tok.kind == "number":
+        val = float(tok.text) if "." in tok.text else int(tok.text)
+        lhs_primitives.append(val)
+        k += 1
+      elif tok.kind == "string":
+        lhs_primitives.append(tok.text)
+        k += 1
+      elif tok.kind == "identifier":
+        lhs_primitives.append(tok.text.lower())
+        k += 1
+      elif tok.text == "/":
+        lhs_primitives.append(_Slash)
+        k += 1
+      else:
+        raise ParseError(f"unexpected token in recode rule input: {tok.text}")
+
+    # LHS Pass 2: parse RecodeRange and primitives
+    inputs = []
+    k = 0
+    while k < len(lhs_primitives):
+      if k + 1 < len(lhs_primitives) and lhs_primitives[k + 1] is _Slash:
+        if k + 2 >= len(lhs_primitives):
+          raise ParseError("unterminated range in recode rule")
+        start = lhs_primitives[k]
+        end = lhs_primitives[k + 2]
+        if not (isinstance(start, (int, float)) or start == "min"):
+          raise ParseError(f"invalid range start in recode rule: {start}")
+        if not (isinstance(end, (int, float)) or end == "max"):
+          raise ParseError(f"invalid range end in recode rule: {end}")
+        inputs.append(RecodeRange(start=start, end=end))
+        k += 3
+      elif lhs_primitives[k] is _Slash:
+        raise ParseError("invalid slash positioning in recode rule")
+      else:
+        val = lhs_primitives[k]
+        if val in {"missing", "nonmissing", "else"}:
+          inputs.append(val)
+        else:
+          inputs.append(val)
+        k += 1
+
+    if "else" in inputs and len(inputs) > 1:
+      raise ParseError("else rule must not be combined with other inputs")
+
+    # RHS: Parse output value
+    rhs_primitives = []
+    k = 0
+    while k < len(rhs_toks):
+      tok = rhs_toks[k]
+      if tok.text in {"-", "+"} and k + 1 < len(rhs_toks) and rhs_toks[k + 1].kind == "number":
+        val = (
+          float(rhs_toks[k + 1].text) if "." in rhs_toks[k + 1].text else int(rhs_toks[k + 1].text)
+        )
+        if tok.text == "-":
+          val = -val
+        rhs_primitives.append(val)
+        k += 2
+      elif tok.kind == "number":
+        val = float(tok.text) if "." in tok.text else int(tok.text)
+        rhs_primitives.append(val)
+        k += 1
+      elif tok.kind == "string":
+        rhs_primitives.append(tok.text)
+        k += 1
+      elif tok.kind == "identifier":
+        rhs_primitives.append(tok.text.lower())
+        k += 1
+      else:
+        raise ParseError(f"unexpected token in recode rule output: {tok.text}")
+
+    if len(rhs_primitives) != 1:
+      raise ParseError("recode rule output must be a single value")
+    output_val = rhs_primitives[0]
+
+    rules.append(RecodeRule(inputs=tuple(inputs), output=output_val))
+    i = j + 1
+
+  return RecodeCommand(
+    variables=variables,
+    rules=tuple(rules),
+    generate_variables=generate_variables,
+    replace=replace,
+  )
