@@ -20,6 +20,7 @@ dependencies = [
     "spreg>=1.4.0",
     "bambi>=0.18.0",
     "matplotlib>=3.10.9",
+    "pyarrow>=24.0.0",
 ]
 
 [project.scripts]

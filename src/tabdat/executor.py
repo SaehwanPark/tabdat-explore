@@ -135,6 +135,7 @@ from tabdat.models import (
   ProbitRegressionResult,
   QregCommand,
   QregRegressionResult,
+  RecodeCommand,
   RegressCommand,
   RegressionResult,
   RenameCommand,
@@ -633,6 +634,9 @@ class Executor:
     if isinstance(command, UseCommand):
       return self._execute_use(command)
 
+    if isinstance(command, RecodeCommand):
+      return self._execute_recode(command)
+
     self._materialize_polars_lazy_if_needed(command)
 
     if isinstance(command, DescribeCommand):
@@ -935,10 +939,12 @@ class Executor:
       self._set_active_dataset(activated, active_table_name=table_name)
       return ActivateResult(table_name=table_name, dataset=activated)
 
-    dataset = self.backend.inspect_parquet(
+    dataset = self.backend.inspect_and_load_source(
       command.path,
       execution_mode=command.execution_mode,
       lazy_engine=command.lazy_engine,
+      delimiter=command.delimiter,
+      has_header=command.has_header,
     )
     self.state.active_table_name = None
     self._set_active_dataset(dataset, active_table_name=None)
@@ -975,6 +981,45 @@ class Executor:
     next_dataset = self.backend.rename_column(dataset, command.old_name, command.new_name)
     next_dataset = _rename_panel_metadata(dataset, next_dataset, command.old_name, command.new_name)
     return self._record_transform(f"Renamed {command.old_name} to {command.new_name}", next_dataset)
+
+  def _execute_recode(self, command: RecodeCommand) -> TransformResult:
+    dataset = self._require_active_dataset("recode")
+
+    col_names = {col.name for col in dataset.columns}
+    for var in command.variables:
+      if var not in col_names:
+        raise UnknownVariableError(f"variable not found: {var}")
+
+    if command.generate_variables is not None:
+      if len(command.generate_variables) != len(command.variables):
+        raise ExecutionError(
+          "number of generate variables must match number of variables to recode"
+        )
+      for gen_var in command.generate_variables:
+        if gen_var in col_names:
+          raise ExecutionError(f"generate variable already exists: {gen_var}")
+
+    next_dataset = self.backend.recode_variables(
+      dataset,
+      variables=command.variables,
+      rules=command.rules,
+      generate_variables=command.generate_variables,
+      replace=command.replace,
+    )
+
+    metadata = dataset.panel_metadata
+    if command.replace and metadata is not None:
+      touched = False
+      for var in command.variables:
+        if _touches_panel_metadata(metadata, var):
+          touched = True
+          break
+      if touched:
+        self.backend.validate_panel_metadata(next_dataset, metadata)
+
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    msg = f"Recoded variables: {', '.join(command.variables)}"
+    return self._record_transform(msg, next_dataset)
 
   def _execute_generate(self, command: GenerateCommand) -> TransformResult:
     dataset = self._require_active_dataset("generate")

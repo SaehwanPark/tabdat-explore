@@ -52,6 +52,9 @@ from tabdat.models import (
   PredictCommand,
   ProbitCommand,
   QregCommand,
+  RecodeCommand,
+  RecodeRange,
+  RecodeRule,
   RegressCommand,
   RenameCommand,
   ReplaceCommand,
@@ -1721,3 +1724,45 @@ def test_parse_statistical_testing_commands() -> None:
   assert parse_command("ttest x, by(g) unequal") == TtestCommand(
     varname1="x", by_variable="g", welch=True
   )
+
+
+def test_parse_recode_command() -> None:
+  # Check basic single values
+  assert parse_command("recode age (1 = 0), replace") == RecodeCommand(
+    variables=("age",),
+    rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+    replace=True,
+  )
+
+  # Check range, list and keywords
+  cmd_str = "recode age (min/17 = 0) (18 19 20 = 1) (else = -1), generate(adult)"
+  assert parse_command(cmd_str) == RecodeCommand(
+    variables=("age",),
+    rules=(
+      RecodeRule(inputs=(RecodeRange(start="min", end=17.0),), output=0.0),
+      RecodeRule(inputs=(18.0, 19.0, 20.0), output=1.0),
+      RecodeRule(inputs=("else",), output=-1.0),
+    ),
+    generate_variables=("adult",),
+  )
+
+  # Check parsing options on use command
+  assert parse_command('use survey.csv, delimiter(",") has_header(true)') == UseCommand(
+    path=Path("survey.csv"),
+    execution_mode="eager",
+    delimiter=",",
+    has_header=True,
+  )
+
+  # Check syntax error cases
+  with pytest.raises(ParseError):
+    parse_command("recode age (min/17 = 0)")  # missing generate/replace
+
+  with pytest.raises(ParseError):
+    parse_command("recode age (min/17 = 0), generate(adult) replace")  # both specified
+
+  with pytest.raises(ParseError):
+    parse_command("recode (1 = 0), replace")  # missing variable list
+
+  with pytest.raises(ParseError):
+    parse_command("recode age, replace")  # missing rules
