@@ -369,7 +369,7 @@ def test_execute_spregress_error_rejects_spatial_lag_predict(tmp_path: Path) -> 
     executor.close()
 
 
-def test_execute_spregress_predict_rejects_mismatched_sample(tmp_path: Path) -> None:
+def test_execute_spregress_predict_supports_mismatched_sample(tmp_path: Path) -> None:
   path = tmp_path / "spatial_mismatch.parquet"
   _write_spatial_parquet(path)
   executor = Executor()
@@ -398,11 +398,9 @@ def test_execute_spregress_predict_rejects_mismatched_sample(tmp_path: Path) -> 
       keep=True,
     )
     executor.state.active_dataset = next_dataset
-    with pytest.raises(
-      ExecutionError,
-      match="predict requires the same active dataset sample as the prior spregress model",
-    ):
-      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+    predict_res = executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+    assert predict_res is not None
+    assert "y_full" in [col.name for col in executor.state.active_dataset.columns]
   finally:
     executor.close()
 
@@ -1012,3 +1010,76 @@ def test_estat_spatial_shell_autocomplete() -> None:
   assert "weights(" in _ESTAT_SPATIAL_OPTIONS
   assert "id(" in _ESTAT_SPATIAL_OPTIONS
   assert "contiguity(" in _ESTAT_SPATIAL_OPTIONS
+
+
+def test_execute_spregress_predict_mismatched_variables(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_mismatched_vars.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="lag",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=False,
+      )
+    )
+    mismatched_path = tmp_path / "mismatched.parquet"
+    _write_sql_parquet(
+      mismatched_path,
+      """
+      select * from (
+        values
+          (10.0, 1.0),
+          (12.0, 2.0)
+      ) as d(y, x)
+      """,
+    )
+    executor.execute(UseCommand(mismatched_path))
+    with pytest.raises(
+      ExecutionError,
+      match="predict requires a prior spregress model with matching variables",
+    ):
+      executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+  finally:
+    executor.close()
+
+
+def test_execute_spregress_predict_sarar_out_of_sample(tmp_path: Path) -> None:
+  path = tmp_path / "spatial_sarar_oos.parquet"
+  _write_spatial_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SpregressCommand(
+        outcome="y",
+        predictors=("x",),
+        model_type="sarar",
+        coord_variables=("lat", "lon"),
+        knn=3,
+        robust=True,
+      )
+    )
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    next_dataset = executor.backend.filter_rows(
+      dataset,
+      BinaryExpression(
+        left=IdentifierExpression("x"),
+        operator="<=",
+        right=NumberExpression(6.0),
+      ),
+      keep=True,
+    )
+    executor.state.active_dataset = next_dataset
+    predict_res = executor.execute(PredictCommand(target_variable="y_full", kind="spatial_lag"))
+    assert predict_res is not None
+    active_ds = executor.state.active_dataset
+    assert "y_full" in [col.name for col in active_ds.columns]
+  finally:
+    executor.close()

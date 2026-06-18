@@ -3658,31 +3658,257 @@ class Executor:
     spatial_regression = self.state.spatial_regression
     if spatial_regression is not None:
       if command.kind == "spatial_lag":
-        if spatial_regression.model_type != "lag":
-          raise ExecutionError("predict spatial_lag is only available after spregress model(lag)")
+        if spatial_regression.model_type not in ("lag", "sarar"):
+          raise ExecutionError(
+            "predict spatial_lag is only available after spregress model(lag) or model(sarar)"
+          )
         if spatial_regression.coord_variables is not None:
           extra_vars = spatial_regression.coord_variables
         else:
           extra_vars = (
             (spatial_regression.id_variable,) if spatial_regression.id_variable is not None else ()
           )
+
+        available_columns = {column.name for column in dataset.columns}
+        is_same_sample = False
+        if spatial_regression.outcome_variable in available_columns:
+          same_sample_cols = (
+            spatial_regression.outcome_variable,
+            *spatial_regression.predictor_names,
+            *extra_vars,
+          )
+          try:
+            same_sample_rows = self.backend.regression_rows(dataset, same_sample_cols)
+            if _spatial_sample_fingerprint(rows=same_sample_rows) == spatial_regression.sample_fingerprint:
+              is_same_sample = True
+          except Exception:
+            pass
+
+        if is_same_sample:
+          next_dataset = self.backend.add_numeric_column_from_values(
+            dataset,
+            target_variable=command.target_variable,
+            values=spatial_regression.full_predictions,
+            command_name="predict",
+          )
+          return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+
+        # Out-of-sample prediction: build weights matrix for the target dataset
         required_columns = (
-          spatial_regression.outcome_variable,
           *spatial_regression.predictor_names,
           *extra_vars,
         )
-        available_columns = {column.name for column in dataset.columns}
         if any(name not in available_columns for name in required_columns):
           raise ExecutionError("predict requires a prior spregress model with matching variables")
+
         rows = self.backend.regression_rows(dataset, required_columns)
-        if _spatial_sample_fingerprint(rows=rows) != spatial_regression.sample_fingerprint:
-          raise ExecutionError(
-            "predict requires the same active dataset sample as the prior spregress model"
+        complete_row_indices: list[int] = []
+        predictors_list: list[tuple[float, ...]] = []
+        coords_list: list[tuple[float, float]] = []
+        ids_list: list[Any] = []
+
+        for index, row in enumerate(rows):
+          if len(row) != len(required_columns):
+            raise ExecutionError("predict spatial_lag failed")
+          raw_predictors = row[0 : len(spatial_regression.predictor_names)]
+          raw_extra = row[len(spatial_regression.predictor_names):]
+
+          if any(val is None for val in raw_predictors) or any(val is None for val in raw_extra):
+            continue
+
+          coerced_predictors = [_coerce_float(val) for val in raw_predictors]
+          if any(val is None for val in coerced_predictors):
+            continue
+          predictor_vals = tuple(float(val) for val in coerced_predictors if val is not None)
+
+          predictors_list.append(predictor_vals)
+          complete_row_indices.append(index)
+
+          if spatial_regression.coord_variables is not None:
+            lat_val = _coerce_float(raw_extra[0])
+            lon_val = _coerce_float(raw_extra[1])
+            if lat_val is None or lon_val is None:
+              predictors_list.pop()
+              complete_row_indices.pop()
+              continue
+            coords_list.append((lat_val, lon_val))
+          else:
+            ids_list.append(raw_extra[0])
+
+        if not complete_row_indices:
+          values: list[float | None] = [None] * len(rows)
+          next_dataset = self.backend.add_numeric_column_from_values(
+            dataset,
+            target_variable=command.target_variable,
+            values=tuple(values),
+            command_name="predict",
           )
+          return self._record_transform(f"Predicted {command.target_variable}", next_dataset)
+
+        if spatial_regression.coord_variables is not None:
+          knn = spatial_regression.knn
+          if knn is None:
+            raise ExecutionError("predict spatial_lag requires a valid knn value")
+          if len(complete_row_indices) <= knn:
+            raise ExecutionError(
+              "predict requires more complete observations than the number of "
+              f"neighbors (knn={knn})"
+            )
+          coords_arr = np.array(coords_list, dtype=float)
+          try:
+            w = KNN.from_array(coords_arr, k=knn)
+            w.transform = "r"
+          except Exception as exc:
+            raise ExecutionError("spregress weight matrix construction failed") from exc
+        else:
+          from pathlib import Path
+          import libpysal
+          from libpysal.weights import Queen, Rook, w_subset
+
+          weights_file = spatial_regression.weights_file
+          if weights_file is None:
+            raise ExecutionError("weights file not found")
+          weights_path = Path(weights_file)
+          if not weights_path.exists():
+            raise ExecutionError("weights file not found")
+
+          ext = weights_path.suffix.lower()
+          if ext not in (".gal", ".gwt", ".shp"):
+            raise ExecutionError(f"unsupported weights file format: {ext}")
+
+          w_original: Any = None
+          try:
+            if ext == ".shp":
+              id_var = spatial_regression.id_variable
+              if id_var is None:
+                raise ExecutionError("id variable is required")
+              resolved_id_var = id_var
+              shp_path_lower = weights_path.with_suffix(".shp")
+              symlinked_shp = False
+              if not shp_path_lower.exists():
+                shp_path_upper = weights_path.with_suffix(".SHP")
+                if shp_path_upper.exists():
+                  import os
+                  try:
+                    os.symlink(shp_path_upper.name, shp_path_lower)
+                    symlinked_shp = True
+                  except Exception:
+                    pass
+
+              db_path = weights_path.with_suffix(".dbf")
+              symlinked_dbf = False
+              if not db_path.exists():
+                db_path_upper = weights_path.with_suffix(".DBF")
+                if db_path_upper.exists():
+                  import os
+                  try:
+                    os.symlink(db_path_upper.name, db_path)
+                    symlinked_dbf = True
+                  except Exception:
+                    pass
+
+              shx_path = weights_path.with_suffix(".shx")
+              symlinked_shx = False
+              if not shx_path.exists():
+                shx_path_upper = weights_path.with_suffix(".SHX")
+                if shx_path_upper.exists():
+                  import os
+                  try:
+                    os.symlink(shx_path_upper.name, shx_path)
+                    symlinked_shx = True
+                  except Exception:
+                    pass
+
+              actual_db_path = db_path if db_path.exists() else weights_path.with_suffix(".DBF")
+              if actual_db_path.exists():
+                try:
+                  db: Any = libpysal.io.open(str(actual_db_path))
+                  for col in db.header:
+                    if col.lower() == id_var.lower():
+                      resolved_id_var = col
+                      break
+                  db.close()
+                except Exception:
+                  pass
+
+              try:
+                if spatial_regression.contiguity == "rook":
+                  w_original = Rook.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+                else:
+                  w_original = Queen.from_shapefile(str(shp_path_lower), idVariable=resolved_id_var)
+              finally:
+                if symlinked_shp and shp_path_lower.is_symlink():
+                  try:
+                    shp_path_lower.unlink()
+                  except Exception:
+                    pass
+                if symlinked_dbf and db_path.is_symlink():
+                  try:
+                    db_path.unlink()
+                  except Exception:
+                    pass
+                if symlinked_shx and shx_path.is_symlink():
+                  try:
+                    shx_path.unlink()
+                  except Exception:
+                    pass
+            else:
+              w_original = libpysal.io.open(str(weights_path)).read()
+          except Exception as exc:
+            raise ExecutionError(f"failed to load spatial weights file: {exc}") from exc
+
+          if ids_list and hasattr(w_original, "neighbors") and w_original.neighbors:
+            sample_key = next(iter(w_original.neighbors.keys()))
+            if isinstance(sample_key, str) and not isinstance(ids_list[0], str):
+              ids_list = [
+                str(int(x)) if isinstance(x, float) and x.is_integer() else str(x) for x in ids_list
+              ]
+            elif isinstance(sample_key, int) and not isinstance(ids_list[0], int):
+              try:
+                ids_list = [int(float(x)) if isinstance(x, str) else int(x) for x in ids_list]
+              except ValueError:
+                pass
+
+          w_keys = set(w_original.neighbors.keys())
+          missing_ids = [str(r_id) for r_id in ids_list if r_id not in w_keys]
+          if missing_ids:
+            raise ExecutionError(
+              "some predict sample IDs are missing from the spatial weights matrix: "
+              f"{', '.join(missing_ids[:5])}"
+            )
+
+          try:
+            w = w_subset(w_original, ids_list)
+            w.id_order = ids_list
+            w.transform = "r"
+          except Exception as exc:
+            raise ExecutionError("spregress weight matrix construction failed") from exc
+
+        design = np.array(predictors_list, dtype=float)
+        if spatial_regression.intercept is not None:
+          design = np.hstack([np.ones((len(design), 1)), design])
+          betas = np.array([spatial_regression.intercept, *spatial_regression.predictor_coefficients], dtype=float)
+        else:
+          betas = np.array(spatial_regression.predictor_coefficients, dtype=float)
+
+        xb = design @ betas
+        rho = spatial_regression.spatial_coefficient
+
+        try:
+          W_dense = w.full()[0]
+          A = np.eye(len(design)) - rho * W_dense
+          predy_e = np.linalg.solve(A, xb)
+        except Exception as exc:
+          raise ExecutionError("predict spatial_lag calculation failed") from exc
+
+        values = [None] * len(rows)
+        for idx, val in zip(complete_row_indices, predy_e, strict=True):
+          values[idx] = float(val)
+
         next_dataset = self.backend.add_numeric_column_from_values(
           dataset,
           target_variable=command.target_variable,
-          values=spatial_regression.full_predictions,
+          values=tuple(values),
           command_name="predict",
         )
         return self._record_transform(f"Predicted {command.target_variable}", next_dataset)

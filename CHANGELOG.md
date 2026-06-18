@@ -4,6 +4,10 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+- Added out-of-sample prediction support for `predict ..., spatial_lag` after spatial regressions (`spregress`):
+  - Dynamically builds a new $K$-Nearest Neighbors (KNN) weights matrix or subsets/aligns a pre-computed spatial weights file for the new active dataset sample.
+  - Computes spatial lag reduced-form predictions via matrix solvers: $\hat{y}_{\text{new}} = (I - \hat{\rho} W_{\text{new}})^{-1} X_{\text{new}} \hat{\beta}$.
+  - Gracefully handles missing values and preserves the existing same-sample prediction optimization.
 - Added Classical Hypothesis Testing commands (`test`, `lincom`, `ttest`):
   - `test` performs Wald/F tests of linear restrictions ($R \beta = r$) or joint significance tests over parameters after active regressions (`regress` or `ivregress`).
   - `lincom` computes standard errors, stats, p-values, and confidence intervals for linear combinations of coefficients.
