@@ -6943,6 +6943,24 @@ def test_execute_recode(sample_parquet: Path) -> None:
     costs = [r[3] for r in preview2.rows]
     assert costs == [100.0, 100.0, 999.0]
 
+    # Happy path 3: recode string column to numeric output
+    # (requires implicit VARCHAR cast to avoid binder error)
+    cmd3 = RecodeCommand(
+      variables=("sex",),
+      rules=(
+        RecodeRule(inputs=("F",), output=1.0),
+        RecodeRule(inputs=("M",), output=2.0),
+      ),
+      generate_variables=("sex_num",),
+    )
+    res3 = executor.execute(cmd3)
+    assert isinstance(res3, TransformResult)
+
+    preview3 = executor.execute(HeadCommand(3))
+    assert isinstance(preview3, PreviewResult)
+    sex_nums = [r[5] for r in preview3.rows]
+    assert sex_nums == ["1.0", "2.0", "1.0"]
+
   finally:
     executor.close()
 

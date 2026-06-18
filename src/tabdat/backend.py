@@ -866,14 +866,6 @@ class DuckDBBackend:
     generate_variables: tuple[str, ...] | None,
     replace: bool,
   ) -> DatasetInfo:
-    def format_literal(val):
-      if isinstance(val, (int, float)):
-        return str(val)
-      elif isinstance(val, str):
-        return _quote_literal(val)
-      else:
-        return _quote_literal(str(val))
-
     recode_map = {}
     var_targets = list(generate_variables) if generate_variables is not None else list(variables)
 
@@ -881,6 +873,21 @@ class DuckDBBackend:
       src_col_info = next(col for col in dataset.columns if col.name == src_var)
       col_type = src_col_info.data_type
       col_ident = _quote_identifier(src_var)
+
+      upper_col_type = col_type.upper()
+      is_src_num = any(upper_col_type.startswith(nt) for nt in NUMERIC_TYPES)
+      any_string_output = any(isinstance(rule.output, str) for rule in rules)
+      to_string_column = any_string_output or not is_src_num
+
+      def format_literal(val):
+        if to_string_column:
+          return _quote_literal(str(val))
+        if isinstance(val, (int, float)):
+          return str(val)
+        elif isinstance(val, str):
+          return _quote_literal(val)
+        else:
+          return _quote_literal(str(val))
 
       case_clauses = []
       has_else = False
@@ -924,8 +931,7 @@ class DuckDBBackend:
           or_cond = f"({') OR ('.join(conditions)})" if len(conditions) > 1 else conditions[0]
           case_clauses.append(f"WHEN {or_cond} THEN {format_literal(rule.output)}")
 
-      any_string_output = any(isinstance(rule.output, str) for rule in rules)
-      if any_string_output:
+      if to_string_column:
         fallback_sql = f"CAST({col_ident} AS VARCHAR)"
       else:
         fallback_sql = col_ident
