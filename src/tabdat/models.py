@@ -13,27 +13,60 @@ _MODEL_CONFIG = ConfigDict(strict=True)
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class IdentifierExpression:
+  """AST node representing a variable name or column identifier in an expression.
+
+  Attributes:
+    name: The name of the variable or column.
+  """
+
   name: str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class NumberExpression:
+  """AST node representing a literal numeric value.
+
+  Attributes:
+    value: The integer or float value of the numeric literal.
+  """
+
   value: int | float
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class StringExpression:
+  """AST node representing a literal string value.
+
+  Attributes:
+    value: The raw string literal value.
+  """
+
   value: str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class UnaryExpression:
+  """AST node representing a unary mathematical operation.
+
+  Attributes:
+    operator: The unary operator symbol (e.g., '-').
+    operand: The Expression to which the operator is applied.
+  """
+
   operator: Literal["-"]
   operand: "Expression"
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class BinaryExpression:
+  """AST node representing a binary mathematical or comparison operation.
+
+  Attributes:
+    left: The left operand expression.
+    operator: The binary operator symbol (e.g., '+', '==').
+    right: The right operand expression.
+  """
+
   left: "Expression"
   operator: Literal["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">="]
   right: "Expression"
@@ -41,6 +74,13 @@ class BinaryExpression:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class FunctionCallExpression:
+  """AST node representing a function call within an expression.
+
+  Attributes:
+    name: The name of the function to invoke (e.g., 'ln', 'sqrt').
+    arguments: A tuple of argument expressions passed to the function.
+  """
+
   name: str
   arguments: tuple["Expression", ...]
 
@@ -57,12 +97,29 @@ Expression = (
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class CommandOption:
+  """Represents a key-value parameter passed to a command (e.g., `, robust` or `, cv(5)`).
+
+  Attributes:
+    name: The name of the option key.
+    value: The option value, defaulting to True for flags.
+  """
+
   name: str
   value: str | int | float | bool | tuple[str, ...] = True
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class UseCommand:
+  """Command to load a tabular dataset into the TabDat session.
+
+  Attributes:
+    path: The local file path or remote URL of the dataset.
+    execution_mode: Mode of loading, either 'eager' (fully loaded) or 'lazy' (lazy evaluation).
+    lazy_engine: The engine to use for lazy execution ('duckdb' or 'polars').
+    delimiter: Custom CSV delimiter, if applicable.
+    has_header: Specify if the CSV file contains a header row.
+  """
+
   path: Path | str
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
@@ -72,31 +129,59 @@ class UseCommand:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class DescribeCommand:
+  """Command to inspect and display the schema and column types of the active dataset."""
+
   pass
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class SummarizeCommand:
+  """Command to display basic summary statistics (count, mean, std, min, max).
+
+  Attributes:
+    variables: A tuple of variable names to summarize. If empty, summarizes all numeric columns.
+  """
+
   variables: tuple[str, ...]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class CodebookCommand:
+  """Command to display structural details of columns (unique values, range, type).
+
+  Attributes:
+    variables: A tuple of variable names to inspect. If empty, inspects all variables.
+  """
+
   variables: tuple[str, ...]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class CountCommand:
+  """Command to display the total number of rows in the active dataset."""
+
   pass
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class HeadCommand:
+  """Command to preview the first few rows of the active dataset.
+
+  Attributes:
+    limit: The maximum number of rows to display.
+  """
+
   limit: int = 5
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class TailCommand:
+  """Command to preview the last few rows of the active dataset.
+
+  Attributes:
+    limit: The maximum number of rows to display.
+  """
+
   limit: int = 5
 
 
@@ -728,18 +813,42 @@ Command = (
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class ColumnInfo:
+  """Metadata representing a single column/variable in a dataset.
+
+  Attributes:
+    name: The name of the column.
+    data_type: The structural datatype string (e.g., 'DOUBLE', 'VARCHAR').
+  """
+
   name: str
   data_type: str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelMetadata:
+  """Metadata identifying the panel keys for long/panel format data.
+
+  Attributes:
+    id_variable: The variable identifying individual cross-sectional entities.
+    time_variable: The variable identifying the time dimension/ordering.
+  """
+
   id_variable: str
   time_variable: str
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelStructureSummary:
+  """Structural statistics of a panel dataset.
+
+  Attributes:
+    observation_count: Total number of observations in the panel.
+    entity_count: Total number of unique cross-sectional entities.
+    time_count: Total number of unique time periods.
+    min_observations_per_entity: Minimum number of time periods observed for any entity.
+    max_observations_per_entity: Maximum number of time periods observed for any entity.
+  """
+
   observation_count: int
   entity_count: int
   time_count: int
@@ -748,11 +857,23 @@ class PanelStructureSummary:
 
   @property
   def is_balanced(self) -> bool:
+    """Check if all entities have the same number of time observations."""
     return self.min_observations_per_entity == self.max_observations_per_entity
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasetInfo:
+  """Description of a loaded or registered dataset.
+
+  Attributes:
+    path: The file path or source URI from which the dataset was loaded.
+    row_count: Total rows in the dataset, or None if lazy loading holds an uncomputed size.
+    columns: Schema information listing ColumnInfo for all fields.
+    execution_mode: The execution engine mode, either 'eager' or 'lazy'.
+    lazy_engine: The backing engine used for lazy queries ('duckdb' or 'polars').
+    panel_metadata: Optional panel variable keys if panel characteristics are configured.
+  """
+
   path: Path | str
   row_count: int | None
   columns: tuple[ColumnInfo, ...]
@@ -762,6 +883,7 @@ class DatasetInfo:
 
   @property
   def column_count(self) -> int:
+    """Return the total number of columns in the schema."""
     return len(self.columns)
 
 

@@ -79,6 +79,17 @@ class ScriptError(TabDatError):
 
 
 def read_script(path: Path) -> tuple[ScriptCommand, ...]:
+  """Read a script file from disk and parse it into structured commands.
+
+  Args:
+    path: Path to the target script file.
+
+  Returns:
+    A tuple of parsed ScriptCommand instances.
+
+  Raises:
+    ScriptError: If the file is missing, unreadable, or not valid UTF-8.
+  """
   try:
     text = path.read_text(encoding="utf-8")
   except FileNotFoundError as exc:
@@ -93,6 +104,21 @@ def read_script(path: Path) -> tuple[ScriptCommand, ...]:
 
 
 def parse_script(text: str, *, path: Path = Path("<script>")) -> tuple[ScriptCommand, ...]:
+  """Decompose a script's raw text into discrete commands.
+
+  Ignores comments and blank lines. Properly groups multi-line SQL commands bounded
+  by triple-quotes (`\"\"\"`).
+
+  Args:
+    text: The raw content of the script.
+    path: The source file path (used for diagnostic error reporting).
+
+  Returns:
+    A tuple of ScriptCommand objects.
+
+  Raises:
+    ScriptError: If a multiline SQL query is left unclosed.
+  """
   commands: list[ScriptCommand] = []
   pending_sql: list[str] = []
   pending_start = 0
@@ -129,6 +155,21 @@ def parse_script(text: str, *, path: Path = Path("<script>")) -> tuple[ScriptCom
 
 
 def expand_script_macros(text: str, context: ScriptContext, *, path: Path, line: int) -> str:
+  """Replace macro references (prefixed with `$`) in a command text with their defined values.
+
+  Args:
+    text: The command text containing potential `$macro_name` strings.
+    context: The script evaluation context containing registered macro definitions.
+    path: The source file path (for error reporting).
+    line: The source line number (for error reporting).
+
+  Returns:
+    The text with all macro references substituted.
+
+  Raises:
+    ScriptError: If a macro is referenced but not defined in the context.
+  """
+
   def replacement(match: re.Match[str]) -> str:
     name = match.group(1)
     value = context.macros.get(name)
@@ -146,6 +187,20 @@ def parse_script_directive(
   path: Path,
   line: int,
 ) -> ScriptDirective | None:
+  """Parse a special script directive command (e.g., `let` or `seed`).
+
+  Args:
+    text: The expanded command line text.
+    context: The active script evaluation context.
+    path: The source file path.
+    line: The source line number.
+
+  Returns:
+    A SeedDirective, LetDirective, or None if the text is not a script directive.
+
+  Raises:
+    ScriptError: If the directive has invalid arguments or syntax.
+  """
   stripped = text.strip()
   command_name = stripped.split(maxsplit=1)[0].lower() if stripped else ""
   if command_name == "seed":
@@ -161,6 +216,19 @@ def parse_control_flow_directive(
   path: Path,
   line: int,
 ) -> ControlFlowDirective | None:
+  """Parse a conditional branching directive (e.g., `if`, `else`, `end`).
+
+  Args:
+    text: The expanded command line text.
+    path: The source file path.
+    line: The source line number.
+
+  Returns:
+    An IfDirective, ElseDirective, EndDirective, or None if not control flow.
+
+  Raises:
+    ScriptError: If syntax or structure constraints are violated.
+  """
   stripped = text.strip()
   command_name, _, body = stripped.partition(" ")
   normalized = command_name.lower()
@@ -181,6 +249,22 @@ def parse_control_flow_directive(
 
 
 def evaluate_script_condition(condition: str, *, path: Path, line: int) -> bool:
+  """Evaluate a script conditional expression to a boolean state.
+
+  Supports basic truthy/falsy keywords (true, false, on, off, 1, 0) and simple
+  equality comparisons (`==`, `!=`).
+
+  Args:
+    condition: The condition expression string to evaluate.
+    path: The source file path.
+    line: The source line number.
+
+  Returns:
+    True if the condition is satisfied, otherwise False.
+
+  Raises:
+    ScriptError: If the condition is syntactically invalid.
+  """
   normalized = condition.strip().lower()
   if normalized in {"true", "on", "1"}:
     return True

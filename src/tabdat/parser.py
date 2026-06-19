@@ -195,11 +195,34 @@ class _CommandParts:
 
 
 def parse_command(text: str) -> Command:
+  """Parse a single command line into its structured Command AST representation.
+
+  Args:
+    text: The raw command string entered by the user.
+
+  Returns:
+    The parsed Command instance.
+
+  Raises:
+    ParseError: If the input string is empty, contains syntax errors, or lacks
+      mandatory options or arguments.
+  """
   command = _parse_command_result(text)
   return result_either(command, _raise_parse_error, lambda parsed: parsed)
 
 
 def _parse_command_result(text: str) -> Result[Command, str]:
+  """Tokenize and compile raw command text into a monadic Result.
+
+  Performs pattern-based routing using the command name prefix to delegate
+  to specialized subcommand parsers.
+
+  Args:
+    text: Command string.
+
+  Returns:
+    A Result containing either the parsed Command (Ok) or a syntax error message (Err).
+  """
   stripped = text.strip()
   if not stripped:
     return Err("empty command")

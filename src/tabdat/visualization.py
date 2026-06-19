@@ -21,11 +21,36 @@ def default_plot_path(
   artifact_dir: Path = DEFAULT_PLOT_DIR.parent,
   graph_format: str = "svg",
 ) -> Path:
+  """Construct a standardized file path for a newly generated plot.
+
+  Generates a sanitized slug name by combining the command name and the variable
+  names.
+
+  Args:
+    command_name: The name of the plot command (e.g., 'histogram', 'scatter').
+    variables: A sequence of column names involved in the plot.
+    artifact_dir: Root directory where artifacts are saved.
+    graph_format: Format suffix ('svg' or 'png').
+
+  Returns:
+    The constructed Path object.
+  """
   slug = "-".join((command_name, *(_slug_part(variable) for variable in variables)))
   return artifact_dir / "plots" / f"{slug}.{graph_format}"
 
 
 def next_available_plot_path(path: Path) -> Path:
+  """Find the next available non-conflicting filename for a plot.
+
+  If the path already exists, appends an incrementing index (e.g., '-2', '-3')
+  to the filename stem to prevent overwriting existing plots.
+
+  Args:
+    path: The base target file path.
+
+  Returns:
+    A non-conflicting Path object.
+  """
   normalized = path.expanduser()
   if not normalized.exists():
     return normalized
@@ -48,6 +73,20 @@ def save_histogram(
   *,
   bins: int | None,
 ) -> Path:
+  """Generate and save an Altair-based histogram plot.
+
+  Args:
+    rows: The raw data rows containing the target variable.
+    variable: The name of the variable to bin.
+    path: The file path where the plot should be written.
+    bins: Optional maximum number of bins.
+
+  Returns:
+    The path to the saved plot file.
+
+  Raises:
+    ExecutionError: If Altair fails to compile or write the file.
+  """
   chart = (
     _base_chart(rows, (variable,))
     .mark_bar()
@@ -69,6 +108,20 @@ def save_scatter(
   x_variable: str,
   path: Path,
 ) -> Path:
+  """Generate and save an Altair-based scatter plot.
+
+  Args:
+    rows: The raw data rows.
+    y_variable: The column name for the Y-axis.
+    x_variable: The column name for the X-axis.
+    path: The file path where the plot should be written.
+
+  Returns:
+    The path to the saved plot file.
+
+  Raises:
+    ExecutionError: If Altair fails to compile or write the file.
+  """
   chart = (
     _base_chart(rows, (y_variable, x_variable))
     .mark_point()
@@ -85,6 +138,19 @@ def save_bar(
   variable: str,
   path: Path,
 ) -> Path:
+  """Generate and save an Altair-based frequency bar chart for nominal/categorical variables.
+
+  Args:
+    rows: Aggregated data rows containing the categorical variable and a 'count' column.
+    variable: The categorical column name.
+    path: The file path where the plot should be written.
+
+  Returns:
+    The path to the saved plot file.
+
+  Raises:
+    ExecutionError: If Altair fails to compile or write the file.
+  """
   chart = (
     alt.Chart(alt.Data(values=_rows_to_records(rows, (variable, "count"))))
     .mark_bar()
@@ -103,6 +169,23 @@ def save_bayes_diagnostic_plot(
   variables: tuple[str, ...],
   path: Path,
 ) -> Path:
+  """Generate and save Bayesian diagnostic plots using Matplotlib.
+
+  Supports trace plots of MCMC chains, posterior density histograms, and autocorrelation
+  lag lines for evaluated variables.
+
+  Args:
+    idata: ArviZ InferenceData object containing posterior draws.
+    kind: The type of diagnostic plot ('trace', 'density', 'autocorrelation').
+    variables: Variable parameter names to plot.
+    path: The file path where the plot should be written.
+
+  Returns:
+    The path to the saved plot file.
+
+  Raises:
+    ExecutionError: If Matplotlib drawing or saving fails.
+  """
   import matplotlib.pyplot as plt
 
   normalized = _validate_plot_path(path)

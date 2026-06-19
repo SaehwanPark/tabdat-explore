@@ -514,6 +514,13 @@ class _XtModelCache:
 
 @dataclass
 class SessionState:
+  """The runtime state container for the active TabDat session.
+
+  Maintains references to loaded tabular frames, configured options (e.g., plot open),
+  and caches model fits (like OLS, logit, panels, or spatial estimators) so post-estimation
+  commands (e.g., `predict`, `test`, `estat`) can run against the most recent estimation.
+  """
+
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
@@ -547,12 +554,25 @@ class SessionState:
 
 
 class Executor:
+  """Pipeline coordinator executing Command AST nodes against a database backend.
+
+  Integrates parsing outputs with computational adapters (DuckDB, PyArrow, NumPy, SciPy,
+  statsmodels, scikit-learn, and R fallback scripts) to load data, compute statistics,
+  run econometrics, and render plots.
+  """
+
   def __init__(
     self,
     backend: DuckDBBackend | None = None,
     *,
     config: TabDatConfig | None = None,
   ) -> None:
+    """Initialize the Executor with a backend engine and optional config.
+
+    Args:
+      backend: The active SQL engine adapter. Defaults to a new DuckDBBackend.
+      config: Runtime settings. Defaults to system defaults.
+    """
     self.backend = backend or DuckDBBackend()
     self.state = SessionState(config=config or TabDatConfig())
 
@@ -585,9 +605,24 @@ class Executor:
     self.state.heckman_regression = None
 
   def close(self) -> None:
+    """Close the active backend adapter to release resources."""
     self.backend.close()
 
   def execute(self, command: Command) -> Result | None:
+    """Execute a parsed command AST node and return its structured Result.
+
+    Coordinates regression cache invalidation prior to running new estimation
+    models, then dispatches the command node to the corresponding backend or local solver.
+
+    Args:
+      command: The parsed Command subclass instance.
+
+    Returns:
+      A Result wrapper around output structures, or None if no display result is generated.
+
+    Raises:
+      TabDatError: For missing datasets, bad types, or backend query failures.
+    """
     if isinstance(
       command,
       (

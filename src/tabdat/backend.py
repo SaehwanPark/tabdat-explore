@@ -76,15 +76,22 @@ class LoadSource:
 
 
 class DuckDBBackend:
-  """Small DuckDB adapter for the active Phase 3 dataset."""
+  """The storage and execution adapter wrapping an in-memory DuckDB connection.
+
+  Responsible for ingesting local/remote files (Parquet, CSV, Stata, Arrow, Feather),
+  managing eager/lazy query execution (via Polars or DuckDB), compiling schema definitions,
+  executing SQL scripts, and preparing query frames for analysis or plotting.
+  """
 
   def __init__(self) -> None:
+    """Initialize the backend connection and internal state variables."""
     self._connection = duckdb.connect(database=":memory:")
     self._active_storage: Literal["table", "view"] = "table"
     self._lazy_engine: Literal["duckdb", "polars"] | None = None
     self._polars_lazy_frame: pl.LazyFrame | None = None
 
   def close(self) -> None:
+    """Close the underlying DuckDB database connection."""
     self._connection.close()
 
   def inspect_and_load_source(
@@ -96,6 +103,23 @@ class DuckDBBackend:
     delimiter: str | None = None,
     has_header: bool | None = None,
   ) -> DatasetInfo:
+    """Inspect data schema from file path and load content.
+
+    Sets up active eager tables or lazy frame references.
+
+    Args:
+      path: File path or remote URI.
+      execution_mode: Engine loading strategy, either 'eager' or 'lazy'.
+      lazy_engine: Target query pushdown engine ('duckdb' or 'polars').
+      delimiter: Delimiter to parse CSV columns.
+      has_header: Explicit header configuration override for CSV files.
+
+    Returns:
+      A DatasetInfo object describing the schema, dimensions, and execution spec.
+
+    Raises:
+      ExecutionError: If parameters are invalid, formats are mismatched, or loading fails.
+    """
     source = resolve_load_source(path)
 
     if source.format != "csv" and (delimiter is not None or has_header is not None):
