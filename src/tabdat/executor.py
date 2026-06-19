@@ -289,6 +289,7 @@ class _PosteriorPredictiveSummary:
   mean: tuple[float | None, ...]
   lower: tuple[float | None, ...] | None = None
   upper: tuple[float | None, ...] | None = None
+  std: tuple[float | None, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -3531,12 +3532,36 @@ class Executor:
     if bayes_mcmc_regression is not None:
       if command.kind != "posterior_predictive":
         raise ExecutionError("predict only supports posterior_predictive after bayes: prefix")
+      if command.saving is None:
+        column_names = {c.name for c in dataset.columns}
+        targets = [command.target_variable]
+        if command.interval:
+          targets.extend([f"{command.target_variable}_lower", f"{command.target_variable}_upper"])
+        if command.std:
+          targets.append(f"{command.target_variable}_std")
+        for target in targets:
+          if target in column_names:
+            raise ExecutionError(f"predict target already exists: {target}")
+      if command.saving is not None:
+        _bayes_mcmc_posterior_predictive_summary(
+          dataset=dataset,
+          backend=self.backend,
+          state=bayes_mcmc_regression,
+          include_interval=False,
+          level=95.0,
+          include_std=False,
+          saving_path=command.saving,
+        )
+        return self._record_transform(
+          f"Saved posterior predictive draws to {command.saving}", dataset
+        )
       predictions = _bayes_mcmc_posterior_predictive_summary(
         dataset=dataset,
         backend=self.backend,
         state=bayes_mcmc_regression,
         include_interval=command.interval,
         level=command.level,
+        include_std=command.std,
       )
       columns: tuple[tuple[str, tuple[float | None, ...]], ...] = (
         (command.target_variable, predictions.mean),
@@ -3546,6 +3571,11 @@ class Executor:
           *columns,
           (f"{command.target_variable}_lower", predictions.lower),
           (f"{command.target_variable}_upper", predictions.upper),
+        )
+      if predictions.std is not None:
+        columns = (
+          *columns,
+          (f"{command.target_variable}_std", predictions.std),
         )
       next_dataset = self.backend.add_numeric_columns_from_values(
         dataset,
@@ -7353,7 +7383,10 @@ def _bayes_mcmc_posterior_predictive_summary(
   state: _BayesMcmcRegressionState,
   include_interval: bool,
   level: float,
+  include_std: bool = False,
+  saving_path: Path | None = None,
 ) -> _PosteriorPredictiveSummary:
+  _require_numeric_columns("predict", dataset, state.predictor_names)
   rows = backend.regression_rows(dataset, state.predictor_names)
   complete_indices: list[int] = []
   complete_rows: list[tuple[float, ...]] = []
@@ -7366,15 +7399,23 @@ def _bayes_mcmc_posterior_predictive_summary(
 
   if not complete_rows:
     missing_values = tuple(None for _ in rows)
-    if include_interval:
-      return _PosteriorPredictiveSummary(
-        mean=missing_values,
-        lower=missing_values,
-        upper=missing_values,
+    if saving_path is not None:
+      saving_path.parent.mkdir(parents=True, exist_ok=True)
+      df = pd.DataFrame(
+        {
+          "observation_index": pd.Series(dtype="int64"),
+          "chain": pd.Series(dtype="int64"),
+          "draw": pd.Series(dtype="int64"),
+          "value": pd.Series(dtype="float64"),
+        }
       )
-    return _PosteriorPredictiveSummary(mean=missing_values)
-
-  import pandas as pd
+      df.to_parquet(saving_path)
+    return _PosteriorPredictiveSummary(
+      mean=missing_values,
+      lower=missing_values if include_interval else None,
+      upper=missing_values if include_interval else None,
+      std=missing_values if include_std else None,
+    )
 
   data = pd.DataFrame(complete_rows, columns=state.predictor_names)
   try:
@@ -7398,37 +7439,87 @@ def _bayes_mcmc_posterior_predictive_summary(
   values: list[float | None] = [None] * len(rows)
   for index, value in zip(complete_indices, flattened, strict=True):
     values[index] = float(value)
-  if not include_interval:
-    return _PosteriorPredictiveSummary(mean=tuple(values))
 
-  try:
-    alpha = (1.0 - (level / 100.0)) / 2.0
-    flattened_lower = np.asarray(
-      predictive_samples.quantile(alpha, dim="__sample").values,
-      dtype=float,
-    ).reshape(-1)
-    flattened_upper = np.asarray(
-      predictive_samples.quantile(1.0 - alpha, dim="__sample").values,
-      dtype=float,
-    ).reshape(-1)
-  except Exception as exc:
-    raise ExecutionError("predict posterior_predictive failed") from exc
-  if len(flattened_lower) != len(complete_indices) or len(flattened_upper) != len(complete_indices):
-    raise ExecutionError("predict posterior_predictive failed")
-  lower_values: list[float | None] = [None] * len(rows)
-  upper_values: list[float | None] = [None] * len(rows)
-  for index, lower_value, upper_value in zip(
-    complete_indices,
-    flattened_lower,
-    flattened_upper,
-    strict=True,
-  ):
-    lower_values[index] = float(lower_value)
-    upper_values[index] = float(upper_value)
+  lower_vals = None
+  upper_vals = None
+  std_vals = None
+
+  if include_interval:
+    try:
+      alpha = (1.0 - (level / 100.0)) / 2.0
+      flattened_lower = np.asarray(
+        predictive_samples.quantile(alpha, dim="__sample").values,
+        dtype=float,
+      ).reshape(-1)
+      flattened_upper = np.asarray(
+        predictive_samples.quantile(1.0 - alpha, dim="__sample").values,
+        dtype=float,
+      ).reshape(-1)
+    except Exception as exc:
+      raise ExecutionError("predict posterior_predictive failed") from exc
+    if len(flattened_lower) != len(complete_indices) or len(flattened_upper) != len(
+      complete_indices
+    ):
+      raise ExecutionError("predict posterior_predictive failed")
+    lower_values: list[float | None] = [None] * len(rows)
+    upper_values: list[float | None] = [None] * len(rows)
+    for index, lower_value, upper_value in zip(
+      complete_indices,
+      flattened_lower,
+      flattened_upper,
+      strict=True,
+    ):
+      lower_values[index] = float(lower_value)
+      upper_values[index] = float(upper_value)
+    lower_vals = tuple(lower_values)
+    upper_vals = tuple(upper_values)
+
+  if include_std:
+    try:
+      flattened_std = np.asarray(
+        predictive_samples.std(dim="__sample").values,
+        dtype=float,
+      ).reshape(-1)
+    except Exception as exc:
+      raise ExecutionError("predict posterior_predictive failed") from exc
+    if len(flattened_std) != len(complete_indices):
+      raise ExecutionError("predict posterior_predictive failed")
+    std_values: list[float | None] = [None] * len(rows)
+    for index, std_value in zip(complete_indices, flattened_std, strict=True):
+      std_values[index] = float(std_value)
+    std_vals = tuple(std_values)
+
+  if saving_path is not None:
+    try:
+      saving_path.parent.mkdir(parents=True, exist_ok=True)
+      n_chains = predictive_draws.sizes["chain"]
+      n_draws = predictive_draws.sizes["draw"]
+      n_obs = len(complete_indices)
+      flat_values = np.asarray(predictive_draws.values, dtype=float).ravel()
+
+      chain_array = np.repeat(predictive_draws.coords["chain"].values, n_draws * n_obs)
+      draw_array = np.tile(np.repeat(predictive_draws.coords["draw"].values, n_obs), n_chains)
+      obs_array = np.tile(complete_indices, n_chains * n_draws)
+
+      df_draws = pd.DataFrame(
+        {
+          "observation_index": obs_array,
+          "chain": chain_array,
+          "draw": draw_array,
+          "value": flat_values,
+        }
+      )
+      df_draws.to_parquet(saving_path)
+    except Exception as exc:
+      if isinstance(exc, ExecutionError):
+        raise exc
+      raise ExecutionError("predict posterior_predictive failed") from exc
+
   return _PosteriorPredictiveSummary(
     mean=tuple(values),
-    lower=tuple(lower_values),
-    upper=tuple(upper_values),
+    lower=lower_vals,
+    upper=upper_vals,
+    std=std_vals,
   )
 
 

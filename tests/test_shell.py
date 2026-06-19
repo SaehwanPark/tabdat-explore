@@ -383,6 +383,8 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     "posterior_predictive",
     "interval",
     "level(",
+    "std",
+    "saving(",
   ]
   assert estat_command == ["estat"]
   assert estat_subcommands == ["ovtest", "overid"]

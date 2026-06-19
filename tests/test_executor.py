@@ -1936,6 +1936,154 @@ def test_phase_19_bayes_prefix_posterior_predictive_requires_bayes_prefix(
     executor.close()
 
 
+def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_std(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_std.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(
+        target_variable="y_pp",
+        kind="posterior_predictive",
+        std=True,
+      )
+    )
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "y_pp" in preview.columns
+  assert "y_pp_std" in preview.columns
+  mean_index = preview.columns.index("y_pp")
+  std_index = preview.columns.index("y_pp_std")
+  for row in preview.rows:
+    mean = row[mean_index]
+    std = row[std_index]
+    assert isinstance(mean, float)
+    assert isinstance(std, float)
+    assert std >= 0.0
+
+
+def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_saving(
+  tmp_path: Path,
+) -> None:
+  path = tmp_path / "bayes_prefix_posterior_predictive_saving.parquet"
+  saving_path = tmp_path / "draws.parquet"
+  _write_regression_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    predicted = executor.execute(
+      PredictCommand(
+        target_variable="y_pp",
+        kind="posterior_predictive",
+        saving=saving_path,
+      )
+    )
+    preview = executor.execute(HeadCommand(6))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "y_pp" not in preview.columns
+  assert saving_path.exists()
+
+  import pandas as pd
+
+  df = pd.read_parquet(saving_path)
+  assert list(df.columns) == ["observation_index", "chain", "draw", "value"]
+  # 6 observations * 1 chain * 30 draws = 180 rows
+  assert len(df) == 180
+  assert df["observation_index"].min() == 0
+  assert df["observation_index"].max() == 5
+  assert df["chain"].unique() == [0]
+  assert len(df["draw"].unique()) == 30
+
+
+def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_oos_missing_y(
+  tmp_path: Path,
+) -> None:
+  train_path = tmp_path / "train.parquet"
+  test_path = tmp_path / "test.parquet"
+  _write_regression_parquet(train_path)
+  # Write test data with x only, no y
+  _write_sql_parquet(
+    test_path,
+    """
+    select * from (
+      values
+        (7.0, 'c', 1.0, 1.0),
+        (8.0, 'd', 1.5, 1.5),
+        (9.0, 'd', 2.0, 2.0)
+    ) as test_data(x, cluster_id, weight, sigma)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(train_path))
+    executor.execute(
+      BayesPrefixCommand(
+        command=RegressCommand(outcome="y", predictors=("x",)),
+        draws=30,
+        burnin=15,
+        chains=1,
+        seed=123,
+      )
+    )
+    # Switch to out-of-sample test dataset
+    executor.execute(UseCommand(test_path))
+    predicted = executor.execute(
+      PredictCommand(
+        target_variable="y_pp",
+        kind="posterior_predictive",
+        std=True,
+        interval=True,
+      )
+    )
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(predicted, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert "x" in preview.columns
+  assert "y" not in preview.columns  # Ensure y is not present
+  assert "y_pp" in preview.columns
+  assert "y_pp_std" in preview.columns
+  assert "y_pp_lower" in preview.columns
+  assert "y_pp_upper" in preview.columns
+
+  mean_idx = preview.columns.index("y_pp")
+  std_idx = preview.columns.index("y_pp_std")
+  for row in preview.rows:
+    assert isinstance(row[mean_idx], float)
+    assert isinstance(row[std_idx], float)
+
+
 def test_phase_19_estat_bayes_after_bayes_prefix_regress(tmp_path: Path) -> None:
   path = tmp_path / "bayes_prefix_estat.parquet"
   _write_regression_parquet(path)

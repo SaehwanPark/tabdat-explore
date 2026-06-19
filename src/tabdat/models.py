@@ -395,6 +395,8 @@ class PredictCommand:
   kind: Literal["xb", "residuals", "pr", "spatial_lag", "posterior_predictive"] = "xb"
   interval: bool = False
   level: float = 95.0
+  std: bool = False
+  saving: Path | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

@@ -1,4 +1,4 @@
-# Recode & Ingestion QA Report
+# QA Report: Phase 19 — Richer Bayesian Prediction Workflows
 
 ## Status
 
@@ -6,12 +6,13 @@ pass
 
 ## Boundaries Checked
 
-- **Contract to parser**: Verified that `recode` commands and the expanded `use` command options (`delimiter(...)`, `has_header(...)`) are successfully parsed according to specifications.
-- **Parser to executor**: Verified mapping of parsed models (`RecodeCommand`, `RecodeRule`, `RecodeRange`) to correct execution handlers, with comprehensive checks for column existence, target collisions, and size matches.
-- **Executor to backend**: Verified SQL translation (ordered `CASE WHEN` clauses with default column fallbacks and explicit string casts) and proper DuckDB active table updates. Verified eager loading for CSV (mapping options to `read_csv_auto`), Feather, and Arrow (using `pyarrow.feather` table registers).
-- **Type safety**: Pyright static typing analysis reported zero errors, warnings, or notes.
-- **CLI/Shell & Help**: Verified that completions, command names, and help files for `recode` and `use` are correctly integrated.
-- **Mixed Type Coercion**: Verified during the review loop that mixing string columns or string rule outputs with numeric rule outputs could cause a DuckDB binder error. Addressed this by enforcing `VARCHAR` typecast coercion across rule branches and fallbacks for string target columns.
+- **Contract to Parser**: Verified that syntax options (`std` and `saving(<path>)`) for `predict` are correctly parsed and validated. Mutual exclusivity constraints between saving and active dataset options (`std`, `interval`, `level`) are verified to raise `ParseError` on syntax load.
+- **Parser to Executor**: Verified mapping of PredictCommand properties (`std` and `saving`) to the execution engine. Proactive collision checks for `<newvar>_std`, `<newvar>_lower`, and `<newvar>_upper` columns occur *before* MCMC sampling begins, raising early `ExecutionError` in case of collision.
+- **Executor to Backend**: Verified DuckDB active table operations. Predictions are added as double precision floats. When `saving` is requested, the active dataset is not mutated, and the backend exports raw draws directly to the destination Parquet file.
+- **Out-of-Sample Predictions**: Verified that predictions and draws saving function correctly on datasets where the outcome variable is missing (only predictors are present).
+- **Empty Datasets / Missing Predictors**: Verified that empty dataset prediction writes an empty Parquet file with explicit schema column types (`observation_index`, `chain`, `draw`, `value`) to avoid PyArrow serialization issues. Partially missing predictors correctly propagate `None` predictions to the dataset and skip MCMC draws inside the saved file.
+- **Type Safety**: Passed `basedpyright` with 0 errors, warnings, or notes.
+- **Code Style**: Checked and formatted via `ruff check` and `ruff format`. All checks passed.
 
 ## Blocking Issues
 
@@ -19,14 +20,14 @@ pass
 
 ## PR Review Loop
 
-- Branch: `feat/recode-and-ingestion`
-- Pass 1 verified rule-parsing logic and parentheses balancing in the parser.
-- Pass 2 verified backend SQL translation safety, handling numeric range rules, missing/nonmissing, and VARCHAR casting.
-- Pass 3 verified Feather/Arrow registration as DuckDB temp tables and remote scheme validation checks.
-- PR Handoff Pass identified a DuckDB binder mixed-type coercion issue when recoding string columns to numeric outputs. A typecast coercion fix was applied and successfully verified.
+- Branch: `feat/bayes-oos-predict`
+- Pass 1 verified the code correctness and identified a redundant pandas import in the backend/executor module. The redundant import was removed.
+- Pass 2 verified type safety and suggested early checks to make sure the target columns are checked before launching time-consuming sampling. Early collision checking was successfully added.
+- Pass 3 verified memory consumption and recommended replacing the heavy `to_dataframe().reset_index()` multi-index call with a high-performance vectorized NumPy construction. Tiling and repeating arrays via NumPy was implemented and fully verified.
 
 ## Validation Evidence
 
-- Target execution tests: `uv run pytest tests/test_executor.py -k "recode or ingestion"` (9 passed)
-- Full test suite: `uv run pytest` (936 passed)
-- Type safety: `uv run basedpyright` (passed)
+- **Type safety check**: `uv run basedpyright` (passed, 0 errors)
+- **Formatting and Lint**: `uv run ruff format --check && uv run ruff check` (passed, all checks passed)
+- **Target unit tests**: `uv run pytest tests/test_parser.py -k "predict" && uv run pytest tests/test_executor.py -k "bayes"` (passed)
+- **Full test suite**: `uv run pytest` (940 passed, 311 warnings)

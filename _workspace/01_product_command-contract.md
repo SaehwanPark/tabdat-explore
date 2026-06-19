@@ -1,85 +1,41 @@
-# Command Contract: Phase 23 — Data Recoding & Ingestion Expansion
+# Command Contract: Phase 19 — Richer Bayesian Prediction Workflows
 
 ## Request Summary
-
-Implement the data transformation command `recode` and expand file loading format support in the `use` command to include CSV, Feather, and Arrow formats.
+Extend the `predict` command after MCMC fits (`bayes:`) to allow predicting the standard deviation of the posterior predictive distribution, and exporting raw posterior predictive draws to a Parquet file.
 
 ## Roadmap Phase
-
-Phase 23: Data Recoding & Ingestion Expansion.
+Phase 19: Modern Extensions (Deferred items).
 
 ## Command Syntax
-
-### 1. `recode` Command
 ```stata
-recode <varlist> (<rule>) [ (<rule>) ...] [, generate(<new_varlist>) replace]
+predict <newvar>, posterior_predictive [std] [interval [level(<num>)]] [saving(<path>)]
 ```
 
 Where:
-- `<varlist>` is a list of existing numeric or categorical variables in the active dataset.
-- Each `(<rule>)` is in the format: `(inputs = output)`.
-  - Inputs can be single values (e.g. `1`), space-separated lists of values (e.g. `1 2 3`), ranges (e.g. `1/5`), or special keywords (`min`, `max`, `missing`, `nonmissing`, `else`).
-  - Examples of rule inputs:
-    - `1 = 0`
-    - `1 2 3 = 4`
-    - `1/5 = 10`
-    - `min/17 = 0`
-    - `18/max = 1`
-    - `missing = -1`
-    - `nonmissing = 1`
-    - `else = 99`
-- Options:
-  - `generate(<new_varlist>)`: Specifies a list of new variables to create. Must have the exact same number of variables as `<varlist>`.
-  - `replace`: Recodes the variables in-place.
-  - Exactly one of `generate()` or `replace` must be specified.
-
-### 2. `use` Command Options
-```stata
-use <path> [, lazy engine(duckdb|polars) delimiter(<char>) has_header(true|false)]
-```
-- `<path>` can end with `.csv`, `.feather`, `.arrow`, in addition to `.parquet` and `.dta`.
-- `delimiter(<char>)` and `has_header(...)` are only supported when `<path>` ends with `.csv`.
+- `std`: Flag option to compute the posterior predictive standard deviation. Adds a column named `<newvar>_std` to the active dataset.
+- `saving(<path>)`: Option to save the complete set of MCMC draws for the posterior predictive distribution. Outputs to a Parquet file at `<path>`. The active dataset is not modified when `saving()` is specified.
+- `interval`: Flag option to compute credible intervals (adds `<newvar>_lower` and `<newvar>_upper`).
+- `level(<num>)`: Specifies the probability level (default 95).
 
 ## Examples
-
-- `recode age (min/17 = 0) (18/max = 1), generate(adult)`
-- `recode score (90/100 = 4) (80/89 = 3) (70/79 = 2) (else = 1), replace`
-- `use survey.csv, delimiter(",") has_header(true)`
-- `use remote_dataset.feather`
+- `predict y_pp, posterior_predictive std`
+- `predict y_pp, posterior_predictive std interval level(90)`
+- `predict y_pp, posterior_predictive saving(predictions.parquet)`
 
 ## Data Assumptions
-
-- Variables in `recode` must exist in the active dataset.
-- Target columns in `generate` must not already exist in the active dataset (collision check).
-- Lazy loading is still restricted to Parquet. E.g., `use dataset.csv, lazy` raises `ExecutionError`.
+- The estimation model must be a Bayesian MCMC model fitted via the `bayes:` prefix.
+- The target dataset (active dataset at time of prediction) must contain all predictor columns used in the model.
+- The outcome variable does not need to exist in the target dataset for prediction.
 
 ## Execution Semantics
-
-### `recode` Command
-- Translates the user-specified rules into a SQL `CASE WHEN` expression:
-  - `(1 = 2)` -> `WHEN col = 1 THEN 2`
-  - `(1 2 3 = 4)` -> `WHEN col IN (1, 2, 3) THEN 4`
-  - `(1/5 = 10)` -> `WHEN col >= 1 AND col <= 5 THEN 10`
-  - `(min/17 = 0)` -> `WHEN col <= 17 THEN 0`
-  - `(18/max = 1)` -> `WHEN col >= 18 THEN 1`
-  - `(missing = -1)` -> `WHEN col IS NULL THEN -1`
-  - `(nonmissing = 1)` -> `WHEN col IS NOT NULL THEN 1`
-  - `(else = 99)` -> `ELSE 99`
-- Rules are evaluated sequentially in the order specified.
-- For categoricals / strings, range-based rules (`/`) are not allowed and will raise an error.
-- Updates the active dataset in DuckDB.
-
-### `use` Command Expansion
-- Resolves file extension of `<path>`.
-- For `.csv` files:
-  - Passes delimiter and header options directly to DuckDB's `read_csv_auto`.
-- For `.feather` and `.arrow` files:
-  - Reads using PyArrow or Pandas, registers the resulting structure as a DuckDB temporary view/table.
+- If `std` is requested, the standard deviation is calculated across MCMC draws (`predictive_samples.std(dim="__sample").values`) and added to the active dataset.
+- If `saving` is requested:
+  - Generate the simulated draws matrix `predictive_samples`.
+  - Export it to a tidy Parquet table with columns `observation_index`, `chain`, `draw`, and `value`.
+  - Return a command-line message indicating successful export: `"Saved posterior predictive draws to <path>"`.
 
 ## Acceptance Criteria
-
-- [ ] `recode` correctly performs transformations on active datasets.
-- [ ] Variables list and generated list match in size.
-- [ ] In-place `replace` updates the existing columns.
-- [ ] `use` successfully loads CSV, Feather, and Arrow files (both local and remote HTTP/HTTPS).
-- [ ] Mismatched options or formats raise clear `ExecutionError` messages.
+- [ ] `predict <newvar>, posterior_predictive std` generates standard deviations correctly.
+- [ ] `predict <newvar>, posterior_predictive saving(<path>)` generates a tidy Parquet file at `<path>` containing all draws.
+- [ ] Out-of-sample prediction succeeds when the outcome variable is missing from the active dataset.
+- [ ] Missing values in predictors correctly propagate to missing values in outputs.
