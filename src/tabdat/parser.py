@@ -1597,12 +1597,12 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
     raise ParseError("predict expects syntax: predict <newvar>")
   option_names = {option.name for option in parts.options}
   predict_kinds = {"xb", "residuals", "pr", "spatial_lag", "posterior_predictive"}
-  predict_aux_options = {"interval", "level"}
+  predict_aux_options = {"interval", "level", "std", "saving"}
   unsupported = option_names - predict_kinds - predict_aux_options
   if unsupported:
     raise ParseError(f"predict unsupported option: {', '.join(sorted(unsupported))}")
   _require_flag_options(parts.options, "predict", predict_kinds)
-  _require_flag_options(parts.options, "predict", {"interval"})
+  _require_flag_options(parts.options, "predict", {"interval", "std"})
   selected_kinds = predict_kinds & option_names
   if len(selected_kinds) > 1:
     raise ParseError(
@@ -1627,11 +1627,17 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
     raise ParseError("predict option level requires interval")
   if level <= 0.0 or level >= 100.0:
     raise ParseError("predict option level must be between 0 and 100")
+  std = "std" in option_names
+  saving = _single_path_option(parts.options, "saving", "predict")
+  if (std or saving is not None) and kind != "posterior_predictive":
+    raise ParseError("predict std and saving options require posterior_predictive")
   return PredictCommand(
     target_variable=parts.arguments[0],
     kind=kind,
     interval=interval,
     level=level,
+    std=std,
+    saving=saving,
   )
 
 

@@ -180,6 +180,8 @@ _PREDICT_OPTIONS = (
   "posterior_predictive",
   "interval",
   "level(",
+  "std",
+  "saving(",
 )
 _ESTAT_SUBCOMMANDS = (
   "residuals",
