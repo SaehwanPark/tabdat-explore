@@ -1631,6 +1631,8 @@ def _parse_predict(parts: _CommandParts) -> PredictCommand:
   saving = _single_path_option(parts.options, "saving", "predict")
   if (std or saving is not None) and kind != "posterior_predictive":
     raise ParseError("predict std and saving options require posterior_predictive")
+  if saving is not None and (std or interval):
+    raise ParseError("predict saving option cannot be combined with std or interval options")
   return PredictCommand(
     target_variable=parts.arguments[0],
     kind=kind,

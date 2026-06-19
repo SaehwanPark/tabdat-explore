@@ -2011,8 +2011,9 @@ def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_saving(
   assert isinstance(preview, PreviewResult)
   assert "y_pp" not in preview.columns
   assert saving_path.exists()
-  
+
   import pandas as pd
+
   df = pd.read_parquet(saving_path)
   assert list(df.columns) == ["observation_index", "chain", "draw", "value"]
   # 6 observations * 1 chain * 30 draws = 180 rows
@@ -2075,7 +2076,7 @@ def test_phase_19_bayes_prefix_predict_supports_posterior_predictive_oos_missing
   assert "y_pp_std" in preview.columns
   assert "y_pp_lower" in preview.columns
   assert "y_pp_upper" in preview.columns
-  
+
   mean_idx = preview.columns.index("y_pp")
   std_idx = preview.columns.index("y_pp_std")
   for row in preview.rows:

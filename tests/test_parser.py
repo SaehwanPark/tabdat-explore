@@ -713,6 +713,47 @@ def test_parse_phase_13_predict_command() -> None:
     interval=True,
     level=90.0,
   )
+  assert parse_command("predict y_pp, posterior_predictive std") == PredictCommand(
+    target_variable="y_pp",
+    kind="posterior_predictive",
+    std=True,
+  )
+  assert parse_command(
+    "predict y_pp, posterior_predictive saving(draws.parquet)"
+  ) == PredictCommand(
+    target_variable="y_pp",
+    kind="posterior_predictive",
+    saving=Path("draws.parquet"),
+  )
+  assert parse_command(
+    "predict y_pp, posterior_predictive std interval level(90)"
+  ) == PredictCommand(
+    target_variable="y_pp",
+    kind="posterior_predictive",
+    std=True,
+    interval=True,
+    level=90.0,
+  )
+
+  with pytest.raises(
+    ParseError, match="predict std and saving options require posterior_predictive"
+  ):
+    parse_command("predict y_pp, xb std")
+
+  with pytest.raises(
+    ParseError, match="predict std and saving options require posterior_predictive"
+  ):
+    parse_command("predict y_pp, residuals saving(draws.parquet)")
+
+  with pytest.raises(
+    ParseError, match="predict saving option cannot be combined with std or interval options"
+  ):
+    parse_command("predict y_pp, posterior_predictive std saving(draws.parquet)")
+
+  with pytest.raises(
+    ParseError, match="predict saving option cannot be combined with std or interval options"
+  ):
+    parse_command("predict y_pp, posterior_predictive interval saving(draws.parquet)")
 
 
 def test_parse_phase_15_logit_command() -> None:

@@ -3532,6 +3532,16 @@ class Executor:
     if bayes_mcmc_regression is not None:
       if command.kind != "posterior_predictive":
         raise ExecutionError("predict only supports posterior_predictive after bayes: prefix")
+      if command.saving is None:
+        column_names = {c.name for c in dataset.columns}
+        targets = [command.target_variable]
+        if command.interval:
+          targets.extend([f"{command.target_variable}_lower", f"{command.target_variable}_upper"])
+        if command.std:
+          targets.append(f"{command.target_variable}_std")
+        for target in targets:
+          if target in column_names:
+            raise ExecutionError(f"predict target already exists: {target}")
       if command.saving is not None:
         _bayes_mcmc_posterior_predictive_summary(
           dataset=dataset,
@@ -7376,6 +7386,7 @@ def _bayes_mcmc_posterior_predictive_summary(
   include_std: bool = False,
   saving_path: Path | None = None,
 ) -> _PosteriorPredictiveSummary:
+  _require_numeric_columns("predict", dataset, state.predictor_names)
   rows = backend.regression_rows(dataset, state.predictor_names)
   complete_indices: list[int] = []
   complete_rows: list[tuple[float, ...]] = []
@@ -7386,12 +7397,18 @@ def _bayes_mcmc_posterior_predictive_summary(
     complete_indices.append(index)
     complete_rows.append(cast(tuple[float, ...], numeric_row))
 
-  import pandas as pd
-
   if not complete_rows:
     missing_values = tuple(None for _ in rows)
     if saving_path is not None:
-      df = pd.DataFrame(columns=["observation_index", "chain", "draw", "value"])
+      saving_path.parent.mkdir(parents=True, exist_ok=True)
+      df = pd.DataFrame(
+        {
+          "observation_index": pd.Series(dtype="int64"),
+          "chain": pd.Series(dtype="int64"),
+          "draw": pd.Series(dtype="int64"),
+          "value": pd.Series(dtype="float64"),
+        }
+      )
       df.to_parquet(saving_path)
     return _PosteriorPredictiveSummary(
       mean=missing_values,
@@ -7474,16 +7491,24 @@ def _bayes_mcmc_posterior_predictive_summary(
 
   if saving_path is not None:
     try:
-      obs_dims = [d for d in predictive_draws.dims if d not in ("chain", "draw")]
-      if len(obs_dims) != 1:
-        raise ExecutionError(
-          "predict posterior_predictive failed: unexpected dimensions in posterior predictive data"
-        )
-      obs_dim = obs_dims[0]
-      df_draws = predictive_draws.to_dataframe(name="value").reset_index()
-      mapping = {i: complete_indices[i] for i in range(len(complete_indices))}
-      df_draws["observation_index"] = df_draws[obs_dim].map(mapping)
-      df_draws = df_draws[["observation_index", "chain", "draw", "value"]]
+      saving_path.parent.mkdir(parents=True, exist_ok=True)
+      n_chains = predictive_draws.sizes["chain"]
+      n_draws = predictive_draws.sizes["draw"]
+      n_obs = len(complete_indices)
+      flat_values = np.asarray(predictive_draws.values, dtype=float).ravel()
+
+      chain_array = np.repeat(predictive_draws.coords["chain"].values, n_draws * n_obs)
+      draw_array = np.tile(np.repeat(predictive_draws.coords["draw"].values, n_obs), n_chains)
+      obs_array = np.tile(complete_indices, n_chains * n_draws)
+
+      df_draws = pd.DataFrame(
+        {
+          "observation_index": obs_array,
+          "chain": chain_array,
+          "draw": draw_array,
+          "value": flat_values,
+        }
+      )
       df_draws.to_parquet(saving_path)
     except Exception as exc:
       if isinstance(exc, ExecutionError):
