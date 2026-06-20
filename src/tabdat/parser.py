@@ -1971,7 +1971,7 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
   expected_estat_syntax = (
     "estat expects syntax: "
     "estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|"
-    "dml|bayes|spatial>"
+    "dml|bayes|spatial|report>"
   )
   if parts.condition is not None or parts.expression is not None:
     raise ParseError(expected_estat_syntax)
@@ -1993,10 +1993,23 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     "dml",
     "bayes",
     "spatial",
+    "report",
   }:
     raise ParseError(
       "estat subcommand must be residuals, ovtest, vif, firststage, "
-      "overid, hausman, endogenous, margins, gof, did, drdid, dml, bayes, or spatial"
+      "overid, hausman, endogenous, margins, gof, did, drdid, dml, bayes, spatial, or report"
+    )
+
+  if subcommand == "report":
+    option_names = {option.name for option in parts.options}
+    unsupported = option_names - {"saving", "noopen"}
+    if unsupported:
+      raise ParseError(f"estat report unsupported option: {', '.join(sorted(unsupported))}")
+    _require_flag_options(parts.options, "estat report", {"noopen"})
+    return EstatCommand(
+      subcommand="report",
+      saving=_single_path_option(parts.options, "saving", "estat report"),
+      open_artifact="noopen" not in option_names,
     )
 
   if subcommand != "spatial":

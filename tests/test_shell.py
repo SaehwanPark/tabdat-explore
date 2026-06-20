@@ -301,6 +301,8 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
     estat_margins = _completion_texts(completer, "estat m")
     estat_gof = _completion_texts(completer, "estat g")
     estat_bayes = _completion_texts(completer, "estat b")
+    estat_report = _completion_texts(completer, "estat r")
+    estat_report_options = _completion_texts(completer, "estat report, ")
   finally:
     executor.close()
 
@@ -392,6 +394,8 @@ def test_completer_suggests_phase_13_and_phase_14_commands_and_options(
   assert estat_endogenous == ["endogenous"]
   assert estat_gof == ["gof"]
   assert estat_margins == ["margins"]
+  assert estat_report == ["residuals", "report"]
+  assert estat_report_options == ["saving(", "noopen"]
 
 
 def test_lexer_highlights_commands_keywords_and_literals() -> None:

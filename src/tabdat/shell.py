@@ -198,6 +198,7 @@ _ESTAT_SUBCOMMANDS = (
   "dml",
   "bayes",
   "spatial",
+  "report",
 )
 _ESTAT_SPATIAL_OPTIONS = ("coord(", "knn(", "weights(", "id(", "contiguity(")
 _SQL_SUGGESTIONS = ("select", "from active", "where", "group by", "order by", "into")
@@ -260,6 +261,8 @@ class TabdatCompleter(Completer):
       if _is_after_comma(text):
         if "spatial" in text.lower():
           yield from _matching_completions(_ESTAT_SPATIAL_OPTIONS, word)
+        elif "report" in text.lower():
+          yield from _matching_completions(("saving(", "noopen"), word)
       else:
         yield from _matching_completions(_ESTAT_SUBCOMMANDS, word)
       return

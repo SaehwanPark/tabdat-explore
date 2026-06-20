@@ -3910,6 +3910,40 @@ def test_phase_13_estat_residuals_ovtest_and_vif(tmp_path: Path) -> None:
   assert vif.rows[0][0] == "x"
 
 
+def test_phase_13_estat_report(tmp_path: Path) -> None:
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  report_path = tmp_path / "my_report.html"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+
+    # Test error when report is run without regression
+    with pytest.raises(ExecutionError, match="estat report requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="report"))
+
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+
+    # Run report with saving option
+    result = executor.execute(
+      EstatCommand(subcommand="report", saving=report_path, open_artifact=False)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == report_path
+  assert result.should_open is False
+  assert report_path.is_file()
+
+  html = report_path.read_text(encoding="utf-8")
+  assert "Regression Diagnostic Report" in html
+  assert "Residuals vs Fitted" in html
+  assert "Normal Q-Q" in html
+  assert "Actual vs Fitted" in html
+  assert "Parameter Estimates" in html
+
+
 def test_phase_13_estat_supports_weighted_regression_states(tmp_path: Path) -> None:
   path = tmp_path / "regression.parquet"
   _write_regression_parquet(path)

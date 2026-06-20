@@ -201,6 +201,7 @@ class _RegressionState:
   intercept: float | None
   include_intercept: bool
   fitted_model: object
+  covariance: str
 
 
 @dataclass(frozen=True)
@@ -1250,6 +1251,7 @@ class Executor:
       intercept=intercept,
       include_intercept=command.include_intercept,
       fitted_model=fitted,
+      covariance=covariance,
     )
     self.state.lasso_regression = None
     self.state.bayes_regression = None
@@ -4637,8 +4639,59 @@ class Executor:
       selection_coefficients=selection_coefficients,
     )
 
-  def _execute_estat(self, command: EstatCommand) -> TableResult:
+  def _execute_estat(self, command: EstatCommand) -> TableResult | PlotResult:
     dataset = self._require_active_dataset("estat")
+    if command.subcommand == "report":
+      regression = self.state.regression
+      if regression is None:
+        raise ExecutionError("estat report requires a prior regress model")
+
+      fitted = regression.fitted_model
+      parameter_names = (
+        ("intercept", *regression.predictor_names)
+        if regression.include_intercept
+        else regression.predictor_names
+      )
+      coefficients = _coefficient_estimates(parameter_names, fitted)
+
+      model_obj = getattr(fitted, "model", None)
+      model_type = type(model_obj).__name__.lower() if model_obj is not None else "ols"
+      estimator = "ols"
+      if "wls" in model_type:
+        estimator = "wls"
+      elif "gls" in model_type:
+        estimator = "gls"
+
+      r_squared = getattr(fitted, "rsquared", None)
+      adjusted_r_squared = getattr(fitted, "rsquared_adj", None)
+      mse_resid = getattr(fitted, "mse_resid", None)
+      root_mse = np.sqrt(mse_resid) if mse_resid is not None else None
+
+      regression_result = RegressionResult(
+        outcome=regression.outcome_variable,
+        predictors=regression.predictor_names,
+        estimator=estimator,
+        covariance=regression.covariance,
+        observation_count=int(getattr(fitted, "nobs", 0)),
+        include_intercept=regression.include_intercept,
+        r_squared=r_squared,
+        adjusted_r_squared=adjusted_r_squared,
+        root_mse=root_mse,
+        coefficients=coefficients,
+      )
+
+      if command.saving is not None:
+        path = command.saving
+      else:
+        path = self._default_plot_path("report", (regression.outcome_variable,)).with_suffix(
+          ".html"
+        )
+
+      from tabdat.reporting import generate_html_report
+
+      saved_path = generate_html_report(regression_result, fitted, path)
+      return PlotResult(path=saved_path, should_open=command.open_artifact)
+
     if command.subcommand == "residuals":
       regression = self.state.regression
       if regression is not None:
