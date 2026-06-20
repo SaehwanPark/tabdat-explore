@@ -4,6 +4,16 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+### Added
+
+- Added `estat report` post-estimation command for standard linear regressions (`regress`):
+  - Generates a self-contained, beautiful, responsive HTML page with regression stats (Outcome, Predictors, Estimator, Covariance, Observations, R-squared, Adj R-squared, Root MSE).
+  - Includes a styled coefficients table with standard error, t-stat, p-value, and 95% confidence intervals.
+  - Embeds three interactive diagnostic plots (Residuals vs Fitted, Normal Q-Q, Actual vs Fitted) rendered with Altair and Vega-Lite/Vega-Embed.
+  - Supports `saving(path)` option to specify output location, and `noopen` to disable automatic browser opening.
+  - Implements HTML/JS escaping for special character safety, bounds validation for datasets with $N < 2$, and random downsampling to at most 5,000 points to prevent browser freeze.
+
+
 ## [0.23.0] — 2026-06-18
 
 Phase 23 Data Recoding & Ingestion Expansion, Classical Hypothesis Testing, Advanced Spatial Models, and Bayesian Predictive Intervals.

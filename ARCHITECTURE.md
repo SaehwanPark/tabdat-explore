@@ -275,7 +275,7 @@ Status: Verified
   `export <path>[, replace]` for local `.parquet`, `.csv`, and `.feather` files.
 - Phase 13 slices 1-3 are executable through
   `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
-  plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif>`.
+  plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif|report>`.
 - Phase 19 first ML slice is executable through
   `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
 - Phase 19 post-selection starter is executable through

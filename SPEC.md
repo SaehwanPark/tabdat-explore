@@ -500,6 +500,13 @@ and describe the active work with concise verification criteria.
     - Loads `.csv` datasets with `delimiter(<char>)` and `has_header(true|false)` option parameters.
     - Loads `.feather` and `.arrow` datasets by registering them as temporary views via PyArrow.
   - focused parser, executor, backend, CLI autocomplete, help topics, and integration tests.
+- Implemented Phase 13 slice 4 — Interactive HTML regression summaries & diagnostic plots:
+  - `estat report` command generates a self-contained, responsive HTML file containing regression stats (outcome, predictors, estimator, covariance method, observations, R-squared, adjusted R-squared, root MSE).
+  - Styled parameter estimates table with coefficients, standard errors, t-statistics, p-values, and 95% confidence intervals.
+  - Interactive diagnostic plots (Residuals vs Fitted, Normal Q-Q, and Actual vs Fitted) rendered with Altair and embedded via Vega-Embed.
+  - Supports `saving(path)` to customize the output location and `noopen` to disable automatic browser opening.
+  - Robust validations (HTML/JS escaping, minimum sample size $N \ge 2$, and deterministic random downsampling for $N > 5000$ to prevent browser freezing).
+  - focused parser, executor, autocompletions, help topic, and integration tests.
 
 ## Present
 
@@ -524,9 +531,9 @@ and describe the active work with concise verification criteria.
     - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger coverage
     - approach (3): narrow `numpy`/`scipy` custom implementations only when no mature backend fits
 - Remaining & Deferred Roadmap Items:
-  - **Interactive HTML regression summaries & diagnostic plots**: HTML outputs for model inspection and interactive reporting instead of just terminal output and static plot artifacts (Phase 13 / project proposal).
   - **Dynamic / Custom User Plugins**: Exposing command and result interfaces as public APIs for third-party extension packages, instead of just the internal extension registry (Phase 18).
   - **Broader Remote Connectors**: Database connectors (e.g. Postgres, Snowflake, BigQuery) and remote object storage credentials management (Phase 11 / Phase 18).
   - **Full Polars-Native Execution Backend**: Deep lazy execution optimizations completely within Polars instead of materializing to DuckDB for unsupported commands (Phase 7 / Phase 10).
   - **Advanced dynamic panel GMM / structural estimators**: Fuller dynamic panel model GMM and structural model replication tools (Phase 17).
+
 
