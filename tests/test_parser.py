@@ -1039,6 +1039,15 @@ def test_parse_phase_13_estat_command() -> None:
     parse_command("estat spatial, weights(columbus.gal) id(neighborhood) contiguity(rook)")
     == expected_weights
   )
+  assert parse_command("estat report") == EstatCommand(subcommand="report")
+  assert parse_command("estat report, saving(my_report.html)") == EstatCommand(
+    subcommand="report",
+    saving=Path("my_report.html"),
+  )
+  assert parse_command("estat report, noopen") == EstatCommand(
+    subcommand="report",
+    open_artifact=False,
+  )
 
 
 def test_parse_phase_14_ivregress_command() -> None:
@@ -1644,6 +1653,8 @@ def test_parse_exit_aliases() -> None:
     "estat spatial, weights(columbus.gal) id(neighborhood) contiguity(invalid)",
     "estat spatial, coord(lat) knn(5)",
     "estat residuals, coord(lat lon)",
+    "estat report, invalid",
+    "estat report, saving()",
     "ivregress",
     "ivregress liml y x, endog(z) iv(w)",
     "ivregress 2sls y x",

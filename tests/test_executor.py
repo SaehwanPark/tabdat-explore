@@ -3910,6 +3910,153 @@ def test_phase_13_estat_residuals_ovtest_and_vif(tmp_path: Path) -> None:
   assert vif.rows[0][0] == "x"
 
 
+def test_phase_13_estat_report(tmp_path: Path) -> None:
+  import re
+
+  path = tmp_path / "regression.parquet"
+  _write_regression_parquet(path)
+  report_path = tmp_path / "my_report.html"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+
+    # Test error when report is run without regression
+    with pytest.raises(ExecutionError, match="estat report requires a prior regress model"):
+      executor.execute(EstatCommand(subcommand="report"))
+
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+
+    # Run report with saving option
+    result = executor.execute(
+      EstatCommand(subcommand="report", saving=report_path, open_artifact=False)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert result.path == report_path
+  assert result.should_open is False
+  assert report_path.is_file()
+
+  html = report_path.read_text(encoding="utf-8")
+  assert "Regression Diagnostic Report" in html
+  assert "Residuals vs Fitted" in html
+  assert "Normal Q-Q" in html
+  assert "Actual vs Fitted" in html
+  assert "Parameter Estimates" in html
+
+  # Confidence intervals formatting verification (non-empty & correctly formatted)
+  # Look for the table cells containing confidence interval brackets.
+  ci_matches = re.findall(r"class='number'>\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]", html)
+  assert len(ci_matches) >= 2  # one for x, one for _cons
+  for lower, upper in ci_matches:
+    assert float(lower) < float(upper)
+
+
+def test_phase_13_estat_report_confidence_intervals_and_escaping(tmp_path: Path) -> None:
+  import re
+
+  path = tmp_path / "regression_special.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0),
+        (2.0, 14.0),
+        (3.0, 16.5),
+        (4.0, 19.0),
+        (5.0, 21.0),
+        (6.0, 23.5)
+    ) as reg_data("x_>_special", "y_<_&_special")
+    """,
+  )
+  report_path = tmp_path / "my_report_special.html"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y_<_&_special", predictors=("x_>_special",)))
+    result = executor.execute(
+      EstatCommand(subcommand="report", saving=report_path, open_artifact=False)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert report_path.is_file()
+  html_content = report_path.read_text(encoding="utf-8")
+
+  # HTML Escaping verification
+  assert "y_&lt;_&amp;_special" in html_content
+  assert "x_&gt;_special" in html_content
+
+  # Confidence intervals formatting verification
+  ci_matches = re.findall(r"class='number'>\[(-?\d+\.\d+),\s*(-?\d+\.\d+)\]", html_content)
+  assert len(ci_matches) >= 2  # one for x_>_special, one for _cons
+  for lower, upper in ci_matches:
+    assert float(lower) < float(upper)
+
+
+def test_phase_13_estat_report_downsampling(tmp_path: Path) -> None:
+  import json
+  import re
+
+  path = tmp_path / "regression_large.parquet"
+  # Generate 5050 rows
+  _write_sql_parquet(
+    path,
+    "select range as x, range * 2.0 + 1.0 as y from range(1, 5051)",
+  )
+  report_path = tmp_path / "my_report_large.html"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    result = executor.execute(
+      EstatCommand(subcommand="report", saving=report_path, open_artifact=False)
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, PlotResult)
+  assert report_path.is_file()
+  html_content = report_path.read_text(encoding="utf-8")
+
+  # Extract the specResFit JSON block
+  match = re.search(r"const specResFit = (\{.+?\});", html_content, re.DOTALL)
+  assert match is not None
+  spec = json.loads(match.group(1))
+  # Downsampling should result in exactly 5000 points
+  records = list(spec["datasets"].values())[0]
+  assert len(records) == 5000
+
+
+def test_phase_13_estat_report_insufficient_obs(tmp_path: Path) -> None:
+  path = tmp_path / "regression_small.parquet"
+  # 1 observation
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1.0, 12.0)
+    ) as reg_data(x, y)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    # Run regress
+    executor.execute(RegressCommand(outcome="y", predictors=("x",)))
+    # Run report - should fail on insufficient observations
+    with pytest.raises(
+      ExecutionError, match="estat report requires at least 2 complete observations"
+    ):
+      executor.execute(EstatCommand(subcommand="report", open_artifact=False))
+  finally:
+    executor.close()
+
+
 def test_phase_13_estat_supports_weighted_regression_states(tmp_path: Path) -> None:
   path = tmp_path / "regression.parquet"
   _write_regression_parquet(path)

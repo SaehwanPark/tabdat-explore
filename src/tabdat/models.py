@@ -582,12 +582,15 @@ class EstatCommand:
     "dml",
     "bayes",
     "spatial",
+    "report",
   ]
   coord_variables: tuple[str, str] | None = None
   knn: int | None = None
   weights_file: str | None = None
   id_variable: str | None = None
   contiguity: Literal["queen", "rook"] | None = None
+  saving: Path | None = None
+  open_artifact: bool = True
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
