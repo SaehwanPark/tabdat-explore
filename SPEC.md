@@ -516,11 +516,17 @@ and describe the active work with concise verification criteria.
     3. only then add focused lower-level implementations on top of `numpy`/`scipy` and the Phase 12
        estimation substrate
   - keep commands as thin wrappers over library backends while normalizing outputs into the shared
-     Phase 12 estimation result contract
+    Phase 12 estimation result contract
 - Deferred Phase 19 modern extensions:
   - Richer Bayesian posterior predictive workflows: add explicit out-of-sample Bayesian prediction workflows beyond the current active-dataset posterior predictive mean and interval columns.
   - library strategy:
     - approach (1): `scikit-learn` for ML workflows, `pymc`/`bambi` for Bayesian workflows, and `pysal` (`spreg`) for spatial econometrics
     - approach (2): `brms`/`rstanarm` and `spdep`/`spatialreg` via `rpy2` where R has stronger coverage
     - approach (3): narrow `numpy`/`scipy` custom implementations only when no mature backend fits
+- Remaining & Deferred Roadmap Items:
+  - **Interactive HTML regression summaries & diagnostic plots**: HTML outputs for model inspection and interactive reporting instead of just terminal output and static plot artifacts (Phase 13 / project proposal).
+  - **Dynamic / Custom User Plugins**: Exposing command and result interfaces as public APIs for third-party extension packages, instead of just the internal extension registry (Phase 18).
+  - **Broader Remote Connectors**: Database connectors (e.g. Postgres, Snowflake, BigQuery) and remote object storage credentials management (Phase 11 / Phase 18).
+  - **Full Polars-Native Execution Backend**: Deep lazy execution optimizations completely within Polars instead of materializing to DuckDB for unsupported commands (Phase 7 / Phase 10).
+  - **Advanced dynamic panel GMM / structural estimators**: Fuller dynamic panel model GMM and structural model replication tools (Phase 17).
 

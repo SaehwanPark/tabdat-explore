@@ -15,14 +15,18 @@ extension registry for ingestion and estimator adapters, plus bounded Phase 19 m
 slices for ML regularization, Bayesian starters, spatial regression, cross-validation wrappers,
 same-sample spatial-lag prediction, post-Lasso inference, general Bayesian MCMC, and posterior
 predictive Bayesian columns plus Bayesian MCMC diagnostic plot artifacts.
-This document records the
-implemented shell UX, script
-runner, command-language model, active DuckDB relation model, session-local named table registry,
-lazy and remote load boundary, runtime configuration, plot artifact boundary, persistence boundary,
-join, append, reshape, panel metadata, and script primitive boundaries, and the boundaries future
+It has also completed Phase 21 (classical hypothesis testing), Phase 22 (advanced spatial models),
+and Phase 23 (data recoding & CSV/Feather/Arrow ingestion format expansion).
+This document records the implemented shell UX, script runner, command-language model, active DuckDB
+relation model, session-local named table registry, lazy and remote load boundary, runtime configuration,
+plot artifact boundary, persistence boundary, join, append, reshape, panel metadata, script primitive
+boundaries, econometrics state, classical testing, and recoding parameters, and the boundaries future
 phases should preserve.
 
 ## Runtime Flow
+
+Last Reviewed: 2026-06-20
+Status: Verified
 
 ```text
 CLI Shell / prompt-toolkit UX
@@ -36,6 +40,9 @@ CLI Shell / prompt-toolkit UX
 ```
 
 ## Component Responsibilities
+
+Last Reviewed: 2026-06-20
+Status: Verified
 
 ### CLI Shell
 
@@ -92,6 +99,9 @@ Phase 19 parsing now adds ML/spatial commands including
 `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`, and
 `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`.
 `predict` also accepts the Bayesian MCMC-only `posterior_predictive` mode after `bayes:` fits.
+Phase 21 parsing adds classical testing commands `test`, `lincom`, and `ttest` with Stata-style restriction and evaluation options.
+Phase 22 parsing adds `spregress <y> <xvars>[, weights(<path>) model(sarar) ...]` support.
+Phase 23 parsing adds `recode` commands with value replacement rules mapping to `generate(...)` or `replace`, and `use` option parameters `delimiter(<char>)` and `has_header(true|false)`.
 It may represent parsed-only future commands, but execution remains an executor or CLI-edge
 responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
 exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
@@ -151,6 +161,9 @@ preserving row order. `estat bayes` can report bounded in-terminal MCMC diagnost
 plot artifact boundary.
 Estimation-family state is explicit: running one family clears stale state from the others to
 prevent cross-family `estat` reuse.
+Phase 21 adds Wald/F restriction and joint significance tests (`test`), linear combination parameter calculations (`lincom`), and t-tests (`ttest`) over active variables.
+Phase 22 adds `spregress ... model(sarar)` GMM Combo estimation and dynamic out-of-sample weights matrix reconstruction/alignment for spatial lag prediction.
+Phase 23 executes value/range recoding rules via the `recode` command, ensuring type safety and DuckDB compatibility.
 
 ### DuckDB Backend
 
@@ -187,6 +200,8 @@ SQL commands bind the active relation as the user-facing DuckDB view `active`. I
 report an unknown row count until a live count or materializing operation runs.
 For Phase 13 prediction workflows, the backend materializes linear `xb` or residual expressions into
 new active-dataset columns through the existing active-relation replacement path.
+Phase 22 out-of-sample predictions compute/align/subset spatial weight matrices from `.gal`, `.gwt`, and `.shp` files or coordinate columns.
+Phase 23 ingestion format expansion loads `.csv` datasets with configurable delimiters and headers, and `.feather`/`.arrow` datasets via PyArrow-backed temporary views.
 
 For visualization commands, the backend extracts typed rows or frequency counts from the active
 table. It does not construct charts or write artifact files.
@@ -206,6 +221,9 @@ Converts structured command results into deterministic terminal text. The backen
 display formatting.
 
 ## Current Repository State
+
+Last Reviewed: 2026-06-20
+Status: Verified
 
 - Product docs are in `docs/project_proposal.md`, `docs/dev_phase.md`, and `docs/phase0_product_guardrails.md`.
 - Initial command scope is in `docs/command_glossary_v0.md`.
@@ -310,6 +328,9 @@ display formatting.
   `estat overid`, and `predict <newvar>[, xb residuals]`, plus
   `xtlogit <y> <xvars>, fe [robust]`, and
   `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
+- Phase 21 classical hypothesis testing commands `test`, `lincom`, and `ttest` are executable.
+- Phase 22 advanced spatial models command `spregress ... model(sarar)` GMM Combo estimation and out-of-sample prediction are executable.
+- Phase 23 recoding command `recode` and expanded format ingestion (`.csv`, `.feather`, `.arrow`) are executable.
 - `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
   observation count, entity/time counts, per-entity min/max counts, and balancedness.
 - Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
@@ -318,6 +339,9 @@ display formatting.
 - Inline suggestions are history-based and persisted via `~/.tabdat_history`.
 
 ## Development Boundaries
+
+Last Reviewed: 2026-06-20
+Status: Verified
 
 - Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
 - Do not add broad command grammar before a command contract needs it.
