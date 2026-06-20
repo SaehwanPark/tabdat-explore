@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import html
 from pathlib import Path
 
 import altair as alt
@@ -36,26 +36,35 @@ def generate_html_report(
   if residuals is None or fitted_values is None:
     raise ExecutionError("estat report failed: missing residuals or fitted values in fitted model")
 
-  residuals = np.array(residuals, dtype=float)
-  fitted_values = np.array(fitted_values, dtype=float)
+  # Squeeze/ravel to 1D arrays
+  residuals = np.ravel(residuals).astype(float)
+  fitted_values = np.ravel(fitted_values).astype(float)
 
   # actual = fitted + resid
   # In case model.endog is available, we can use it, but fitted + resid
   # is mathematically identical for OLS.
   actual_values = getattr(getattr(fitted_model, "model", None), "endog", None)
   if actual_values is not None:
-    actual_values = np.array(actual_values, dtype=float)
+    actual_values = np.ravel(actual_values).astype(float)
   else:
     actual_values = fitted_values + residuals
 
+  # Filter out non-finite entries (NaN/inf) from the arrays
+  valid_mask = np.isfinite(residuals) & np.isfinite(fitted_values) & np.isfinite(actual_values)
+  residuals = residuals[valid_mask]
+  fitted_values = fitted_values[valid_mask]
+  actual_values = actual_values[valid_mask]
+
   n = len(residuals)
-  if n == 0:
-    raise ExecutionError("estat report failed: zero observations in fitted model")
+  if n < 2:
+    raise ExecutionError(
+      "estat report requires at least 2 complete observations to calculate statistics"
+    )
 
   # Standardized residuals
   resid_mean = np.mean(residuals)
   resid_std = np.std(residuals, ddof=1)
-  if resid_std == 0:
+  if not np.isfinite(resid_std) or resid_std == 0:
     resid_std = 1.0  # Avoid division by zero
   std_residuals = (residuals - resid_mean) / resid_std
 
@@ -79,7 +88,7 @@ def generate_html_report(
   line_x = np.array([np.min(theoretical_quantiles), np.max(theoretical_quantiles)])
   line_y = slope * line_x + intercept
 
-  # 1. Residuals vs Fitted Plot
+  # Construct plotting DataFrames
   df_res_fit = pd.DataFrame(
     {
       "fitted": fitted_values,
@@ -87,6 +96,36 @@ def generate_html_report(
       "index": np.arange(n),
     }
   )
+
+  df_qq = pd.DataFrame(
+    {
+      "theoretical": theoretical_quantiles,
+      "standardized": sorted_std_residuals,
+      "index": np.arange(n),
+    }
+  )
+
+  df_act_fit = pd.DataFrame(
+    {
+      "fitted": fitted_values,
+      "actual": actual_values,
+      "index": np.arange(n),
+    }
+  )
+
+  # Performance Downsampling: Sample at most 5,000 observations to keep HTML
+  # generation/rendering fast.
+  MAX_PLOT_POINTS = 5000
+  if n > MAX_PLOT_POINTS:
+    # Use deterministic seeding to make the sample consistent across runs of the same model fit
+    rng = np.random.default_rng(seed=42)
+    sample_indices = rng.choice(n, size=MAX_PLOT_POINTS, replace=False)
+
+    df_res_fit = df_res_fit.iloc[sample_indices].reset_index(drop=True)
+    df_qq = df_qq.iloc[sample_indices].reset_index(drop=True)
+    df_act_fit = df_act_fit.iloc[sample_indices].reset_index(drop=True)
+
+  # 1. Residuals vs Fitted Plot
   chart_res_fit = (
     alt.Chart(df_res_fit)
     .mark_point(color="#3b82f6", opacity=0.7)
@@ -110,13 +149,6 @@ def generate_html_report(
   plot_res_fit = (chart_res_fit + line_y0).interactive()
 
   # 2. Normal Q-Q Plot
-  df_qq = pd.DataFrame(
-    {
-      "theoretical": theoretical_quantiles,
-      "standardized": sorted_std_residuals,
-      "index": np.arange(n),
-    }
-  )
   chart_qq = (
     alt.Chart(df_qq)
     .mark_point(color="#8b5cf6", opacity=0.7)
@@ -124,7 +156,7 @@ def generate_html_report(
       x=alt.X("theoretical:Q", title="Theoretical Quantiles"),
       y=alt.Y("standardized:Q", title="Standardized Residuals"),
       tooltip=[
-        alt.Tooltip("index:Q", title="Sorted Index"),
+        alt.Tooltip("index:Q", title="Observation Index"),
         alt.Tooltip("theoretical:Q", title="Theoretical Quantile"),
         alt.Tooltip("standardized:Q", title="Standardized Residual"),
       ],
@@ -149,13 +181,6 @@ def generate_html_report(
   plot_qq = (chart_qq + line_qq).interactive()
 
   # 3. Actual vs Fitted Plot
-  df_act_fit = pd.DataFrame(
-    {
-      "fitted": fitted_values,
-      "actual": actual_values,
-      "index": np.arange(n),
-    }
-  )
   chart_act_fit = (
     alt.Chart(df_act_fit)
     .mark_point(color="#10b981", opacity=0.7)
@@ -184,38 +209,44 @@ def generate_html_report(
   )
   plot_act_fit = (chart_act_fit + line_identity).interactive()
 
-  # Convert charts to JSON specs
-  spec_res_fit = json.dumps(plot_res_fit.to_dict())
-  spec_qq = json.dumps(plot_qq.to_dict())
-  spec_act_fit = json.dumps(plot_act_fit.to_dict())
+  # Convert charts to JSON specs (handling numpy types and escaping < for script tags)
+  spec_res_fit = plot_res_fit.to_json().replace("<", "\\u003c")
+  spec_qq = plot_qq.to_json().replace("<", "\\u003c")
+  spec_act_fit = plot_act_fit.to_json().replace("<", "\\u003c")
 
-  # Extract conf intervals
-  conf_int_lower = {}
-  conf_int_upper = {}
+  # Extract confidence intervals safely using positional index
+  conf_int_lower = []
+  conf_int_upper = []
   try:
     conf_ints = getattr(fitted_model, "conf_int", lambda: None)()
     if conf_ints is not None:
-      # conf_ints is pandas DataFrame with index representing variable names
-      for name in conf_ints.index:
-        conf_int_lower[name] = float(conf_ints.loc[name, 0])
-        conf_int_upper[name] = float(conf_ints.loc[name, 1])
+      conf_ints_arr = np.asarray(conf_ints)
+      for idx in range(len(result.coefficients)):
+        if idx < len(conf_ints_arr):
+          conf_int_lower.append(float(conf_ints_arr[idx, 0]))
+          conf_int_upper.append(float(conf_ints_arr[idx, 1]))
+        else:
+          conf_int_lower.append(None)
+          conf_int_upper.append(None)
   except Exception:
     pass
 
-  # Build coefficients table rows
+  # Build coefficients table rows with escaping
   coef_rows = []
-  for coef in result.coefficients:
-    low = conf_int_lower.get(coef.name)
-    high = conf_int_upper.get(coef.name)
+  for idx, coef in enumerate(result.coefficients):
+    low = conf_int_lower[idx] if idx < len(conf_int_lower) else None
+    high = conf_int_upper[idx] if idx < len(conf_int_upper) else None
 
     std_err_str = f"{coef.standard_error:.6f}" if coef.standard_error is not None else ""
     stat_str = f"{coef.statistic:.4f}" if coef.statistic is not None else ""
     p_val_str = f"{coef.p_value:.4f}" if coef.p_value is not None else ""
     ci_str = f"[{low:.6f}, {high:.6f}]" if (low is not None and high is not None) else ""
 
+    escaped_name = html.escape(coef.name)
+
     coef_rows.append(
       f"<tr>\n"
-      f"  <td style='font-weight: 500;'>{coef.name}</td>\n"
+      f"  <td style='font-weight: 500;'>{escaped_name}</td>\n"
       f"  <td class='number'>{coef.value:.6f}</td>\n"
       f"  <td class='number'>{std_err_str}</td>\n"
       f"  <td class='number'>{stat_str}</td>\n"
@@ -224,12 +255,12 @@ def generate_html_report(
       f"</tr>"
     )
 
-  # Render HTML template
+  # Render HTML template with escaping for text fields
   html_content = _HTML_TEMPLATE.format(
-    outcome=result.outcome,
-    predictors=", ".join(result.predictors),
-    estimator=result.estimator.upper(),
-    covariance=result.covariance,
+    outcome=html.escape(result.outcome),
+    predictors=", ".join(html.escape(pred) for pred in result.predictors),
+    estimator=html.escape(result.estimator.upper()),
+    covariance=html.escape(result.covariance),
     observations=result.observation_count,
     r_squared=f"{result.r_squared:.4f}" if result.r_squared is not None else "",
     adj_r_squared=f"{result.adjusted_r_squared:.4f}"
@@ -260,9 +291,9 @@ _HTML_TEMPLATE = """<!DOCTYPE html>
     href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
     rel="stylesheet"
   >
-  <!-- Load Vega Embed -->
+  <!-- Load Vega Embed (Using Vega-Lite v6 CDN imports to match Altair spec version) -->
   <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@6"></script>
   <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
   <style>
     :root {{
