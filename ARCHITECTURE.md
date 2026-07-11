@@ -25,6 +25,37 @@ plot artifact boundary, persistence boundary, join, append, reshape, panel metad
 boundaries, econometrics state, classical testing, and recoding parameters, and the boundaries future
 phases should preserve.
 
+## Documentation Ownership
+
+Last Reviewed: 2026-07-11
+Status: Needs Review
+
+This file should converge on durable components, dependency direction, state transitions, and
+invariants. Its cumulative phase ledger is retained as historical context until deliberately
+migrated. Current command availability belongs in a capability matrix, historical additions in
+`CHANGELOG.md`, and major choices in ADRs. Phase 24 enqueues that migration; it is not complete.
+
+## Target Capability Layers
+
+Last Reviewed: 2026-07-11
+Status: Needs Review
+
+```text
+tabdat-core
+  -> tabdat-stats
+      -> specialized capabilities: bayes | spatial | R | ML
+```
+
+The arrows describe allowed dependency growth: core must not depend on statistical or specialized
+runtimes, and conventional statistics must not require unrelated specialized runtimes. The
+existing typed adapter registry is the intended capability boundary. This is a target constraint,
+not a claim about the current dependency graph or packaging.
+
+Phase 24 must measure install size, cold startup, portability, and import behavior before an ADR
+chooses optional dependency groups or separate distributions. Missing optional capabilities must
+fail at their command boundary with actionable guidance; routine EDA must not import R, Bayesian,
+spatial, or ML stacks.
+
 ## Runtime Flow
 
 Last Reviewed: 2026-06-20

@@ -633,6 +633,51 @@ libraries instead of bespoke estimators.
 
 ---
 
+## Phase 24 — Product-Center Stabilization & Public Preview
+
+**Goal:** Validate TabDat's core terminal-EDA thesis and reduce installation, semantic, and trust
+risk before resuming breadth expansion.
+
+### Priority Order
+
+1. Publish and benchmark one unmistakable Parquet-first journey from lazy load through
+   deterministic script replay and export.
+2. Specify cross-command identifiers, missingness, coercion, ordering, overwrite, randomness,
+   estimation-sample, error, and exit semantics.
+3. Expose backend, source, lazy/materialized state, operation lineage, known row counts,
+   materialization reasons, and estimation sample.
+4. Add stable JSON/JSONL output, structured discovery, dry-run/explain, and repair diagnostics.
+5. Expand golden and differential testing and publish a trusted-reference statistical matrix.
+6. Measure install/startup costs and formalize core, stats, and specialized dependency capabilities.
+7. Resolve naming/versioning, separate architecture/capabilities/history/ADRs, test clean installs
+   and portability, and gather external workflow feedback.
+
+### Sequencing Constraint
+
+Net-new estimator families and broad integrations remain queued until this phase exits. Existing
+estimators remain supported and may receive correctness, compatibility, and documentation fixes.
+Packaging must follow measurements and an ADR; conceptual layers do not by themselves require
+multiple repositories or distributions.
+
+### Exit Gate
+
+* A clean core install completes the canonical EDA workflow without R, Bayesian, spatial, or ML runtimes.
+* Interactive and scripted runs are deterministic and have equivalent state transitions.
+* Users can inspect execution and materialization boundaries without causing materialization.
+* Stable language and machine-output contracts are documented and covered by focused tests.
+* Shared backend/eager/lazy behavior has differential coverage.
+* Statistical commands have a published support matrix and reference-validation status.
+* Naming, versioning, dependency layering, and documentation ownership are recorded decisions.
+* At least one external-user feedback round has been captured and triaged.
+
+### Non-goals
+
+* Removing completed estimator surfaces solely to simplify the roadmap
+* Adding another estimator as evidence of product readiness
+* Splitting packages before dependency and startup measurements justify it
+
+---
+
 # Development Strategy (Critical)
 
 ## 1. Build Vertical, Not Horizontal

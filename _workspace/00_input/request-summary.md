@@ -1,26 +1,31 @@
-# Request Summary: Phase 19 — Out-of-Sample Bayesian Prediction
+# Request Summary: Product-Center Stabilization Queue
 
 ## Goal
-Extend the MCMC Bayesian prefix prediction workflow (`predict`) to support richer out-of-sample predictions:
-1. Support standard deviation of predictions (`std` option) written to the active dataset.
-2. Support exporting raw posterior predictive MCMC draws (`saving()` option) to an external Parquet file.
-3. Validate and verify that these predictions function out-of-sample, including on datasets where the outcome variable is missing.
+
+Convert external strategic feedback into durable SDD action items that refocus TabDat on fast,
+transparent, reproducible terminal EDA before further estimator expansion.
 
 ## Phase Fit
-Phase 19: Modern Extensions (deferred items).
+
+Planning-only Phase 24 stabilization and public-preview readiness. This supersedes the prior
+assumption that Phase 19 estimator extensions are the next default development queue.
 
 ## Touched Surfaces
-- `models.py` (PredictCommand model updates)
-- `parser.py` (predict command option parsing)
-- `executor.py` (predict execution mapping and Bambi integration)
-- `shell.py` (predict option autocompletions)
-- Help topics (`predict.md`, `bayes_prefix.md`)
-- Tests (`test_executor.py`)
+
+- `SPEC.md`: prioritized Future queue with verification and non-goals
+- `docs/dev_phase.md`: Phase 24 sequencing and release gate
+- `docs/project_proposal.md`: layered product direction and product-center clarification
+- `ARCHITECTURE.md`: proposed dependency layers and documentation separation
+- `CHANGELOG.md`: contributor-visible planning change
 
 ## Assumptions
-- Estimation model is MCMC-based (`bayes:` prefix regress/logit).
-- Predictors exist in target dataset; outcome variable does not need to exist.
+
+- Completed estimator work remains supported; this task does not remove commands.
+- Layer names describe product and dependency boundaries first; packaging is a later, measured decision.
+- The queue is ordered by product risk and dependency, not implementation convenience.
 
 ## Non-Goals
-- Adding out-of-sample options to frequentist estimators.
-- Storing MCMC draws inside the active dataset (must be exported to external file).
+
+- Implementing queued features or changing dependencies now.
+- Renaming project surfaces without availability research.
+- Claiming numerical parity before differential evidence exists.

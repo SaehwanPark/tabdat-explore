@@ -514,6 +514,54 @@ and describe the active work with concise verification criteria.
 
 ## Future
 
+- **P0 — Phase 24 product-center stabilization and public-preview gate**
+  - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
+  - create and benchmark one canonical Parquet-first workflow covering lazy load, inspection,
+    missingness, transformation, grouped summaries, deterministic script replay, and export
+  - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
+    categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
+  - add execution transparency for backend, source, lazy/materialized state, active operations,
+    row-count knowledge, materialization reasons, and retained estimation samples
+  - verification:
+    - the canonical workflow passes from a clean install in interactive and script modes
+    - documented semantics have focused parser/executor/backend/CLI tests
+    - transparency output is deterministic and does not trigger hidden materialization
+  - out of scope: new estimator families, broad remote connectors, or public plugin APIs
+- **P1 — Agent and automation interface**
+  - specify JSON or JSON Lines output, schema/result metadata, stable exit codes, structured command
+    discovery, dry-run/explain behavior, and repair-oriented diagnostics
+  - verification:
+    - representative EDA commands have versioned, snapshot-tested machine-readable envelopes
+    - interactive, script, and `-c` execution produce equivalent state transitions
+- **P1 — Differential and statistical assurance**
+  - add DuckDB/Polars and eager/lazy equivalence fixtures for their shared supported surface
+  - cover quoting, Unicode, paths, missingness, type edges, and terminal golden output
+  - create an estimator support matrix with options, sample rules, covariance conventions,
+    prediction semantics, trusted references, and tolerated numerical differences
+  - verification:
+    - every advertised estimator family has a trusted differential fixture or an explicit
+      unsupported/unverified label
+    - estimation-family invalidation and post-estimation compatibility are tested
+- **P1 — Layered dependency and extension architecture**
+  - formalize `tabdat-core`, `tabdat-stats`, and specialized Bayes/spatial/R/ML capability layers
+    using the existing typed adapter registry
+  - measure install size, cold startup, portability, and failure behavior before choosing optional
+    dependency groups or separate distributions
+  - verification:
+    - core EDA runs without importing or requiring specialized runtimes
+    - missing optional capabilities fail with concise installation guidance
+  - out of scope: separate repositories or a packaging split without measurements and an ADR
+- **P2 — Public identity, documentation separation, and validation**
+  - settle Product/Repository/PyPI/Python-package/CLI naming after availability research
+  - separate durable architecture and invariants from capability status and release history; record
+    DuckDB-primary, Polars fallback, R adapters, estimator-state invalidation, and dependency
+    layering as ADRs
+  - run release-readiness checks for installation, portability, startup latency, walkthroughs,
+    examples, compatibility, and external user feedback before choosing a preview version
+  - verification:
+    - naming and versioning decisions have migration plans and ADRs
+    - architecture has no cumulative phase ledger; capability and history have named homes
+
 - Phase 13+ statistical/econometric implementation policy:
   - approach order:
     1. use well-established Python libraries first when the method is directly supported or can be
@@ -535,5 +583,4 @@ and describe the active work with concise verification criteria.
   - **Broader Remote Connectors**: Database connectors (e.g. Postgres, Snowflake, BigQuery) and remote object storage credentials management (Phase 11 / Phase 18).
   - **Full Polars-Native Execution Backend**: Deep lazy execution optimizations completely within Polars instead of materializing to DuckDB for unsupported commands (Phase 7 / Phase 10).
   - **Advanced dynamic panel GMM / structural estimators**: Fuller dynamic panel model GMM and structural model replication tools (Phase 17).
-
 

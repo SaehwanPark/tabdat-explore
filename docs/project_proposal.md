@@ -234,6 +234,18 @@ This project addresses these needs directly.
 
 * R via `rpy2` (future phase)
 
+#### Layered Product Direction
+
+The product-defining core is terminal EDA: loading, inspection, transformation, joins/reshape,
+scripting, SQL, deterministic output, and execution transparency. Conventional statistics form a
+second capability layer. Bayesian, spatial, R, and ML integrations are specialized capabilities
+that must not be required to install or start the core workflow.
+
+These are dependency and product boundaries first. Whether they become optional dependency groups
+or separate distributions must be decided from installation-size, startup-latency, portability,
+and maintenance evidence. Until the public-preview readiness gate is met, correctness and workflow
+depth take priority over new estimator families.
+
 #### Packaging / Dev
 
 * Python + `uv`

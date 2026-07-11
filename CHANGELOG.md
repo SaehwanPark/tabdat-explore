@@ -4,6 +4,13 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+### Changed
+
+- Reprioritized the SDD roadmap around a Phase 24 product-center stabilization and public-preview
+  gate: canonical Parquet workflow, language semantics, execution transparency, automation output,
+  differential assurance, measured dependency layering, naming, and external validation now
+  precede new estimator-family expansion.
+
 ### Added
 
 - Added `estat report` post-estimation command for standard linear regressions (`regress`):
