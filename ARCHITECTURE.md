@@ -1,5 +1,7 @@
 # TabDat-Explore Architecture
 
+**See also:** [User guide](docs/user-guide.md) for behavior-oriented workflows and session concepts.
+
 TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
 linear econometrics with three `regress`/`predict`/`estat` slices, implemented thirteen Phase 14
 slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel

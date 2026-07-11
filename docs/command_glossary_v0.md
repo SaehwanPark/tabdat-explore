@@ -1,5 +1,8 @@
 # Command Glossary v0
 
+> **Note:** This is the historical Phase 0 glossary. For the current command index, see
+> [command-reference.md](command-reference.md).
+
 This glossary defines the first small command surface for TabDat-Explore. It is intentionally high level. Detailed syntax, output, and error behavior should be written in a command contract before implementation.
 
 ## Inspection And Loading

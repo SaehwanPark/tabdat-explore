@@ -14,6 +14,7 @@ Keep this file short and repo-wide. Detailed reusable workflows live under `.age
 - Keep the command surface small until each command has clear syntax, tests, useful errors, and documented behavior.
 
 ## How
+- Human contributors: start with [CONTRIBUTING.md](CONTRIBUTING.md) for setup and validation.
 - Install/sync with `uv sync`.
 - Run project commands through `uv run ...`.
 - Until a test suite exists, every implementation task should add or update focused tests and record the exact validation command in the final response.

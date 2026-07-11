@@ -1,190 +1,80 @@
 # TabDat-Explore
 
-TabDat-Explore is a terminal-native exploratory data analysis tool for modern tabular data.
-It is Stata-inspired in feel, but not Stata-compatible. The current implementation uses one active
-dataset, a session-local named table registry, DuckDB for execution, and Parquet as the primary
-input format.
+TabDat-Explore is a terminal-native exploratory data analysis tool for modern tabular data. It
+feels Stata-inspired, but it is **not** Stata-compatible.
 
-## What It Does
+## Who it's for
 
-TabDat-Explore is built for quick inspection and transformation of local datasets from the
-command line. The current CLI supports:
+TabDat is built for people who want fast, command-driven data work in a terminal:
 
-- loading a local `.parquet` file with `use`
-- inspecting structure with `describe`
-- computing summaries with `summarize`
-- column profiling with `codebook`
-- row counts with `count`
-- row previews with `head` and `tail`
-- column selection and row filtering with `keep`, `drop`, and `select`
-- renaming and deriving columns with `rename`, `generate`, and `replace`
-- frequency and aggregate crosstabs with `tabulate`
-- grouped aggregation with `collapse`
-- grouped commands with `by <vars>: summarize ...`, `by <vars>: count`, and
-  `by <vars>: tabulate ...`
-- SQL escape-hatch queries with `sql`, where the active dataset is available as `active`
-- session-local named tables with `sql ... into <table>` and `use <table>`
-- session-local panel metadata with `panel <id_var> <time_var>`, `panel`, and `panel clear`
-- artifact plots with `histogram`, `scatter`, and `bar`
-- opt-in lazy Parquet loading with `use data.parquet, lazy`
-- script execution with `tabdat -f analysis.td`, `tabdat analysis.td`, and `run analysis.td`
-- script-only `seed` metadata and `let` macros for reproducible scripts
-- project-local or explicit config for graph defaults
-- runtime settings with `set graph_format`, `set artifact_dir`, and `set graph_open`
-- Parquet persistence with `save` and `export`
-- linear regression with
-  `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
-- bounded machine-learning lasso regression with
-  `lasso linear <y> <xvars>[, alpha(<num>) noconstant]`
-- post-selection linear inference with
-  `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`
-- partial-linear double/debiased machine learning with
-  `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
-- bounded machine-learning ridge regression with
-  `ridge linear <y> <xvars>[, alpha(<num>) noconstant]`
-- bounded machine-learning elastic-net regression with
-  `elasticnet linear <y> <xvars>[, alpha(<num>) l1_ratio(<num>) noconstant]`
-- cross-validated hyperparameter selection with `cvlasso`, `cvridge`, and `cvelasticnet`
-- Bayesian linear regression with
-  `bayes linear <y> <xvars>[, n_iter(<int>) tol(<num>) noconstant]`
-- Bayesian MCMC workflows with `bayes [, options]: regress|logit ...`, `estat bayes`,
-  `predict <newvar>, posterior_predictive [interval level(<num>)]`, and
-  `bayesplot <trace|density|autocorrelation>`
-- spatial regression with
-  `spregress <y> <xvars>, coord(<lat> <lon>) [model(lag|error) knn(<k>) robust]`
-- same-sample spatial spillover prediction with
-  `predict <newvar>, spatial_lag` after `spregress ... model(lag)`
-- doubly robust difference-in-differences with
-  `drdid <y> [covariates], treat(<var>) post(<var>) [method(or|ipw|aipw) robust bootstrap(<n>) seed(<n>)]`
-- quantile regression with
-  `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`
-- bounded panel-metadata DID with
-  `did <y> [controls], treat(<var>) post(<var>) [robust]` after `panel <id_var> <time_var>`
-- bounded dynamic-panel GMM starter with
-  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` after `panel <id_var> <time_var>`
-- bounded nonlinear panel logit starter with
-  `xtlogit <y> <xvars>, fe [robust]` after `panel <id_var> <time_var>`
-- bounded nonparametric smoothing with
-  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`
-- binary-choice logistic regression with
-  `logit <y> <xvars>[, robust cluster(<var>) noconstant]`
-- binary-choice probit regression with
-  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`
-- limited-dependent Tobit regression with
-  `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`
-- sample-selection Heckman-style regression with
-  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`
-- bounded nonlinear least-squares regression with
-  `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`
-- Poisson count regression with
-  `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`
-- negative-binomial count regression with
-  `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`
-- zero-inflated Poisson count regression with
-  `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
-- zero-inflated negative-binomial count regression with
-  `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`
-- bounded parametric survival regression with
-  `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential) [robust cluster(<var>) noconstant]`
-- instrumental-variables regression with
-  `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
-- control-function regression with
-  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`
-- panel regression with
-  `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` after `panel <id_var> <time_var>`
-- panel-data transforms with
-  `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`
-- prediction workflows with
-  `predict <newvar>[, xb residuals pr spatial_lag posterior_predictive interval level(<num>)]`
-- post-estimation diagnostics with
-  `estat <residuals|ovtest|vif|firststage|overid|hausman|endogenous|margins|gof|did|drdid|dml|bayes>`
-- interactive shell UX with command history, inline history suggestions, syntax highlighting, and
-  context-aware autocomplete
+- **Statisticians and analysts** who like concise inspection and summary workflows
+- **CLI-oriented data scientists** who want reproducible scripts without notebook overhead
+- **Engineers and analysts working with Parquet** who need lightweight local exploration
 
-The repository is at **v0.22.0**. It has completed Phase 1–12 core infrastructure, three Phase
-13 linear-econometrics slices, thirteen Phase 14 IV/panel slices, seven Phase 15 nonlinear
-estimation slices (`logit`, `probit`, `estat margins`, binary `predict`, `tobit`, `heckman`,
-`nl`), four Phase 16 count/survival slices (`poisson`, `nbreg`, `zip`, `zinb`, `streg`), seven
-Phase 17 advanced-empirics slices (`qreg`, `did`, `xtabond`, `xtlogit`, `lowess`), three Phase 18
-ingestion/demo/registry slices, thirteen Phase 19 ML/Bayesian/spatial extension slices (`lasso`,
-`postlasso`, `dml`, `bayes`, `bayes:`, `bayesplot`, `spregress`, `ridge`, `elasticnet`,
-`cvlasso`, `cvridge`, `cvelasticnet`), and Phase 20 doubly robust DID (`drdid`).
+## Why TabDat
 
+- **Fast terminal EDA** — inspect, filter, summarize, and plot without leaving the shell
+- **Scriptable workflows** — save repeatable analysis in `.td` script files
+- **Modern tabular formats** — Parquet-first, with CSV, Feather, Arrow, and Stata `.dta` support
+- **Concise commands** — expressive syntax for routine tasks, with SQL when you need it
+
+See the [project proposal](docs/project_proposal.md) for the full product vision. Release history
+is in [CHANGELOG.md](CHANGELOG.md).
 
 ## Quickstart
 
-1. Install dependencies:
+### Prerequisites
 
-   ```bash
-   uv sync
-   ```
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/)
 
-2. Run the CLI against a Parquet file:
+### Install from source
 
-   ```bash
-   uv run tabdat -c "use data.parquet" -c "describe" -c "summarize age bmi"
-   ```
+PyPI publication is planned. For now, install from the repository:
 
-   For larger Parquet workflows, opt into lazy loading:
+```bash
+git clone https://github.com/SaehwanPark/tabdat-explore.git
+cd tabdat-explore
+uv sync
+```
 
-   ```bash
-   uv run tabdat -c "use data.parquet, lazy" -c "keep if age >= 18" -c "summarize age bmi"
-   ```
+### First run
 
-   `engine=polars` is currently accepted as an experimental metadata selector. Command execution
-   still runs through the DuckDB relation boundary.
+Run a few commands against a Parquet file:
 
-3. Run a script:
+```bash
+uv run tabdat -c "use data.parquet" -c "describe" -c "summarize age bmi"
+```
 
-   ```bash
-   uv run tabdat -f analysis.td
-   uv run tabdat analysis.td
-   ```
+### Interactive shell
 
-   Script files use one command per non-empty line. Whole-line `#` comments are ignored,
-   multiline `sql """..."""` blocks are supported, and script-local `seed <integer>` plus
-   `let <name> = <value>` directives can make runs easier to reproduce.
+Start the shell and work at the `tabdat>` prompt:
 
-   ```stata
-   seed 123
-   let data = patients.parquet
-   use $data
-   ```
+```bash
+uv run tabdat
+```
 
-4. Configure plot defaults when needed:
+The shell provides command history, syntax highlighting, inline history suggestions, and
+context-aware autocomplete.
 
-   ```toml
-   # .tabdat.toml
-   graph_format = "png"
-   artifact_dir = "artifacts"
-   graph_open = false
-   ```
+### Discover commands
 
-   Or load an explicit config:
+Use in-app help for syntax and options:
 
-   ```bash
-   uv run tabdat --config project.tabdat.toml -f analysis.td
-   ```
+```text
+tabdat> help use
+tabdat> help summarize
+```
 
-5. Persist a transformed dataset:
+Or in batch mode:
 
-   ```bash
-   uv run tabdat -c "use data.parquet" -c "keep if age >= 18" -c "save adults.parquet"
-   ```
+```bash
+uv run tabdat -c "help regress"
+```
 
-6. Start the interactive shell:
+For lazy loading, scripts, configuration, and plots, see the [user guide](docs/user-guide.md).
 
-   ```bash
-   uv run tabdat
-   ```
-
-   Then enter commands at the `tabdat>` prompt.
-
-   The interactive shell uses command history at `~/.tabdat_history`, suggests prior commands
-   inline, and completes command names, active dataset column names, common options, and lightweight
-   SQL helpers.
-
-## Example Session
+## Example session
 
 ```text
 tabdat> use data.parquet
@@ -200,6 +90,9 @@ age       INTEGER
 bmi       DOUBLE
 sex       VARCHAR
 cost      DOUBLE
+
+tabdat> help summarize
+# ... in-app help for summarize ...
 
 tabdat> summarize age bmi
 Variable  Count  Mean  Std Dev  Min  Max
@@ -217,122 +110,36 @@ Created summary: 2 rows, 2 columns
 tabdat> use summary
 Activated: summary (2 rows, 2 columns)
 
-tabdat> panel sex age
-Panel set: id=sex, time=age
-
-tabdat> panel
-Panel: id=sex, time=age
-
-tabdat> set graph_format png
-Set graph_format: png
-
 tabdat> save transformed.parquet
 Saved: transformed.parquet (3 rows, 4 columns)
 
 tabdat> run analysis.td
 ```
 
-## Design Notes
+Panel metadata, plot defaults, and other session details are covered in the
+[user guide](docs/user-guide.md).
 
-- One active dataset remains the default command target, while session-local named tables let SQL
-  `into` results be reactivated later with `use <table>`.
-- DuckDB is the primary execution engine.
-- Parquet is the primary data format.
-- `use data.parquet` remains eager. `use data.parquet, lazy` creates a DuckDB Parquet scan view and
-  reports the active lazy engine; `engine=duckdb|polars` can be supplied for explicit lazy-engine
-  selection. The Polars selector is experimental until Polars-native command execution is designed.
-- Lazy `use` validates readability and schema through DuckDB, but does not count rows at load time.
-  Run `count` for a live row count. Transformations currently materialize the active relation after
-  the first lazy transformation.
-- SQL is an escape hatch, not the main interface. `sql ... into <table>` creates a session-local
-  named table, makes it active, and does not persist a file.
-- Panel metadata is session-local and data-only commands do not write it into saved Parquet files.
-  The active id/time pair must have no missing values and must uniquely identify rows.
-- Plots are saved artifacts. Interactive sessions open generated plot files by default; batch
-  `-c` and script runs only print the saved path.
-- Default plot paths use `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Interactive shell
-  reruns avoid collisions with `-2`, `-3`, and later suffixes, while batch and script runs keep
-  the stable unsuffixed default path. Use `saving(...)` for explicit artifact paths.
-- Runtime settings apply for the current session only. Startup config precedence is
-  `--config <path>`, then project-local `.tabdat.toml`, then XDG user config at
-  `~/.config/tabdat/config.toml` or `$XDG_CONFIG_HOME/tabdat/config.toml`.
-  These config files support `graph_format`, `artifact_dir`, and `graph_open`.
-- `save <path>[, replace]` and `export <path>[, replace]` persist the active dataset as local
-  Parquet. Existing files require `replace`.
-- `regress` currently fits OLS/WLS/GLS through `statsmodels` and supports `robust`,
-  `cluster(<var>)`, `noconstant`, `wls(<weight_var>)`, and `gls(<sigma_var>)`.
-- `postlasso` runs Lasso selection through `scikit-learn` and refits OLS through `statsmodels` on
-  selected predictors. It supports `robust` HC1 covariance, but does not yet add `predict`
-  routing.
-- `dml` estimates binary-treatment ATEs with cross-fitted Lasso nuisances and an OLS final stage.
-  Use `estat dml` for fold, overlap, and nuisance-fit diagnostics.
-- `predict` writes fitted values (`xb`) or residuals into a new active-dataset column using the
-  latest `regress`/`qreg`/`cfregress`/`nl` model state, supports `xb` after `did`, supports
-  `xb`/`residuals` after `xtabond`, supports `pr` (plus `xb`) after `logit`/`probit`, and supports
-  `xb` only after `lasso linear`.
-- `tobit` currently provides a bounded limited-dependent path with required `ll(...)`, optional
-  `ul(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) through an R adapter
-  boundary (`survival::survreg` via `rpy2`).
-- `heckman` currently provides a bounded sample-selection path with required `selectdep(...)`,
-  required `select(...)`, and covariance modes (`nonrobust`, `robust`, `cluster(...)`) with
-  deterministic outcome/selection equation output.
-- `estat` currently provides:
-  - linear-model diagnostics (`residuals`, `ovtest`, `vif`) over the latest `regress` state
-  - quantile residual diagnostics (`residuals`) over the latest `qreg` state
-  - IV diagnostics (`firststage`, `overid`, `endogenous`) over the latest `ivregress` state
-  - dynamic-panel overidentification diagnostics (`overid`) over the latest `xtabond` state
-  - panel model comparison (`hausman`) over matching latest `xtreg` FE/RE states
-  - control-function endogenous diagnostics (`endogenous`) over the latest `cfregress` state
-    with deterministic residual-inclusion metrics:
-    `test`, `estimate`, `std_error`, `statistic`, `p_value`, `ci_level`, `ci_lower`, `ci_upper`,
-    `distribution`, and `df`
-  - DID post-estimation interaction diagnostics (`did`) over the latest `did` state
-- `ivregress` currently provides Python-first IV/2SLS and IV-GMM paths via `linearmodels` with
-  `endog(...)`, `iv(...)`, `robust`, `cluster(...)`, and `noconstant`.
-- `estat endogenous` after `ivregress` is currently scoped to prior `ivregress 2sls` fits and
-  reports Durbin/Wu-Hausman diagnostics.
-- `cfregress` currently provides a bounded two-step control-function path (first-stage endogenous
-  fit plus second-stage outcome fit with residual inclusion) for one endogenous variable.
-- `xtreg` currently provides Python-first `linearmodels` FE/RE estimation with `robust` and
-  `cluster(...)` covariance options; `estat hausman` currently supports non-cluster FE/RE pairs.
-- `xtdata` currently provides panel-index-aware within/between transforms for numeric variables and
-  appends deterministic `<var>_within` or `<var>_between` columns.
-- `xtlogit` currently provides a bounded fixed-effects nonlinear panel binary-choice workflow via
-  `xtlogit <y> <xvars>, fe [robust]`.
-- `xtabond` currently provides a bounded dynamic-panel AR(1) GMM starter with nonrobust/robust
-  covariance modes plus `lags(#)` and `instlag(#)` controls, plus `estat overid` and
-  `predict <newvar>[, xb residuals]`. The Python IV-GMM path is primary; an R-backed fallback path
-  is available when Python fitting fails.
-- `lowess` currently provides a bounded nonparametric smoothing transform workflow via
-  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
-- Scripts print deterministic run metadata, echo each expanded command as `. <command>`, fail fast
-  on the first error, and include file and line number diagnostics. `seed <integer>` records
-  script-run metadata, and `let <name> = <value>` defines plain text macros that expand as `$name`
-  in later script entries and nested `run` scripts. Loops and inline comments are deferred, while
-  script-level `if` / `else` / `end` conditionals are supported.
-- Named table registries are not persisted across CLI sessions; use `save` or `export` for durable
-  Parquet output.
-- Autocomplete is best-effort UX help. The parser and executor remain authoritative for validation
-  and error messages.
-- The terminal experience is part of the product, not an afterthought.
+## What you can do
 
-## Project Docs
+| Area | Commands | What they help with |
+|------|----------|---------------------|
+| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `head`, `count` | Open data and understand structure |
+| Transform | `keep`, `drop`, `select`, `generate`, `rename`, `recode` | Filter, reshape, and derive columns |
+| Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
+| Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |
+| ML and causal | `lasso`, `dml`, `bayes`, `spregress`, `drdid`, … | Regularization, Bayesian, spatial, DID |
+| Visualize | `histogram`, `scatter`, `bar` | Save plot artifacts from the shell |
+| Scripts and I/O | `run`, `save`, `export`, `sql` | Reproducible scripts and Parquet output |
 
-- [Project proposal](docs/project_proposal.md)
-- [Development roadmap](docs/dev_phase.md)
-- [Phase 0 product guardrails](docs/phase0_product_guardrails.md)
-- [Command glossary v0](docs/command_glossary_v0.md)
-- [Architecture notes](ARCHITECTURE.md)
-- [Spec status](SPEC.md)
+**Full syntax and options:** [command reference](docs/command-reference.md) and `help <command>`.
 
-## Validation
+## Learn more
 
-This repository uses `uv` for commands, `pytest` for tests, `mypy` for type checking, and `ruff`
-for linting and formatting.
+- [User guide](docs/user-guide.md) — sessions, lazy loading, scripts, config, plots, estimation
+- [Command reference](docs/command-reference.md) — categorized command index
+- [Project proposal](docs/project_proposal.md) — product vision (optional deep read)
 
-```bash
-uv run mypy
-uv run pytest
-uv run ruff check .
-uv run ruff format --check .
-```
+## Contributing
+
+Interested in developing TabDat? See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, validation
+commands, and links to architecture and spec docs.
