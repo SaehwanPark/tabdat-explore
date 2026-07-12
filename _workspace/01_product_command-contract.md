@@ -1,92 +1,101 @@
-# Product Contract: Phase 24 P0 — Canonical Parquet Workflow
+# Product Contract: Phase 24 P0 — Read-Only Status Transparency
 
 ## Request Summary
 
-Publish one runnable, reproducible terminal EDA journey and make its integrated validation output
-include repeatability and timing evidence.
+Expose the current execution boundary through a deterministic, read-only `status` command that
+does not trigger a backend scan or lazy materialization.
 
 ## Roadmap Phase
 
-Phase 24 P0, workstream 1: product-center stabilization and public-preview readiness.
+Phase 24 P0, workstream 3: execution transparency before command-catalog expansion.
+
+## Command Syntax
+
+```text
+status
+```
+
+`status` accepts no arguments, options, conditions, or assignment syntax.
+
+## Output Contract
+
+The terminal output is a stable labeled summary with these fields, in this order:
+
+```text
+Backend: duckdb
+Source: <path-or-uri|none>
+Active table: <name|none>
+Execution mode: <eager|lazy|none>
+Lazy engine: <duckdb|polars|none>
+Materialization: <materialized|deferred|none>
+Rows: <integer|unknown|none>
+Columns: <integer|none>
+```
+
+For an eager active dataset, materialization is `materialized`; for a lazy active dataset it is
+`deferred`. `Rows: unknown` reports an active lazy dataset whose row count has not been recorded.
+After `count`, the executor records the live count in session metadata and `status` reports that
+integer without changing the existing `count` output.
+
+With no active dataset, backend remains `duckdb` and the remaining dataset fields are `none`.
 
 ## Product Outcome
 
 TabDat demonstrates that it is the fastest, clearest, and most reproducible terminal workflow for
 first-pass exploration of modern tabular data. Conventional statistics remain available, while
-specialized integrations no longer determine the installation or product narrative of the core.
+specialized integrations no longer determine the installation or product narrative of the core;
+users can see the current execution boundary before choosing a potentially materializing command.
 
-## Published Workflow
+## Execution Semantics
 
-Tracked script: `demos/canonical_parquet_eda.td`.
+- The parser creates a `StatusCommand` with no backend access.
+- The executor builds `StatusResult` from `SessionState.active_dataset`,
+  `SessionState.active_table_name`, and the fixed DuckDB backend identity.
+- `status` is dispatched before the existing Polars lazy materialization hook.
+- The formatter renders only the structured result; it does not inspect or count the backend.
+- The command is valid in interactive, script, and `-c` execution modes.
 
-The script expects a Titanic-shaped Parquet dataset with `age`, `fare`, `sibsp`, `parch`, and
-`class` columns. It performs these steps in order:
+## Examples
 
-1. Set source and output paths with script macros.
-2. Load the source lazily through DuckDB.
-3. Inspect structure and row count with `describe` and `count`.
-4. Inspect missingness and representative values with `codebook`.
-5. Filter adults and derive `family_size`.
-6. Run overall and `by class:` summaries.
-7. Collapse the transformed data to class-level means.
-8. Export the transformed summary as Parquet.
-
-Clean-checkout acceptance invocation (prepares the fixture and runs the script twice):
-
-```bash
-uv run python integrated_testing/run_e2e.py s6_canonical_parquet_workflow
+```text
+tabdat> status
+Backend: duckdb
+Source: none
+Active table: none
+Execution mode: none
+Lazy engine: none
+Materialization: none
+Rows: none
+Columns: none
 ```
 
-After the harness has prepared `artifacts/e2e/data/titanic.parquet`, the tracked script can also
-be run directly with `uv run tabdat -f demos/canonical_parquet_eda.td`. Users can point the `source`
-macro at another Parquet file with the same five-column minimum schema.
-
-## Integrated Benchmark Contract
-
-The `s6_canonical_parquet_workflow` harness scenario must:
-
-- use the existing Titanic public fixture converted to Parquet;
-- run the same tracked script twice in separate CLI processes;
-- require exit code `0` and empty stderr for both runs;
-- require both runs to emit the same stdout;
-- require both exported Parquet tables to have the same schema and rows, with three class rows and
-  four output columns;
-- record the wall-clock duration of each CLI run in `reports/latest/results.json` and the summary;
-- treat timings as observations, not a host-independent pass/fail threshold.
+```text
+tabdat> use data.parquet, lazy engine=duckdb
+tabdat> status
+Backend: duckdb
+Source: data.parquet
+Active table: none
+Execution mode: lazy
+Lazy engine: duckdb
+Materialization: deferred
+Rows: unknown
+Columns: 4
+```
 
 ## Acceptance Criteria
 
-- [x] The tracked script contains lazy Parquet load, inspection, missingness, transformation,
-  grouped summary, collapse, and export steps.
-- [x] The user guide explains the expected input columns, invocation, and output artifact.
-- [x] The integrated scenario verifies deterministic replay and exported-table equivalence.
-- [x] The integrated report records timing evidence for both replays.
-- [x] The scenario passes from a synced environment without modifying source or test fixtures.
-
-## Ordered Workstreams
-
-1. Publish one measured end-to-end Parquet workflow as the product acceptance journey.
-2. Specify cross-command language semantics and stable error/exit behavior.
-3. Add execution transparency (`status`/`explain`) before expanding the command catalog.
-4. Add deterministic machine-readable output and command discovery for agents and scripts.
-5. Strengthen golden, execution-mode, backend-differential, and estimator-reference testing.
-6. Measure startup/install costs, then design optional dependency and adapter boundaries.
-7. Resolve public naming and preview versioning using availability and migration evidence.
-8. Separate durable architecture, capability status, history, and ADR responsibilities.
-
-## Later Phase 24 Gate (unchanged)
-
-- A fresh user can install the core workflow without R, Bayesian, spatial, or ML runtimes.
-- The canonical workflow runs interactively and as a deterministic `.td` script.
-- Execution mode and materialization boundaries are inspectable.
-- Core command semantics and machine-readable errors are documented and tested.
-- Backend and eager/lazy overlaps have explicit equivalence coverage.
-- Statistical support claims link to a support matrix and trusted-reference fixtures.
-- Public naming, dependency layering, and versioning decisions are recorded as ADRs.
+- [x] `parse_command("status")` returns `StatusCommand()` and invalid extra input has a command-
+  level parse error.
+- [x] No-active, eager, lazy DuckDB, lazy Polars, named-table, and post-`count` states render the
+  contracted fields.
+- [x] `status` after lazy load leaves the dataset lazy and the row count unknown; it does not invoke
+  a materialization or row-count backend operation.
+- [x] CLI, script, shell completion, help, and command-reference coverage exist.
+- [x] Full tests, type checks, lint/format checks, and a CLI smoke flow pass.
 
 ## Non-Goals For This Slice
 
-- Implementing `status`/`explain`, machine-readable output, semantic policy changes, or dependency
-  layering.
-- Adding estimators or broad connectors before the stabilization gate.
-- Making timing thresholds part of the public command contract.
+- Implementing `explain`, operation lineage, materialization reasons, retained estimation samples,
+  machine-readable output, or stable exit-code redesign.
+- Changing lazy/eager execution or adding backend implementations.
+- Adding estimators, connectors, plugins, or dependency-layer changes.

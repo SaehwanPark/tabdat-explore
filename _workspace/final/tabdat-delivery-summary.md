@@ -1,29 +1,30 @@
-# Delivery Summary: Phase 24 P0 Canonical Parquet Workflow
+# Delivery Summary: Phase 24 P0 Read-Only Status Transparency
 
-The first Phase 24 stabilization slice is implemented and verified.
+The execution-transparency slice is implemented and locally validated.
 
 ## Delivered
 
-- Published `demos/canonical_parquet_eda.td` as the canonical Parquet-first terminal EDA journey.
-- Added the local replay contract test in `tests/test_canonical_workflow.py`.
-- Added integrated scenario `s6_canonical_parquet_workflow`, including exact transcript/table replay
-  checks and per-run wall-clock metrics.
-- Documented the workflow and acceptance contract in the user guide and integrated E2E plan.
-- Hardened the pre-existing Phase 13 HTML report downsampling test against Altair dataset ordering.
-- Updated `SPEC.md`, `CHANGELOG.md`, and all TabDat handoff artifacts.
+- Added the typed, read-only `status` command.
+- Exposed backend, source, active table, eager/lazy mode, lazy engine, materialization state, row
+  count knowledge, and column count in deterministic labeled output.
+- Kept `status` state-only: lazy datasets remain deferred and are not counted or materialized by
+  the command.
+- Updated `count` metadata so a later `status` reports the known count without changing `count`
+  output.
+- Added parser, executor, CLI/script, shell-completion, help, documentation, and handoff coverage.
 
 ## Validation
 
-- `uv run pytest` — 947 passed.
+- `uv run pytest` — 956 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` and `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed.
-- Canonical replay: exact stdout and typed Parquet table match, expected class-level values, 3 rows
-  and 4 columns; observed CLI timings approximately 2.160s and 2.144s in the full run.
+- `uv run tabdat -c status` — passed with the contracted no-active output.
+- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed, including canonical
+  replay equivalence.
 
 ## Remaining Phase 24 Work
 
-Execution transparency, cross-command semantic contracts, machine-readable automation output,
-differential/statistical assurance, dependency measurement, and public-preview decisions remain in
-`SPEC.md` Future and are intentionally outside this slice.
+Active operations, materialization reasons, retained estimation samples, cross-command semantics,
+machine-readable automation output, differential assurance, dependency measurement, and preview
+readiness remain in `SPEC.md` Future.

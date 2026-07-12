@@ -36,6 +36,7 @@ def test_completer_suggests_command_names() -> None:
     bayesplot_completions = _completion_texts(TabdatCompleter(executor), "bayesp")
     reshape_completions = _completion_texts(TabdatCompleter(executor), "resh")
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
+    status_completions = _completion_texts(TabdatCompleter(executor), "stat")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
   finally:
     executor.close()
@@ -44,6 +45,7 @@ def test_completer_suggests_command_names() -> None:
   assert bayesplot_completions == ["bayesplot"]
   assert reshape_completions == ["reshape"]
   assert panel_completions == ["panel"]
+  assert status_completions == ["status"]
   assert help_completions == ["help"]
 
 

@@ -2111,6 +2111,84 @@ def test_cli_runs_phase_7_lazy_use_flow(sample_parquet: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_24_status_flow(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}, lazy engine=duckdb",
+      "-c",
+      "status",
+      "-c",
+      "count",
+      "-c",
+      "status",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Backend: duckdb" in captured.out
+  assert "Execution mode: lazy" in captured.out
+  assert "Lazy engine: duckdb" in captured.out
+  assert "Materialization: deferred" in captured.out
+  assert "Rows: unknown" in captured.out
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
+  exit_code = main(["-c", "status"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out == (
+    "Backend: duckdb\n"
+    "Source: none\n"
+    "Active table: none\n"
+    "Execution mode: none\n"
+    "Lazy engine: none\n"
+    "Materialization: none\n"
+    "Rows: none\n"
+    "Columns: none\n"
+  )
+  assert captured.err == ""
+
+
+def test_cli_reports_phase_24_eager_status(sample_parquet: Path, capsys) -> None:
+  exit_code = main(["-c", f"use {sample_parquet}", "-c", "status"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Source: {sample_parquet}" in captured.out
+  assert "Execution mode: eager" in captured.out
+  assert "Lazy engine: none" in captured.out
+  assert "Materialization: materialized" in captured.out
+  assert "Rows: 3" in captured.out
+  assert "Columns: 4" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_24_status_in_script(sample_parquet: Path, tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "status.td"
+  script_path.write_text(
+    f"use {sample_parquet}, lazy engine=duckdb\nstatus\ncount\nstatus\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out.count("Execution mode: lazy") == 2
+  assert "Rows: unknown" in captured.out
+  assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, capsys) -> None:
   script_path = tmp_path / "analysis.td"
   plot_path = tmp_path / "age.svg"

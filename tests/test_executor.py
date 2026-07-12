@@ -123,6 +123,8 @@ from tabdat.models import (
   SetResult,
   SqlCommand,
   SqlCreateResult,
+  StatusCommand,
+  StatusResult,
   StregCommand,
   StregRegressionResult,
   StringExpression,
@@ -660,6 +662,69 @@ def test_use_lazy_loads_active_dataset(sample_parquet: Path, engine: str) -> Non
   assert result.dataset.column_count == 4
   assert result.dataset.execution_mode == "lazy"
   assert result.dataset.lazy_engine == engine
+
+
+def test_status_reports_no_active_dataset() -> None:
+  executor = Executor()
+  try:
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.backend == "duckdb"
+  assert result.source is None
+  assert result.active_table is None
+  assert result.execution_mode is None
+  assert result.lazy_engine is None
+  assert result.row_count is None
+  assert result.column_count is None
+
+
+@pytest.mark.parametrize("engine", ["duckdb", "polars"])
+def test_status_preserves_lazy_state_until_count(sample_parquet: Path, engine: str) -> None:
+  executor = Executor()
+  try:
+    executor.execute(
+      UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    )
+    before_count = executor.execute(StatusCommand())
+    count_result = executor.execute(CountCommand())
+    after_count = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before_count, StatusResult)
+  assert before_count.execution_mode == "lazy"
+  assert before_count.lazy_engine == engine
+  assert before_count.row_count is None
+  assert isinstance(count_result, CountResult)
+  assert count_result.row_count == 3
+  assert isinstance(after_count, StatusResult)
+  assert after_count.execution_mode == "lazy"
+  assert after_count.lazy_engine == engine
+  assert after_count.row_count == 3
+  assert after_count.column_count == 4
+
+
+def test_status_reports_active_named_table(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand("select sex, count(*) as n from active group by sex", into="summary")
+    )
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.source == Path("summary")
+  assert result.active_table == "summary"
+  assert result.execution_mode == "eager"
+  assert result.lazy_engine is None
+  assert result.row_count == 2
+  assert result.column_count == 2
 
 
 def test_resolve_remote_parquet_source() -> None:

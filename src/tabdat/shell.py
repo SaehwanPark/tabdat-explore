@@ -22,6 +22,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "recode",
   "help",
   "describe",
+  "status",
   "summarize",
   "codebook",
   "count",

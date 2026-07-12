@@ -7,6 +7,7 @@ def test_help_topics_are_discoverable() -> None:
 
   assert "summarize" in topics
   assert "describe" in topics
+  assert "status" in topics
   assert "lasso" in topics
   assert "postlasso" in topics
   assert "dml" in topics

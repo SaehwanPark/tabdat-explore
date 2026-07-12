@@ -148,6 +148,7 @@ reproducible `.td` scripts. See the [user guide](user-guide.md).
 | Command | Purpose | Minimal invocation |
 |---------|---------|-------------------|
 | `set` | Change runtime settings for the session | `set graph_format png` |
+| `status` | Show read-only execution and materialization state | `status` |
 | `lowess` | Nonparametric smoothing into a new variable | `lowess y x, gen(y_smooth)` |
 | `help` | Show in-app help for a command | `help regress` |
 | `exit` / `quit` | Leave the interactive shell | `exit` |

@@ -66,6 +66,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SqlCommand,
+  StatusCommand,
   StregCommand,
   StringExpression,
   SummarizeCommand,
@@ -117,6 +118,15 @@ def test_parse_help_command() -> None:
   assert parse_command("? summarize") == HelpCommand("summarize")
   assert parse_command("help") == HelpCommand()
   assert parse_command("?") == HelpCommand()
+
+
+def test_parse_status_command() -> None:
+  assert parse_command("status") == StatusCommand()
+
+  with pytest.raises(ParseError, match="status does not accept arguments"):
+    parse_command("status now")
+  with pytest.raises(ParseError, match="status does not accept arguments"):
+    parse_command("status, verbose")
 
 
 def test_parse_phase_11_join_command() -> None:

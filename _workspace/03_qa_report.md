@@ -1,65 +1,47 @@
-# QA Report: Phase 24 P0 Canonical Parquet Workflow
+# QA Report: Phase 24 P0 Read-Only Status Transparency
 
-Status: pass
+Status: implementation validation pass; PR review loop pending
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, `docs/user-guide.md`, and
-  `docs/e2e_public_dataset_test_plan.md` identify the same Phase 24 P0 workflow, expected
-  Titanic-shaped input columns, output path/shape, replay checks, and timing non-goal.
-- **Contract to tracked script:** `demos/canonical_parquet_eda.td` contains lazy DuckDB loading,
-  `describe`, `count`, `codebook`, filtering, derivation, overall/grouped summaries, collapse, and
-  export in the contracted order.
-- **Script to CLI/parser/executor:** the local replay test and real harness execute the tracked
-  script through `tabdat -f`; both runs emit the expected transcript and exit successfully.
-- **Executor/backend to evidence:** the harness reads the exported Parquet through DuckDB and
-  compares column names and sorted rows between replays; it does not infer equivalence from
-  stdout alone.
-- **Benchmark/reporting:** `ScenarioResult` records per-process wall-clock durations and canonical
-  output metrics in JSON/Markdown reports; no timing threshold is asserted.
-- **Existing reporting behavior:** the Phase 13 HTML report downsampling regression is covered by
-  a focused test that identifies sampled observations by fields and separately verifies the
-  one-row reference line; report rendering code is unchanged.
+- **Roadmap/docs to contract:** `SPEC.md`, `docs/command-reference.md`, and `docs/user-guide.md`
+  describe the same read-only `status` fields, ordering, sentinels, and non-materialization scope.
+- **Contract to parser/models:** exact `status` syntax creates `StatusCommand`; unsupported suffixes
+  are rejected with the documented command-level parse error.
+- **Parser/CLI to executor:** interactive, script, and `-c` tests exercise the command through the
+  public CLI while preserving the existing command transcript behavior.
+- **Executor/state to evidence:** typed results cover no-active, eager, lazy DuckDB, lazy Polars,
+  named-table, and post-`count` states. Lazy state remains deferred and unknown before counting.
+- **Hidden-work boundary:** dispatch occurs before the existing lazy materialization hook and
+  `_execute_status` reads session metadata only; count remains an explicit operation.
+- **UX surface:** command completion, help-topic coverage, command reference, and user-guide
+  examples are all updated.
 
 ## Blocking Issues
 
-- None.
-
-## PR Review Loop
-
-- **Pass 1:** identified the undeclared `codebook` columns (fixed by using the documented
-  five-column minimum), timer placement (fixed by stopping immediately after the subprocess), and
-  the reference-line dataset concern (resolved by keeping the one-row runtime source and
-  strengthening the existing test).
-- **Pass 2:** identified composite-duration aggregation, mutable fixture sources, incomplete schema
-  checks, missing expected-value assertions, and the same reference-line concern. All were fixed by
-  aggregating durations, pinning and hashing fixtures, recording column types, asserting canonical
-  class-level values, and retaining the one-row reference dataset.
-- **Pass 3:** independently confirmed the clean-checkout documentation issue, schema/input contract,
-  harness exit-code/reporting edge cases, report-test weakness, and rendering concern; each was
-  addressed in the current diff.
-- No Critical or High findings remained; Medium and Low findings were fixed rather than deferred.
-
-## Non-Blocking Follow-Ups
-
-- Public dataset acquisition remains network-dependent in the integrated harness; the local
-  temporary-fixture replay test provides an offline command-contract check.
-- Cross-command semantic policy, execution transparency, machine-readable output, and dependency
-  measurement remain intentionally queued Phase 24 work.
-- Benchmark timings are host-dependent observations rather than release thresholds.
+- None found in implementation validation.
 
 ## Validation Evidence
 
-- `uv run pytest` — 947 passed, 314 third-party warnings.
+- `uv run pytest` — 956 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed.
-- Canonical replay evidence: exact stdout match, exact exported table match, typed 3-row/4-column
-  schema, expected class-level values, and observed first/replay CLI timings approximately
-  2.160s/2.144s in the full run.
+- `uv run tabdat -c status` — no-active output matches the contract.
+- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
+  exact stdout/table equivalence with 4.318 seconds composite duration.
+
+## PR Review Loop
+
+- Three independent code-review passes are required after the PR is opened.
+- Findings, fixes, and the final disposition will be recorded here before merge.
+
+## Non-Blocking Follow-Ups
+
+- `explain`, operation lineage, materialization reasons, retained estimation samples, and
+  machine-readable output remain intentionally queued in `SPEC.md`.
 
 ## Recommended Next Action
 
-Proceed to the three independent code-review passes, then use the documented PR/merge handoff.
+Proceed to the PR handoff and three independent review passes after committing the validated slice.

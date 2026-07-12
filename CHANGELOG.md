@@ -10,6 +10,8 @@ All notable project changes are tracked here.
   gate: canonical Parquet workflow, language semantics, execution transparency, automation output,
   differential assurance, measured dependency layering, naming, and external validation now
   precede new estimator-family expansion.
+- Started the Phase 24 read-only `status` transparency slice on a dedicated feature branch; richer
+  execution explanation and machine-readable output remain deferred.
 
 ### Added
 

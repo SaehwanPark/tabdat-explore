@@ -154,6 +154,8 @@ from tabdat.models import (
   SpregressCommand,
   SqlCommand,
   SqlCreateResult,
+  StatusCommand,
+  StatusResult,
   StregCommand,
   StregRegressionResult,
   StringExpression,
@@ -674,6 +676,9 @@ class Executor:
     if isinstance(command, RecodeCommand):
       return self._execute_recode(command)
 
+    if isinstance(command, StatusCommand):
+      return self._execute_status()
+
     self._materialize_polars_lazy_if_needed(command)
 
     if isinstance(command, DescribeCommand):
@@ -691,8 +696,10 @@ class Executor:
       return CodebookResult(rows=codebook_rows)
 
     if isinstance(command, CountCommand):
-      self._require_active_dataset("count")
-      return CountResult(row_count=self.backend.active_row_count())
+      dataset = self._require_active_dataset("count")
+      row_count = self.backend.active_row_count()
+      self.state.active_dataset = replace(dataset, row_count=row_count)
+      return CountResult(row_count=row_count)
 
     if isinstance(command, HeadCommand):
       dataset = self._require_active_dataset("head")
@@ -963,6 +970,28 @@ class Executor:
       variables,
       artifact_dir=self.state.config.artifact_dir,
       graph_format=self.state.config.graph_format,
+    )
+
+  def _execute_status(self) -> StatusResult:
+    dataset = self.state.active_dataset
+    if dataset is None:
+      return StatusResult(
+        backend="duckdb",
+        source=None,
+        active_table=None,
+        execution_mode=None,
+        lazy_engine=None,
+        row_count=None,
+        column_count=None,
+      )
+    return StatusResult(
+      backend="duckdb",
+      source=dataset.path,
+      active_table=self.state.active_table_name,
+      execution_mode=dataset.execution_mode,
+      lazy_engine=dataset.lazy_engine,
+      row_count=dataset.row_count,
+      column_count=dataset.column_count,
     )
 
   def _execute_use(self, command: UseCommand) -> LoadResult | ActivateResult:
