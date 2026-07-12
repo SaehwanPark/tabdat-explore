@@ -44,6 +44,8 @@ class ScenarioResult:
   stdout_path: str | None = None
   stderr_path: str | None = None
   exit_code: int | None = None
+  duration_seconds: float | None = None
+  metrics: dict[str, bool | float | int | str] = field(default_factory=dict)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -459,7 +461,92 @@ def s5_titanic_phase13_dogfood() -> ScenarioResult:
   return run_command_scenario("s5_titanic_phase13_dogfood", command)
 
 
+def s6_canonical_parquet_workflow() -> ScenarioResult:
+  output_path = Path("artifacts/e2e/s6/canonical_summary.parquet")
+  command = CommandSpec(
+    argv=(
+      "uv",
+      "run",
+      "tabdat",
+      "-f",
+      "demos/canonical_parquet_eda.td",
+    ),
+    stdout_contains=(
+      "Script: demos/canonical_parquet_eda.td",
+      "lazy=duckdb",
+      "Rows:",
+      "Nonmissing",
+      "Missing",
+      "Kept matching rows:",
+      "Generated family_size:",
+      "Count  Mean",
+      "by class: summarize fare",
+      "Collapsed dataset:",
+      "Exported: artifacts/e2e/s6/canonical_summary.parquet",
+    ),
+    stdout_regex=(
+      r"Collapsed dataset: 3 rows, 4 columns",
+      r"Exported: artifacts/e2e/s6/canonical_summary\.parquet \(3 rows, 4 columns\)",
+    ),
+    expected_files=(output_path,),
+  )
+
+  result = ScenarioResult("s6_canonical_parquet_workflow", passed=True)
+  first = run_command_scenario("s6_canonical_parquet_workflow_first", command)
+  merge_result(result, first)
+  first_snapshot = read_parquet_snapshot_or_failure(
+    result,
+    REPO_ROOT / output_path,
+    "first replay output",
+  )
+
+  replay = run_command_scenario("s6_canonical_parquet_workflow_replay", command)
+  merge_result(result, replay)
+  replay_snapshot = read_parquet_snapshot_or_failure(
+    result,
+    REPO_ROOT / output_path,
+    "second replay output",
+  )
+
+  check(result, first.stdout_path is not None, "first replay stdout was captured")
+  check(result, replay.stdout_path is not None, "second replay stdout was captured")
+  if first.stdout_path is not None and replay.stdout_path is not None:
+    first_stdout = (REPO_ROOT / first.stdout_path).read_text(encoding="utf-8")
+    replay_stdout = (REPO_ROOT / replay.stdout_path).read_text(encoding="utf-8")
+    check(result, first_stdout == replay_stdout, "script replay stdout is identical")
+    result.metrics["replay_stdout_match"] = first_stdout == replay_stdout
+  check(
+    result,
+    first_snapshot != ((), ())
+    and replay_snapshot != ((), ())
+    and first_snapshot == replay_snapshot,
+    "script replay output table is identical",
+  )
+  check(
+    result,
+    replay_snapshot[0] == ("class", "mean_age", "mean_fare", "mean_family_size"),
+    "output schema is class-level means",
+  )
+  check(result, len(replay_snapshot[1]) == 3, "output has three class rows")
+  check_file(result, output_path)
+
+  first_seconds = first.duration_seconds or 0.0
+  replay_seconds = replay.duration_seconds or 0.0
+  result.duration_seconds = first_seconds + replay_seconds
+  result.metrics.update(
+    {
+      "first_run_seconds": first_seconds,
+      "replay_seconds": replay_seconds,
+      "total_seconds": result.duration_seconds,
+      "output_rows": len(replay_snapshot[1]),
+      "output_columns": len(replay_snapshot[0]),
+    }
+  )
+  return result
+
+
 def run_command_scenario(scenario_id: str, command: CommandSpec) -> ScenarioResult:
+  started_at = time.perf_counter()
   completed = subprocess.run(
     command.argv,
     cwd=REPO_ROOT,
@@ -475,6 +562,7 @@ def run_command_scenario(scenario_id: str, command: CommandSpec) -> ScenarioResu
     stdout_path=str(stdout_path.relative_to(REPO_ROOT)),
     stderr_path=str(stderr_path.relative_to(REPO_ROOT)),
     exit_code=completed.returncode,
+    duration_seconds=time.perf_counter() - started_at,
   )
   check(result, completed.returncode == 0, f"exit code {completed.returncode}")
   check(result, completed.stderr == command.expected_stderr, "stderr matches expectation")
@@ -522,12 +610,45 @@ def check_file(result: ScenarioResult, path: Path) -> None:
       con.close()
 
 
+def read_parquet_snapshot(path: Path) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+  con = duckdb.connect()
+  try:
+    cursor = con.execute("select * from read_parquet(?) order by all", [str(path)])
+    columns = tuple(column[0] for column in cursor.description or ())
+    return columns, tuple(cursor.fetchall())
+  finally:
+    con.close()
+
+
+def read_parquet_snapshot_or_failure(
+  result: ScenarioResult,
+  path: Path,
+  label: str,
+) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+  if not path.exists():
+    check(result, False, f"{label} exists at {path.relative_to(REPO_ROOT)}")
+    return (), ()
+  try:
+    return read_parquet_snapshot(path)
+  except duckdb.Error as exc:
+    check(result, False, f"{label} is readable: {exc}")
+    return (), ()
+
+
 def merge_result(target: ScenarioResult, source: ScenarioResult) -> None:
   target.checks.extend(f"{source.scenario_id}: {check_message}" for check_message in source.checks)
   target.failures.extend(
     f"{source.scenario_id}: {failure_message}" for failure_message in source.failures
   )
   target.passed = target.passed and source.passed
+  if target.stdout_path is None:
+    target.stdout_path = source.stdout_path
+  if target.stderr_path is None:
+    target.stderr_path = source.stderr_path
+  if target.exit_code is None:
+    target.exit_code = source.exit_code
+  if source.duration_seconds is not None:
+    target.metrics[f"{source.scenario_id}.seconds"] = source.duration_seconds
 
 
 class HarnessFailure(Exception):
@@ -631,6 +752,8 @@ def write_reports(results: Sequence[ScenarioResult]) -> None:
       "exit_code": result.exit_code,
       "stdout_path": result.stdout_path,
       "stderr_path": result.stderr_path,
+      "duration_seconds": result.duration_seconds,
+      "metrics": result.metrics,
       "checks": result.checks,
       "failures": result.failures,
     }
@@ -644,6 +767,12 @@ def write_reports(results: Sequence[ScenarioResult]) -> None:
   for result in results:
     status = "PASS" if result.passed else "FAIL"
     summary_lines.append(f"- {status}: `{result.scenario_id}`")
+    if result.duration_seconds is not None:
+      summary_lines.append(f"  - duration: {result.duration_seconds:.3f}s")
+    for metric, value in sorted(result.metrics.items()):
+      if metric.endswith(".seconds"):
+        continue
+      summary_lines.append(f"  - {metric}: {value}")
     for failure in result.failures:
       summary_lines.append(f"  - {failure}")
   summary_lines.append("")
@@ -658,6 +787,7 @@ SCENARIO_DATASETS = {
   "s3_taxi_lazy_scale": ("nyc_taxi_jan_2023",),
   "s4_penguins_script_repro": ("penguins",),
   "s5_titanic_phase13_dogfood": ("titanic",),
+  "s6_canonical_parquet_workflow": ("titanic",),
 }
 
 SCENARIOS = {
@@ -666,6 +796,7 @@ SCENARIOS = {
   "s3_taxi_lazy_scale": s3_taxi_lazy_scale,
   "s4_penguins_script_repro": s4_penguins_script_repro,
   "s5_titanic_phase13_dogfood": s5_titanic_phase13_dogfood,
+  "s6_canonical_parquet_workflow": s6_canonical_parquet_workflow,
 }
 
 

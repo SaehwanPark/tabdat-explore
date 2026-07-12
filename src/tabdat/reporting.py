@@ -141,10 +141,10 @@ def generate_html_report(
     .properties(title="Residuals vs Fitted", width="container", height=300)
   )
 
+  # Reuse the sampled frame so Altair does not serialize a one-row reference-line
+  # dataset ahead of the diagnostic observations in the embedded chart payload.
   line_y0 = (
-    alt.Chart(pd.DataFrame({"y": [0.0]}))
-    .mark_rule(color="#ef4444", strokeDash=[4, 4])
-    .encode(y="y:Q")
+    alt.Chart(df_res_fit).mark_rule(color="#ef4444", strokeDash=[4, 4]).encode(y=alt.datum(0.0))
   )
   plot_res_fit = (chart_res_fit + line_y0).interactive()
 

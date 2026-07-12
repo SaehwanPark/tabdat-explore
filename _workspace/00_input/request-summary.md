@@ -1,31 +1,34 @@
-# Request Summary: Product-Center Stabilization Queue
+# Request Summary: Phase 24 Canonical Parquet Workflow
 
 ## Goal
 
-Convert external strategic feedback into durable SDD action items that refocus TabDat on fast,
-transparent, reproducible terminal EDA before further estimator expansion.
+Implement the first Phase 24 stabilization slice: publish and measure one canonical Parquet-first
+workflow that demonstrates TabDat's core terminal EDA path before further estimator expansion.
 
 ## Phase Fit
 
-Planning-only Phase 24 stabilization and public-preview readiness. This supersedes the prior
-assumption that Phase 19 estimator extensions are the next default development queue.
+Phase 24 P0 product-center stabilization. This is the first implementation slice after the
+feedback-driven roadmap reprioritization.
 
 ## Touched Surfaces
 
-- `SPEC.md`: prioritized Future queue with verification and non-goals
-- `docs/dev_phase.md`: Phase 24 sequencing and release gate
-- `docs/project_proposal.md`: layered product direction and product-center clarification
-- `ARCHITECTURE.md`: proposed dependency layers and documentation separation
-- `CHANGELOG.md`: contributor-visible planning change
+- `demos/canonical_parquet_eda.td`: reusable user-facing workflow
+- `docs/user-guide.md`: canonical workflow instructions and scope
+- `docs/e2e_public_dataset_test_plan.md`: scenario and acceptance evidence
+- `integrated_testing/run_e2e.py`: deterministic replay and timing checks
+- `integrated_testing/README.md` and `RUN_REPORT.md`: harness usage and measured result
+- `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: SDD state and delivery evidence
 
 ## Assumptions
 
-- Completed estimator work remains supported; this task does not remove commands.
-- Layer names describe product and dependency boundaries first; packaging is a later, measured decision.
-- The queue is ordered by product risk and dependency, not implementation convenience.
+- Existing `use`, inspection, transformation, grouped-summary, and export contracts are sufficient;
+  no runtime command semantics need to change.
+- The integrated harness may use the existing public Titanic sample and converts it to Parquet as
+  an external fixture; the tracked workflow documents its expected schema.
+- Timing is observational evidence rather than a machine-specific performance threshold.
 
 ## Non-Goals
 
-- Implementing queued features or changing dependencies now.
-- Renaming project surfaces without availability research.
-- Claiming numerical parity before differential evidence exists.
+- Adding `status`, `explain`, JSON output, or new command semantics.
+- Adding estimator families, broader connectors, or dependency-layer changes.
+- Treating public dataset acquisition or host-specific timing as a product guarantee.

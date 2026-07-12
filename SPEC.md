@@ -508,6 +508,14 @@ and describe the active work with concise verification criteria.
   - Robust validations (HTML/JS escaping, minimum sample size $N \ge 2$, and deterministic random downsampling for $N > 5000$ to prevent browser freezing).
   - focused parser, executor, autocompletions, help topic, and integration tests.
 
+- Implemented Phase 24 P0 canonical Parquet-first workflow:
+  - published `demos/canonical_parquet_eda.td` covering lazy load, inspection, missingness,
+    transformation, grouped summaries, collapse, and Parquet export
+  - added exact two-process script replay and exported-table equivalence checks
+  - added observational wall-clock benchmark metrics to the integrated E2E reports
+  - fixed HTML regression-report downsampling serialization so sampled observations remain the
+    first embedded diagnostic dataset
+
 ## Present
 
 - No active implementation slice is open.
@@ -516,8 +524,6 @@ and describe the active work with concise verification criteria.
 
 - **P0 — Phase 24 product-center stabilization and public-preview gate**
   - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
-  - create and benchmark one canonical Parquet-first workflow covering lazy load, inspection,
-    missingness, transformation, grouped summaries, deterministic script replay, and export
   - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
     categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
   - add execution transparency for backend, source, lazy/materialized state, active operations,
@@ -583,4 +589,3 @@ and describe the active work with concise verification criteria.
   - **Broader Remote Connectors**: Database connectors (e.g. Postgres, Snowflake, BigQuery) and remote object storage credentials management (Phase 11 / Phase 18).
   - **Full Polars-Native Execution Backend**: Deep lazy execution optimizations completely within Polars instead of materializing to DuckDB for unsupported commands (Phase 7 / Phase 10).
   - **Advanced dynamic panel GMM / structural estimators**: Fuller dynamic panel model GMM and structural model replication tools (Phase 17).
-

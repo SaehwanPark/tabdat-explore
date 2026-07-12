@@ -74,6 +74,24 @@ run analysis.td
 - Script-level `if` / `else` / `end` conditionals are supported. Loops and inline comments are
   not yet available.
 
+### Canonical Parquet-first workflow
+
+The repository includes a complete first-pass EDA journey in
+[`demos/canonical_parquet_eda.td`](../demos/canonical_parquet_eda.td). It expects a Titanic-shaped
+Parquet file with `age`, `fare`, `sibsp`, `parch`, and `class` columns, then lazily loads the data,
+inspects structure and missingness, filters and derives a variable, summarizes overall and by
+class, collapses to class-level means, and exports a Parquet summary.
+
+Run it from the repository root with:
+
+```bash
+uv run tabdat -f demos/canonical_parquet_eda.td
+```
+
+The integrated acceptance harness prepares the public sample, runs this same script twice, compares
+the transcripts and exported rows, and records wall-clock timings. Those timings are observations
+for product-readiness work, not a portability guarantee.
+
 ### Reproducibility helpers
 
 Script-only directives:

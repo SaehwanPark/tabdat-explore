@@ -7,13 +7,14 @@ regexes, stderr expectations, and file existence at fixed paths.
 
 ## Coverage Matrix
 
-| Scenario | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6 | Phase 7 | Phase 8 | Phase 9 | Phase 13 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `s1_titanic_batch_core` | yes | yes | yes | no | no | no | no | no | no | no |
-| `s2_interactive_shell_contract` | yes | no | yes | yes | yes | yes | no | no | no | no |
-| `s3_taxi_lazy_scale` | yes | no | yes | yes | no | yes | yes | no | yes | no |
-| `s4_penguins_script_repro` | yes | yes | yes | yes | no | yes | no | yes | yes | no |
-| `s5_titanic_phase13_dogfood` | yes | no | yes | no | no | no | no | no | no | yes |
+| Scenario | Phase 1 | Phase 2 | Phase 3 | Phase 4 | Phase 5 | Phase 6 | Phase 7 | Phase 8 | Phase 9 | Phase 13 | Phase 24 P0 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `s1_titanic_batch_core` | yes | yes | yes | no | no | no | no | no | no | no | no |
+| `s2_interactive_shell_contract` | yes | no | yes | yes | yes | yes | no | no | no | no | no |
+| `s3_taxi_lazy_scale` | yes | no | yes | yes | no | yes | yes | no | yes | no | no |
+| `s4_penguins_script_repro` | yes | yes | yes | yes | no | yes | no | yes | yes | no | no |
+| `s5_titanic_phase13_dogfood` | yes | no | yes | no | no | no | no | no | no | yes | no |
+| `s6_canonical_parquet_workflow` | yes | yes | yes | no | no | no | yes | yes | yes | no | yes |
 
 ## Global Harness Rules
 
@@ -472,6 +473,51 @@ red_flags:
   - predict commands do not add generated columns to subsequent preview
   - estat residuals/ovtest/vif fail after successful regress
   - diagnostics output changes shape without a matching command-contract update
+```
+
+### `s6_canonical_parquet_workflow`
+
+```yaml
+scenario_id: s6_canonical_parquet_workflow
+goal: Publish and benchmark one deterministic Parquet-first terminal EDA journey.
+phases: [1, 2, 3, 7, 8, 9, 24]
+mode: script_replay
+dataset:
+  dataset_id: titanic
+  local_path: artifacts/e2e/data/titanic.parquet
+script:
+  tracked_path: demos/canonical_parquet_eda.td
+  steps:
+    - lazy DuckDB Parquet load
+    - describe and count
+    - codebook missingness inspection
+    - adult-row filter and family-size derivation
+    - overall and by-class summaries
+    - class-level collapse
+    - Parquet export
+replay:
+  runs: 2
+  compare_stdout: exact
+  compare_export_schema_and_rows: exact
+benchmark:
+  measure: wall_clock_seconds_per_cli_run
+  threshold: none
+expected_exit_code: 0
+expected_stdout_contains:
+  - "lazy=duckdb"
+  - "Nonmissing"
+  - "Missing"
+  - "Generated family_size:"
+  - "Collapsed dataset: 3 rows, 4 columns"
+  - "Exported: artifacts/e2e/s6/canonical_summary.parquet (3 rows, 4 columns)"
+expected_stderr: ""
+expected_files:
+  - artifacts/e2e/s6/canonical_summary.parquet
+red_flags:
+  - either replay emits stderr or a non-zero exit code
+  - replay transcripts differ for the same input and script
+  - exported schema or rows differ between replays
+  - timing is treated as a portable pass/fail threshold
 ```
 
 ## Global Red Flags
