@@ -364,6 +364,8 @@ def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
     return cast(Command, (yield Err("nested by commands are not supported")))
   if isinstance(command, HelpCommand):
     return cast(Command, (yield Err("help is not supported inside by commands")))
+  if isinstance(command, StatusCommand):
+    return cast(Command, (yield Err("status is not supported inside by commands")))
   return ByCommand(groups=groups, command=command)
 
 

@@ -38,19 +38,19 @@
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_parser.py -k status -q` — passed, 1 test.
+- `uv run pytest tests/test_parser.py -k status -q` — passed, 2 tests.
 - `uv run pytest tests/test_executor.py -k status -q` — passed, 4 tests.
-- `uv run pytest tests/test_cli.py -k phase_24_status -q` — passed, 2 tests.
+- `uv run pytest tests/test_cli.py -k phase_24_status -q` — passed, 3 tests.
 - `uv run pytest tests/test_shell.py -k command_names -q` — passed, 1 test.
 - `uv run pytest tests/test_help.py -k help_topics -q` — passed, 2 tests.
-- `uv run pytest` — passed, 956 tests, with 314 existing third-party warnings.
+- `uv run pytest` — passed, 958 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
 - `uv run tabdat -c status` — passed; rendered the no-active-dataset contract exactly.
 - `uv run python integrated_testing/run_e2e.py` — passed; all six existing scenarios passed,
-  including canonical replay with exact stdout/table equivalence and 4.318 seconds composite
+  including canonical replay with exact stdout/table equivalence and 4.327 seconds composite
   duration.
 
 ## Known Limits And Follow-Up Work

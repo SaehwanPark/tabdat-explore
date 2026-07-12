@@ -727,6 +727,22 @@ def test_status_reports_active_named_table(sample_parquet: Path) -> None:
   assert result.column_count == 2
 
 
+def test_unsupported_by_command_does_not_materialize_polars_lazy(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(ExecutionError, match="by only supports summarize, count, and tabulate"):
+      executor.execute(ByCommand(("sex",), StatusCommand()))
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.execution_mode == "lazy"
+  assert result.lazy_engine == "polars"
+  assert result.row_count is None
+
+
 def test_resolve_remote_parquet_source() -> None:
   source = resolve_load_source("https://example.com/data.parquet")
 

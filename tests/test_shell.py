@@ -155,6 +155,7 @@ def test_completer_suggests_by_child_commands_after_compact_colon(
     executor.close()
 
   assert "summarize" in all_commands
+  assert "status" not in all_commands
   assert summarize_command == ["summarize"]
   assert summarize_start_positions == [-3]
 

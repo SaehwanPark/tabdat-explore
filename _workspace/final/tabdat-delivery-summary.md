@@ -15,7 +15,7 @@ The execution-transparency slice is implemented and locally validated.
 
 ## Validation
 
-- `uv run pytest` — 956 passed, 314 existing third-party warnings.
+- `uv run pytest` — 958 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` and `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.

@@ -178,6 +178,11 @@ def test_parse_by_rejects_help_child_command() -> None:
     parse_command("by sex: help summarize")
 
 
+def test_parse_by_rejects_status_child_command() -> None:
+  with pytest.raises(ParseError, match="status is not supported inside by commands"):
+    parse_command("by sex: status")
+
+
 def test_parse_describe_command() -> None:
   assert parse_command("describe") == DescribeCommand()
 

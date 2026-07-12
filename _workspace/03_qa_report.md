@@ -1,6 +1,8 @@
 # QA Report: Phase 24 P0 Read-Only Status Transparency
 
-Status: implementation validation pass; PR review loop pending
+Status: pass
+
+PR review disposition: three independent passes completed; all findings fixed and revalidated.
 
 ## Boundaries Checked
 
@@ -12,6 +14,8 @@ Status: implementation validation pass; PR review loop pending
   public CLI while preserving the existing command transcript behavior.
 - **Executor/state to evidence:** typed results cover no-active, eager, lazy DuckDB, lazy Polars,
   named-table, and post-`count` states. Lazy state remains deferred and unknown before counting.
+- **Invalid nested command safety:** `status` is rejected inside `by` during parsing, and direct
+  unsupported `ByCommand` values are rejected before any Polars-lazy materialization.
 - **Hidden-work boundary:** dispatch occurs before the existing lazy materialization hook and
   `_execute_status` reads session metadata only; count remains an explicit operation.
 - **UX surface:** command completion, help-topic coverage, command reference, and user-guide
@@ -23,19 +27,27 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 956 passed, 314 existing third-party warnings.
+- `uv run pytest` — 958 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run tabdat -c status` — no-active output matches the contract.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
-  exact stdout/table equivalence with 4.318 seconds composite duration.
+  exact stdout/table equivalence with 4.327 seconds composite duration.
 
 ## PR Review Loop
 
-- Three independent code-review passes are required after the PR is opened.
-- Findings, fixes, and the final disposition will be recorded here before merge.
+- **Pass 1:** identified hidden Polars-lazy materialization for unsupported `by ...: status` and
+  required a pre-materialization validation plus a state-preservation regression test. Fixed by
+  rejecting the nested command in the parser and executor before the materialization hook.
+- **Pass 2:** independently identified the same state-safety issue, misleading `by:` completion,
+  and the focused CLI test-count mismatch. Fixed by limiting child completion to supported
+  commands, adding parser/executor tests, and correcting the evidence count.
+- **Pass 3:** identified the focused CLI test-count mismatch and the non-canonical QA status label.
+  Fixed by recording 3 selected CLI tests and changing the QA status to `pass`.
+- No Critical or High findings remained; the Medium and Low findings above were fixed rather than
+  deferred.
 
 ## Non-Blocking Follow-Ups
 

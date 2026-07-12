@@ -679,6 +679,12 @@ class Executor:
     if isinstance(command, StatusCommand):
       return self._execute_status()
 
+    if isinstance(command, ByCommand) and not isinstance(
+      command.command,
+      (SummarizeCommand, CountCommand, TabulateCommand),
+    ):
+      raise ExecutionError("by only supports summarize, count, and tabulate")
+
     self._materialize_polars_lazy_if_needed(command)
 
     if isinstance(command, DescribeCommand):
