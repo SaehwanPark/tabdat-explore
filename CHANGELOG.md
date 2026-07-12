@@ -13,6 +13,14 @@ All notable project changes are tracked here.
 
 ### Added
 
+- Added the Phase 24 canonical Parquet-first workflow:
+  - `demos/canonical_parquet_eda.td` publishes a lazy-load, inspect, transform, group, collapse,
+    and export journey over a Titanic-shaped Parquet file.
+  - Integrated scenario `s6_canonical_parquet_workflow` replays the script twice, compares exact
+    transcripts and exported tables, and records observational wall-clock timings.
+- Hardened HTML regression-report downsampling coverage against Altair dataset ordering, verifying
+  both sampled observations and the one-row reference line without changing report rendering.
+
 - Added `estat report` post-estimation command for standard linear regressions (`regress`):
   - Generates a self-contained, beautiful, responsive HTML page with regression stats (Outcome, Predictors, Estimator, Covariance, Observations, R-squared, Adj R-squared, Root MSE).
   - Includes a styled coefficients table with standard error, t-stat, p-value, and 95% confidence intervals.
