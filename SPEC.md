@@ -518,7 +518,24 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- No active implementation slice is open.
+- Feature: Phase 24 P0 read-only status transparency
+  Status: Active
+  Started: 2026-07-12
+  Branch: feat/phase24-status-transparency
+
+  Summary:
+  Add `status` as a deterministic, read-only view of current backend, source, active table,
+  eager/lazy mode, materialization state, row-count knowledge, and column count.
+
+  Verification:
+  - parser rejects unsupported `status` arguments with a command-level error
+  - status reports no-active, eager, lazy, named-table, and post-count states
+  - status does not materialize lazy datasets or execute a backend count
+  - CLI, script, shell, help, docs, full tests, and type/lint checks pass
+
+  Out of Scope:
+  - `explain`, operation lineage, materialization reasons, retained estimation samples, and JSON
+  - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
 
 ## Future
 
@@ -526,8 +543,8 @@ and describe the active work with concise verification criteria.
   - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
   - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
     categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
-  - add execution transparency for backend, source, lazy/materialized state, active operations,
-    row-count knowledge, materialization reasons, and retained estimation samples
+  - extend execution transparency with active operations, materialization reasons, and retained
+    estimation samples after the initial read-only `status` slice
   - verification:
     - the canonical workflow passes from a clean install in interactive and script modes
     - documented semantics have focused parser/executor/backend/CLI tests

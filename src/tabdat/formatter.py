@@ -41,6 +41,7 @@ from tabdat.models import (
   SetResult,
   SpatialRegressionResult,
   SqlCreateResult,
+  StatusResult,
   StregRegressionResult,
   SummarizeResult,
   TableResult,
@@ -92,6 +93,28 @@ def format_result(result: Result) -> str:
       )
     )
     return "\n".join(lines)
+
+  if isinstance(result, StatusResult):
+    source = result.source
+    materialization = (
+      "materialized"
+      if result.execution_mode == "eager"
+      else "deferred"
+      if result.execution_mode == "lazy"
+      else "none"
+    )
+    return "\n".join(
+      (
+        f"Backend: {result.backend}",
+        f"Source: {_display_path(source) if source is not None else 'none'}",
+        f"Active table: {result.active_table or 'none'}",
+        f"Execution mode: {result.execution_mode or 'none'}",
+        f"Lazy engine: {result.lazy_engine or 'none'}",
+        f"Materialization: {materialization}",
+        f"Rows: {_row_count(result.row_count) if source is not None else 'none'}",
+        f"Columns: {result.column_count if result.column_count is not None else 'none'}",
+      )
+    )
 
   if isinstance(result, SummarizeResult):
     summary_rows = (

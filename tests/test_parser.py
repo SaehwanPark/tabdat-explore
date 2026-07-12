@@ -66,6 +66,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SqlCommand,
+  StatusCommand,
   StregCommand,
   StringExpression,
   SummarizeCommand,
@@ -119,6 +120,15 @@ def test_parse_help_command() -> None:
   assert parse_command("?") == HelpCommand()
 
 
+def test_parse_status_command() -> None:
+  assert parse_command("status") == StatusCommand()
+
+  with pytest.raises(ParseError, match="status does not accept arguments"):
+    parse_command("status now")
+  with pytest.raises(ParseError, match="status does not accept arguments"):
+    parse_command("status, verbose")
+
+
 def test_parse_phase_11_join_command() -> None:
   assert parse_command("join lookup on id") == JoinCommand(
     table_name="lookup",
@@ -166,6 +176,11 @@ def test_parse_phase_11_panel_commands() -> None:
 def test_parse_by_rejects_help_child_command() -> None:
   with pytest.raises(ParseError, match="help is not supported inside by commands"):
     parse_command("by sex: help summarize")
+
+
+def test_parse_by_rejects_status_child_command() -> None:
+  with pytest.raises(ParseError, match="status is not supported inside by commands"):
+    parse_command("by sex: status")
 
 
 def test_parse_describe_command() -> None:

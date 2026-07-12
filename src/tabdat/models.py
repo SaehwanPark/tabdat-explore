@@ -135,6 +135,13 @@ class DescribeCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class StatusCommand:
+  """Command to display read-only execution state for the current session."""
+
+  pass
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SummarizeCommand:
   """Command to display basic summary statistics (count, mean, std, min, max).
 
@@ -744,6 +751,7 @@ Command = (
   UseCommand
   | RecodeCommand
   | DescribeCommand
+  | StatusCommand
   | SummarizeCommand
   | CodebookCommand
   | CountCommand
@@ -904,6 +912,19 @@ class ActivateResult:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class DescribeResult:
   dataset: DatasetInfo
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class StatusResult:
+  """Structured read-only execution state for the current session."""
+
+  backend: Literal["duckdb"]
+  source: Path | str | None
+  active_table: str | None
+  execution_mode: Literal["eager", "lazy"] | None
+  lazy_engine: Literal["duckdb", "polars"] | None
+  row_count: int | None
+  column_count: int | None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1439,6 +1460,7 @@ Result = (
   LoadResult
   | ActivateResult
   | DescribeResult
+  | StatusResult
   | SummarizeResult
   | CodebookResult
   | CountResult

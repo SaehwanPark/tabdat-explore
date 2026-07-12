@@ -22,6 +22,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "recode",
   "help",
   "describe",
+  "status",
   "summarize",
   "codebook",
   "count",
@@ -85,7 +86,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "exit",
   "quit",
 )
-_BY_CHILD_COMMAND_NAMES = tuple(name for name in COMMAND_NAMES if name != "help")
+_BY_CHILD_COMMAND_NAMES = ("summarize", "count", "tabulate")
 
 _COLUMN_COMMANDS = {
   "recode",

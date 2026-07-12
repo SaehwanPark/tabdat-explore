@@ -39,6 +39,27 @@ Panel-aware commands such as `xtreg`, `did`, and `xtabond` require panel metadat
 - `engine=duckdb|polars` can be supplied with lazy loading. The Polars selector is experimental;
   command execution still runs through the DuckDB relation boundary.
 
+### Inspecting execution state
+
+Use `status` to inspect the current execution boundary without running a data operation:
+
+```text
+tabdat> use data.parquet, lazy engine=duckdb
+tabdat> status
+Backend: duckdb
+Source: data.parquet
+Active table: none
+Execution mode: lazy
+Lazy engine: duckdb
+Materialization: deferred
+Rows: unknown
+Columns: 4
+```
+
+The command is read-only. After `count`, the known row count is reflected in a later `status`
+result; operation lineage, materialization reasons, and retained estimation samples are planned for
+later transparency work.
+
 ### Named tables
 
 ```text

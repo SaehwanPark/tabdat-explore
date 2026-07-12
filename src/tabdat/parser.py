@@ -72,6 +72,7 @@ from tabdat.models import (
   SetCommand,
   SpregressCommand,
   SqlCommand,
+  StatusCommand,
   StregCommand,
   StringExpression,
   SummarizeCommand,
@@ -95,6 +96,7 @@ _EXECUTABLE_COMMANDS = {
   "use",
   "recode",
   "describe",
+  "status",
   "summarize",
   "codebook",
   "count",
@@ -362,6 +364,8 @@ def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
     return cast(Command, (yield Err("nested by commands are not supported")))
   if isinstance(command, HelpCommand):
     return cast(Command, (yield Err("help is not supported inside by commands")))
+  if isinstance(command, StatusCommand):
+    return cast(Command, (yield Err("status is not supported inside by commands")))
   return ByCommand(groups=groups, command=command)
 
 
@@ -455,6 +459,18 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if parts.arguments or parts.condition is not None or parts.options:
       raise ParseError("describe does not accept arguments, if clauses, or options")
     return DescribeCommand()
+
+  if parts.name == "status":
+    if (
+      parts.arguments
+      or parts.condition is not None
+      or parts.options
+      or parts.expression is not None
+    ):
+      raise ParseError(
+        "status does not accept arguments, if clauses, options, or assignment syntax"
+      )
+    return StatusCommand()
 
   if parts.name == "summarize":
     if parts.expression is not None:
