@@ -18,8 +18,8 @@ All notable project changes are tracked here.
     and export journey over a Titanic-shaped Parquet file.
   - Integrated scenario `s6_canonical_parquet_workflow` replays the script twice, compares exact
     transcripts and exported tables, and records observational wall-clock timings.
-- Fixed HTML regression-report downsampling serialization so the sampled diagnostic observations
-  remain the first embedded plotting dataset.
+- Hardened HTML regression-report downsampling coverage against Altair dataset ordering, verifying
+  both sampled observations and the one-row reference line without changing report rendering.
 
 - Added `estat report` post-estimation command for standard linear regressions (`regress`):
   - Generates a self-contained, beautiful, responsive HTML page with regression stats (Outcome, Predictors, Estimator, Covariance, Observations, R-squared, Adj R-squared, Root MSE).

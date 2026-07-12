@@ -513,8 +513,8 @@ and describe the active work with concise verification criteria.
     transformation, grouped summaries, collapse, and Parquet export
   - added exact two-process script replay and exported-table equivalence checks
   - added observational wall-clock benchmark metrics to the integrated E2E reports
-  - fixed HTML regression-report downsampling serialization so sampled observations remain the
-    first embedded diagnostic dataset
+  - hardened HTML regression-report downsampling coverage against Altair dataset ordering and
+    verified both sampled observations and the one-row reference line
 
 ## Present
 

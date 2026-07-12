@@ -13,13 +13,13 @@ def _write_canonical_fixture(path: Path) -> None:
       copy (
         select * from (
           values
-            (17, 20.0, 1, 0, 'first', 'S', 1),
-            (25, 100.0, 1, 0, 'first', 'S', 1),
-            (30, null, 2, 1, 'second', 'C', 0),
-            (40, 40.0, 0, 0, 'second', null, 1),
-            (50, 60.0, 3, 2, 'third', 'S', 0),
-            (60, 80.0, null, 1, 'third', 'Q', 0)
-        ) as canonical(age, fare, sibsp, parch, class, embarked, survived)
+            (17, 20.0, 1, 0, 'first'),
+            (25, 100.0, 1, 0, 'first'),
+            (30, null, 2, 1, 'second'),
+            (40, 40.0, 0, 0, 'second'),
+            (50, 60.0, 3, 2, 'third'),
+            (60, 80.0, null, 1, 'third')
+        ) as canonical(age, fare, sibsp, parch, class)
       ) to ? (format parquet)
       """,
       [str(path)],
@@ -28,11 +28,13 @@ def _write_canonical_fixture(path: Path) -> None:
     connection.close()
 
 
-def _parquet_snapshot(path: Path) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+def _parquet_snapshot(
+  path: Path,
+) -> tuple[tuple[tuple[str, str], ...], tuple[tuple[object, ...], ...]]:
   connection = duckdb.connect(database=":memory:")
   try:
     cursor = connection.execute("select * from read_parquet(?) order by all", [str(path)])
-    columns = tuple(column[0] for column in cursor.description or ())
+    columns = tuple((column[0], str(column[1])) for column in cursor.description or ())
     rows = tuple(cursor.fetchall())
     return columns, rows
   finally:
@@ -66,5 +68,14 @@ def test_canonical_parquet_workflow_replays_deterministically(tmp_path: Path, ca
   assert "by class: summarize fare" in first.out
   assert "Exported:" in first.out
   assert first_snapshot == second_snapshot
-  assert first_snapshot[0] == ("class", "mean_age", "mean_fare", "mean_family_size")
-  assert len(first_snapshot[1]) == 3
+  assert first_snapshot[0] == (
+    ("class", "VARCHAR"),
+    ("mean_age", "DOUBLE"),
+    ("mean_fare", "DOUBLE"),
+    ("mean_family_size", "DOUBLE"),
+  )
+  assert first_snapshot[1] == (
+    ("first", 25.0, 100.0, 2.0),
+    ("second", 35.0, 40.0, 2.5),
+    ("third", 55.0, 70.0, 6.0),
+  )

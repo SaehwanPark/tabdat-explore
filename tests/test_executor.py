@@ -4026,9 +4026,16 @@ def test_phase_13_estat_report_downsampling(tmp_path: Path) -> None:
   match = re.search(r"const specResFit = (\{.+?\});", html_content, re.DOTALL)
   assert match is not None
   spec = json.loads(match.group(1))
-  # Downsampling should result in exactly 5000 points
-  records = list(spec["datasets"].values())[0]
-  assert len(records) == 5000
+  datasets = list(spec["datasets"].values())
+  observation_sets = [
+    records
+    for records in datasets
+    if records and {"fitted", "residual", "index"}.issubset(records[0])
+  ]
+  reference_sets = [records for records in datasets if records == [{"y": 0.0}]]
+  assert len(observation_sets) == 1
+  assert len(observation_sets[0]) == 5000
+  assert reference_sets == [[{"y": 0.0}]]
 
 
 def test_phase_13_estat_report_insufficient_obs(tmp_path: Path) -> None:

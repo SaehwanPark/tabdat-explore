@@ -15,6 +15,8 @@ This directory contains the reusable integrated testing harness for
 
 The harness downloads public datasets into `artifacts/e2e/data/` and writes scenario outputs under
 `artifacts/e2e/`. These generated files are intentionally ignored by git.
+Dataset URLs are pinned to immutable source revisions where available and every downloaded fixture
+is verified against a recorded SHA-256 digest before use.
 
 ## Commands
 

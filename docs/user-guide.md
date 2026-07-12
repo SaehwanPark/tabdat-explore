@@ -82,11 +82,16 @@ Parquet file with `age`, `fare`, `sibsp`, `parch`, and `class` columns, then laz
 inspects structure and missingness, filters and derives a variable, summarizes overall and by
 class, collapses to class-level means, and exports a Parquet summary.
 
-Run it from the repository root with:
+The default source path is an ignored integrated-test fixture. From a clean checkout, prepare it
+and run the complete replay benchmark with:
 
 ```bash
-uv run tabdat -f demos/canonical_parquet_eda.td
+uv run python integrated_testing/run_e2e.py s6_canonical_parquet_workflow
 ```
+
+Once the fixture exists, run the tracked script directly with `uv run tabdat -f
+demos/canonical_parquet_eda.td`; edit its `source` macro for another local Parquet file with the
+same five-column minimum schema.
 
 The integrated acceptance harness prepares the public sample, runs this same script twice, compares
 the transcripts and exported rows, and records wall-clock timings. Those timings are observations

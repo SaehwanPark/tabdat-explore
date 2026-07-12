@@ -43,12 +43,13 @@ harness:
 datasets:
   - dataset_id: titanic
     source_kind: csv
-    source_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/master/titanic.csv
+    source_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/a29a0141d20e156043ec257a64c8de3b3a03fd6e/titanic.csv
     source_license_note: seaborn sample dataset
+    sha256: 81787d320d7f7b03df935e91de8bd19e11d45c5bbcab86ef4d4a76dc91b7d4f2
     local_csv_path: artifacts/e2e/data/titanic.csv
     local_parquet_path: artifacts/e2e/data/titanic.parquet
     fetch_command: >
-      curl -L https://raw.githubusercontent.com/mwaskom/seaborn-data/master/titanic.csv
+      curl -L https://raw.githubusercontent.com/mwaskom/seaborn-data/a29a0141d20e156043ec257a64c8de3b3a03fd6e/titanic.csv
       -o artifacts/e2e/data/titanic.csv
     convert_command: >
       uv run python -c "from pathlib import Path; import duckdb, sys;
@@ -59,12 +60,13 @@ datasets:
       artifacts/e2e/data/titanic.csv artifacts/e2e/data/titanic.parquet
   - dataset_id: penguins
     source_kind: csv
-    source_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/master/penguins.csv
+    source_url: https://raw.githubusercontent.com/mwaskom/seaborn-data/4e06bf0b8c4bf161ed04e9df59b77c35fd2ec44a/penguins.csv
     source_license_note: seaborn sample dataset
+    sha256: e07636bd8af74260099ea2f8678e2eabbf35def579940cc76f67061ee16c06c1
     local_csv_path: artifacts/e2e/data/penguins.csv
     local_parquet_path: artifacts/e2e/data/penguins.parquet
     fetch_command: >
-      curl -L https://raw.githubusercontent.com/mwaskom/seaborn-data/master/penguins.csv
+      curl -L https://raw.githubusercontent.com/mwaskom/seaborn-data/4e06bf0b8c4bf161ed04e9df59b77c35fd2ec44a/penguins.csv
       -o artifacts/e2e/data/penguins.csv
     convert_command: >
       uv run python -c "from pathlib import Path; import duckdb, sys;
@@ -77,6 +79,7 @@ datasets:
     source_kind: parquet
     source_url: https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet
     provenance_url: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+    sha256: 32df6f67578fa86c484a6b5ef23a5281992ff085521082340b0f9e5889e9a572
     local_parquet_path: artifacts/e2e/data/yellow_tripdata_2023-01.parquet
     fetch_command: >
       curl -L https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet

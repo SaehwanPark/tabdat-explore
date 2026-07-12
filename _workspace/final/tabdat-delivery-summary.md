@@ -9,7 +9,7 @@ The first Phase 24 stabilization slice is implemented and verified.
 - Added integrated scenario `s6_canonical_parquet_workflow`, including exact transcript/table replay
   checks and per-run wall-clock metrics.
 - Documented the workflow and acceptance contract in the user guide and integrated E2E plan.
-- Fixed the pre-existing Phase 13 HTML report downsampling serialization failure.
+- Hardened the pre-existing Phase 13 HTML report downsampling test against Altair dataset ordering.
 - Updated `SPEC.md`, `CHANGELOG.md`, and all TabDat handoff artifacts.
 
 ## Validation
@@ -19,8 +19,8 @@ The first Phase 24 stabilization slice is implemented and verified.
 - `uv run ruff check .` and `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed.
-- Canonical replay: exact stdout and Parquet table match; 3 rows and 4 columns; observed CLI
-  timings approximately 2.166s and 2.166s in the full run.
+- Canonical replay: exact stdout and typed Parquet table match, expected class-level values, 3 rows
+  and 4 columns; observed CLI timings approximately 2.160s and 2.144s in the full run.
 
 ## Remaining Phase 24 Work
 

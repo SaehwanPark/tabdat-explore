@@ -18,11 +18,27 @@ Status: pass
 - **Benchmark/reporting:** `ScenarioResult` records per-process wall-clock durations and canonical
   output metrics in JSON/Markdown reports; no timing threshold is asserted.
 - **Existing reporting behavior:** the Phase 13 HTML report downsampling regression is covered by
-  its focused tests after the narrow Altair serialization fix.
+  a focused test that identifies sampled observations by fields and separately verifies the
+  one-row reference line; report rendering code is unchanged.
 
 ## Blocking Issues
 
 - None.
+
+## PR Review Loop
+
+- **Pass 1:** identified the undeclared `codebook` columns (fixed by using the documented
+  five-column minimum), timer placement (fixed by stopping immediately after the subprocess), and
+  the reference-line dataset concern (resolved by keeping the one-row runtime source and
+  strengthening the existing test).
+- **Pass 2:** identified composite-duration aggregation, mutable fixture sources, incomplete schema
+  checks, missing expected-value assertions, and the same reference-line concern. All were fixed by
+  aggregating durations, pinning and hashing fixtures, recording column types, asserting canonical
+  class-level values, and retaining the one-row reference dataset.
+- **Pass 3:** independently confirmed the clean-checkout documentation issue, schema/input contract,
+  harness exit-code/reporting edge cases, report-test weakness, and rendering concern; each was
+  addressed in the current diff.
+- No Critical or High findings remained; Medium and Low findings were fixed rather than deferred.
 
 ## Non-Blocking Follow-Ups
 
@@ -40,8 +56,9 @@ Status: pass
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed.
-- Canonical replay evidence: exact stdout match, exact exported table match, 3 output rows, 4
-  output columns; observed first/replay CLI timings approximately 2.166s/2.166s in the full run.
+- Canonical replay evidence: exact stdout match, exact exported table match, typed 3-row/4-column
+  schema, expected class-level values, and observed first/replay CLI timings approximately
+  2.160s/2.144s in the full run.
 
 ## Recommended Next Action
 

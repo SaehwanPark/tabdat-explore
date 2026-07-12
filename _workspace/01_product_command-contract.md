@@ -31,11 +31,15 @@ The script expects a Titanic-shaped Parquet dataset with `age`, `fare`, `sibsp`,
 7. Collapse the transformed data to class-level means.
 8. Export the transformed summary as Parquet.
 
-Canonical invocation:
+Clean-checkout acceptance invocation (prepares the fixture and runs the script twice):
 
 ```bash
-uv run tabdat -f demos/canonical_parquet_eda.td
+uv run python integrated_testing/run_e2e.py s6_canonical_parquet_workflow
 ```
+
+After the harness has prepared `artifacts/e2e/data/titanic.parquet`, the tracked script can also
+be run directly with `uv run tabdat -f demos/canonical_parquet_eda.td`. Users can point the `source`
+macro at another Parquet file with the same five-column minimum schema.
 
 ## Integrated Benchmark Contract
 

@@ -22,9 +22,14 @@
   - Published the workflow, invocation, scope, replay contract, and benchmark limitations.
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/00_input/request-summary.md`
   - Recorded the active branch and verification criteria, then moved the verified slice into Past.
-- `src/tabdat/reporting.py`
-  - Fixed the pre-existing HTML report downsampling serialization issue by reusing the sampled
-    plotting frame for the zero reference line.
+- `tests/test_executor.py`
+  - Hardened the pre-existing HTML report downsampling test to identify the diagnostic observation
+    dataset by fields and separately verify the one-row zero reference line, without depending on
+    Altair dataset insertion order.
+- `integrated_testing/run_e2e.py`
+  - Pins public fixture sources and verifies SHA-256 digests before use.
+  - Compares Parquet column names and types, checks expected canonical aggregate values, aggregates
+    composite scenario durations, and reports both replay exit codes.
 
 ## Implementation Notes By Boundary
 
@@ -51,8 +56,8 @@
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py s6_canonical_parquet_workflow` — passed.
 - `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed.
-  - canonical full-run first replay: approximately 2.166 seconds
-  - canonical full-run second replay: approximately 2.166 seconds
+  - canonical full-run first replay: approximately 2.160 seconds
+  - canonical full-run second replay: approximately 2.144 seconds
   - output: 3 rows, 4 columns; exact stdout and table replay match
 
 ## Known Limits And Follow-Up Work

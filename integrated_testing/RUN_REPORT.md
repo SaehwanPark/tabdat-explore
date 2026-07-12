@@ -22,17 +22,17 @@ format checks passed; all six integrated scenarios passed.
 ## Observations
 
 - `s1_titanic_batch_core` passed against `artifacts/e2e/data/titanic.parquet` in approximately
-  2.149 seconds.
+  2.235 seconds.
 - `s2_interactive_shell_contract` passed with isolated history under `artifacts/e2e/home`.
 - `s3_taxi_lazy_scale` passed against the NYC taxi January 2023 Parquet dataset in approximately
-  22.050 seconds, including SVG plot checks and Parquet persistence.
+  23.637 seconds, including SVG plot checks and Parquet persistence.
 - `s4_penguins_script_repro` passed with explicit config, nested `run`, multiline SQL, PNG plot
-  output, and Parquet export in approximately 2.604 seconds.
+  output, and Parquet export in approximately 2.589 seconds.
 - `s5_titanic_phase13_dogfood` passed with real-dataset `regress`, `predict`, and
-  `estat residuals|ovtest|vif` coverage in approximately 2.153 seconds.
+  `estat residuals|ovtest|vif` coverage in approximately 2.165 seconds.
 - `s6_canonical_parquet_workflow` passed twice using the tracked
-  `demos/canonical_parquet_eda.td` script. The first run took approximately 2.166 seconds and the
-  replay approximately 2.166 seconds. Both transcripts and exported tables matched exactly; the
+  `demos/canonical_parquet_eda.td` script. The first run took approximately 2.160 seconds and the
+  replay approximately 2.144 seconds. Both transcripts and exported tables matched exactly; the
   output contained three class rows and four columns.
 
 ## Fixes
@@ -49,8 +49,8 @@ format checks passed; all six integrated scenarios passed.
 - Fixed interactive shell Ctrl-C handling so completion interrupts return to the prompt instead of
   exiting with a traceback.
 - Added the Phase 24 canonical workflow replay/benchmark scenario and per-run timing fields.
-- Fixed HTML regression-report serialization so the downsampled diagnostic observations remain the
-  first embedded plotting dataset instead of the one-row zero reference line.
+- Hardened HTML regression-report downsampling coverage against Altair dataset ordering, verifying
+  sampled observations and the one-row zero reference line without changing report rendering.
 
 ## Residual Risks
 

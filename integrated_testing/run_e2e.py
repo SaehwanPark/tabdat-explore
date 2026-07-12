@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import math
 import os
 import pty
 import re
@@ -24,6 +26,24 @@ ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "e2e"
 DATA_DIR = ARTIFACT_ROOT / "data"
 REPORT_ROOT = REPO_ROOT / "integrated_testing" / "reports" / "latest"
 TTY_HOME = ARTIFACT_ROOT / "home"
+
+ParquetSnapshot = tuple[
+  tuple[tuple[str, str], ...],
+  tuple[tuple[object, ...], ...],
+]
+
+TITANIC_CSV_URL = (
+  "https://raw.githubusercontent.com/mwaskom/seaborn-data/"
+  "a29a0141d20e156043ec257a64c8de3b3a03fd6e/titanic.csv"
+)
+TITANIC_CSV_SHA256 = "81787d320d7f7b03df935e91de8bd19e11d45c5bbcab86ef4d4a76dc91b7d4f2"
+PENGUINS_CSV_URL = (
+  "https://raw.githubusercontent.com/mwaskom/seaborn-data/"
+  "4e06bf0b8c4bf161ed04e9df59b77c35fd2ec44a/penguins.csv"
+)
+PENGUINS_CSV_SHA256 = "e07636bd8af74260099ea2f8678e2eabbf35def579940cc76f67061ee16c06c1"
+TAXI_PARQUET_URL = "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet"
+TAXI_PARQUET_SHA256 = "32df6f67578fa86c484a6b5ef23a5281992ff085521082340b0f9e5889e9a572"
 
 
 @dataclass(frozen=True)
@@ -83,27 +103,34 @@ def ensure_datasets(selected: Sequence[str]) -> None:
 
   if "titanic" in required:
     ensure_csv_parquet(
-      "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/titanic.csv",
+      TITANIC_CSV_URL,
       DATA_DIR / "titanic.csv",
       DATA_DIR / "titanic.parquet",
+      source_sha256=TITANIC_CSV_SHA256,
     )
   if "penguins" in required:
     ensure_csv_parquet(
-      "https://raw.githubusercontent.com/mwaskom/seaborn-data/master/penguins.csv",
+      PENGUINS_CSV_URL,
       DATA_DIR / "penguins.csv",
       DATA_DIR / "penguins.parquet",
+      source_sha256=PENGUINS_CSV_SHA256,
     )
   if "nyc_taxi_jan_2023" in required:
     ensure_download(
-      "https://d37ci6vzurychx.cloudfront.net/trip-data/yellow_tripdata_2023-01.parquet",
+      TAXI_PARQUET_URL,
       DATA_DIR / "yellow_tripdata_2023-01.parquet",
+      expected_sha256=TAXI_PARQUET_SHA256,
     )
 
 
-def ensure_csv_parquet(url: str, csv_path: Path, parquet_path: Path) -> None:
-  ensure_download(url, csv_path)
-  if parquet_path.exists():
-    return
+def ensure_csv_parquet(
+  url: str,
+  csv_path: Path,
+  parquet_path: Path,
+  *,
+  source_sha256: str,
+) -> None:
+  ensure_download(url, csv_path, expected_sha256=source_sha256)
   parquet_path.parent.mkdir(parents=True, exist_ok=True)
   con = duckdb.connect()
   try:
@@ -115,14 +142,26 @@ def ensure_csv_parquet(url: str, csv_path: Path, parquet_path: Path) -> None:
     con.close()
 
 
-def ensure_download(url: str, destination: Path) -> None:
+def ensure_download(url: str, destination: Path, *, expected_sha256: str) -> None:
   if destination.exists() and destination.stat().st_size > 0:
-    return
+    if _sha256(destination) == expected_sha256:
+      return
   destination.parent.mkdir(parents=True, exist_ok=True)
   tmp_path = destination.with_suffix(destination.suffix + ".tmp")
   with urllib.request.urlopen(url, timeout=120) as response:
     tmp_path.write_bytes(response.read())
+  if _sha256(tmp_path) != expected_sha256:
+    tmp_path.unlink(missing_ok=True)
+    raise HarnessFailure(f"downloaded fixture hash mismatch: {destination}")
   tmp_path.replace(destination)
+
+
+def _sha256(path: Path) -> str:
+  digest = hashlib.sha256()
+  with path.open("rb") as stream:
+    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+      digest.update(chunk)
+  return digest.hexdigest()
 
 
 def s1_titanic_batch_core() -> ScenarioResult:
@@ -524,19 +563,46 @@ def s6_canonical_parquet_workflow() -> ScenarioResult:
   )
   check(
     result,
-    replay_snapshot[0] == ("class", "mean_age", "mean_fare", "mean_family_size"),
+    replay_snapshot[0]
+    == (
+      ("class", "VARCHAR"),
+      ("mean_age", "DOUBLE"),
+      ("mean_fare", "DOUBLE"),
+      ("mean_family_size", "DOUBLE"),
+    ),
     "output schema is class-level means",
   )
   check(result, len(replay_snapshot[1]) == 3, "output has three class rows")
+  expected_rows = {
+    "First": (40.0316091954023, 86.5741149425287, 1.7988505747126438),
+    "Second": (33.443333333333335, 20.782833333333333, 1.7),
+    "Third": (29.608303249097474, 11.056360288808674, 1.5270758122743682),
+  }
+  actual_rows = {str(row[0]): row for row in replay_snapshot[1] if row}
+  for class_name, expected_values in expected_rows.items():
+    actual = actual_rows.get(class_name)
+    values_match = (
+      actual is not None
+      and len(actual) == 4
+      and all(
+        isinstance(observed, (int, float))
+        and math.isclose(observed, expected, rel_tol=0.0, abs_tol=1e-12)
+        for observed, expected in zip(actual[1:], expected_values, strict=True)
+      )
+    )
+    check(result, values_match, f"output values match expected {class_name} means")
   check_file(result, output_path)
 
   first_seconds = first.duration_seconds or 0.0
   replay_seconds = replay.duration_seconds or 0.0
   result.duration_seconds = first_seconds + replay_seconds
+  result.exit_code = 0 if first.exit_code == replay.exit_code == 0 else 1
   result.metrics.update(
     {
       "first_run_seconds": first_seconds,
       "replay_seconds": replay_seconds,
+      "first_exit_code": first.exit_code if first.exit_code is not None else 1,
+      "replay_exit_code": replay.exit_code if replay.exit_code is not None else 1,
       "total_seconds": result.duration_seconds,
       "output_rows": len(replay_snapshot[1]),
       "output_columns": len(replay_snapshot[0]),
@@ -554,6 +620,7 @@ def run_command_scenario(scenario_id: str, command: CommandSpec) -> ScenarioResu
     capture_output=True,
     check=False,
   )
+  finished_at = time.perf_counter()
   stdout_path = write_log(scenario_id, "stdout", completed.stdout)
   stderr_path = write_log(scenario_id, "stderr", completed.stderr)
   result = ScenarioResult(
@@ -562,7 +629,7 @@ def run_command_scenario(scenario_id: str, command: CommandSpec) -> ScenarioResu
     stdout_path=str(stdout_path.relative_to(REPO_ROOT)),
     stderr_path=str(stderr_path.relative_to(REPO_ROOT)),
     exit_code=completed.returncode,
-    duration_seconds=time.perf_counter() - started_at,
+    duration_seconds=finished_at - started_at,
   )
   check(result, completed.returncode == 0, f"exit code {completed.returncode}")
   check(result, completed.stderr == command.expected_stderr, "stderr matches expectation")
@@ -610,11 +677,11 @@ def check_file(result: ScenarioResult, path: Path) -> None:
       con.close()
 
 
-def read_parquet_snapshot(path: Path) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+def read_parquet_snapshot(path: Path) -> ParquetSnapshot:
   con = duckdb.connect()
   try:
     cursor = con.execute("select * from read_parquet(?) order by all", [str(path)])
-    columns = tuple(column[0] for column in cursor.description or ())
+    columns = tuple((column[0], str(column[1])) for column in cursor.description or ())
     return columns, tuple(cursor.fetchall())
   finally:
     con.close()
@@ -624,7 +691,7 @@ def read_parquet_snapshot_or_failure(
   result: ScenarioResult,
   path: Path,
   label: str,
-) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+) -> ParquetSnapshot:
   if not path.exists():
     check(result, False, f"{label} exists at {path.relative_to(REPO_ROOT)}")
     return (), ()
@@ -645,9 +712,10 @@ def merge_result(target: ScenarioResult, source: ScenarioResult) -> None:
     target.stdout_path = source.stdout_path
   if target.stderr_path is None:
     target.stderr_path = source.stderr_path
-  if target.exit_code is None:
+  if target.exit_code is None or source.exit_code not in (None, 0):
     target.exit_code = source.exit_code
   if source.duration_seconds is not None:
+    target.duration_seconds = (target.duration_seconds or 0.0) + source.duration_seconds
     target.metrics[f"{source.scenario_id}.seconds"] = source.duration_seconds
 
 
