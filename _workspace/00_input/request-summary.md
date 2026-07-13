@@ -1,38 +1,37 @@
-# Request Summary: Phase 24 P1 Structured JSON Declared Effect Categories
+# Request Summary: Phase 24 P1 Structured JSON Command Schema Discovery
 
 ## Goal
 
-Expose a finite, stable command-level effect vocabulary for machine clients without inspecting data,
-estimating cost, planning resources, or executing commands.
+Expose bounded machine-readable syntax and argument metadata for one discovered command without
+executing it, creating a session, reading data, or changing terminal behavior.
 
 ## Phase Fit
 
 Phase 24 P1 Agent and automation interface. This follows JSON success/error envelopes, command/help
-discovery, and parser-only syntax preview, and is a bounded step toward full dry-run/explain behavior.
+discovery, syntax preview, and declared effects, and provides a narrow option-schema surface before
+full parser/execution planning.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: typed effect-category result model
-- `src/tabdat/formatter.py`: terminal/JSON serialization and stable result-label coverage
-- `src/tabdat/cli.py`: `--list-command-effects` routing and read-only emission
-- `docs/command-reference.md`, `docs/user-guide.md`, `src/tabdat/help/topics/run.md`: semantics/docs
-- `tests/test_cli.py`, `tests/test_help.py`: vocabulary, mapping, unknown, and compatibility coverage
+- `src/tabdat/models.py`: typed command-schema metadata models
+- `src/tabdat/formatter.py`: JSON serialization and stable result-label coverage
+- `src/tabdat/cli.py`: `--describe-command` validation and read-only routing
+- `src/tabdat/help/topics/`, `docs/command-reference.md`, `docs/user-guide.md`: metadata docs
+- `tests/test_cli.py`, `tests/test_help.py`: known/unknown command, ordering, and side-effect coverage
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- `tabdat --json --list-command-effects` emits one deterministic catalog envelope whose entries map
-  each advertised command to one or more declared effect categories; existing command execution and
-  JSON success/error envelopes remain unchanged.
-- Categories are possible top-level command-family effects, including active-dataset reads, output
-  writes, artifact plots, and delegated `run`/`by` behavior. They do not inspect an active dataset,
-  account for options or predicates, estimate cost, or imply a full execution plan.
-- Every advertised command has an explicit category mapping; any future/unclassified command uses
-  `unknown` rather than an inferred category.
-- Terminal and interactive behavior remain unchanged; the new machine-readable path is batch-only.
+- `tabdat --json --describe-command <name>` emits one versioned result for one known command with a
+  canonical name, syntax string, help-topic availability, and bounded argument/option descriptors.
+- Metadata is declarative and registry-derived. It does not execute a parser branch, inspect data,
+  resolve backend capabilities, estimate cost, or promise complete grammar validation.
+- Unknown command names emit one existing structured JSON error envelope and exit status `1`.
+- The path is batch-only and cannot be combined with command/script execution, other discovery flags,
+  explain/help-topic flags, or interactive mode.
 
 ## Non-Goals
 
-- Data-dependent planning, resource/state plans, estimates, command execution, scripts, option/
-  argument schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain,
-  repair diagnostics, operation lineage, or new exit codes.
+- Command execution, data-dependent planning, scripts, multiple-command output, plugin schemas,
+  interactive JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation
+  lineage, new syntax, or new exit codes.

@@ -657,31 +657,39 @@ and describe the active work with concise verification criteria.
     as PR #109
   - explicitly deferred declared effect categories, data-dependent planning, estimates, and full
     dry-run/explain behavior
+- Implemented Phase 24 P1 structured JSON declared effect categories:
+  - added read-only `--json --list-command-effects` with explicit coverage for every current command,
+    canonical finite categories, delegated/output-effect semantics, and `unknown` fallback
+  - enforced category tuple invariants and preserved all existing execution/session boundaries
+  - completed exactly three independent reviews, fixed all findings, and merged the validated slice
+    as PR #110
+  - explicitly deferred data-dependent planning, option/argument schemas, estimates, and full
+    dry-run/explain behavior
 
 ## Present
 
-- Feature: Phase 24 P1 structured JSON declared effect categories
+- Feature: Phase 24 P1 structured JSON command schema discovery
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-effects
+  Branch: feat/phase24-json-schema
 
   Summary:
-  Add a small stable command-level effect vocabulary for machine clients without claiming
-  data-dependent plans, estimates, or execution.
+  Add read-only machine-readable syntax and argument metadata for one discovered command without
+  executing it, creating a session, or reading data.
 
   Verification:
-  - one deterministic machine-readable envelope maps each advertised command to one or more declared
-    effect categories from a finite documented vocabulary
-  - categories are command-level declarations only, are deterministic, and never inspect active data,
-    estimate cost, or imply execution planning
-  - unknown/unclassified commands use an explicit `unknown` category; existing command execution and
-    JSON envelopes remain unchanged
+  - `--json --describe-command <name>` emits one deterministic schema envelope with canonical command
+    name, syntax/help-topic metadata, and bounded argument/option descriptors
+  - metadata is registry-derived, read-only, and does not launch `Executor`, load config, inspect data,
+    or claim full parser/execution equivalence
+  - unknown commands use the existing structured JSON error envelope; terminal and existing JSON paths
+    remain unchanged
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - data-dependent effects, resource/state plans, estimates, command execution, scripts, option/
-    argument schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain,
-    repair diagnostics, operation lineage, estimation samples, and new exit codes
+  - command execution, data-dependent planning, scripts, multiple-command output, plugins, interactive
+    JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation lineage,
+    estimation samples, new syntax, and new exit codes
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

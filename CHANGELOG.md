@@ -75,8 +75,10 @@ All notable project changes are tracked here.
   envelopes, stable resource errors, and a fresh-wheel packaged-resource smoke check.
 - Completed the Phase 24 structured JSON syntax-preview slice with stable normalized command names,
   conventional help precedence, and parser-only execution boundaries.
-- Started the Phase 24 structured JSON declared-effect slice; command-level effect categories will be
-  exposed without data-dependent planning or execution.
+- Completed the Phase 24 structured JSON declared-effect slice with explicit registry coverage,
+  delegated/output-effect semantics, canonical category invariants, and unknown fallback.
+- Started the Phase 24 structured JSON command-schema discovery slice; one command's bounded syntax
+  and argument metadata will become available without execution or session setup.
 
 ### Added
 
