@@ -562,38 +562,61 @@ class DuckDBBackend:
     identifiers: tuple[str, ...],
     j_variable: str,
   ) -> DatasetInfo:
+    j_values = self.validate_reshape_long(dataset, variables, identifiers, j_variable)
+    row_order_name, j_order_name = _reshape_long_order_column_names(
+      dataset,
+      reserved_names=(*identifiers, j_variable, *variables),
+    )
+    row_order_sql = _quote_identifier(row_order_name)
+    j_order_sql = _quote_identifier(j_order_name)
+    id_sql = ", ".join(
+      f"reshape_source.{_quote_identifier(identifier)}" for identifier in identifiers
+    )
+    selects = []
+    for j_index, j_value in enumerate(j_values):
+      value_sql = ", ".join(
+        f"reshape_source.{_quote_identifier(variable + '_' + j_value)} as "
+        f"{_quote_identifier(variable)}"
+        for variable in variables
+      )
+      selects.append(
+        f"""
+        select reshape_source.{row_order_sql}, {id_sql},
+          {_quote_literal(j_value)} as {_quote_identifier(j_variable)}, {value_sql},
+          {j_index} as {j_order_sql}
+        from reshape_source
+        """
+      )
+    self._replace_active(
+      f"""
+      with reshape_source as (
+        select row_number() over () as {row_order_sql}, *
+        from {ACTIVE_TABLE}
+      )
+      select * exclude ({row_order_sql}, {j_order_sql})
+      from (
+        {" union all ".join(selects)}
+      ) as reshape_long_rows
+      order by {row_order_sql}, {j_order_sql}
+      """,
+      "reshape",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def validate_reshape_long(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    identifiers: tuple[str, ...],
+    j_variable: str,
+  ) -> tuple[str, ...]:
     column_types = {column.name: column.data_type for column in dataset.columns}
     _require_columns("reshape", column_types, identifiers)
     _reject_existing_column("reshape", column_types, j_variable)
     j_values = _long_j_values(dataset, variables)
     for variable in variables:
       _require_long_stub_columns(column_types, variable, j_values)
-
-    id_sql = _select_list(identifiers)
-    selects = []
-    for j_value in j_values:
-      value_sql = ", ".join(
-        f"{_quote_identifier(variable + '_' + j_value)} as {_quote_identifier(variable)}"
-        for variable in variables
-      )
-      selects.append(
-        f"""
-        select {id_sql}, {_quote_literal(j_value)} as {_quote_identifier(j_variable)}, {value_sql}
-        from {ACTIVE_TABLE}
-        """
-      )
-    order_sql = ", ".join(_quote_identifier(identifier) for identifier in identifiers)
-    self._replace_active(
-      f"""
-      select *
-      from (
-        {" union all ".join(selects)}
-      )
-      order by {order_sql}, {_quote_identifier(j_variable)}
-      """,
-      "reshape",
-    )
-    return self.active_dataset_info(dataset.path)
+    return j_values
 
   def reshape_wide(
     self,
@@ -602,30 +625,57 @@ class DuckDBBackend:
     identifiers: tuple[str, ...],
     j_variable: str,
   ) -> DatasetInfo:
-    column_types = {column.name: column.data_type for column in dataset.columns}
-    _require_columns("reshape", column_types, identifiers + (j_variable,) + variables)
-    j_values = self._wide_j_values(j_variable)
-    if not j_values:
-      raise ExecutionError("reshape wide found no j values")
-    _require_wide_output_names(column_types, variables, identifiers, j_variable, j_values)
-
-    id_sql = _select_list(identifiers)
+    j_values = self.validate_reshape_wide(dataset, variables, identifiers, j_variable)
+    public_names = set(identifiers)
+    public_names.update(variable + "_" + j_value for variable in variables for j_value in j_values)
+    used_names = {column.name for column in dataset.columns} | public_names
+    group_order_name = _unique_internal_name("__tabdat_reshape_group_order", used_names)
+    group_order_sql = _quote_identifier(group_order_name)
+    used_names.add(group_order_name)
+    source_order_name = _unique_internal_name("__tabdat_reshape_source_order", used_names)
+    source_order_sql = _quote_identifier(source_order_name)
+    id_sql = ", ".join(
+      f"reshape_source.{_quote_identifier(identifier)}" for identifier in identifiers
+    )
     aggregate_sql = ", ".join(
-      f"max(case when cast({_quote_identifier(j_variable)} as varchar) = {_quote_literal(j_value)} "
-      f"then {_quote_identifier(variable)} end) as {_quote_identifier(variable + '_' + j_value)}"
+      f"max(case when cast(reshape_source.{_quote_identifier(j_variable)} as varchar) = "
+      f"{_quote_literal(j_value)} then reshape_source.{_quote_identifier(variable)} end) "
+      f"as {_quote_identifier(variable + '_' + j_value)}"
       for variable in variables
       for j_value in j_values
     )
     self._replace_active(
       f"""
-      select {id_sql}, {aggregate_sql}
-      from {ACTIVE_TABLE}
-      group by {id_sql}
-      order by {id_sql}
+      select * exclude ({group_order_sql})
+      from (
+        select {id_sql}, {aggregate_sql},
+          min(reshape_source.{source_order_sql}) as {group_order_sql}
+        from (
+          select row_number() over () as {source_order_sql}, *
+          from {ACTIVE_TABLE}
+        ) as reshape_source
+        group by {id_sql}
+      ) as reshape_wide_rows
+      order by {group_order_sql}
       """,
       "reshape",
     )
     return self.active_dataset_info(dataset.path)
+
+  def validate_reshape_wide(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    identifiers: tuple[str, ...],
+    j_variable: str,
+  ) -> tuple[str, ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("reshape", column_types, identifiers + (j_variable,) + variables)
+    j_values = self._reshape_wide_j_values(j_variable)
+    if not j_values:
+      raise ExecutionError("reshape wide found no j values")
+    _require_wide_output_names(column_types, variables, identifiers, j_variable, j_values)
+    return j_values
 
   def validate_panel_metadata(self, dataset: DatasetInfo, metadata: PanelMetadata) -> None:
     column_types = {column.name: column.data_type for column in dataset.columns}
@@ -2020,6 +2070,20 @@ class DuckDBBackend:
     """
     return tuple(str(row[0]) for row in self._fetch_table(sql, "reshape"))
 
+  def _reshape_wide_j_values(self, j_variable: str) -> tuple[str, ...]:
+    if self._polars_lazy_frame is None:
+      return self._wide_j_values(j_variable)
+    try:
+      values = (
+        self._polars_lazy_frame.select(pl.col(j_variable))
+        .collect()
+        .get_column(j_variable)
+        .to_list()
+      )
+    except PolarsError as exc:
+      raise ExecutionError("reshape failed") from exc
+    return tuple(sorted({str(value) for value in values if value is not None}))
+
   def _has_nulls(self, variable: str) -> bool:
     quoted_variable = _quote_identifier(variable)
     sql = f"select exists(select 1 from {ACTIVE_TABLE} where {quoted_variable} is null)"
@@ -2527,6 +2591,18 @@ def _join_order_column_names(
   used_names.add(left_name)
   right_name = _unique_internal_name("__tabdat_join_right_order", used_names)
   return left_name, right_name
+
+
+def _reshape_long_order_column_names(
+  dataset: DatasetInfo,
+  *,
+  reserved_names: tuple[str, ...] = (),
+) -> tuple[str, str]:
+  used_names = {column.name for column in dataset.columns} | set(reserved_names)
+  row_name = _unique_internal_name("__tabdat_reshape_row_order", used_names)
+  used_names.add(row_name)
+  j_name = _unique_internal_name("__tabdat_reshape_j_order", used_names)
+  return row_name, j_name
 
 
 def _unique_internal_name(candidate: str, used_names: set[str]) -> str:

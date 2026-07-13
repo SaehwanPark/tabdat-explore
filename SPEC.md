@@ -592,23 +592,23 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- Feature: Phase 24 P0 join row-order semantics
+- Feature: Phase 24 P0 reshape row-order semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-join-order
+  Branch: feat/phase24-reshape-order
 
   Summary:
-  Define and regression-test deterministic result sequence for `join table_name on keyvars` across
-  supported execution paths.
+  Define and regression-test deterministic result sequences for `reshape long` and `reshape wide`
+  across supported execution paths.
 
   Verification:
-  - join groups output by active-row sequence and preserves named-table match sequence within each group
-  - duplicate right-side matches remain present for inner and left joins
+  - reshape long emits each source row's j-values in established wide-column sequence
+  - reshape wide emits identifier groups in first-appearance order from the active sequence
   - eager, DuckDB-lazy, and Polars-lazy inputs produce the same preview sequence
   - CLI, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new sort syntax, row-ID persistence, append/reshape ordering, unordered SQL guarantees,
+  - new sort syntax, row-ID persistence, append/join ordering, unordered SQL guarantees,
     categorical ordering, exact arithmetic storage widths, overflow reporting, randomness,
     estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins

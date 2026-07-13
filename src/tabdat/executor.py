@@ -5950,6 +5950,22 @@ class Executor:
         table_name=command.table_name,
         keys=command.keys,
       )
+      return
+    if isinstance(command, ReshapeCommand):
+      if command.direction == "long":
+        self.backend.validate_reshape_long(
+          dataset,
+          command.variables,
+          command.identifiers,
+          command.j_variable,
+        )
+      else:
+        self.backend.validate_reshape_wide(
+          dataset,
+          command.variables,
+          command.identifiers,
+          command.j_variable,
+        )
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

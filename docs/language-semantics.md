@@ -108,8 +108,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
   results follow the existing keep/drop policy and never reorder survivors.
 - Column projection and row-preserving value transformations preserve the current row sequence.
-- Grouped or relation-changing commands such as `collapse` and reshape establish
-  separate result-sequence contracts; this slice does not redefine their later preview order.
+- Grouped or relation-changing commands such as `collapse` establish separate result-sequence
+  contracts; this slice does not redefine their later preview order.
 - Categorical order remains a separate contract.
 
 ## SQL and named-table row order
@@ -122,7 +122,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
   fallback path before the query executes, and successful named-table activation resets the prior
   materialization reason.
-- Reshape order and categorical order remain separate contracts.
+- Reshape row order and categorical order remain separate contracts.
 
 ## Join row order
 
@@ -135,7 +135,19 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - Existing key equality, suffixing, output-column, and missing-key behavior remain unchanged.
 - Join validates named-table existence and key columns before Polars fallback; a validation failure
   preserves the active rows, execution mode, and materialization metadata.
-- Reshape order and categorical order remain separate contracts.
+- Reshape row order and categorical order remain separate contracts.
+
+## Reshape row order
+
+- `reshape long` preserves the active source-row sequence. For each source row, generated rows follow
+  the established wide-column j-value sequence: scan requested stubs in command varlist order, scan
+  each stub's matching source columns in schema order, and keep each suffix's first appearance once.
+- `reshape wide` emits one row per identifier group in the order of the first active row belonging to
+  that group. Existing generated-column order and duplicate-cell aggregation remain unchanged.
+- `head`/`tail` consume each reshape result using the active row-order rules.
+- Reshape crosses the existing eager boundary where required; eager, DuckDB-lazy, and Polars-lazy
+  inputs produce the same result sequence.
+- Append/join order and categorical order remain separate contracts.
 
 ## Append row order
 
@@ -143,7 +155,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
   `name` in its stored sequence.
 - Append does not sort, deduplicate, or interleave the two inputs. `head`/`tail` consume the combined
   sequence using the active row-order rules.
-- Reshape order and categorical order remain separate contracts.
+- Categorical order remains a separate contract.
 
 ## Write targets
 
@@ -172,6 +184,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics, reshape ordering,
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics,
 SQL without explicit ordering, randomness, estimation samples, machine-readable output,
 and exit codes are not defined here yet.

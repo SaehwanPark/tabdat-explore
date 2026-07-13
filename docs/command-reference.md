@@ -41,6 +41,10 @@ paths, and more).
 | `append` | Append rows from a named table | `append followup` |
 | `reshape` | Reshape data between wide and long layouts | `reshape long value, i(id) j(year)` |
 
+Reshape preserves source-row order for long expansion and first-appearance identifier-group order for
+wide output. See [language-semantics.md](language-semantics.md#reshape-row-order) for the exact
+j-value sequence rule.
+
 ## Summarize and tabulate
 
 | Command | Purpose | Minimal invocation |

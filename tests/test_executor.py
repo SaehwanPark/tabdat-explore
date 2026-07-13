@@ -6277,6 +6277,252 @@ def test_phase_11_reshape_long_wide_roundtrip(tmp_path: Path) -> None:
   )
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_reshape_preserves_source_and_group_sequence(tmp_path: Path, engine: str) -> None:
+  path = tmp_path / "reshape_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select id, income_2021, income_2020, cost_2020, cost_2021
+    from (
+      values
+        (1, 2, 21.0, 20.0, 200.0, 210.0),
+        (2, 1, 11.0, 10.0, 100.0, 110.0)
+    ) as wide(row_order, id, income_2021, income_2020, cost_2020, cost_2021)
+    order by row_order
+    """,
+  )
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(use_command())
+    long_result = executor.execute(
+      ReshapeCommand(
+        direction="long",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    long_preview = executor.execute(HeadCommand(10))
+    wide_result = executor.execute(
+      ReshapeCommand(
+        direction="wide",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    wide_preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(long_result, TransformResult)
+  assert isinstance(long_preview, PreviewResult)
+  assert long_preview.rows == (
+    (2, "2021", 21.0, 210.0),
+    (2, "2020", 20.0, 200.0),
+    (1, "2021", 11.0, 110.0),
+    (1, "2020", 10.0, 100.0),
+  )
+  assert isinstance(wide_result, TransformResult)
+  assert isinstance(wide_preview, PreviewResult)
+  assert wide_preview.rows == (
+    (2, 20.0, 21.0, 200.0, 210.0),
+    (1, 10.0, 11.0, 100.0, 110.0),
+  )
+
+
+def test_reshape_internal_order_names_do_not_overwrite_public_columns(tmp_path: Path) -> None:
+  long_path = tmp_path / "reshape_long_collision.parquet"
+  _write_sql_parquet(
+    long_path,
+    """
+    select id, __tabdat_reshape_row_order_2020, __tabdat_reshape_row_order_2021
+    from (
+      values
+        (1, 10.0, 11.0)
+    ) as wide(id, __tabdat_reshape_row_order_2020, __tabdat_reshape_row_order_2021)
+    """,
+  )
+  wide_path = tmp_path / "reshape_wide_collision.parquet"
+  _write_sql_parquet(
+    wide_path,
+    """
+    select * from (
+      values
+        (2, 'order', 20.0),
+        (1, 'order', 10.0)
+    ) as long_data(id, year, __tabdat_reshape_group)
+    order by id desc
+    """,
+  )
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(long_path))
+    long_result = executor.execute(
+      ReshapeCommand(
+        direction="long",
+        variables=("__tabdat_reshape_row_order",),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    executor.execute(UseCommand(wide_path))
+    wide_result = executor.execute(
+      ReshapeCommand(
+        direction="wide",
+        variables=("__tabdat_reshape_group",),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(long_result, TransformResult)
+  assert [column.name for column in long_result.dataset.columns] == [
+    "id",
+    "year",
+    "__tabdat_reshape_row_order",
+  ]
+  assert isinstance(wide_result, TransformResult)
+  assert [column.name for column in wide_result.dataset.columns] == [
+    "id",
+    "__tabdat_reshape_group_order",
+  ]
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_reshape_wide_preserves_null_and_duplicate_cell_behavior(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "reshape_wide_cells.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2, '2021', 21.0),
+        (2, 2, '2021', null::double),
+        (3, 2, '2020', 20.0),
+        (4, 1, '2020', 10.0)
+    ) as long_data(row_order, id, year, income)
+    order by row_order
+    """,
+  )
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(use_command())
+    result = executor.execute(
+      ReshapeCommand(
+        direction="wide",
+        variables=("income",),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    (2, 20.0, 21.0),
+    (1, 10.0, None),
+  )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_failed_reshape_validation_preserves_active_state(tmp_path: Path, engine: str) -> None:
+  long_path = tmp_path / "reshape_validation_long.parquet"
+  _write_sql_parquet(
+    long_path,
+    """
+    select * from (
+      values
+        (1, 1, 10.0),
+        (2, 2, 20.0)
+    ) as wide(row_order, id, income_2020)
+    order by row_order
+    """,
+  )
+  wide_path = tmp_path / "reshape_validation_wide.parquet"
+  _write_sql_parquet(
+    wide_path,
+    """
+    select * from (
+      values
+        (1, 2, '2020', 20.0, 999.0),
+        (2, 1, '2020', 10.0, 999.0)
+    ) as long_data(row_order, id, year, income, income_2020)
+    order by row_order
+    """,
+  )
+
+  def use_command(path: Path) -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(use_command(long_path))
+    with pytest.raises(
+      UnknownVariableError, match="reshape long found no columns for stub: missing"
+    ):
+      executor.execute(
+        ReshapeCommand(
+          direction="long",
+          variables=("missing",),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
+    long_status = executor.execute(StatusCommand())
+
+    executor.execute(use_command(wide_path))
+    with pytest.raises(ExecutionError, match="reshape wide output column already exists"):
+      executor.execute(
+        ReshapeCommand(
+          direction="wide",
+          variables=("income",),
+          identifiers=("id",),
+          j_variable="year",
+        )
+      )
+    wide_status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  for status in (long_status, wide_status):
+    assert isinstance(status, StatusResult)
+    assert status.last_operation == "use"
+    assert status.last_materialization_reason is None
+    if engine == "eager":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.row_count == 2
+    else:
+      assert status.execution_mode == "lazy"
+      assert status.lazy_engine == engine
+      assert status.row_count is None
+
+
 def test_phase_11_reshape_reports_dataset_and_variable_errors(
   sample_parquet: Path,
   tmp_path: Path,
