@@ -32,6 +32,8 @@ All notable project changes are tracked here.
   normalization are bounded before exact storage-width and overflow policy.
 - The arithmetic-result slice rejects unsigned subtraction/unary-minus and covers Decimal operand
   order so backend edge cases remain deterministic.
+- Started the Phase 24 grouped-result ordering slice; native numeric/text/missing key order is being
+  bounded before active row-order and categorical-order contracts.
 
 ### Added
 

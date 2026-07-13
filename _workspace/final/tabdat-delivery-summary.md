@@ -1,27 +1,25 @@
-# Delivery Summary: Phase 24 P0 Arithmetic Results
+# Delivery Summary: Phase 24 P0 Grouped-Result Ordering
 
-The arithmetic-result slice is implemented and fully validated locally.
+The grouped-result ordering slice is implemented and fully validated locally.
 
 ## Delivered
 
-- Defined missing propagation for existing arithmetic and numeric functions.
-- Normalized zero-denominator results, invalid `sqrt`/`ln`/`log` domains, and computed NaN/infinity
-  to missing values without rewriting direct source values.
-- Rejected unsigned subtraction and unary minus before backend execution, avoiding underflow and
-  signedness divergence.
-- Kept eager, DuckDB-lazy, and Polars-lazy predicate behavior aligned, including Decimal division.
-- Covered generated values, replacements, arithmetic predicates, CLI output, help, and docs.
+- Numeric grouped keys sort numerically without float precision loss; text and boolean ordering is
+  explicit.
+- Missing and NaN grouped keys sort last and use canonical wide-tabulate cell keys.
+- Bar categories sort nonmissing counts/ties deterministically, with missing last.
+- Altair preserves backend category order; eager, DuckDB-lazy, and Polars-lazy tabulate behavior,
+  CLI output, help, and docs are covered.
 
 ## Validation
 
-- Arithmetic executor regressions: 28 passed in the final focused run.
-- CLI regressions: 3 passed; help regressions: 2 passed.
-- Full suite: 1,053 passed, with 314 existing third-party warnings.
+- Final review-fix ordering regressions: 9 executor, 1 CLI, and 1 help test passed.
+- Full suite: 1,062 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully.
 
 ## Remaining Phase 24 Work
 
-Exact arithmetic storage widths and overflow diagnostics, categorical conversion, ordering,
-randomness, estimation samples, errors and exits, operation lineage, machine output, differential
-assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.
+Active row order, `head`/`tail`, arbitrary SQL ordering, categorical ordering, exact arithmetic widths,
+overflow diagnostics, randomness, estimation samples, errors and exits, operation lineage, machine
+output, differential assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.

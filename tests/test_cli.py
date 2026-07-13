@@ -2353,6 +2353,35 @@ def test_cli_normalizes_nonfinite_arithmetic_results(sample_parquet: Path, capsy
   assert captured.err == ""
 
 
+def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "ordering.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2),
+        (1, 10),
+        (1, null::integer)
+    ) as ordering_data(group_id, code)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "tabulate, rows(group_id) columns(code) missing",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out.index("2 Count") < captured.out.index("10 Count")
+  assert captured.err == ""
+
+
 def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
   exit_code = main(["-c", "status"])
 

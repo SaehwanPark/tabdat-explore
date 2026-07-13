@@ -19,6 +19,7 @@ import pytest
 from scipy.stats import norm
 
 import tabdat.executor as executor_module
+import tabdat.visualization as visualization_module
 from tabdat.backend import resolve_load_source
 from tabdat.config import TabDatConfig
 from tabdat.errors import (
@@ -204,6 +205,50 @@ def _write_decimal_arithmetic_parquet(path: Path) -> None:
         (cast(1.0 as decimal(10, 2)), cast(0.0 as decimal(10, 2)), 'zero'),
         (cast(null as decimal(10, 2)), cast(2.0 as decimal(10, 2)), 'missing')
     ) as decimal_data(amount, divisor, label)
+    """,
+  )
+
+
+def _write_grouped_ordering_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 2, 'z'),
+        (1, 10, 'a'),
+        (1, null::integer, null::varchar),
+        (2, 10, 'a'),
+        (2, 2, 'z')
+    ) as ordering_data(group_id, code, label)
+    """,
+  )
+
+
+def _write_exact_ordering_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, cast('9007199254740993' as decimal(20, 0))),
+        (2, cast('9007199254740992' as decimal(20, 0)))
+    ) as exact_ordering_data(group_id, code)
+    """,
+  )
+
+
+def _write_nan_ordering_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, cast(1.0 as double)),
+        (1, cast('nan' as double)),
+        (2, cast(1.0 as double)),
+        (2, cast('nan' as double))
+    ) as nan_ordering_data(group_id, code)
     """,
   )
 
@@ -7436,6 +7481,28 @@ def test_tabulate_missing_option_controls_missing_categories(sample_parquet: Pat
   assert any(row[0] is None for row in with_missing.rows)
 
 
+def test_bar_visualization_preserves_backend_category_order(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  captured: dict[str, Any] = {}
+
+  def capture_chart(chart: Any, path: Path) -> Path:
+    captured["sort"] = chart.to_dict()["encoding"]["x"]["sort"]
+    return path
+
+  monkeypatch.setattr(visualization_module, "_save_chart", capture_chart)
+  path = tmp_path / "plots" / "ordered-bar.svg"
+  result = visualization_module.save_bar(
+    (("2", 2), ("10", 2), (None, 5)),
+    "code",
+    path,
+  )
+
+  assert result == path
+  assert captured["sort"] == ["2", "10", "<missing>"]
+
+
 def test_phase_24_bar_missing_category_is_rendered(
   sample_parquet: Path,
   tmp_path: Path,
@@ -7545,6 +7612,153 @@ def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None
     ("north", "M", None, 30.0),
     ("south", "F", None, 40.0),
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_grouped_results_use_native_numeric_text_and_missing_order(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "grouped-ordering.parquet"
+  _write_grouped_ordering_parquet(path)
+
+  def run_grouped(command: TabulateCommand | ByCommand) -> tuple[TableResult, StatusResult]:
+    executor = Executor()
+    try:
+      use_command = UseCommand(path)
+      if engine != "eager":
+        use_command = UseCommand(
+          path,
+          execution_mode="lazy",
+          lazy_engine=engine,  # type: ignore[arg-type]
+        )
+      executor.execute(use_command)
+      result = executor.execute(command)
+      status = executor.execute(StatusCommand())
+    finally:
+      executor.close()
+    assert isinstance(result, TableResult)
+    assert isinstance(status, StatusResult)
+    return result, status
+
+  numeric_wide, wide_status = run_grouped(
+    TabulateCommand(
+      ("group_id",),
+      column_variables=("code",),
+      include_missing=True,
+    )
+  )
+  numeric_long, long_status = run_grouped(TabulateCommand(("code",), include_missing=True))
+  text_long, text_status = run_grouped(TabulateCommand(("label",), include_missing=True))
+  grouped_count, count_status = run_grouped(ByCommand(("group_id",), CountCommand()))
+
+  statuses = (wide_status, long_status, text_status, count_status)
+  for status in statuses:
+    if engine == "polars":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.last_materialization_reason == "polars_fallback"
+    elif engine == "duckdb":
+      assert status.execution_mode == "lazy"
+      assert status.lazy_engine == "duckdb"
+      assert status.last_materialization_reason is None
+    else:
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.last_materialization_reason is None
+
+  assert isinstance(numeric_wide, TableResult)
+  assert numeric_wide.headers == ("group_id", "2 Count", "10 Count", "missing Count")
+  assert numeric_wide.rows == ((1, 1, 1, 1), (2, 1, 1, 0))
+  assert isinstance(numeric_long, TableResult)
+  assert numeric_long.rows == (
+    (2, 2, pytest.approx(40.0)),
+    (10, 2, pytest.approx(40.0)),
+    (None, 1, pytest.approx(20.0)),
+  )
+  assert isinstance(text_long, TableResult)
+  assert text_long.rows == (
+    ("a", 2, pytest.approx(40.0)),
+    ("z", 2, pytest.approx(40.0)),
+    (None, 1, pytest.approx(20.0)),
+  )
+  assert isinstance(grouped_count, TableResult)
+  assert grouped_count.rows == ((1, 3), (2, 2))
+
+
+def test_wide_tabulate_preserves_exact_decimal_key_order(tmp_path: Path) -> None:
+  path = tmp_path / "exact-ordering.parquet"
+  _write_exact_ordering_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(TabulateCommand(("group_id",), column_variables=("code",)))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == (
+    "group_id",
+    "9007199254740992 Count",
+    "9007199254740993 Count",
+  )
+
+
+def test_wide_tabulate_canonicalizes_nan_keys_for_cells(tmp_path: Path) -> None:
+  path = tmp_path / "nan-ordering.parquet"
+  _write_nan_ordering_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(TabulateCommand(("group_id",), column_variables=("code",)))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  assert result.headers == ("group_id", "1.0 Count", "nan Count")
+  assert result.rows == ((1, 1, 1), (2, 1, 1))
+
+
+def test_bar_tie_order_uses_native_category_values(tmp_path: Path) -> None:
+  path = tmp_path / "bar-ordering.parquet"
+  _write_grouped_ordering_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    rows = executor.backend.bar_counts(dataset, "code", include_missing=True)
+  finally:
+    executor.close()
+
+  assert rows == (("2", 2), ("10", 2), (None, 1))
+
+
+def test_bar_missing_category_remains_last_when_count_is_high(tmp_path: Path) -> None:
+  path = tmp_path / "bar-missing-ordering.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (2),
+        (10),
+        (null::integer),
+        (null::integer),
+        (null::integer)
+    ) as bar_ordering_data(code)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    rows = executor.backend.bar_counts(dataset, "code", include_missing=True)
+  finally:
+    executor.close()
+
+  assert rows == (("2", 1), ("10", 1), (None, 3))
 
 
 def test_by_summarize_and_count_do_not_change_active_dataset(sample_parquet: Path) -> None:

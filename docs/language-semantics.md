@@ -89,6 +89,18 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - The policy is row-level: valid rows remain usable in `generate`, `replace`, and arithmetic
   predicates while affected rows become missing and follow the existing predicate rules.
 
+## Grouped-result ordering
+
+- `by summarize`, `by count`, `collapse`, and long-form `tabulate` sort grouping dimensions in
+  native scalar order with missing values last. Numeric values sort numerically; strings sort
+  lexicographically; booleans sort false before true.
+- Wide-form `tabulate` uses the same native order for row keys and column headers. Numeric labels are
+  not ordered by their rendered text, so `2` precedes `10`.
+- `bar` sorts nonmissing categories by descending count, then native category order for ties; the
+  missing category is always last.
+- Active row order, `head`/`tail`, arbitrary SQL ordering, and categorical ordering are not defined
+  by this slice.
+
 ## Write targets
 
 | Command family | Target rule | Failure behavior |
@@ -116,5 +128,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics, ordering, randomness,
-estimation samples, machine-readable output, and exit codes are not defined here yet.
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics, active row ordering,
+arbitrary SQL ordering, randomness, estimation samples, machine-readable output, and exit codes are
+not defined here yet.

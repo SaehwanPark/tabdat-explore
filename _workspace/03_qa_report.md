@@ -1,24 +1,23 @@
-# QA Report: Phase 24 P0 Arithmetic Results
+# QA Report: Phase 24 P0 Grouped-Result Ordering
 
 Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
 - **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, help topics, and the
-  product contract agree on missing propagation, finite numeric results, invalid numeric domains,
-  and unsigned arithmetic rejection.
-- **AST/backend compilation:** arithmetic and numeric functions normalize at expression boundaries;
-  nested SQL expressions are bound once, and comparison operands receive safe numeric boundaries.
-- **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy paths agree for missing operands,
-  zero denominators, invalid `sqrt`/`ln`/`log`, Decimal operand order, source NaN/infinity, and
-  unsigned subtraction/unary minus rejection.
-- **Failure behavior:** unsupported unsigned arithmetic is rejected before execution; row-level
-  numeric domain failures become missing values; existing validation and active-dataset boundaries
-  remain intact.
-- **User-facing paths:** CLI `-c`, command help, canonical script replay, and language docs cover
-  the result policy.
-- **Scope control:** no new syntax, categorical conversion, string concatenation, command, or
-  estimator was added.
+  product contract agree on native grouped-key ordering and the row-order non-goals.
+- **Pure result assembly:** wide tabulate headers use exact tagged numeric/text/boolean/null keys;
+  canonical NaN keys prevent duplicate headers and split cell lookups.
+- **Backend ordering:** DuckDB grouped queries retain native `ORDER BY`; bar ties use the source
+  category expression, nonmissing counts first, and missing last.
+- **Visualization ordering:** Altair receives the backend category sequence explicitly and does not
+  re-sort categories by its own count order.
+- **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy tabulate fixtures agree for numeric,
+  text, Decimal, NaN, and missing keys; each Polars operation is independently verified as fallback.
+- **User-facing paths:** CLI numeric header output, help text, canonical script replay, and language
+  docs cover the contract.
+- **Scope control:** no sort syntax, active row-order metadata, arbitrary SQL rewrite, categorical
+  ordering, command, or estimator was added.
 
 ## Blocking Issues
 
@@ -26,10 +25,10 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- Initial arithmetic executor regressions: 15 passed.
-- Final review-fix executor regressions: 28 passed.
-- Focused CLI regressions: 3 passed; help regressions: 2 passed.
-- `uv run pytest` — 1,053 passed, 314 existing third-party warnings.
+- Initial ordering executor regressions: 5 passed.
+- Final review-fix executor regressions: 9 passed.
+- Focused ordering CLI regression: 1 passed; help regression: 1 passed.
+- `uv run pytest` — 1,062 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -41,21 +40,19 @@ Status: final; implementation validation and exactly three independent PR review
 
 Exactly three independent review passes completed before merge readiness:
 
-- **Pass 1:** found Medium unsigned unary/subtraction parity and repeated SQL numeric subexpressions.
-- **Pass 2:** found Medium Decimal division with a literal on the left and independently confirmed
-  unsigned arithmetic divergence.
-- **Pass 3:** independently confirmed the same unsigned parity and SQL duplication risks.
+- **Pass 1:** found Medium exact numeric precision loss and NaN key canonicalization defects.
+- **Pass 2:** independently found the same exact precision issue and a Low Polars test-isolation gap.
+- **Pass 3:** found Medium Altair re-sorting and NaN cell-key defects plus a Low SPEC wording issue.
 
-Fixed by rejecting unsigned subtraction/unary minus before backend execution, using a Float64-safe
-Polars finite/result probe for Decimal expressions, and compiling raw nested SQL under one scalar
-numeric-result projection. All three agents were closed after their reports; no fourth review pass
-was created. No Critical or High findings remain.
+Fixed by preserving exact numeric sort values, canonicalizing NaN keys for deduplication and cell
+maps, passing explicit backend category order to Altair, isolating Polars grouped operations, and
+clarifying deferred arithmetic/order scope in SPEC. No Critical or High findings remain.
 
 ## Non-Blocking Follow-Ups
 
-Exact arithmetic storage widths and overflow diagnostics, categorical conversion, string
-concatenation, ordering/randomness, estimation samples, machine output, exit semantics, lineage,
-differential assurance, and public-preview readiness remain queued in `SPEC.md`.
+Active row order, `head`/`tail`, arbitrary SQL ordering, categorical ordering, exact arithmetic
+widths, overflow diagnostics, randomness, estimation samples, machine output, exit semantics,
+lineage, differential assurance, and public-preview readiness remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 
