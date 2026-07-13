@@ -7058,6 +7058,36 @@ def test_phase_3_transformations_report_user_facing_errors(sample_parquet: Path)
     executor.close()
 
 
+def test_write_target_validation_failures_are_atomic(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    before = executor.execute(DescribeCommand())
+    with pytest.raises(ExecutionError):
+      executor.execute(GenerateCommand("age", NumberExpression(1)))
+    with pytest.raises(ExecutionError):
+      executor.execute(RenameCommand("age", "bmi"))
+    with pytest.raises(ExecutionError):
+      executor.execute(RenameCommand("missing", "age"))
+    with pytest.raises(ExecutionError):
+      executor.execute(ReplaceCommand("missing", NumberExpression(1)))
+    with pytest.raises(ExecutionError):
+      executor.execute(
+        RecodeCommand(
+          variables=("age",),
+          rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+          generate_variables=("bmi",),
+        )
+      )
+    after = executor.execute(DescribeCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before, DescribeResult)
+  assert isinstance(after, DescribeResult)
+  assert after == before
+
+
 @pytest.mark.parametrize(
   ("command", "message"),
   [

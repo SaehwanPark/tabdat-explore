@@ -1,20 +1,17 @@
-# QA Report: Phase 24 P0 Materialization-Reason Taxonomy
+# QA Report: Phase 24 P0 Identifier Overwrite and Atomic Error Semantics
 
 Status: implementation validation pass; PR review loop pending
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, command reference, user guide, and status help agree on
-  the three public reason phrases and their scope.
-- **Typed taxonomy:** `SessionState` and `StatusResult` accept only the two tracked reasons or
-  `none`; formatter mapping is explicit and type-checked.
-- **Transition detection:** successful DuckDB-lazy to eager commands report `eager operation`,
-  while successful Polars fallback reports the more-specific `polars fallback`; the generic
-  predicate explicitly excludes Polars lazy state.
-- **Reset/failure boundary:** source/table activation resets the reason; failed commands do not
-  commit a new reason; status/count preserve existing behavior.
-- **Public surfaces:** `-c`, script, no-active, eager/lazy, named-table, help, and documentation
-  flows are covered.
+- **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, and the user guide agree
+  on the four write-target rules and the active-dataset atomicity guarantee.
+- **Executor behavior to policy:** generate/recode collisions, rename source/destination errors,
+  and replace missing targets are all rejected before successful active-relation replacement.
+- **Atomicity evidence:** the focused regression compares schema/rows before and after four failed
+  write validations; existing tests retain exact command-specific diagnostics.
+- **Scope control:** no successful transformation, lazy/eager, backend, or error-message behavior
+  was changed by this documentation/test slice.
 
 ## Blocking Issues
 
@@ -22,29 +19,23 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 967 passed, 314 existing third-party warnings.
+- `uv run pytest` — 968 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
-  exact stdout/table equivalence with 4.324 seconds composite duration.
+  exact stdout/table equivalence with 4.334 seconds composite duration.
 
 ## PR Review Loop
 
-- **Pass 1:** found no actionable issues across executor transitions, typed output, and failure/reset
-  behavior.
-- **Pass 2:** found no actionable issues across the reason taxonomy, precedence, formatter, and
-  CLI/script paths.
-- **Pass 3:** identified two Low findings: the generic predicate did not explicitly restrict itself
-  to DuckDB lazy state, and user-guide reset wording omitted named-table/SQL activation. Fixed with
-  the engine predicate, a Polars regression test, and corrected documentation.
-- No Critical, High, or unresolved Medium findings remain.
+- Three independent code-review passes will run after the PR is opened.
+- Findings, fixes, and final disposition will be recorded here before merge.
 
 ## Non-Blocking Follow-Ups
 
-- Backend-internal traces, operation lineage/history, retained estimation samples, and machine
-  output remain intentionally queued in `SPEC.md`.
+- Identifier case/quoting, missingness, coercion, arithmetic, categories, ordering, randomness,
+  estimation samples, machine output, exit semantics, and full lineage remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 

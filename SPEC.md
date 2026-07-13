@@ -528,29 +528,34 @@ and describe the active work with concise verification criteria.
   - reports the last successfully executed command family in `status`
   - keeps `status` read-only and preserves the prior operation across failures
   - covers interactive shell, `-c`, and script state transitions
+- Implemented Phase 24 P0 materialization-reason taxonomy:
+  - distinguishes `eager operation` from the specific `polars fallback` reason
+  - restricts generic eager-transition detection to DuckDB-lazy state
+  - preserves source/table reset and success-only reason semantics
 
 ## Present
 
-- Feature: Phase 24 P0 materialization-reason taxonomy
+- Feature: Phase 24 P0 identifier overwrite and atomic error semantics
   Status: Active
   Started: 2026-07-12
-  Branch: feat/phase24-materialization-taxonomy
+  Branch: feat/phase24-identifier-overwrite-semantics
 
   Summary:
-  Extend the tracked materialization reason so successful DuckDB-lazy to eager command transitions
-  are distinguishable from Polars fallback and source/table resets.
+  Define and regression-test the initial cross-command write policy: generated, renamed, replaced,
+  and recode-generated identifiers have explicit collision/target rules and failed validation does
+  not mutate the active dataset.
 
   Verification:
-  - a successful DuckDB-lazy command that becomes eager reports `eager operation`
-  - successful Polars fallback still reports `polars fallback`
-  - source/table activation and non-materializing status/count states report `none` or preserve
-    the prior reason according to the existing contract
-  - failed commands do not claim a new materialization reason
+  - generate and recode generate reject existing output identifiers
+  - rename rejects missing sources and existing destinations
+  - replace rejects missing targets and does not implicitly create variables
+  - failed write validation leaves schema/rows unchanged
+  - the policy is documented as the first stable cross-command semantics slice
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - full operation lineage, active-operation progress, retained estimation samples, and JSON
-  - per-command timing or a complete backend-internal materialization trace
+  - case/quoting rules, missing-value/coercion policy, ordering/randomness, estimation samples,
+    operation lineage, machine output, and exit-code redesign
   - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
 
 ## Future
