@@ -98,7 +98,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
   not ordered by their rendered text, so `2` precedes `10`.
 - `bar` sorts nonmissing categories by descending count, then native category order for ties; the
   missing category is always last.
-- Arbitrary SQL ordering and categorical ordering remain separate contracts.
+- SQL without explicit `order by` and categorical ordering remain separate contracts.
 
 ## Active row order
 
@@ -114,12 +114,14 @@ unknown-variable error and follows the write-validation atomicity policy below.
 
 ## SQL and named-table row order
 
-- A direct SQL result follows the row sequence produced by its query. An explicit `order by` is the
-  deterministic way to define that sequence; SQL without `order by` has no guarantee here.
+- A direct SQL result follows the row sequence produced by its query. An explicit `order by` defines
+  the listed-key order; a reproducible total sequence requires tie-breaker keys that distinguish
+  tied rows. SQL without `order by` has no guarantee here.
 - `sql ... into name` stores and activates the query result without reordering it. `use name` restores
   that stored sequence, and `head`/`tail` consume it using the active row-order rules.
 - SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
-  fallback path before the query executes.
+  fallback path before the query executes, and successful named-table activation resets the prior
+  materialization reason.
 - Append/join/reshape order and categorical order remain separate contracts.
 
 ## Write targets

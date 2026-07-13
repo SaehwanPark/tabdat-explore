@@ -148,7 +148,7 @@ def test_cli_script_preserves_ordered_sql_through_named_table(tmp_path: Path, ca
   script_path = tmp_path / "sql_order.td"
   script_path.write_text(
     f"use {path}\nsql select value, label from active order by value desc nulls last into ordered\n"
-    "head 2\nuse ordered\ntail 2\n",
+    f"head 2\nuse {path}\nuse ordered\ntail 2\n",
     encoding="utf-8",
   )
 
@@ -160,6 +160,10 @@ def test_cli_script_preserves_ordered_sql_through_named_table(tmp_path: Path, ca
   assert "Activated: ordered (4 rows, 2 columns)" in captured.out
   head_output = captured.out[captured.out.index(". head 2") : captured.out.index(". use ordered")]
   tail_output = captured.out[captured.out.rindex(". tail 2") :]
+  assert "3      first" in head_output
+  assert "2      third" in head_output
+  assert "1      second" in tail_output
+  assert ".      missing" in tail_output
   assert head_output.index("first") < head_output.index("third")
   assert tail_output.index("second") < tail_output.index("missing")
   assert captured.err == ""

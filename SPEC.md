@@ -589,9 +589,10 @@ and describe the active work with concise verification criteria.
 
   Verification:
   - ordered direct SQL results agree across eager, DuckDB-lazy, and Polars-lazy inputs
+  - tied SQL keys require a deterministic secondary key for reproducible total order
   - `sql ... into` followed by head/tail preserves query order
   - named-table reactivation restores stored order
-  - CLI, script, help, docs, full tests, and type/lint checks pass
+  - CLI, script, parser, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
   - new sort syntax, row-ID persistence, append/join/reshape ordering, unordered SQL guarantees,

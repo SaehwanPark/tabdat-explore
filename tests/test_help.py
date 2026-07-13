@@ -46,7 +46,9 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "native ordering" in load_help_topic("tabulate")
   assert "descending count" in load_help_topic("bar")
   assert "explicit `order by`" in load_help_topic("sql")
+  assert "tie-breaker keys" in load_help_topic("sql")
   assert "no row-order guarantee" in load_help_topic("sql")
+  assert "restores its stored row sequence" in load_help_topic("use")
 
 
 def test_help_topics_document_expression_domains() -> None:

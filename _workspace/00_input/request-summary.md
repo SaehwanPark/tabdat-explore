@@ -13,8 +13,10 @@ compose predictably with previews and named tables without adding syntax.
 ## Touched Surfaces
 
 - `docs/language-semantics.md`: durable SQL and named-table sequence policy
-- `src/tabdat/help/topics/sql.md`: user guidance for explicit SQL ordering
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine and CLI regressions
+- `src/tabdat/help/topics/sql.md`, `src/tabdat/help/topics/use.md`, `docs/user-guide.md`: user
+  guidance for explicit SQL ordering and named-table reactivation
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`, `tests/test_parser.py`:
+  cross-engine, parser, and CLI regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions

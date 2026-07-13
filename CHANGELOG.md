@@ -40,6 +40,8 @@ All notable project changes are tracked here.
   cross-engine transformation coverage, and Polars-lazy recode fallback handling.
 - Started the Phase 24 SQL and named-table order slice; explicit `order by` results are being bounded
   before unordered SQL and relation-combination contracts.
+- Completed the Phase 24 SQL and named-table order slice with tie-breaker guidance, parser coverage,
+  and reactivation/fallback regressions.
 
 ### Added
 

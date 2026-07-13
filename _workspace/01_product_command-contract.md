@@ -28,14 +28,16 @@ No new options, commands, or output fields are introduced.
 
 ## SQL-Order Rules
 
-- A SQL result follows the row sequence produced by its query. An explicit `order by` is the
-  deterministic way to define that sequence; SQL without `order by` remains unspecified here.
+- A SQL result follows the row sequence produced by its query. An explicit `order by` defines the
+  listed-key order; reproducible total order requires tie-breaker keys that distinguish tied rows.
+  SQL without `order by` remains unspecified here.
 - A successful `sql ... into name` stores and activates the result without reordering its rows.
 - `use name` restores the named table's stored row sequence. `head` and `tail` then consume it using
   the existing active-row contract, including tail relative order.
 - A direct SQL result without `into` preserves the query's returned row sequence in its table output.
 - Eager, DuckDB-lazy, and Polars-lazy loads agree for ordered SQL; SQL remains an eager boundary for
-  named-table creation, with Polars reporting its existing fallback reason.
+  named-table creation, and successful named-table activation resets materialization reason as an
+  active-table boundary.
 
 ## Data And Execution Assumptions
 
@@ -50,9 +52,11 @@ No new options, commands, or output fields are introduced.
 ## Acceptance Criteria
 
 - [x] Direct ordered SQL results retain query order across supported execution paths.
+- [x] Tied SQL keys require an explicit tie-breaker for reproducible total order.
 - [x] `sql ... into` followed by `head`/`tail` preserves the ordered result sequence.
 - [x] Named-table reactivation restores the stored sequence without reordering.
-- [x] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
+- [x] Named-table creation preserves the existing activation-boundary materialization semantics.
+- [x] CLI/help/parser/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
