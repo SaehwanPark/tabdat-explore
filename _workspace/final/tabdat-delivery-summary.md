@@ -1,28 +1,26 @@
-# Delivery Summary: Phase 24 P1 Structured JSON Error Envelopes
+# Delivery Summary: Phase 24 P1 Structured JSON Command Discovery
 
-The structured JSON error-envelope slice is implemented, fully validated, and has completed exactly
-three independent PR reviews; all findings are fixed.
+The structured JSON command-discovery slice is implemented and fully validated; PR review is pending.
 
 ## Delivered
 
-- Added versioned error envelopes to non-interactive `--json` command and script failure paths.
-- Preserved prior success envelopes, fail-fast ordering, nested-script resolved path/line, human
-  stderr, exit status `1`, terminal formatting, and interactive behavior.
-- Added explicit stable labels for the complete user-facing error hierarchy and sanitized raw causes
-  from machine messages without changing human stderr.
+- Added strict typed command-catalog models and a stable `CommandCatalogResult` JSON label.
+- Added `--json --list-commands`, with sorted registry-derived command names and help-topic values.
+- Kept discovery before config/`Executor` setup so it is read-only and data-free.
+- Rejected missing JSON mode and command/script combinations without changing existing envelopes,
+  terminal output, interactive behavior, or command execution.
+- Documented and tested the new contract.
 
 ## Validation
 
-- JSON CLI regressions: 19 passed; JSON help regression: 1 passed.
-- Full suite: 1,161 passed, with 314 existing third-party warnings.
-- `basedpyright`, Ruff, formatting, and diff checks passed.
-- Integrated workflow command exited successfully with all scenarios passing and canonical replay stdout
-  matching.
-- Exactly three independent PR review passes completed; all findings were fixed and no fourth review
-  was run.
+- Focused JSON/catalog CLI checks: 24 passed; focused help/docs checks: 2 passed.
+- Full suite: 1,166 passed, with 314 existing third-party warnings.
+- basedpyright, Ruff, formatting, and diff checks passed.
+- All six integrated workflows passed; canonical replay stdout matched exactly.
+- Exactly three PR review passes are required after opening the PR; none have started yet.
 
 ## Remaining Phase 24 Work
 
-Interactive JSON mode, error recovery, multi-error aggregation, new exit codes, command discovery,
-dry-run/explain, repair diagnostics, SQL-result metadata, operation lineage, retained estimation
-samples, differential assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.
+Option/argument schemas, catalog examples, plugin discovery, interactive JSON mode, dry-run/explain,
+repair diagnostics, SQL-result metadata, operation lineage, retained estimation samples,
+differential assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.

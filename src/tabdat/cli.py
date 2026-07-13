@@ -21,6 +21,8 @@ from tabdat.models import (
   BarCommand,
   BayesPlotCommand,
   Command,
+  CommandCatalogEntry,
+  CommandCatalogResult,
   ExitCommand,
   HelpCommand,
   HistogramCommand,
@@ -44,7 +46,7 @@ from tabdat.script import (
   parse_script_directive,
   read_script,
 )
-from tabdat.shell import create_prompt_session
+from tabdat.shell import COMMAND_NAMES, create_prompt_session
 from tabdat.visualization import next_available_plot_path
 
 
@@ -83,16 +85,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     action="store_true",
     help="emit versioned JSONL results for batch or script execution",
   )
+  parser.add_argument(
+    "--list-commands",
+    action="store_true",
+    help="emit the available command catalog; requires --json",
+  )
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
+  if args.list_commands and not args.json:
+    parser.error("--list-commands requires --json")
+  if args.list_commands and (args.command or args.file is not None or args.script is not None):
+    parser.error("--list-commands cannot be combined with command or script execution")
   if args.command and (args.file is not None or args.script is not None):
     parser.error("-c/--command cannot be combined with script execution")
   if args.file is not None and args.script is not None:
     parser.error("-f/--file cannot be combined with a positional script")
   script_path = args.file or args.script
-  if args.json and not (args.command or script_path is not None):
+  if args.json and not (args.command or script_path is not None or args.list_commands):
     parser.error("--json requires -c/--command or a script path")
+  if args.list_commands:
+    print(format_result_json(_command_catalog_result()))
+    return 0
 
   try:
     config = load_config(args.config) if args.config is not None else load_default_config()
@@ -117,6 +131,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     return _run_shell(executor)
   finally:
     executor.close()
+
+
+def _command_catalog_result() -> CommandCatalogResult:
+  help_topics = set(available_help_topics())
+  return CommandCatalogResult(
+    commands=tuple(
+      CommandCatalogEntry(name=name, help_topic=name if name in help_topics else None)
+      for name in sorted(COMMAND_NAMES)
+    )
+  )
 
 
 def _run_commands(

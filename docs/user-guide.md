@@ -114,7 +114,10 @@ This writes one versioned JSON object per successful result, one per line, and s
 metadata and command echoes. Missing values are `null`; exact decimal values are lossless strings;
 non-finite floats are `null`; bytes are `base64:<payload>` strings; and errors keep the existing stderr
 text and nonzero exit status while adding one error envelope with a stable type/message and script
-location when available. Interactive sessions remain terminal-only.
+location when available. Interactive sessions remain terminal-only. To discover the available
+commands without starting a session or reading data, use `uv run tabdat --json --list-commands`;
+the result is one sorted `CommandCatalogResult` envelope with each command's `help_topic` or `null`.
+This discovery mode cannot be combined with command or script execution.
 
 ### Canonical Parquet-first workflow
 

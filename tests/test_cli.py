@@ -26,8 +26,10 @@ from tabdat.errors import (
 )
 from tabdat.executor import Executor
 from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS, format_error_json
+from tabdat.help import available_help_topics
 from tabdat.models import PlotResult, Result
 from tabdat.script import ScriptError
+from tabdat.shell import COMMAND_NAMES
 
 
 def _write_sql_parquet(path: Path, query: str) -> None:
@@ -138,6 +140,56 @@ def test_cli_json_emits_status_and_table_results(sample_parquet: Path, capsys) -
   assert envelopes[1]["data"]["last_operation"] == "use"
   assert "sex" in envelopes[2]["data"]["headers"]
   assert envelopes[2]["data"]["rows"]
+
+
+def test_cli_json_lists_commands_without_starting_a_session(monkeypatch, capsys) -> None:
+  class FailingExecutor:
+    def __init__(self, *args, **kwargs) -> None:
+      raise AssertionError("command discovery must not construct an Executor")
+
+  monkeypatch.setattr("tabdat.cli.Executor", FailingExecutor)
+
+  exit_code = main(["--json", "--list-commands"])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+  entries = envelope["data"]["commands"]
+  help_topics = set(available_help_topics())
+
+  assert exit_code == 0
+  assert captured.err == ""
+  assert envelope["schema_version"] == 1
+  assert envelope["result_type"] == "CommandCatalogResult"
+  assert [entry["name"] for entry in entries] == sorted(COMMAND_NAMES)
+  assert [entry["help_topic"] for entry in entries] == [
+    name if name in help_topics else None for name in sorted(COMMAND_NAMES)
+  ]
+
+
+def test_cli_list_commands_requires_json(capsys) -> None:
+  with pytest.raises(SystemExit) as error:
+    main(["--list-commands"])
+
+  captured = capsys.readouterr()
+
+  assert error.value.code == 2
+  assert captured.out == ""
+  assert "--list-commands requires --json" in captured.err
+
+
+@pytest.mark.parametrize(
+  "execution_args",
+  (("-c", "count"), ("-f", "commands.td"), ("commands.td",)),
+)
+def test_cli_list_commands_rejects_execution_arguments(execution_args, capsys) -> None:
+  with pytest.raises(SystemExit) as error:
+    main(["--json", "--list-commands", *execution_args])
+
+  captured = capsys.readouterr()
+
+  assert error.value.code == 2
+  assert captured.out == ""
+  assert "--list-commands cannot be combined" in captured.err
 
 
 def test_json_result_labels_cover_the_result_union() -> None:

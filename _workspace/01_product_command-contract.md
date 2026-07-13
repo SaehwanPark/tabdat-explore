@@ -25,14 +25,14 @@ Phase 24 P1: Agent and automation interface.
 
 ## Acceptance Criteria
 
-- [ ] Catalog output is one valid versioned JSON envelope with complete stable command names and help
+- [x] Catalog output is one valid versioned JSON envelope with complete stable command names and help
   availability.
-- [ ] Catalog order is deterministic and registry-derived; no Executor/session side effects occur.
-- [ ] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
+- [x] Catalog order is deterministic and registry-derived; no Executor/session side effects occur.
+- [x] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
   existing error-envelope behavior.
-- [ ] Terminal output, command execution, success/error schemas, and interactive behavior remain
+- [x] Terminal output, command execution, success/error schemas, and interactive behavior remain
   unchanged.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
+- [x] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 

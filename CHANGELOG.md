@@ -68,8 +68,9 @@ All notable project changes are tracked here.
   explicit result labels, exact/non-finite/binary serialization policies, and nested-script coverage.
 - Completed the Phase 24 structured JSON error-envelope slice with stable error labels, source
   locations, fail-fast ordering, sanitized machine messages, and unchanged human stderr.
-- Started the Phase 24 structured JSON command-discovery slice; a read-only catalog will expose the
-  existing command/help registry without starting a session or executing data commands.
+- Completed the Phase 24 structured JSON command-discovery slice with a deterministic read-only
+  catalog derived from the existing command/help registry, without starting a session or executing
+  data commands.
 
 ### Added
 

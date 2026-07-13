@@ -905,6 +905,21 @@ class DatasetInfo:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandCatalogEntry:
+  """A command name and its corresponding in-app help topic, when available."""
+
+  name: str
+  help_topic: str | None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandCatalogResult:
+  """The deterministic command catalog exposed by machine-readable discovery."""
+
+  commands: tuple[CommandCatalogEntry, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class LoadResult:
   dataset: DatasetInfo
 
@@ -1466,7 +1481,8 @@ class TtestResult:
 
 
 Result = (
-  LoadResult
+  CommandCatalogResult
+  | LoadResult
   | ActivateResult
   | DescribeResult
   | StatusResult
