@@ -4251,3 +4251,33 @@ def test_cli_json_describe_command_no_session(monkeypatch, capsys) -> None:
   assert captured.err == ""
   envelope = json.loads(captured.out)
   assert envelope["result_type"] == "CommandSchemaResult"
+
+
+def test_cli_json_describe_command_complex_schemas(capsys) -> None:
+  # Test regress schema
+  exit_code = main(["--json", "--describe-command", "regress"])
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  envelope = json.loads(captured.out)
+  data = envelope["data"]
+  assert data["name"] == "regress"
+  assert len(data["arguments"]) == 2
+  assert data["arguments"][0] == {"name": "depvar", "required": True}
+  assert data["arguments"][1] == {"name": "indepvars", "required": False}
+  assert len(data["options"]) == 5
+  assert {"name": "robust", "required": False} in data["options"]
+  assert {"name": "cluster", "required": False} in data["options"]
+  assert {"name": "noconstant", "required": False} in data["options"]
+  assert {"name": "wls", "required": False} in data["options"]
+  assert {"name": "gls", "required": False} in data["options"]
+
+  # Test tobit schema
+  exit_code = main(["--json", "--describe-command", "tobit"])
+  captured2 = capsys.readouterr()
+  assert exit_code == 0
+  envelope = json.loads(captured2.out)
+  data = envelope["data"]
+  assert data["name"] == "tobit"
+  assert {"name": "ll", "required": True} in data["options"]
+  assert {"name": "ul", "required": False} in data["options"]
+  assert {"name": "robust", "required": False} in data["options"]

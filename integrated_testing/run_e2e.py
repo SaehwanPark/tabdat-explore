@@ -245,7 +245,7 @@ def s2_interactive_shell_contract() -> ScenarioResult:
   child = spawn_pty(("uv", "run", "tabdat"), env=env)
   try:
     output += expect_output(child, "tabdat>", timeout=20)
-    output += send_and_expect(child, "use artifacts/e2e/data/titanic.parquet\n", "tabdat>")
+    output += send_and_expect(child, "use artifacts/e2e/data/titanic.parquet\n", "Loaded:")
     output += send_and_expect(child, "summarize a\t", "age")
     output += send_and_expect(child, "\x03", "tabdat>")
     output += send_and_expect(child, "tabulate sex, \t", "missing")

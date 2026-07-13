@@ -298,7 +298,10 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="table", required=True),
       ArgumentDescriptor(name="keys", required=True),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="how", required=False),
+      OptionDescriptor(name="suffix", required=False),
+    ),
   ),
   "append": CommandSchemaResult(
     name="append",
@@ -490,7 +493,10 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="alpha", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "postlasso": CommandSchemaResult(
     name="postlasso",
@@ -501,7 +507,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="alpha", required=False),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "ridge": CommandSchemaResult(
     name="ridge",
@@ -512,7 +522,10 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="alpha", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "elasticnet": CommandSchemaResult(
     name="elasticnet",
@@ -523,7 +536,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="alpha", required=False),
+      OptionDescriptor(name="l1_ratio", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "cvlasso": CommandSchemaResult(
     name="cvlasso",
@@ -534,7 +551,10 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="cv", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "cvridge": CommandSchemaResult(
     name="cvridge",
@@ -545,7 +565,10 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="cv", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "cvelasticnet": CommandSchemaResult(
     name="cvelasticnet",
@@ -556,7 +579,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="cv", required=False),
+      OptionDescriptor(name="l1_ratio", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "bayes": CommandSchemaResult(
     name="bayes",
@@ -567,7 +594,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="n_iter", required=False),
+      OptionDescriptor(name="tol", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "qreg": CommandSchemaResult(
     name="qreg",
@@ -577,7 +608,12 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(OptionDescriptor(name="quantile", required=False),),
+    options=(
+      OptionDescriptor(name="quantile", required=False),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "logit": CommandSchemaResult(
     name="logit",
@@ -587,7 +623,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "probit": CommandSchemaResult(
     name="probit",
@@ -597,7 +637,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "tobit": CommandSchemaResult(
     name="tobit",
@@ -608,8 +652,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="indepvars", required=False),
     ),
     options=(
-      OptionDescriptor(name="ll", required=False),
+      OptionDescriptor(name="ll", required=True),
       OptionDescriptor(name="ul", required=False),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
     ),
   ),
   "heckman": CommandSchemaResult(
@@ -643,7 +690,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "nbreg": CommandSchemaResult(
     name="nbreg",
@@ -653,7 +704,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(),
+    options=(
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "zip": CommandSchemaResult(
     name="zip",
@@ -663,7 +718,12 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(OptionDescriptor(name="inflate", required=True),),
+    options=(
+      OptionDescriptor(name="inflate", required=True),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "zinb": CommandSchemaResult(
     name="zinb",
@@ -673,7 +733,12 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(OptionDescriptor(name="inflate", required=True),),
+    options=(
+      OptionDescriptor(name="inflate", required=True),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
+    ),
   ),
   "streg": CommandSchemaResult(
     name="streg",
@@ -700,6 +765,9 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     options=(
       OptionDescriptor(name="endog", required=True),
       OptionDescriptor(name="iv", required=True),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+      OptionDescriptor(name="noconstant", required=False),
     ),
   ),
   "xtreg": CommandSchemaResult(
@@ -713,6 +781,8 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     options=(
       OptionDescriptor(name="fe", required=False),
       OptionDescriptor(name="re", required=False),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
     ),
   ),
   "xtdata": CommandSchemaResult(
@@ -733,7 +803,11 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(OptionDescriptor(name="fe", required=False),),
+    options=(
+      OptionDescriptor(name="fe", required=False),
+      OptionDescriptor(name="robust", required=False),
+      OptionDescriptor(name="cluster", required=False),
+    ),
   ),
   "xtabond": CommandSchemaResult(
     name="xtabond",
@@ -807,7 +881,15 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="depvar", required=True),
       ArgumentDescriptor(name="indepvars", required=False),
     ),
-    options=(OptionDescriptor(name="coord", required=True),),
+    options=(
+      OptionDescriptor(name="coord", required=False),
+      OptionDescriptor(name="weights", required=False),
+      OptionDescriptor(name="id", required=False),
+      OptionDescriptor(name="contiguity", required=False),
+      OptionDescriptor(name="knn", required=False),
+      OptionDescriptor(name="model", required=False),
+      OptionDescriptor(name="robust", required=False),
+    ),
   ),
 }
 
@@ -939,7 +1021,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     or args.explain
     or args.describe_command is not None
   ):
-    parser.error("--json requires -c/--command or a script path")
+    parser.error(
+      "--json requires a command execution, script path, explain, or discovery/describe flag"
+    )
   if args.list_commands:
     print(format_result_json(_command_catalog_result()))
     return 0
@@ -1022,9 +1106,9 @@ def _describe_command_result(name: str) -> CommandSchemaResult:
   if normalized not in COMMAND_NAMES:
     raise TabDatError(f"unknown command name: {normalized}")
 
+  help_topics = set(available_help_topics())
   schema_data = _COMMAND_SCHEMAS.get(normalized)
   if schema_data is None:
-    help_topics = set(available_help_topics())
     schema_data = CommandSchemaResult(
       name=normalized,
       syntax=normalized,
@@ -1033,7 +1117,6 @@ def _describe_command_result(name: str) -> CommandSchemaResult:
       options=(),
     )
   else:
-    help_topics = set(available_help_topics())
     schema_data = replace(
       schema_data,
       help_topic=normalized if normalized in help_topics else None,
