@@ -19,4 +19,6 @@ interactive shell sessions remain terminal-only. Use `tabdat --json --list-comma
 sorted command catalog without starting a session or reading data; discovery cannot be combined with
 command or script execution. Use `tabdat --json --help-topic summarize` to retrieve one existing
 help topic as a single JSON envelope; topic names are case-insensitive and unknown topics emit the
-existing JSON error envelope.
+existing JSON error envelope. Use `tabdat --json --explain -c "summarize age"` for a syntax-only
+preview that reports the parsed command type with `execution: "not_run"`; exactly one `-c` is required
+and the command is not executed.

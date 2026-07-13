@@ -51,14 +51,14 @@ contains one `ParseError` envelope, and the process exits with status `1`.
 
 ## Acceptance Criteria
 
-- [ ] One valid versioned success envelope reports the parsed command type and `not_run` execution.
-- [ ] Preview parses exactly one `-c` command without config/Executor/data/session side effects.
-- [ ] Syntax failures emit one stable JSON error envelope with exit status `1` and unchanged stderr.
-- [ ] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
+- [x] One valid versioned success envelope reports the parsed command type and `not_run` execution.
+- [x] Preview parses exactly one `-c` command without config/Executor/data/session side effects.
+- [x] Syntax failures emit one stable JSON error envelope with exit status `1` and unchanged stderr.
+- [x] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
   existing behavior.
-- [ ] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
+- [x] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
   unchanged.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
+- [x] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 

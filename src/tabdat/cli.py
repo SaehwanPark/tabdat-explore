@@ -23,6 +23,7 @@ from tabdat.models import (
   Command,
   CommandCatalogEntry,
   CommandCatalogResult,
+  CommandExplainResult,
   ExitCommand,
   HelpCommand,
   HelpTopicResult,
@@ -96,6 +97,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     metavar="TOPIC",
     help="emit one packaged help topic; requires --json",
   )
+  parser.add_argument(
+    "--explain",
+    action="store_true",
+    help="parse one batch command without executing it; requires --json",
+  )
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
@@ -103,19 +109,31 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.error("--list-commands requires --json")
   if args.help_topic is not None and not args.json:
     parser.error("--help-topic requires --json")
+  if args.explain and not args.json:
+    parser.error("--explain requires --json")
   if args.list_commands and (args.command or args.file is not None or args.script is not None):
     parser.error("--list-commands cannot be combined with command or script execution")
   if args.help_topic is not None and (
     args.command or args.file is not None or args.script is not None or args.list_commands
   ):
     parser.error("--help-topic cannot be combined with command, script, or command discovery")
+  if args.explain and (args.list_commands or args.help_topic is not None):
+    parser.error("--explain cannot be combined with command discovery or help-topic retrieval")
+  if args.explain and (args.file is not None or args.script is not None):
+    parser.error("--explain requires exactly one -c/--command")
+  if args.explain and len(args.command or ()) != 1:
+    parser.error("--explain requires exactly one -c/--command")
   if args.command and (args.file is not None or args.script is not None):
     parser.error("-c/--command cannot be combined with script execution")
   if args.file is not None and args.script is not None:
     parser.error("-f/--file cannot be combined with a positional script")
   script_path = args.file or args.script
   if args.json and not (
-    args.command or script_path is not None or args.list_commands or args.help_topic is not None
+    args.command
+    or script_path is not None
+    or args.list_commands
+    or args.help_topic is not None
+    or args.explain
   ):
     parser.error("--json requires -c/--command or a script path")
   if args.list_commands:
@@ -123,6 +141,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0
   if args.help_topic is not None:
     return _run_help_topic_json(args.help_topic)
+  if args.explain:
+    return _run_explain_json(args.command[0])
 
   try:
     config = load_config(args.config) if args.config is not None else load_default_config()
@@ -183,6 +203,22 @@ def _help_topic_result(topic: str) -> HelpTopicResult:
   except (OSError, UnicodeError):
     raise TabDatError(f"unable to load help topic: {normalized}") from None
   return HelpTopicResult(help_topic=normalized, text=text)
+
+
+def _run_explain_json(command_text: str) -> int:
+  try:
+    result = _command_explain_result(command_text)
+  except TabDatError as exc:
+    print(f"Error: {exc}", file=sys.stderr)
+    print(format_error_json(exc))
+    return 1
+  print(format_result_json(result))
+  return 0
+
+
+def _command_explain_result(command_text: str) -> CommandExplainResult:
+  command = parse_command(command_text)
+  return CommandExplainResult(command_type=type(command).__name__, execution="not_run")
 
 
 def _run_commands(
