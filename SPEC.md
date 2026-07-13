@@ -600,32 +600,36 @@ and describe the active work with concise verification criteria.
   - added collision-safe rendering for missing/reserved-looking labels and multi-key headers
   - verified fresh eager, DuckDB-lazy, and Polars-lazy bar artifacts plus CLI/help/docs coverage
   - explicitly deferred exact arithmetic result widths and overflow policy
+- Implemented Phase 24 P0 exact integer arithmetic result widths:
+  - defined exact `DECIMAL(38,0)` results for integral addition, subtraction, multiplication, and
+    unary minus across signed, unsigned, `UHUGEINT`, and `UINT128` aliases
+  - made out-of-domain results row-level missing without integer wraparound
+  - preserved atomic validation and explicit Polars fallback for exact arithmetic predicates
+  - explicitly deferred stable overflow diagnostics and broader numeric-width policy
 
 ## Present
 
-- Feature: Phase 24 P0 exact integer arithmetic result widths
+- Feature: Phase 24 P0 stable arithmetic overflow diagnostics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-exact-arithmetic
+  Branch: feat/phase24-overflow-diagnostics
 
   Summary:
-  Define exact result widths and deterministic overflow behavior for integral arithmetic in existing
-  expressions without adding command syntax.
+  Report deterministic row-level counts for exact integral arithmetic overflow while preserving the
+  existing missing-result policy and command syntax.
 
   Verification:
-  - integral `+`, `-`, `*`, and unary minus results use exact `DECIMAL(38,0)` storage
-  - representable signed and unsigned integer results preserve their exact values across eager,
-    DuckDB-lazy, and Polars-lazy write paths
-  - results outside the bounded exact width become missing rather than wrapping or failing the whole
-    row-preserving transformation
-  - real division, floating arithmetic, decimal-scale arithmetic, and invalid-function behavior keep
-    their existing contracts
+  - generate, replace, keep, and drop report affected overflow-row counts only when exact integral
+    arithmetic overflows
+  - missing operands, false/missing predicates, division by zero, non-finite values, and decimal-scale
+    or floating arithmetic are not misclassified as integer overflow
+  - eager, DuckDB-lazy, and Polars-lazy results agree, including validated fallback state
   - CLI, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - stable overflow error/warning output, arbitrary-precision arithmetic, decimal-scale/precision
-    redesign, float-width guarantees, new operators or functions, randomness, estimation samples,
-    operation lineage, machine output, and exit-code redesign
+  - changing overflow from row-level missingness, arbitrary-precision arithmetic, decimal-scale or
+    floating diagnostics, SQL-only diagnostics, machine-readable output, operation lineage, randomness,
+    estimation samples, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

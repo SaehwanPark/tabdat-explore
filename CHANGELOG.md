@@ -60,6 +60,10 @@ All notable project changes are tracked here.
   collision-safe labels, and fresh cross-engine bar-artifact coverage.
 - Started the Phase 24 exact integer arithmetic slice; integral result widths and bounded overflow
   behavior are being defined before stable overflow diagnostics or broader numeric policy.
+- Completed the Phase 24 exact integer arithmetic slice with exact `DECIMAL(38,0)` results,
+  row-level overflow missingness, native unsigned-width coverage, and atomic Polars fallback tests.
+- Started the Phase 24 arithmetic overflow-diagnostics slice; transform and row-filter results will
+  report deterministic overflow-row counts without changing the missing-result policy.
 
 ### Added
 

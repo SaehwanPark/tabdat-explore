@@ -1,38 +1,38 @@
-# Request Summary: Phase 24 Exact Integer Arithmetic Contract
+# Request Summary: Phase 24 Arithmetic Overflow Diagnostics Contract
 
 ## Goal
 
-Define and verify exact result widths and deterministic overflow behavior for existing integral
-arithmetic expressions without adding command syntax.
+Report deterministic row-level counts for exact integral arithmetic overflow while preserving the
+existing missing-result policy and command syntax.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This follows the completed identifier, missingness, coercion,
-arithmetic-result, ordering, and categorical-ordering slices and closes the bounded integer-width
-boundary before broader numeric policy.
+Phase 24 P0 language semantics. This follows the completed exact integer-width slice and adds a narrow
+user-visible diagnostic without changing arithmetic values, missingness, or command grammar.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md`, `src/tabdat/help/topics/generate.md`,
-  `src/tabdat/help/topics/replace.md`: exact integer result and overflow policy
-- `src/tabdat/backend.py`: typed arithmetic compilation across DuckDB and Polars validation
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine exactness and
-  user-visible regression coverage
+- `src/tabdat/models.py`, `src/tabdat/executor.py`, `src/tabdat/formatter.py`: typed transform
+  diagnostics and stable terminal output
+- `src/tabdat/backend.py`: pure expression classification plus bounded overflow-row counting
+- `src/tabdat/help/topics/generate.md`, `src/tabdat/help/topics/replace.md`,
+  `docs/language-semantics.md`, `docs/command-reference.md`: user-facing semantics
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine diagnostics and
+  non-misclassification coverage
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- Integral `+`, `-`, `*`, and unary minus results use `DECIMAL(38,0)` as the bounded exact domain;
-  native `UHUGEINT` and Arrow/Polars `UINT128` aliases are included in the unsigned integer family.
-- Values within that domain remain exact; values outside it become missing for the affected row
-  rather than wrapping or aborting the entire row-preserving transformation.
-- Real division, floating arithmetic, decimal-scale arithmetic, and existing invalid-function and
-  non-finite policies remain unchanged.
-- Existing `generate`, `replace`, and predicate syntax is reused; no new arithmetic commands or
-  options are introduced.
+- Exact integral arithmetic already uses `DECIMAL(38,0)` and turns out-of-domain values into missing;
+  this slice reports the affected row count after a successful command.
+- `generate`, `replace`, `keep`, and `drop` report overflow counts only for exact integral arithmetic
+  evaluated by those commands. Missing operands, false/missing predicates, division by zero,
+  non-finite values, and scale-bearing decimal/floating arithmetic are not integer overflow.
+- A zero overflow count preserves existing transform output text; a positive count appends a stable
+  `overflow rows: N` diagnostic.
+- Eager, DuckDB-lazy, and Polars-lazy paths retain their existing state and fallback behavior.
 
 ## Non-Goals
 
-- Stable overflow error/warning output, arbitrary-precision arithmetic, decimal-scale/precision
-  redesign, float-width guarantees, new operators/functions, estimator behavior, or execution
-  lineage.
+- Changing overflow missingness, arbitrary precision, decimal-scale/floating diagnostics, SQL-only
+  diagnostics, machine-readable output, operation lineage, new syntax, estimators, or exit codes.

@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Exact Integer Arithmetic Result Widths
+# Product Contract: Phase 24 P0 — Stable Arithmetic Overflow Diagnostics
 
 ## Request Summary
 
-Make integral arithmetic in existing expressions exact within one explicit bounded result domain,
-with deterministic row-level overflow behavior and no new syntax.
+Report deterministic row-level counts for exact integral arithmetic overflow without changing the
+existing missing-result policy or adding syntax.
 
 ## Roadmap Phase
 
@@ -11,58 +11,54 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This closes the exact-width boundary deferred by the earlier arithmetic-result slice. It does not
-redesign decimal scales, floating widths, or user-facing overflow diagnostics.
+This adds a small diagnostic layer on top of the completed exact integer-width contract. It does not
+turn overflow into a command failure or redesign numeric storage.
 
 ## Existing Syntax
 
 Valid forms retain the current grammar:
 
-- `generate total = amount + 1`
-- `replace amount = amount * 2 if active == true`
-- `keep if amount - adjustment > 0`
+- `generate total = amount * factor`
+- `replace amount = amount * factor if active == true`
+- `keep if amount * factor > 0`
+- `drop if amount * factor > 0`
 
 No new operators, options, commands, result fields, or numeric literals are introduced.
 
-## Exact Integer Rules
+## Diagnostic Rules
 
-- Integral `+`, `-`, `*`, and unary minus expressions use `DECIMAL(38,0)` as their exact result
-  domain. This includes signed and unsigned integer columns (including native `UHUGEINT` and
-  Arrow/Polars `UINT128` aliases) and integer literals when every operand in the arithmetic subtree
-  is integral.
-- Representable results preserve their exact integer value and result width across eager, DuckDB-lazy,
-  and Polars-lazy write paths. A normal terminal preview renders integral values without a fractional
-  suffix even though the stored result is decimal-backed.
-- A result outside `DECIMAL(38,0)` becomes missing for that row. There is no integer wraparound, and
-  other rows in `generate`, `replace`, or a row predicate remain eligible under their existing
-  missing/predicate policies.
-- Real division remains real division. Floating operands, decimal-scale operands, numeric functions,
-  zero-denominator behavior, invalid-domain behavior, and computed non-finite normalization retain
-  their existing contracts.
+- Exact integral arithmetic continues to use `DECIMAL(38,0)` and turns out-of-domain results into
+  missing values for affected rows.
+- A successful `generate`, `replace`, `keep`, or `drop` result reports `overflow rows: N` when one or
+  more rows overflowed an exact integral arithmetic expression. `N` counts only rows affected by the
+  command's expression or predicate.
+- A zero overflow count preserves the existing transform message and terminal shape; no noisy zero
+  diagnostic is added.
+- Missing operands are excluded from the overflow count. False or missing predicates, division by
+  zero, invalid numeric-function domains, computed non-finite values, scale-bearing decimal arithmetic,
+  and floating arithmetic are not classified as exact integer overflow.
+- Overflow diagnostics are informational: the command still succeeds, retains valid rows/values, and
+  applies existing missing/predicate policies.
 
 ## Data And Execution Assumptions
 
-- Existing native column types and parser ASTs identify integral subtrees; no categorical or numeric
-  metadata model is introduced.
-- DuckDB is the materialization and exact-result boundary. Polars-lazy writes continue through the
-  existing validated fallback path; Polars predicate compilation uses the same exact result domain
-  when the result is representable.
-- Overflow diagnostics as stable error/warning output, arbitrary precision, decimal-scale policy, and
-  floating-width guarantees remain separate contracts.
+- The backend counts overflow using the typed expression and active relation before the successful
+  row-preserving transformation commits. Failed validation leaves active data and status unchanged.
+- Polars-lazy exact arithmetic predicates continue through the existing validated fallback; the
+  diagnostic count and `polars_fallback` materialization reason remain consistent with eager/DuckDB.
+- Diagnostics are currently terminal transform-result text only; stable JSON/JSONL envelopes and SQL
+  result metadata remain separate automation contracts.
 
 ## Acceptance Criteria
 
-- [ ] Integral addition, subtraction, multiplication, and unary minus return exact decimal-backed
-  values rather than backend-width wraparound or float coercion.
-- [ ] Signed and unsigned boundary fixtures agree across eager, DuckDB-lazy, and Polars-lazy paths.
-- [ ] Out-of-domain results become row-level missing without mutating unrelated rows.
-- [ ] Existing real division, decimal-scale arithmetic, non-finite, and mixed-domain behavior remains
-  green.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
-  checks pass.
+- [ ] Generate and replace report positive exact-integer overflow counts while preserving missing rows.
+- [ ] Keep and drop report predicate overflow counts with correct missing/false predicate behavior.
+- [ ] Missing operands, non-finite/zero-division/decimal-scale/floating cases are not misclassified.
+- [ ] Eager, DuckDB-lazy, and Polars-lazy output and fallback metadata agree.
+- [ ] Zero-count output remains backward compatible; CLI/help/docs, focused tests, full validation, and
+  integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- New arithmetic syntax, arbitrary precision, stable overflow diagnostics, decimal-scale/precision
-  redesign, float-width guarantees, randomness, estimators, lineage, machine output, or exit-code
-  redesign.
+- Changing overflow missingness, arbitrary precision, decimal-scale/floating diagnostics, SQL-only
+  diagnostics, machine-readable output, operation lineage, new syntax, estimators, or exit codes.
