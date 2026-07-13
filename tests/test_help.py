@@ -49,6 +49,7 @@ def test_run_help_documents_batch_json_output() -> None:
   assert "--list-commands" in text
   assert "--help-topic" in text
   assert "--explain" in text
+  assert "--list-command-effects" in text
   assert "JSON" in text
   assert "interactive shell sessions remain terminal-only" in text
 

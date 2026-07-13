@@ -919,6 +919,24 @@ class CommandCatalogResult:
   commands: tuple[CommandCatalogEntry, ...]
 
 
+EffectCategory = Literal["read", "write", "control", "plot", "unknown"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandEffectEntry:
+  """A command name and its declared command-level effects."""
+
+  name: str
+  effects: tuple[EffectCategory, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandEffectCatalogResult:
+  """The deterministic command-effect catalog exposed to machine clients."""
+
+  commands: tuple[CommandEffectEntry, ...]
+
+
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class HelpTopicResult:
   """The packaged text for one canonical in-app help topic."""
@@ -1498,6 +1516,7 @@ class TtestResult:
 
 Result = (
   CommandCatalogResult
+  | CommandEffectCatalogResult
   | HelpTopicResult
   | CommandExplainResult
   | LoadResult

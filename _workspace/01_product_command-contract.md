@@ -38,12 +38,12 @@ unknown   -> [unknown]
 
 ## Acceptance Criteria
 
-- [ ] The result uses one finite documented vocabulary and deterministic category ordering.
-- [ ] Every advertised command has an explicit mapping; unclassified commands report `unknown`.
-- [ ] Mapping is pure and does not inspect data, estimate cost, plan resources, or execute commands.
-- [ ] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
+- [x] The result uses one finite documented vocabulary and deterministic category ordering.
+- [x] Every advertised command has an explicit mapping; unclassified commands report `unknown`.
+- [x] Mapping is pure and does not inspect data, estimate cost, plan resources, or execute commands.
+- [x] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
   unchanged.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
+- [x] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 

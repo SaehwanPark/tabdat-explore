@@ -23,7 +23,10 @@ from tabdat.models import (
   Command,
   CommandCatalogEntry,
   CommandCatalogResult,
+  CommandEffectCatalogResult,
+  CommandEffectEntry,
   CommandExplainResult,
+  EffectCategory,
   ExitCommand,
   HelpCommand,
   HelpTopicResult,
@@ -60,6 +63,81 @@ class _RunStatus(Enum):
 
 OutputFormat = Literal["terminal", "json"]
 
+_EFFECT_CATEGORY_ORDER: tuple[EffectCategory, ...] = ("read", "write", "control", "plot", "unknown")
+_EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(_EFFECT_CATEGORY_ORDER)}
+_COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
+  "append": ("read", "write"),
+  "bar": ("read", "plot"),
+  "bayes": ("read",),
+  "bayesplot": ("read", "plot"),
+  "by": ("control",),
+  "cfregress": ("read",),
+  "codebook": ("read",),
+  "collapse": ("read", "write"),
+  "count": ("read",),
+  "cvelasticnet": ("read",),
+  "cvlasso": ("read",),
+  "cvridge": ("read",),
+  "describe": ("read",),
+  "did": ("read",),
+  "dml": ("read",),
+  "drdid": ("read",),
+  "drop": ("read", "write"),
+  "elasticnet": ("read",),
+  "estat": ("read",),
+  "exit": ("control",),
+  "export": ("write",),
+  "generate": ("read", "write"),
+  "head": ("read",),
+  "heckman": ("read",),
+  "help": ("control",),
+  "histogram": ("read", "plot"),
+  "ivregress": ("read",),
+  "join": ("read", "write"),
+  "keep": ("read", "write"),
+  "lasso": ("read",),
+  "lincom": ("read",),
+  "logit": ("read",),
+  "lowess": ("read", "write"),
+  "nbreg": ("read",),
+  "nl": ("read",),
+  "panel": ("control",),
+  "poisson": ("read",),
+  "postlasso": ("read",),
+  "predict": ("read", "write"),
+  "probit": ("read",),
+  "qreg": ("read",),
+  "quit": ("control",),
+  "recode": ("read", "write"),
+  "regress": ("read",),
+  "rename": ("read", "write"),
+  "replace": ("read", "write"),
+  "reshape": ("read", "write"),
+  "ridge": ("read",),
+  "run": ("control",),
+  "save": ("write",),
+  "scatter": ("read", "plot"),
+  "select": ("read", "write"),
+  "set": ("control",),
+  "spregress": ("read",),
+  "sql": ("read", "write"),
+  "status": ("read",),
+  "streg": ("read",),
+  "summarize": ("read",),
+  "tabulate": ("read",),
+  "tail": ("read",),
+  "test": ("read",),
+  "tobit": ("read",),
+  "ttest": ("read",),
+  "use": ("read", "control"),
+  "xtabond": ("read",),
+  "xtdata": ("read", "write"),
+  "xtlogit": ("read",),
+  "xtreg": ("read",),
+  "zinb": ("read",),
+  "zip": ("read",),
+}
+
 
 class _PromptSession(Protocol):
   def prompt(self, *args: Any, **kwargs: Any) -> str: ...
@@ -93,6 +171,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     help="emit the available command catalog; requires --json",
   )
   parser.add_argument(
+    "--list-command-effects",
+    action="store_true",
+    help="emit declared command effects; requires --json",
+  )
+  parser.add_argument(
     "--help-topic",
     metavar="TOPIC",
     help="emit one packaged help topic; requires --json",
@@ -107,12 +190,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
   if args.list_commands and not args.json:
     parser.error("--list-commands requires --json")
+  if args.list_command_effects and not args.json:
+    parser.error("--list-command-effects requires --json")
   if args.help_topic is not None and not args.json:
     parser.error("--help-topic requires --json")
   if args.explain and not args.json:
     parser.error("--explain requires --json")
   if args.list_commands and (args.command or args.file is not None or args.script is not None):
     parser.error("--list-commands cannot be combined with command or script execution")
+  if args.list_command_effects and (
+    args.command
+    or args.file is not None
+    or args.script is not None
+    or args.list_commands
+    or args.help_topic is not None
+    or args.explain
+  ):
+    parser.error("--list-command-effects cannot be combined with another execution mode")
   if args.help_topic is not None and (
     args.command or args.file is not None or args.script is not None or args.list_commands
   ):
@@ -132,12 +226,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.command
     or script_path is not None
     or args.list_commands
+    or args.list_command_effects
     or args.help_topic is not None
     or args.explain
   ):
     parser.error("--json requires -c/--command or a script path")
   if args.list_commands:
     print(format_result_json(_command_catalog_result()))
+    return 0
+  if args.list_command_effects:
+    print(format_result_json(_command_effect_catalog_result()))
     return 0
   if args.help_topic is not None:
     return _run_help_topic_json(args.help_topic)
@@ -177,6 +275,22 @@ def _command_catalog_result() -> CommandCatalogResult:
       for name in sorted(COMMAND_NAMES)
     )
   )
+
+
+def _command_effect_catalog_result() -> CommandEffectCatalogResult:
+  commands = tuple(
+    CommandEffectEntry(
+      name=name,
+      effects=tuple(
+        sorted(
+          _COMMAND_EFFECTS.get(name, ("unknown",)),
+          key=_EFFECT_CATEGORY_RANK.__getitem__,
+        )
+      ),
+    )
+    for name in sorted(COMMAND_NAMES)
+  )
+  return CommandEffectCatalogResult(commands=commands)
 
 
 def _run_help_topic_json(topic: str) -> int:

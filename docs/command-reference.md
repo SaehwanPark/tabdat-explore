@@ -32,6 +32,11 @@ the command or creates a session. Exactly one `-c` is required, and parse failur
 JSON error envelope. Standard `--help` retains argparse help precedence. Effect classification,
 estimates, and full dry-run planning remain out of scope.
 
+Use `tabdat --json --list-command-effects` to retrieve declared command-level effect categories. Each
+entry uses only `read`, `write`, `control`, `plot`, or `unknown`; categories are deterministic
+declarations and do not inspect data or plan execution. This mode is read-only and cannot be combined
+with command, script, discovery, help-topic, or explain execution.
+
 ## Load and inspect
 
 | Command | Purpose | Minimal invocation |

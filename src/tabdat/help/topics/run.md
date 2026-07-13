@@ -22,3 +22,5 @@ help topic as a single JSON envelope; topic names are case-insensitive and unkno
 existing JSON error envelope. Use `tabdat --json --explain -c "summarize age"` for a syntax-only
 preview that reports the normalized command name with `execution: "not_run"`; exactly one `-c` is
 required and the command is not executed. Standard `--help` keeps argparse help precedence.
+Use `tabdat --json --list-command-effects` for the finite declared command-level effect catalog; it
+does not start a session, read data, or plan execution.

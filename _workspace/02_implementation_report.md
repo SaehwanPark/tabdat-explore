@@ -1,42 +1,39 @@
-# Implementation Report: Phase 24 P1 Structured JSON Syntax Preview
+# Implementation Report: Phase 24 P1 Structured JSON Declared Effect Categories
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — a parser-only JSON preview for exactly one batch
-  command, with stable normalized command names, `not_run` execution, and existing parse errors.
+- `_workspace/01_product_command-contract.md` — a deterministic read-only command-effect catalog
+  using the finite `read`/`write`/`control`/`plot`/`unknown` vocabulary.
 
 ## Delivered Boundary
 
 - `src/tabdat/models.py`
-  - Added strict typed `CommandExplainResult` with stable `command_name` and `execution` fields.
-  - Included it in the public `Result` union.
+  - Added strict `EffectCategory`, `CommandEffectEntry`, and `CommandEffectCatalogResult` models.
+  - Included the catalog result in the public `Result` union.
 - `src/tabdat/formatter.py`
-  - Added the stable `CommandExplainResult` label to the exhaustive result-label map and a total
-    terminal formatter branch.
+  - Added the stable catalog result label and terminal table formatter.
 - `src/tabdat/cli.py`
-  - Added `--explain`, requiring exactly one `-c/--command` and `--json`.
-  - Parses one command before config or `Executor` construction and emits its normalized leading
-    command name with `execution: "not_run"`.
-  - Routes parser failures through the existing JSON error envelope while preserving human stderr.
-  - Preserves conventional argparse `--help` precedence without executing or previewing a command.
+  - Added `--json --list-command-effects` before config/`Executor` setup.
+  - Added explicit current-command mappings, deterministic category ordering, and `unknown` fallback
+    for future/unclassified registry names.
+  - Rejected execution/discovery/help/preview combinations without changing existing paths.
 - Help/docs/tests
-  - Documented syntax-only preview limits and help precedence in the command reference, user guide,
-    and `run` help.
-  - Added success, parser-error, empty/built-in/conditional/run command, config-bypass,
-    exact-cardinality, help-precedence, and incompatible-invocation coverage.
+  - Documented the vocabulary and declared-only boundary in the command reference, user guide, and
+    `run` help.
+  - Added full registry coverage, category examples, unknown fallback, no-session/config bypass, and
+    incompatible-invocation tests.
 
 ## Functional-First Notes
 
-The preview is a pure parser/presentation boundary. It deliberately exposes a stable semantic
-command name rather than Python AST class names and makes no claims about effects, resource plans,
-estimates, state transitions, or execution equivalence.
+The mapping is a pure registry presentation step. It does not inspect active data, evaluate command
+options, estimate cost, plan resources, execute commands, or alter session state.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_cli.py -k 'json or list_commands or help_topic or explain' -q` — passed,
-  49 tests.
+- `uv run pytest tests/test_cli.py -k 'json or list_commands or list_command_effects or help_topic or explain' -q`
+  — passed, 58 tests.
 - `uv run pytest tests/test_help.py -k 'run_help or current_commands' -q` — passed, 2 tests.
-- `uv run pytest -q` — passed, 1,191 tests, with 314 existing third-party warnings.
+- `uv run pytest -q` — passed, 1,200 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 35 files already formatted.
@@ -45,13 +42,11 @@ estimates, state transitions, or execution equivalence.
   s3_taxi_lazy_scale s4_penguins_script_repro s5_titanic_phase13_dogfood
   s6_canonical_parquet_workflow` — passed with exit code 0; all six scenarios passed and canonical
   replay stdout matched.
-- Exactly three independent PR reviews completed: one reported help precedence, one reported unstable
-  AST-type labels, and one reported stale handoff text plus edge-case coverage. All findings were fixed
-  and validated; no fourth review was started.
+- PR review loop: pending; no review passes have been started for this slice.
 
 ## Known Limits And Follow-Up Work
 
-Effect classification, estimates, state/resource plans, scripts, multiple commands, option/argument
+Data-dependent effects, resource/state plans, estimates, command execution, scripts, option/argument
 schemas, plugin discovery, interactive JSON mode, full dry-run/explain, repair diagnostics, lineage,
-new exits, and new syntax remain separate Phase 24 contracts. The implementation is ready for PR
-merge.
+new exits, and new commands remain separate Phase 24 contracts. The implementation is ready for PR
+review.
