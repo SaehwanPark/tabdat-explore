@@ -42,6 +42,8 @@ All notable project changes are tracked here.
   before unordered SQL and relation-combination contracts.
 - Completed the Phase 24 SQL and named-table order slice with tie-breaker guidance, parser coverage,
   and reactivation/fallback regressions.
+- Started the Phase 24 append row-order slice; active-left and named-table-right sequence semantics
+  are being bounded before join and reshape ordering.
 
 ### Added
 

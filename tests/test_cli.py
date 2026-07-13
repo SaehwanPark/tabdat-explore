@@ -169,6 +169,45 @@ def test_cli_script_preserves_ordered_sql_through_named_table(tmp_path: Path, ca
   assert captured.err == ""
 
 
+def test_cli_script_preserves_append_sequence(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "append_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select value, label
+    from (
+      values
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second'),
+        (4, 2, 'third'),
+        (5, 4, 'fourth')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
+    """,
+  )
+  script_path = tmp_path / "append_order.td"
+  script_path.write_text(
+    f"use {path}\nsql select value, label from (values (1, 9, 'ninth'), (2, 8, 'eighth')) "
+    "as append_data(row_id, value, label) order by row_id into followup\n"
+    f"use {path}\nappend followup\nhead 5\ntail 3\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Appended followup: 7 rows, 2 columns" in captured.out
+  head_output = captured.out[captured.out.index(". head 5") : captured.out.index(". tail 3")]
+  tail_output = captured.out[captured.out.rindex(". tail 3") :]
+  for row in ("3      first", ".      missing", "1      second", "2      third", "4      fourth"):
+    assert row in head_output
+  for row in ("4      fourth", "9      ninth", "8      eighth"):
+    assert row in tail_output
+  assert captured.err == ""
+
+
 def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   class InterruptThenEofSession:
     def __init__(self) -> None:

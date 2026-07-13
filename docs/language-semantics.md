@@ -124,6 +124,14 @@ unknown-variable error and follows the write-validation atomicity policy below.
   materialization reason.
 - Append/join/reshape order and categorical order remain separate contracts.
 
+## Append row order
+
+- `append name` emits every row in the active dataset first, followed by every row in named table
+  `name` in its stored sequence.
+- Append does not sort, deduplicate, or interleave the two inputs. `head`/`tail` consume the combined
+  sequence using the active row-order rules.
+- Join/reshape order and categorical order remain separate contracts.
+
 ## Write targets
 
 | Command family | Target rule | Failure behavior |

@@ -7592,6 +7592,67 @@ def test_ordered_sql_results_survive_into_and_named_table_activation(
   assert activated_all.rows == expected_all
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_append_preserves_left_then_right_sequence(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "append_order.parquet"
+  _write_row_order_parquet(path)
+  append_query = """
+    select value, label
+    from (
+      values
+        (1, 9, 'ninth'),
+        (2, 8, 'eighth')
+    ) as append_data(row_id, value, label)
+    order by row_id
+  """
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(use_command())
+    executor.execute(SqlCommand(append_query, into="followup"))
+    executor.execute(use_command())
+    result = executor.execute(AppendCommand(table_name="followup"))
+    head = executor.execute(HeadCommand(5))
+    tail = executor.execute(TailCommand(3))
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.row_count == 7
+  assert isinstance(head, PreviewResult)
+  assert isinstance(tail, PreviewResult)
+  assert isinstance(status, StatusResult)
+  assert head.rows == (
+    (3, "first"),
+    (None, "missing"),
+    (1, "second"),
+    (2, "third"),
+    (4, "fourth"),
+  )
+  assert tail.rows == ((4, "fourth"), (9, "ninth"), (8, "eighth"))
+  if engine == "polars":
+    assert status.execution_mode == "eager"
+    assert status.lazy_engine is None
+    assert status.last_materialization_reason == "polars_fallback"
+  elif engine == "duckdb":
+    assert status.execution_mode == "eager"
+    assert status.lazy_engine is None
+    assert status.last_materialization_reason == "eager_operation"
+  else:
+    assert status.execution_mode == "eager"
+    assert status.lazy_engine is None
+    assert status.last_materialization_reason is None
+
+
 def test_keep_and_drop_columns_update_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:
