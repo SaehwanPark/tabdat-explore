@@ -9,6 +9,8 @@
 - `src/tabdat/executor.py` and `src/tabdat/models.py`
   - Expanded the typed reason union with `eager_operation`.
   - Detects a successful lazy-to-eager active-dataset transition after command execution.
+  - Restricts the generic transition category to a prior DuckDB-lazy dataset; Polars remains on
+    the specific fallback path.
   - Keeps the specific staged `polars_fallback` reason ahead of the generic transition reason.
   - Preserves success-only and reset precedence from the previous slice.
 - `src/tabdat/formatter.py`
@@ -35,7 +37,7 @@
 
 - `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 9 tests.
 - `uv run pytest tests/test_cli.py -k 'phase_24_status or fallback_reason or eager_operation' -q` — passed, 7 tests.
-- `uv run pytest` — passed, 966 tests, with 314 existing third-party warnings.
+- `uv run pytest` — passed, 967 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.

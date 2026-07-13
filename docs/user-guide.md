@@ -61,8 +61,9 @@ Columns: 4
 The command is read-only. After `count`, the known row count and `Last operation: count` are
 reflected in a later `status`; repeated `status` calls leave the last operation unchanged. If an
 unsupported Polars-lazy command falls back to eager execution, status reports
-`Last materialization reason: polars fallback`; a successful `use` resets it to `none`. Full
-DuckDB-lazy operations that become eager report `Last materialization reason: eager operation`.
+`Last materialization reason: polars fallback`; a successful `use`, named-table activation, or
+`sql ... into <table>` resets it to `none`. Full DuckDB-lazy operations that become eager report
+`Last materialization reason: eager operation`.
 Full operation lineage, active-operation progress, and retained estimation samples remain planned
 for later transparency work.
 

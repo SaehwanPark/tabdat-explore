@@ -9543,6 +9543,7 @@ def _lazy_to_eager_transition(
   return (
     previous is not None
     and previous.execution_mode == "lazy"
+    and previous.lazy_engine == "duckdb"
     and current is not None
     and current.execution_mode == "eager"
   )

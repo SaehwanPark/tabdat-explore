@@ -9,7 +9,8 @@ Status: implementation validation pass; PR review loop pending
 - **Typed taxonomy:** `SessionState` and `StatusResult` accept only the two tracked reasons or
   `none`; formatter mapping is explicit and type-checked.
 - **Transition detection:** successful DuckDB-lazy to eager commands report `eager operation`,
-  while successful Polars fallback reports the more-specific `polars fallback`.
+  while successful Polars fallback reports the more-specific `polars fallback`; the generic
+  predicate explicitly excludes Polars lazy state.
 - **Reset/failure boundary:** source/table activation resets the reason; failed commands do not
   commit a new reason; status/count preserve existing behavior.
 - **Public surfaces:** `-c`, script, no-active, eager/lazy, named-table, help, and documentation
@@ -21,7 +22,7 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 966 passed, 314 existing third-party warnings.
+- `uv run pytest` — 967 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -31,8 +32,14 @@ Status: implementation validation pass; PR review loop pending
 
 ## PR Review Loop
 
-- Three independent code-review passes will run after the PR is opened.
-- Findings, fixes, and final disposition will be recorded here before merge.
+- **Pass 1:** found no actionable issues across executor transitions, typed output, and failure/reset
+  behavior.
+- **Pass 2:** found no actionable issues across the reason taxonomy, precedence, formatter, and
+  CLI/script paths.
+- **Pass 3:** identified two Low findings: the generic predicate did not explicitly restrict itself
+  to DuckDB lazy state, and user-guide reset wording omitted named-table/SQL activation. Fixed with
+  the engine predicate, a Polars regression test, and corrected documentation.
+- No Critical, High, or unresolved Medium findings remain.
 
 ## Non-Blocking Follow-Ups
 
