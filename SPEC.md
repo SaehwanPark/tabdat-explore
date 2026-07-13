@@ -551,31 +551,38 @@ and describe the active work with concise verification criteria.
   - defined null-aware equality/inequality, direct all-missing assignment, and cross-engine filters
   - rejected unsupported null arithmetic/functions and preserved Polars-lazy state on invalid tabulate
     conditions
+- Implemented Phase 24 P0 expression coercion:
+  - defined numeric, string, boolean, other, and null expression domains
+  - allowed numeric-family compatibility while rejecting mixed-domain comparisons, arithmetic, and
+    functions with deterministic diagnostics
+  - required boolean or missing predicates and same-domain/null replacement targets
+  - validated Polars-lazy writes and tabulates before fallback materialization
 
 ## Present
 
-- Feature: Phase 24 P0 expression coercion contract
+- Feature: Phase 24 P0 arithmetic result and non-finite-value policy
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-expression-coercion-contract
+  Branch: feat/phase24-arithmetic-results
 
   Summary:
-  Define and regression-test scalar-domain compatibility for existing expression comparisons,
-  arithmetic, functions, predicates, and replacement targets.
+  Define and regression-test missing propagation, zero-denominator behavior, invalid numeric-function
+  domains, and computed non-finite normalization for existing arithmetic expressions.
 
   Verification:
-  - numeric-family expressions are compatible across eager, DuckDB-lazy, and Polars-lazy paths
-  - unsafe unsigned-column/negative-literal combinations are rejected consistently
-  - mixed numeric/string comparisons and arithmetic fail with deterministic type diagnostics
-  - numeric and string functions enforce their argument domains
-  - predicates reject numeric/string truthiness and replacement rejects cross-domain assignments
-  - null replacement preserves target domains and tabulate validation preserves Polars-lazy state
-    before unsupported-command fallback
+  - missing operands propagate to missing arithmetic/function results across all execution paths
+  - division by zero and invalid sqrt/ln/log domains produce missing rather than backend-specific
+    infinity, NaN, or execution failure
+  - computed non-finite results are normalized while direct source values remain unchanged
+  - generated/replaced values and arithmetic predicates remain consistent across eager, DuckDB-lazy,
+    and Polars-lazy paths
+  - existing type validation remains atomic before Polars-lazy fallback
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new expression syntax, categorical conversion, string concatenation, ordering/randomness,
-    estimation samples, operation lineage, machine output, and exit-code redesign
+  - new expression syntax, categorical conversion, string concatenation, exact arithmetic storage
+    widths, overflow reporting, ordering/randomness, estimation samples, operation lineage, machine
+    output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

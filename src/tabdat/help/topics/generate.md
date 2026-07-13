@@ -19,3 +19,6 @@ arithmetic and null function arguments are rejected.
 
 Arithmetic requires numeric operands. Numeric functions require numeric arguments; `lower` and
 `upper` require string arguments.
+
+Missing operands produce missing results. Division by zero and invalid `sqrt`, `ln`, or `log`
+domains produce missing values for those rows; computed `inf` and `nan` are normalized to missing.

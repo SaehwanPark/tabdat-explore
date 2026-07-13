@@ -28,6 +28,8 @@ All notable project changes are tracked here.
   from coercion and broader arithmetic policy.
 - Started the Phase 24 expression coercion contract slice; numeric-family compatibility and
   deterministic mixed-domain failures are bounded before broader arithmetic expansion.
+- Started the Phase 24 arithmetic-result slice; missing propagation and computed non-finite
+  normalization are bounded before exact storage-width and overflow policy.
 
 ### Added
 

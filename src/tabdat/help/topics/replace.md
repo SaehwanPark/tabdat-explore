@@ -19,3 +19,6 @@ Replacement expressions must stay in the target variable's domain; numeric/strin
 implicit.
 
 `if` conditions must produce boolean or missing values; numeric and string truthiness is rejected.
+
+Missing operands produce missing results. Division by zero and invalid `sqrt`, `ln`, or `log`
+domains produce missing values for those rows; computed `inf` and `nan` are normalized to missing.

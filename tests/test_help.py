@@ -40,6 +40,8 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "cost == null" in load_help_topic("drop")
   assert "generate missing_cost = null" in load_help_topic("generate")
   assert "cost != null" in load_help_topic("replace")
+  assert "Division by zero" in load_help_topic("generate")
+  assert "computed `inf` and `nan`" in load_help_topic("replace")
 
 
 def test_help_topics_document_expression_domains() -> None:

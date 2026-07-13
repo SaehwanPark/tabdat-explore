@@ -83,6 +83,7 @@ UNSIGNED_NUMERIC_TYPES = (
 )
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
+NUMERIC_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "round", "sqrt"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
 ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
@@ -1571,7 +1572,8 @@ class DuckDBBackend:
     if isinstance(expression, UnaryExpression):
       if _contains_null_literal(expression.operand):
         raise ExecutionError(NULL_LITERAL_ERROR)
-      return f"-({self._compile_expression(dataset, expression.operand)})"
+      operand_sql = self._compile_expression(dataset, expression.operand)
+      return _safe_sql_numeric_result(f"-({operand_sql})")
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
@@ -1591,6 +1593,8 @@ class DuckDBBackend:
         return f"({other_sql} {comparator})"
       left = self._compile_expression(dataset, expression.left)
       right = self._compile_expression(dataset, expression.right)
+      if expression.operator in {"+", "-", "*", "/"}:
+        return _safe_sql_numeric_result(f"({left} {expression.operator} {right})")
       return f"({left} {expression.operator} {right})"
     if isinstance(expression, FunctionCallExpression):
       if _contains_null_literal(expression):
@@ -1601,7 +1605,10 @@ class DuckDBBackend:
       arguments = ", ".join(
         self._compile_expression(dataset, argument) for argument in expression.arguments
       )
-      return f"{function_name}({arguments})"
+      function_sql = f"{function_name}({arguments})"
+      if function_name in NUMERIC_FUNCTIONS:
+        return _safe_sql_numeric_result(function_sql)
+      return function_sql
     raise ExecutionError("unsupported expression")
 
   def _compile_polars_expression(self, dataset: DatasetInfo, expression: Expression) -> pl.Expr:
@@ -1619,7 +1626,8 @@ class DuckDBBackend:
     if isinstance(expression, UnaryExpression):
       if _contains_null_literal(expression.operand):
         raise ExecutionError(NULL_LITERAL_ERROR)
-      return -self._compile_polars_expression(dataset, expression.operand)
+      operand_expr = self._compile_polars_expression(dataset, expression.operand)
+      return _normalize_polars_numeric_result(-operand_expr)
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
@@ -1634,13 +1642,16 @@ class DuckDBBackend:
       left = self._compile_polars_expression(dataset, expression.left)
       right = self._compile_polars_expression(dataset, expression.right)
       if expression.operator == "+":
-        return left + right
+        return _normalize_polars_numeric_result(left + right)
       if expression.operator == "-":
-        return left - right
+        return _normalize_polars_numeric_result(left - right)
       if expression.operator == "*":
-        return left * right
+        return _normalize_polars_numeric_result(left * right)
       if expression.operator == "/":
-        return left / right
+        denominator_is_zero = right == pl.lit(0)
+        safe_right = pl.when(denominator_is_zero).then(pl.lit(1)).otherwise(right)
+        normalized_division = _normalize_polars_numeric_result(left / safe_right)
+        return pl.when(denominator_is_zero).then(pl.lit(None)).otherwise(normalized_division)
       if expression.operator == "==":
         return left == right
       if expression.operator == "!=":
@@ -1662,7 +1673,10 @@ class DuckDBBackend:
       arguments = tuple(
         self._compile_polars_expression(dataset, argument) for argument in expression.arguments
       )
-      return _compile_polars_function(function_name, arguments)
+      compiled = _compile_polars_function(function_name, arguments)
+      if function_name in NUMERIC_FUNCTIONS:
+        return _normalize_polars_numeric_result(compiled)
+      return compiled
     raise ExecutionError("unsupported expression")
 
   def is_polars_lazy_active(self) -> bool:
@@ -2406,6 +2420,18 @@ def _compile_polars_function(function_name: str, arguments: tuple[pl.Expr, ...])
   if function_name == "upper" and len(arguments) == 1:
     return arguments[0].str.to_uppercase()
   raise ExecutionError(f"unsupported function in expression: {function_name}")
+
+
+def _safe_sql_numeric_result(expression_sql: str) -> str:
+  tried_expression = f"try({expression_sql})"
+  return (
+    f"case when isfinite(cast({tried_expression} as double)) then {tried_expression} else NULL end"
+  )
+
+
+def _normalize_polars_numeric_result(expression: pl.Expr) -> pl.Expr:
+  finite_probe = expression.cast(pl.Float64).is_finite()
+  return pl.when(finite_probe).then(expression).otherwise(pl.lit(None))
 
 
 def _contains_null_literal(expression: Expression) -> bool:
