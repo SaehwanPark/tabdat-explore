@@ -9,13 +9,13 @@ from collections.abc import Callable, Sequence
 from dataclasses import replace
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from tabdat import __version__
 from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
-from tabdat.formatter import format_result
+from tabdat.formatter import format_result, format_result_json
 from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
   BarCommand,
@@ -54,6 +54,9 @@ class _RunStatus(Enum):
   ERROR = auto()
 
 
+OutputFormat = Literal["terminal", "json"]
+
+
 class _PromptSession(Protocol):
   def prompt(self, *args: Any, **kwargs: Any) -> str: ...
 
@@ -75,6 +78,11 @@ def main(argv: Sequence[str] | None = None) -> int:
   parser.add_argument("-c", "--command", action="append", help="run a command and exit")
   parser.add_argument("-f", "--file", type=Path, help="run a TabDat script file and exit")
   parser.add_argument("--config", type=Path, help="load a TabDat TOML config file")
+  parser.add_argument(
+    "--json",
+    action="store_true",
+    help="emit versioned JSONL results for batch or script execution",
+  )
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
@@ -82,6 +90,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.error("-c/--command cannot be combined with script execution")
   if args.file is not None and args.script is not None:
     parser.error("-f/--file cannot be combined with a positional script")
+  script_path = args.file or args.script
+  if args.json and not (args.command or script_path is not None):
+    parser.error("--json requires -c/--command or a script path")
 
   try:
     config = load_config(args.config) if args.config is not None else load_default_config()
@@ -92,16 +103,28 @@ def main(argv: Sequence[str] | None = None) -> int:
   executor = Executor(config=config)
   try:
     if args.command:
-      return _run_commands(args.command, executor)
-    script_path = args.file or args.script
+      return _run_commands(
+        args.command,
+        executor,
+        output_format="json" if args.json else "terminal",
+      )
     if script_path is not None:
-      return _run_script(script_path, executor)
+      return _run_script(
+        script_path,
+        executor,
+        output_format="json" if args.json else "terminal",
+      )
     return _run_shell(executor)
   finally:
     executor.close()
 
 
-def _run_commands(commands: Sequence[str], executor: Executor) -> int:
+def _run_commands(
+  commands: Sequence[str],
+  executor: Executor,
+  *,
+  output_format: OutputFormat = "terminal",
+) -> int:
   """Execute a list of commands sequentially and exit.
 
   This mode handles commands passed using the `-c` or `--command` command-line options.
@@ -119,6 +142,7 @@ def _run_commands(commands: Sequence[str], executor: Executor) -> int:
       command_text,
       executor,
       open_plots=False,
+      output_format=output_format,
       help_chooser=None,
       run_script=lambda path: _run_script_status(
         path,
@@ -126,6 +150,7 @@ def _run_commands(commands: Sequence[str], executor: Executor) -> int:
         base_dir=None,
         active_stack=(),
         context=ScriptContext.empty(),
+        output_format=output_format,
       ),
     )
     if status is _RunStatus.ERROR:
@@ -182,6 +207,7 @@ def _run_one(
   executor: Executor,
   *,
   open_plots: bool,
+  output_format: OutputFormat = "terminal",
   command_rewriter: Callable[[Command, Executor], Command] | None = None,
   help_chooser: Callable[[tuple[str, ...]], str | None] | None = None,
   opener: Callable[[PlotResult], None] | None = None,
@@ -205,6 +231,7 @@ def _run_one(
     status, result = _execute_one(
       command_text,
       executor,
+      output_format=output_format,
       command_rewriter=command_rewriter,
       help_chooser=help_chooser,
       run_script=run_script,
@@ -216,7 +243,8 @@ def _run_one(
   if status is not _RunStatus.CONTINUE:
     return status
   if result is not None:
-    print(format_result(result))
+    formatted = format_result_json(result) if output_format == "json" else format_result(result)
+    print(formatted)
     _open_plot_if_needed(result, open_plots=open_plots, opener=opener or _open_plot)
   return _RunStatus.CONTINUE
 
@@ -225,6 +253,7 @@ def _execute_one(
   command_text: str,
   executor: Executor,
   *,
+  output_format: OutputFormat = "terminal",
   command_rewriter: Callable[[Command, Executor], Command] | None,
   help_chooser: Callable[[tuple[str, ...]], str | None] | None,
   run_script: Callable[[Path], _RunStatus] | None,
@@ -251,6 +280,8 @@ def _execute_one(
   if command_rewriter is not None:
     command = command_rewriter(command, executor)
   if isinstance(command, HelpCommand):
+    if output_format == "json":
+      raise TabDatError("help is not available with --json")
     topic = command.topic
     if topic is None:
       if help_chooser is None:
@@ -339,6 +370,7 @@ def _run_script(
   path: Path,
   executor: Executor,
   *,
+  output_format: OutputFormat = "terminal",
   base_dir: Path | None = None,
   active_stack: tuple[Path, ...] = (),
 ) -> int:
@@ -349,6 +381,7 @@ def _run_script(
       base_dir=base_dir,
       active_stack=active_stack,
       context=ScriptContext.empty(),
+      output_format=output_format,
     )
   except ScriptError as exc:
     print(f"Error: {exc}", file=sys.stderr)
@@ -363,13 +396,15 @@ def _run_script_status(
   base_dir: Path | None,
   active_stack: tuple[Path, ...],
   context: ScriptContext,
+  output_format: OutputFormat = "terminal",
 ) -> _RunStatus:
   resolved_path = _resolve_script_path(path, base_dir)
   if resolved_path in active_stack:
     raise ScriptError(path, 1, "recursive script inclusion is not supported")
 
   commands = read_script(resolved_path)
-  _print_script_metadata(resolved_path, executor.state.config, context)
+  if output_format == "terminal":
+    _print_script_metadata(resolved_path, executor.state.config, context)
   next_stack = active_stack + (resolved_path,)
   block_state: ScriptBlockState | None = None
 
@@ -402,7 +437,8 @@ def _run_script_status(
           script_command.start_line,
           "nested if blocks are not supported",
         )
-      print(f". {expanded_text}")
+      if output_format == "terminal":
+        print(f". {expanded_text}")
       block_state = ScriptBlockState(
         start_line=script_command.start_line,
         condition_active=control_directive.active,
@@ -417,7 +453,8 @@ def _run_script_status(
           script_command.start_line,
           "if block already has an else branch",
         )
-      print(f". {expanded_text}")
+      if output_format == "terminal":
+        print(f". {expanded_text}")
       block_state = ScriptBlockState(
         start_line=block_state.start_line,
         condition_active=block_state.condition_active,
@@ -427,11 +464,13 @@ def _run_script_status(
     if isinstance(control_directive, EndDirective):
       if block_state is None:
         raise ScriptError(resolved_path, script_command.start_line, "end without matching if")
-      print(f". {expanded_text}")
+      if output_format == "terminal":
+        print(f". {expanded_text}")
       block_state = None
       continue
 
-    print(f". {expanded_text}")
+    if output_format == "terminal":
+      print(f". {expanded_text}")
 
     directive = parse_script_directive(
       expanded_text,
@@ -441,11 +480,13 @@ def _run_script_status(
     )
     if isinstance(directive, SeedDirective):
       context.seed = directive.value
-      print(f"Seed: {directive.value}")
+      if output_format == "terminal":
+        print(f"Seed: {directive.value}")
       continue
     if isinstance(directive, LetDirective):
       context.macros[directive.name] = directive.value
-      print(f"Macro set: {directive.name}")
+      if output_format == "terminal":
+        print(f"Macro set: {directive.name}")
       continue
 
     def run_nested(nested_path: Path) -> _RunStatus:
@@ -455,18 +496,21 @@ def _run_script_status(
         base_dir=resolved_path.parent,
         active_stack=next_stack,
         context=context,
+        output_format=output_format,
       )
 
     try:
       status, result = _execute_one(
         expanded_text,
         executor,
+        output_format=output_format,
         command_rewriter=None,
         help_chooser=None,
         run_script=run_nested,
       )
       if result is not None:
-        print(format_result(result))
+        formatted = format_result_json(result) if output_format == "json" else format_result(result)
+        print(formatted)
     except ScriptError:
       raise
     except TabDatError as exc:

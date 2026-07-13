@@ -1,19 +1,19 @@
-# QA Report: Phase 24 P0 Stable Arithmetic Overflow Diagnostics
+# QA Report: Phase 24 P1 Batch JSON Result Envelopes
 
-Status: implementation validation complete; exactly three independent PR reviews complete
+Status: implementation validation complete; PR review pending
 
 ## Boundaries Checked
 
-- **Contract to output:** successful transform results append `overflow rows: N` only when a positive
-  exact integral overflow count exists; zero-count output remains backward compatible.
-- **Correct counting:** missing operands are excluded; valid false/missing predicates, division by
-  zero, non-finite results, decimal-scale arithmetic, and floating arithmetic are not misclassified.
-- **Atomicity:** overflow counting is read-only and occurs before relation mutation; failed validation
-  and injected Polars count failures preserve active data and lazy/materialization state.
-- **Execution parity:** eager, DuckDB-lazy, and Polars-lazy generate/replace/filter paths use the same
-  diagnostic policy and existing fallback taxonomy.
-- **Scope control:** machine-readable envelopes, SQL-only diagnostics, arbitrary precision, and broader
-  numeric diagnostics remain deferred.
+- **Envelope contract:** successful structured results emit one deterministic JSON line with version,
+  result type, and data; no-result commands emit no line.
+- **Serialization policy:** missing values become `null`, tuples become arrays, paths become strings,
+  exact decimals remain lossless strings, and non-finite floats become `null`.
+- **Script cleanliness:** metadata, dot echoes, directive notices, and nested-script chatter are
+  suppressed in JSON mode while result order is preserved.
+- **Compatibility:** terminal output and interactive behavior remain unchanged; JSON misuse is
+  rejected before starting an interactive session.
+- **Failure behavior:** parse/execution errors retain stderr text, nonzero status, and existing
+  Executor atomicity; serialization occurs only after successful results.
 
 ## Blocking Issues
 
@@ -21,11 +21,9 @@ Status: implementation validation complete; exactly three independent PR reviews
 
 ## Validation Evidence
 
-- Exact-width and overflow policy regressions: 12 passed across all engines.
-- Review regression set: 34 passed across nested expressions, conditional replacement, rollback,
-  nonfinite/floating exclusions, and decimal keep/drop behavior.
-- CLI regression: 1 passed; focused help regressions: 2 passed.
-- `uv run pytest -q` — 1,141 passed, 314 existing third-party warnings.
+- JSON CLI regressions: 6 passed.
+- JSON help regression: 1 passed.
+- `uv run pytest -q` — 1,148 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -34,16 +32,17 @@ Status: implementation validation complete; exactly three independent PR reviews
 
 ## PR Review Loop
 
-Exactly three independent review passes were completed after the PR was opened. They checked count
-correctness, false-positive exclusions, atomicity, lazy fallback metadata, CLI/docs alignment, and
-regression coverage. Findings were fixed; no fourth review pass was permitted or started.
+Exactly three independent review passes are required after the PR is opened. Reviewers must check
+envelope stability, serialization edge cases, output contamination, mode routing, stderr/exit
+behavior, terminal compatibility, and regression coverage. No fourth review pass is permitted.
 
 ## Non-Blocking Follow-Ups
 
-Machine-readable diagnostics, SQL-result metadata, decimal-scale/floating diagnostics, arbitrary
-precision, unordered SQL, randomness, estimation samples, operation lineage, and preview readiness
-remain queued in `SPEC.md` Future.
+Structured error envelopes, interactive JSON mode, command discovery, dry-run/explain, repair
+diagnostics, SQL-result metadata, operation lineage, retained estimation samples, differential
+assurance, dependency layering, and preview readiness remain queued in `SPEC.md` Future.
 
 ## Recommended Next Action
 
-Push the review fixes, verify the PR is clean, merge it, and remove the feature branch.
+Commit the validated JSON slice, push it, open the PR, and complete exactly three independent review
+passes before any merge.

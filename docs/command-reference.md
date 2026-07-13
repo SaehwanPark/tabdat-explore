@@ -6,6 +6,15 @@ This is the living command index for TabDat-Explore. For authoritative syntax an
 The historical Phase 0 glossary lives in [command_glossary_v0.md](command_glossary_v0.md). That
 document records early scope decisions; this reference reflects the current CLI.
 
+## Batch JSON output
+
+Use `tabdat --json -c "..."` or `tabdat --json -f analysis.td` for machine-readable output. Each
+successful structured result emits one compact JSON line with `schema_version`, `result_type`, and
+`data`; multiple commands and nested scripts form JSONL in execution order. Missing values are
+`null`, paths are strings, exact decimals are lossless strings, and non-finite floats are `null`.
+Script metadata and command echoes are suppressed. Errors retain their existing stderr text and exit
+status, and `--json` is not valid for interactive sessions.
+
 ## Load and inspect
 
 | Command | Purpose | Minimal invocation |

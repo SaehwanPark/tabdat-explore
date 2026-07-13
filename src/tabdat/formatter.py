@@ -1,7 +1,10 @@
 """Terminal formatting for structured command results."""
 
+import json
 from collections.abc import Iterable, Sequence
 from pathlib import Path
+
+from pydantic import TypeAdapter
 
 from tabdat.models import (
   ActivateResult,
@@ -1115,6 +1118,23 @@ def format_result(result: Result) -> str:
     )
 
   raise TypeError(f"Unsupported result: {type(result).__name__}")
+
+
+def format_result_json(result: Result) -> str:
+  """Serialize one successful result as a deterministic machine-readable envelope."""
+  data = TypeAdapter(type(result)).dump_python(result, mode="json")
+  envelope = {
+    "schema_version": 1,
+    "result_type": type(result).__name__,
+    "data": data,
+  }
+  return json.dumps(
+    envelope,
+    ensure_ascii=False,
+    allow_nan=False,
+    sort_keys=True,
+    separators=(",", ":"),
+  )
 
 
 def _row_count(row_count: int | None) -> str:
