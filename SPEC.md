@@ -537,32 +537,35 @@ and describe the active work with concise verification criteria.
   - preserved active schema, rows, execution metadata, and success-only transparency metadata on
     validation failures across eager, DuckDB-lazy, and Polars-lazy paths
   - rejected duplicate recode-generated identifiers and preflighted Polars-lazy write validation
+- Implemented Phase 24 P0 identifier spelling and quoted identifiers:
+  - defined exact case-sensitive bare identifiers and backtick quoting
+  - preserved quoted names through command wrappers, control-word parsing, CLI/script paths, and
+    Bayes formula construction
 
 ## Present
 
-- Feature: Phase 24 P0 identifier spelling and quoted identifiers
+- Feature: Phase 24 P0 missing predicate semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-identifier-grammar-quoting
+  Branch: feat/phase24-missing-predicate-semantics
 
   Summary:
-  Define and regression-test exact case-sensitive variable spelling plus backtick-quoted identifiers
-  for variable targets, variable lists, and expression references.
+  Define and regression-test how missing predicate results affect keep/drop/replace and how existing
+  summarize, codebook, tabulate, and bar outputs treat missing values.
 
   Verification:
-  - bare identifiers preserve exact case and Unicode spelling
-  - backtick-quoted identifiers accept whitespace and punctuation with escaped backticks
-  - quoted identifiers work in command targets, variable lists, and expressions
-  - quoted keywords are not mistaken for command-language control keywords
-  - exact spelling mismatches remain unknown-variable errors
-  - the policy is documented as the identifier grammar slice
+  - keep-if excludes false and missing predicate results
+  - drop-if removes true results and retains false and missing results across eager, DuckDB-lazy,
+    and Polars-lazy execution
+  - replace-if preserves values for false and missing conditions
+  - summarize/codebook missing-count behavior is documented and tested
+  - the policy is documented as the first missingness semantics slice
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - missing-value/coercion policy, arithmetic, categories, ordering/randomness, estimation samples,
-    operation lineage, machine output, and exit-code redesign
-  - SQL identifier rules, lazy/eager semantic changes, new backends, estimators, connectors, or
-    plugins
+  - explicit missing predicates/null literals, coercion, arithmetic, categories, ordering/randomness,
+    estimation samples, operation lineage, machine output, and exit-code redesign
+  - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
 

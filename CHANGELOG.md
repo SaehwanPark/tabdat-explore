@@ -22,6 +22,8 @@ All notable project changes are tracked here.
   policy remains queued behind this initial write-contract increment.
 - Started the Phase 24 identifier spelling and quoted-identifier semantics slice; missingness,
   coercion, and broader language policy remain queued.
+- Started the Phase 24 missing-predicate semantics slice; explicit missing predicates and coercion
+  remain queued.
 
 ### Added
 
