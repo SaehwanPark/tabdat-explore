@@ -1,37 +1,35 @@
-# Request Summary: Phase 24 Join Row-Order Contract
+# Request Summary: Phase 24 Reshape Row-Order Contract
 
 ## Goal
 
-Define and verify how `join table_name on keyvars` orders rows when active rows match zero, one, or
-multiple rows in a named table.
+Define and verify how existing `reshape long` and `reshape wide` commands order their result rows
+without adding syntax.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This follows the completed active, SQL/named-table, and append order
-slices and bounds the first keyed relation-combination result without adding syntax.
+Phase 24 P0 language semantics. This follows the completed active, SQL/named-table, append, and join
+order slices and closes the remaining relation-changing row-order boundary before categorical order.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md`: durable join result-sequence policy
-- `docs/command-reference.md`, `src/tabdat/help/topics/join.md`: user-facing join syntax and order
-- `src/tabdat/backend.py`, `src/tabdat/executor.py`: collision-safe join ordinals and pre-materialized
-  key/table validation
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: duplicate-match, unmatched-row,
-  collision, failure-state, and cross-engine regressions
+- `docs/language-semantics.md`: durable long/wide result-sequence policy
+- `src/tabdat/help/topics/reshape.md`, `docs/command-reference.md`: user guidance
+- `src/tabdat/backend.py`: explicit source-row and first-group ordering for reshape results
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: non-sorted source and
+  cross-engine regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- The active dataset is the left input and has a current row sequence; the named table is the right
-  input and has a stored row sequence.
-- For each active row, matching right rows are emitted in the named table's stored order. Output is
-  grouped by active-row order; duplicate matches remain present.
-- `inner` omits active rows with no match. `left` emits one missing-right row for each active row
-  with no match.
-- Existing key equality, suffixing, schema, and missing-key behavior remain unchanged.
-- Append, reshape, categorical ordering, and a new sort command remain separate contracts.
+- `reshape long` preserves current active-row order; for each source row, generated rows follow the
+  established wide-column j-value sequence.
+- `reshape wide` emits one row per identifier group in the order of the first active row belonging
+  to each group; existing generated-column and duplicate-cell behavior remains unchanged.
+- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same result sequence after the existing
+  reshape materialization boundary.
+- Append/join order, categorical order, and a new sort command remain separate contracts.
 
 ## Non-Goals
 
-- Adding row IDs, sort syntax, a `sort` command, SQL rewriting, append/reshape order,
-  categorical order, or estimator behavior.
+- Adding row IDs, sort syntax, a `sort` command, SQL rewriting, append/join order, categorical order,
+  duplicate-cell aggregation changes, or estimator behavior.

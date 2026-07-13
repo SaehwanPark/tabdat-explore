@@ -6277,6 +6277,67 @@ def test_phase_11_reshape_long_wide_roundtrip(tmp_path: Path) -> None:
   )
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_reshape_preserves_source_and_group_sequence(tmp_path: Path, engine: str) -> None:
+  path = tmp_path / "reshape_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select id, income_2021, income_2020, cost_2021, cost_2020
+    from (
+      values
+        (1, 2, 21.0, 20.0, 210.0, 200.0),
+        (2, 1, 11.0, 10.0, 110.0, 100.0)
+    ) as wide(row_order, id, income_2021, income_2020, cost_2021, cost_2020)
+    order by row_order
+    """,
+  )
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(use_command())
+    long_result = executor.execute(
+      ReshapeCommand(
+        direction="long",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    long_preview = executor.execute(HeadCommand(10))
+    wide_result = executor.execute(
+      ReshapeCommand(
+        direction="wide",
+        variables=("income", "cost"),
+        identifiers=("id",),
+        j_variable="year",
+      )
+    )
+    wide_preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(long_result, TransformResult)
+  assert isinstance(long_preview, PreviewResult)
+  assert long_preview.rows == (
+    (2, "2021", 21.0, 210.0),
+    (2, "2020", 20.0, 200.0),
+    (1, "2021", 11.0, 110.0),
+    (1, "2020", 10.0, 100.0),
+  )
+  assert isinstance(wide_result, TransformResult)
+  assert isinstance(wide_preview, PreviewResult)
+  assert wide_preview.rows == (
+    (2, 20.0, 21.0, 200.0, 210.0),
+    (1, 10.0, 11.0, 100.0, 110.0),
+  )
+
+
 def test_phase_11_reshape_reports_dataset_and_variable_errors(
   sample_parquet: Path,
   tmp_path: Path,

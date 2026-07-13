@@ -569,27 +569,38 @@ class DuckDBBackend:
     for variable in variables:
       _require_long_stub_columns(column_types, variable, j_values)
 
-    id_sql = _select_list(identifiers)
+    row_order_name, j_order_name = _reshape_long_order_column_names(dataset)
+    row_order_sql = _quote_identifier(row_order_name)
+    j_order_sql = _quote_identifier(j_order_name)
+    id_sql = ", ".join(
+      f"reshape_source.{_quote_identifier(identifier)}" for identifier in identifiers
+    )
     selects = []
-    for j_value in j_values:
+    for j_index, j_value in enumerate(j_values):
       value_sql = ", ".join(
-        f"{_quote_identifier(variable + '_' + j_value)} as {_quote_identifier(variable)}"
+        f"reshape_source.{_quote_identifier(variable + '_' + j_value)} as "
+        f"{_quote_identifier(variable)}"
         for variable in variables
       )
       selects.append(
         f"""
-        select {id_sql}, {_quote_literal(j_value)} as {_quote_identifier(j_variable)}, {value_sql}
-        from {ACTIVE_TABLE}
+        select reshape_source.{row_order_sql}, {id_sql},
+          {_quote_literal(j_value)} as {_quote_identifier(j_variable)}, {value_sql},
+          {j_index} as {j_order_sql}
+        from reshape_source
         """
       )
-    order_sql = ", ".join(_quote_identifier(identifier) for identifier in identifiers)
     self._replace_active(
       f"""
-      select *
+      with reshape_source as (
+        select row_number() over () as {row_order_sql}, *
+        from {ACTIVE_TABLE}
+      )
+      select * exclude ({row_order_sql}, {j_order_sql})
       from (
         {" union all ".join(selects)}
-      )
-      order by {order_sql}, {_quote_identifier(j_variable)}
+      ) as reshape_long_rows
+      order by {row_order_sql}, {j_order_sql}
       """,
       "reshape",
     )
@@ -609,19 +620,39 @@ class DuckDBBackend:
       raise ExecutionError("reshape wide found no j values")
     _require_wide_output_names(column_types, variables, identifiers, j_variable, j_values)
 
-    id_sql = _select_list(identifiers)
+    group_order_name = _unique_internal_name(
+      "__tabdat_reshape_group_order",
+      {column.name for column in dataset.columns},
+    )
+    group_order_sql = _quote_identifier(group_order_name)
+    source_order_name = _unique_internal_name(
+      "__tabdat_reshape_source_order",
+      {column.name for column in dataset.columns} | {group_order_name},
+    )
+    source_order_sql = _quote_identifier(source_order_name)
+    id_sql = ", ".join(
+      f"reshape_source.{_quote_identifier(identifier)}" for identifier in identifiers
+    )
     aggregate_sql = ", ".join(
-      f"max(case when cast({_quote_identifier(j_variable)} as varchar) = {_quote_literal(j_value)} "
-      f"then {_quote_identifier(variable)} end) as {_quote_identifier(variable + '_' + j_value)}"
+      f"max(case when cast(reshape_source.{_quote_identifier(j_variable)} as varchar) = "
+      f"{_quote_literal(j_value)} then reshape_source.{_quote_identifier(variable)} end) "
+      f"as {_quote_identifier(variable + '_' + j_value)}"
       for variable in variables
       for j_value in j_values
     )
     self._replace_active(
       f"""
-      select {id_sql}, {aggregate_sql}
-      from {ACTIVE_TABLE}
-      group by {id_sql}
-      order by {id_sql}
+      select * exclude ({group_order_sql})
+      from (
+        select {id_sql}, {aggregate_sql},
+          min(reshape_source.{source_order_sql}) as {group_order_sql}
+        from (
+          select row_number() over () as {source_order_sql}, *
+          from {ACTIVE_TABLE}
+        ) as reshape_source
+        group by {id_sql}
+      ) as reshape_wide_rows
+      order by {group_order_sql}
       """,
       "reshape",
     )
@@ -2527,6 +2558,14 @@ def _join_order_column_names(
   used_names.add(left_name)
   right_name = _unique_internal_name("__tabdat_join_right_order", used_names)
   return left_name, right_name
+
+
+def _reshape_long_order_column_names(dataset: DatasetInfo) -> tuple[str, str]:
+  used_names = {column.name for column in dataset.columns}
+  row_name = _unique_internal_name("__tabdat_reshape_row_order", used_names)
+  used_names.add(row_name)
+  j_name = _unique_internal_name("__tabdat_reshape_j_order", used_names)
+  return row_name, j_name
 
 
 def _unique_internal_name(candidate: str, used_names: set[str]) -> str:

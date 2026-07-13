@@ -55,6 +55,9 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "An inner join omits unmatched active rows" in join_help
   assert "a left join keeps" in join_help
   assert "does not sort, deduplicate, or interleave" in load_help_topic("append")
+  reshape_help = load_help_topic("reshape")
+  assert "source-row order" in reshape_help
+  assert "first active row" in reshape_help
 
 
 def test_help_topics_document_expression_domains() -> None:

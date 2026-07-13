@@ -502,9 +502,10 @@ def test_cli_runs_phase_11_reshape_long_flow(tmp_path: Path, capsys) -> None:
     """
     select * from (
       values
-        (1, 10.0, 12.0),
-        (2, 20.0, 21.0)
-    ) as wide(id, income_2020, income_2021)
+        (1, 2, 21.0, 20.0),
+        (2, 1, 11.0, 10.0)
+    ) as wide(row_order, id, income_2021, income_2020)
+    order by row_order
     """,
   )
   exit_code = main(
@@ -523,8 +524,13 @@ def test_cli_runs_phase_11_reshape_long_flow(tmp_path: Path, capsys) -> None:
   assert exit_code == 0
   assert "Reshaped long: 4 rows, 3 columns" in captured.out
   assert "id  year  income" in captured.out
-  assert "1   2020  10" in captured.out
-  assert "2   2021  21" in captured.out
+  head_output = captured.out[captured.out.index("id  year  income") :]
+  assert tuple(line.strip() for line in head_output.splitlines()[1:] if line.strip()) == (
+    "2   2021  21.0",
+    "2   2020  20.0",
+    "1   2021  11.0",
+    "1   2020  10.0",
+  )
   assert captured.err == ""
 
 

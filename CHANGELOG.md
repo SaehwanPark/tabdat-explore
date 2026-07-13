@@ -50,6 +50,8 @@ All notable project changes are tracked here.
   bounded before reshape and categorical ordering.
 - Completed the Phase 24 join row-order slice with collision-safe ordinals, lazy validation, and
   duplicate/unmatched regression coverage.
+- Started the Phase 24 reshape row-order slice; long expansion and wide group order are being bounded
+  before categorical ordering.
 
 ### Added
 

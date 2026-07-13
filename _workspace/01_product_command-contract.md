@@ -1,8 +1,8 @@
-# Product Contract: Phase 24 P0 — Join Row Order
+# Product Contract: Phase 24 P0 — Reshape Row Order
 
 ## Request Summary
 
-Make existing `join table_name on keyvars` result ordering sequence-preserving and predictable
+Make existing `reshape long` and `reshape wide` result ordering sequence-preserving and predictable
 without adding new syntax.
 
 ## Roadmap Phase
@@ -11,55 +11,48 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This is a bounded follow-up to the completed active, SQL/named-table, and append order contracts. It
-covers keyed relation combination while leaving reshape and categorical order decisions for later.
+This is a bounded follow-up to the completed active, SQL/named-table, append, and join order
+contracts. It defines the result sequence for wide/long layout changes while leaving categorical order
+separate.
 
 ## Existing Syntax
 
 Valid forms retain the current grammar:
 
-- `sql select value, label from active order by value desc nulls last into followup`
 - `use source.parquet`
-- `sql select key, label from active order by key, label into lookup`
-- `use source.parquet`
-- `join lookup on key, how=left`
+- `reshape long income cost, i(id) j(year)`
+- `reshape wide income cost, i(id) j(year)`
 - `head 5`
 
 No new options, commands, or output fields are introduced.
 
-## Join-Order Rules
+## Reshape-Order Rules
 
-- The active dataset is the left input. For each active row, `join name on keys` emits matching rows
-  from named table `name` in that table's stored sequence.
-- Output is grouped by active-row sequence. A later active row never appears before an earlier active
-  row's matches, and duplicate right-side matches are preserved.
-- An `inner` join omits active rows with no match. A `left` join emits one row with missing right-side
-  values for each active row with no match.
-- Join validates named-table existence and key columns before Polars fallback; a validation failure
-  preserves the active rows, execution mode, and materialization metadata.
-- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same join result sequence. Join crosses the
-  existing eager boundary where required and preserves current state reporting.
+- `reshape long` preserves the active source-row sequence. For each source row, generated rows are
+  emitted in the established wide-column j-value sequence.
+- `reshape wide` emits one row per identifier group in the order of the first active row belonging to
+  that group. Existing generated-column order and duplicate-cell aggregation remain unchanged.
+- `head`/`tail` consume each reshape result using the active row-order contract.
+- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same reshape result sequence. Reshape crosses
+  the existing eager boundary where required and preserves current state reporting.
 
 ## Data And Execution Assumptions
 
-- The active dataset and named table must exist. Existing key validation, equality behavior, suffixing,
-  and output-column rules remain unchanged.
-- Both inputs use their already established sequences; SQL source creation should use explicit order
-  and tie-breakers when a reproducible named-table sequence is required.
-- Append, reshape order, unordered SQL, categorical order, and a new sort command remain outside this
+- Existing identifier, stub, j-value, output-column, and duplicate-cell validation remains unchanged.
+- The source sequence is the current active sequence, not a newly sorted identifier or j-value order.
+- Append/join order, unordered SQL, categorical order, and a new sort command remain outside this
   slice.
 
 ## Acceptance Criteria
 
-- [x] Join groups results by active-row order and preserves named-table match order.
-- [x] Duplicate right-side matches remain present for inner and left joins.
-- [x] Inner and left unmatched-row behavior remains unchanged and ordered.
-- [x] Eager, DuckDB-lazy, and Polars-lazy result previews agree.
-- [x] Failed table/key validation preserves active execution state before lazy fallback.
-- [x] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
+- [ ] Long output follows source-row order and established j-value sequence.
+- [ ] Wide output follows first-appearance order of identifier groups.
+- [ ] Existing wide/long column layout and duplicate-cell behavior remain unchanged.
+- [ ] Eager, DuckDB-lazy, and Polars-lazy result previews agree.
+- [ ] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
   checks pass.
 
 ## Non-Goals For This Slice
 
-- New sort syntax or commands, row-ID persistence, append/reshape ordering, unordered SQL guarantees,
-  categorical ordering, or estimators.
+- New sort syntax or commands, row-ID persistence, append/join ordering, unordered SQL guarantees,
+  categorical ordering, duplicate-cell aggregation changes, or estimators.
