@@ -44,6 +44,8 @@ All notable project changes are tracked here.
   and reactivation/fallback regressions.
 - Started the Phase 24 append row-order slice; active-left and named-table-right sequence semantics
   are being bounded before join and reshape ordering.
+- Completed the Phase 24 append row-order slice with explicit per-input ordinals, duplicate-row
+  coverage, and pre-materialization validation for failed lazy appends.
 
 ### Added
 

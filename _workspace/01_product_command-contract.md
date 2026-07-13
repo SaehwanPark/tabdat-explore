@@ -32,6 +32,8 @@ No new options, commands, or output fields are introduced.
   from named table `name` in its stored sequence.
 - Append does not sort, deduplicate, or interleave rows. The combined sequence is consumed by
   `head`/`tail` using the active row-order contract.
+- Append validates the named table and schema before replacing the active relation; a failed append
+  preserves the active rows, execution mode, and materialization metadata.
 - Eager, DuckDB-lazy, and Polars-lazy inputs produce the same combined row sequence. Append crosses
   the existing eager boundary for relation combination and preserves its current state reporting.
 
@@ -49,6 +51,7 @@ No new options, commands, or output fields are introduced.
 - [x] Append emits active rows before named-table rows across supported execution paths.
 - [x] Head/tail of the combined sequence preserve left-then-right order.
 - [x] Append does not sort, deduplicate, or interleave inputs.
+- [x] Failed table/schema validation preserves active execution state before lazy fallback.
 - [x] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice

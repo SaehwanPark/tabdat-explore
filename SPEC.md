@@ -580,6 +580,11 @@ and describe the active work with concise verification criteria.
   - preserved ordered sequences through isolated named-table reactivation and existing state resets
   - added multiline parser, exact CLI, help, and eager/lazy SQL regressions
   - explicitly deferred unordered SQL, append/join/reshape order, and categorical ordering
+- Implemented Phase 24 P0 append row-order semantics:
+  - explicitly snapshot each input sequence and order active rows before named-table rows
+  - preserved duplicate rows and made head/tail consume the combined sequence deterministically
+  - validated append table/schema failures before Polars fallback materialization
+  - explicitly deferred join/reshape and categorical ordering
 
 ## Present
 

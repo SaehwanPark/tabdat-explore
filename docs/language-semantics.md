@@ -108,7 +108,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
   results follow the existing keep/drop policy and never reorder survivors.
 - Column projection and row-preserving value transformations preserve the current row sequence.
-- Grouped or relation-changing commands such as `collapse`, append, join, and reshape establish
+- Grouped or relation-changing commands such as `collapse`, join, and reshape establish
   separate result-sequence contracts; this slice does not redefine their later preview order.
 - Categorical order remains a separate contract.
 
@@ -122,7 +122,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
   fallback path before the query executes, and successful named-table activation resets the prior
   materialization reason.
-- Append/join/reshape order and categorical order remain separate contracts.
+- Join/reshape order and categorical order remain separate contracts.
 
 ## Append row order
 
@@ -159,6 +159,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics, append/join/reshape
-ordering, SQL without explicit ordering, randomness, estimation samples, machine-readable output,
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics, join/reshape ordering,
+SQL without explicit ordering, randomness, estimation samples, machine-readable output,
 and exit codes are not defined here yet.

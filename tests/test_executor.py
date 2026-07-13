@@ -7604,7 +7604,8 @@ def test_append_preserves_left_then_right_sequence(
     from (
       values
         (1, 9, 'ninth'),
-        (2, 8, 'eighth')
+        (2, 4, 'fourth'),
+        (3, 8, 'eighth')
     ) as append_data(row_id, value, label)
     order by row_id
   """
@@ -7621,13 +7622,13 @@ def test_append_preserves_left_then_right_sequence(
     executor.execute(use_command())
     result = executor.execute(AppendCommand(table_name="followup"))
     head = executor.execute(HeadCommand(5))
-    tail = executor.execute(TailCommand(3))
+    tail = executor.execute(TailCommand(4))
     status = executor.execute(StatusCommand())
   finally:
     executor.close()
 
   assert isinstance(result, TransformResult)
-  assert result.dataset.row_count == 7
+  assert result.dataset.row_count == 8
   assert isinstance(head, PreviewResult)
   assert isinstance(tail, PreviewResult)
   assert isinstance(status, StatusResult)
@@ -7638,7 +7639,7 @@ def test_append_preserves_left_then_right_sequence(
     (2, "third"),
     (4, "fourth"),
   )
-  assert tail.rows == ((4, "fourth"), (9, "ninth"), (8, "eighth"))
+  assert tail.rows == ((4, "fourth"), (9, "ninth"), (4, "fourth"), (8, "eighth"))
   if engine == "polars":
     assert status.execution_mode == "eager"
     assert status.lazy_engine is None
@@ -7651,6 +7652,63 @@ def test_append_preserves_left_then_right_sequence(
     assert status.execution_mode == "eager"
     assert status.lazy_engine is None
     assert status.last_materialization_reason is None
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_failed_append_validation_preserves_active_state(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "append_validation.parquet"
+  _write_row_order_parquet(path)
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(SqlCommand("select value from active", into="missing_label"))
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SqlCommand(
+        "select cast(value as varchar) as value, label from active",
+        into="bad_type",
+      )
+    )
+    executor.execute(use_command())
+    with pytest.raises(UnknownTableError, match="unknown table: missing_table"):
+      executor.execute(AppendCommand(table_name="missing_table"))
+    unknown_status = executor.execute(StatusCommand())
+
+    executor.execute(use_command())
+    with pytest.raises(
+      UnknownVariableError, match="append unknown variable in missing_label: label"
+    ):
+      executor.execute(AppendCommand(table_name="missing_label"))
+    missing_status = executor.execute(StatusCommand())
+
+    executor.execute(use_command())
+    with pytest.raises(TypeMismatchExecutionError, match="append type mismatch for value"):
+      executor.execute(AppendCommand(table_name="bad_type"))
+    mismatch_status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  for status in (unknown_status, missing_status, mismatch_status):
+    assert isinstance(status, StatusResult)
+    assert status.last_operation == "use"
+    assert status.last_materialization_reason is None
+    if engine == "eager":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.row_count == 5
+    else:
+      assert status.execution_mode == "lazy"
+      assert status.lazy_engine == engine
+      assert status.row_count is None
 
 
 def test_keep_and_drop_columns_update_active_dataset(sample_parquet: Path) -> None:

@@ -14,6 +14,7 @@ relation-combination sequence without adding syntax.
 
 - `docs/language-semantics.md`: durable append sequence policy
 - `src/tabdat/help/topics/append.md`: user guidance for left-then-right row order
+- `src/tabdat/backend.py`, `src/tabdat/executor.py`: explicit append ordinals and lazy validation
 - `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine and CLI regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
