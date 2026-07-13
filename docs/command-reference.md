@@ -13,8 +13,8 @@ successful structured result emits one compact JSON line with `schema_version`, 
 `data`; multiple commands and nested scripts form JSONL in execution order. Missing values are
 `null`, paths are strings, exact decimals are lossless strings, non-finite floats are `null`, and bytes
 are `base64:<payload>` strings. Script metadata and command echoes are suppressed. Errors retain their
-existing stderr text and exit status. `help` is rejected in JSON mode because it is terminal prose;
-`--json` is not valid for interactive sessions.
+existing stderr text and exit status; JSON mode also emits one `error` envelope with a stable type and
+message, plus script path/line when available. `--json` is not valid for interactive sessions.
 
 ## Load and inspect
 

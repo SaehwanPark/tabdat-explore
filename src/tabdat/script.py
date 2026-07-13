@@ -90,14 +90,17 @@ def read_script(path: Path) -> tuple[ScriptCommand, ...]:
   Raises:
     ScriptError: If the file is missing, unreadable, or not valid UTF-8.
   """
+  raw = b""
   try:
-    text = path.read_text(encoding="utf-8")
+    raw = path.read_bytes()
+    text = raw.decode("utf-8")
   except FileNotFoundError as exc:
     raise ScriptError(path, 1, "script file not found") from exc
   except IsADirectoryError as exc:
     raise ScriptError(path, 1, "script path is a directory") from exc
   except UnicodeDecodeError as exc:
-    raise ScriptError(path, exc.start + 1, "script file must be UTF-8 text") from exc
+    line = raw.count(b"\n", 0, exc.start) + 1
+    raise ScriptError(path, line, "script file must be UTF-8 text") from exc
   except OSError as exc:
     raise ScriptError(path, 1, f"could not read script: {exc}") from exc
   return parse_script(text, path=path)

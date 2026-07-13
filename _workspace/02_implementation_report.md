@@ -1,41 +1,36 @@
-# Implementation Report: Phase 24 P1 Batch JSON Result Envelopes
+# Implementation Report: Phase 24 P1 Structured JSON Error Envelopes
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — versioned JSON/JSONL success envelopes for
-  non-interactive `-c` and script execution, with unchanged terminal and interactive behavior.
+- `_workspace/01_product_command-contract.md` — one versioned JSON error envelope at the first
+  non-interactive parse/execution failure, with stable type/message and script location.
 
 ## Delivered Boundary
 
 - `src/tabdat/formatter.py`
-  - Added `format_result_json` using Pydantic serialization plus an explicit exhaustive result-label
-    map for every typed result.
-  - Emits compact deterministic envelopes with `schema_version`, `result_type`, and `data`.
-  - Preserves exact decimals as lossless text, converts paths and tuples to JSON-safe values, encodes
-    bytes as `base64:<payload>`, and normalizes non-finite values to `null`.
-- `src/tabdat/cli.py`
-  - Added `--json` for `-c/--command`, `-f`, and positional script execution.
-  - Propagated output mode through multiple commands and nested scripts while suppressing script
-    metadata, command echoes, and directive notices in JSON mode.
-  - Kept errors on stderr with existing nonzero status, rejected interactive `--json` usage, and
-    rejected terminal-only `help` clearly in JSON mode.
+  - Added an explicit exhaustive `ERROR_TYPE_LABELS` map for the user-facing error hierarchy.
+  - Added deterministic error envelopes with concise sanitized messages and optional script path/line
+    fields; raw causes remain available only in human stderr.
+- `src/tabdat/cli.py` and `src/tabdat/script.py`
+  - Emits one JSON error envelope at top-level command and script boundaries while preserving prior
+    success envelopes, fail-fast execution, human stderr, and exit status `1`.
+  - Nested failures use resolved paths; invalid UTF-8 scripts report a source line derived from newline
+    positions rather than a byte offset.
 - Help/docs/tests
-  - Documented batch JSON output in the run help, command reference, and user guide.
-  - Added CLI coverage for envelopes, JSONL ordering, nested scripts, status/table results, exact,
-    nonfinite, binary-cell conversion, errors, terminal compatibility, and incompatible mode usage,
-    plus help coverage.
+  - Documented machine-readable failure behavior in run help, command reference, and user guide.
+  - Added parse, execution, help, script-location, nested-script, invalid-UTF8, raw-cause sanitization,
+    fail-fast, hierarchy-label, and terminal-compatibility coverage.
 
 ## Functional-First Notes
 
-The output boundary is pure presentation over a successfully typed `Result`; no Executor or backend
-state is changed. Pydantic remains the schema boundary, while the CLI carries one explicit output
-mode through the existing command/script control flow.
+Error serialization is a pure CLI presentation step after parser/Executor failure. It does not alter
+the existing error hierarchy, Executor state, rollback behavior, or command control flow.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_cli.py -k 'json' -q` — passed, 12 tests.
+- `uv run pytest tests/test_cli.py -k 'json' -q` — passed, 19 tests.
 - `uv run pytest tests/test_help.py -k 'run_help' -q` — passed, 1 test.
-- `uv run pytest -q` — passed, 1,154 tests, with 314 existing third-party warnings.
+- `uv run pytest -q` — passed, 1,161 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
@@ -46,7 +41,7 @@ mode through the existing command/script control flow.
 
 ## Known Limits And Follow-Up Work
 
-Structured error envelopes, interactive JSON mode, command discovery, dry-run/explain, repair
-diagnostics, SQL-result metadata, operation lineage, retained estimation samples, and exit-code
-redesign remain separate Phase 24 contracts. The reviewed implementation is ready for PR update and
+Interactive JSON mode, error recovery, multi-error aggregation, new exit codes, command discovery,
+dry-run/explain, repair diagnostics, SQL-result metadata, operation lineage, and retained estimation
+samples remain separate Phase 24 contracts. The reviewed implementation is ready for PR update and
 merge.
