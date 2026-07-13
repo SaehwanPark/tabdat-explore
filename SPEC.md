@@ -532,31 +532,37 @@ and describe the active work with concise verification criteria.
   - distinguishes `eager operation` from the specific `polars fallback` reason
   - restricts generic eager-transition detection to DuckDB-lazy state
   - preserves source/table reset and success-only reason semantics
+- Implemented Phase 24 P0 identifier overwrite and atomic error semantics:
+  - defined generate, rename, replace, and recode-generated target rules
+  - preserved active schema, rows, execution metadata, and success-only transparency metadata on
+    validation failures across eager, DuckDB-lazy, and Polars-lazy paths
+  - rejected duplicate recode-generated identifiers and preflighted Polars-lazy write validation
 
 ## Present
 
-- Feature: Phase 24 P0 identifier overwrite and atomic error semantics
+- Feature: Phase 24 P0 identifier spelling and quoted identifiers
   Status: Active
-  Started: 2026-07-12
-  Branch: feat/phase24-identifier-overwrite-semantics
+  Started: 2026-07-13
+  Branch: feat/phase24-identifier-grammar-quoting
 
   Summary:
-  Define and regression-test the initial cross-command write policy: generated, renamed, replaced,
-  and recode-generated identifiers have explicit collision/target rules and failed validation does
-  not mutate the active dataset.
+  Define and regression-test exact case-sensitive variable spelling plus backtick-quoted identifiers
+  for variable targets, variable lists, and expression references.
 
   Verification:
-  - generate and recode generate reject existing output identifiers
-  - rename rejects missing sources and existing destinations
-  - replace rejects missing targets and does not implicitly create variables
-  - failed write validation leaves schema/rows unchanged
-  - the policy is documented as the first stable cross-command semantics slice
+  - bare identifiers preserve exact case and Unicode spelling
+  - backtick-quoted identifiers accept whitespace and punctuation with escaped backticks
+  - quoted identifiers work in command targets, variable lists, and expressions
+  - quoted keywords are not mistaken for command-language control keywords
+  - exact spelling mismatches remain unknown-variable errors
+  - the policy is documented as the identifier grammar slice
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - case/quoting rules, missing-value/coercion policy, ordering/randomness, estimation samples,
+  - missing-value/coercion policy, arithmetic, categories, ordering/randomness, estimation samples,
     operation lineage, machine output, and exit-code redesign
-  - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
+  - SQL identifier rules, lazy/eager semantic changes, new backends, estimators, connectors, or
+    plugins
 
 ## Future
 

@@ -1324,6 +1324,37 @@ def test_parse_expression_with_precedence_and_function_call() -> None:
   )
 
 
+def test_parse_quoted_identifiers_preserves_exact_names() -> None:
+  assert parse_expression("`body mass` + 1") == BinaryExpression(
+    left=IdentifierExpression("body mass"),
+    operator="+",
+    right=NumberExpression(1),
+  )
+  assert parse_expression("`a``b`") == IdentifierExpression("a`b")
+  assert parse_expression("`a+b`") == IdentifierExpression("a+b")
+  assert parse_command("select `a,b`") == SelectCommand(variables=("a,b",))
+  assert parse_command("generate `age group` = `body mass` + 1") == GenerateCommand(
+    variable="age group",
+    expression=BinaryExpression(
+      left=IdentifierExpression("body mass"),
+      operator="+",
+      right=NumberExpression(1),
+    ),
+  )
+  assert parse_command("keep if `if` == 1") == KeepCommand(
+    condition=BinaryExpression(
+      left=IdentifierExpression("if"),
+      operator="==",
+      right=NumberExpression(1),
+    )
+  )
+
+  with pytest.raises(ParseError, match="quoted identifier cannot be empty"):
+    parse_expression("``")
+  with pytest.raises(ParseError, match="unterminated quoted identifier"):
+    parse_expression("`body mass")
+
+
 def test_parse_exit_aliases() -> None:
   assert parse_command("exit") == ExitCommand()
   assert parse_command("quit") == ExitCommand()

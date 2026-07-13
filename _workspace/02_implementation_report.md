@@ -1,47 +1,46 @@
-# Implementation Report: Phase 24 P0 Identifier Overwrite and Atomic Error Semantics
+# Implementation Report: Phase 24 P0 Identifier Spelling and Quoted Identifiers
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — initial stable write-target and failure policy.
+- `_workspace/01_product_command-contract.md` — exact identifier spelling and backtick-quoting policy.
 
 ## Delivered Boundary
 
-- `docs/language-semantics.md`
-  - Records generate, rename, replace, and recode-generated target rules.
-  - Defines active-dataset atomicity and explicitly lists deferred semantic areas.
-- `tests/test_executor.py`
-  - Adds a cross-command regression comparing `DescribeResult`, `HeadResult`, and `StatusResult`
-    before and after generate, rename, replace, and recode-generate validation failures across eager,
-    DuckDB-lazy, and Polars-lazy sessions.
-  - Covers existing collision/source diagnostics, unknown expressions, and duplicate generated
-    identifiers through focused error tests.
-- `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Link and describe the durable semantics policy, scope, acceptance criteria, and evidence.
+- `src/tabdat/parser.py`
+  - Adds backtick-quoted identifier tokens with doubled-backtick escaping.
+  - Keeps quoted identifiers distinct from unquoted command/control keywords.
+  - Treats punctuation inside quoted identifiers as identifier content rather than command or
+    expression syntax.
+- `tests/test_parser.py` and `tests/test_executor.py`
+  - Cover whitespace, punctuation, escaped backticks, quoted `if`, exact case, variable lists,
+    generated targets, replacement expressions, and unknown exact-spelling diagnostics.
+- `docs/language-semantics.md`, `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
+  - Record the stable spelling/quoting policy and the bounded follow-up scope.
 
 ## Implementation Notes By Boundary
 
-- Target policy: generate/recode-generate outputs must be new; rename sources must exist and
-  destinations must be new; replace targets must already exist.
-- Atomicity: validation failures leave the active schema, rows, execution metadata, active table,
-  last operation, and materialization reason unchanged. Polars-lazy write validation now runs before
-  the fallback materialization hook.
-- Duplicate recode outputs are rejected before backend execution.
-- Scope: this slice documents and hardens existing behavior; successful transformation semantics and
-  error wording are unchanged.
+- Bare identifiers retain existing exact, case-sensitive resolution and Unicode spelling.
+- Backtick quoting is accepted only in variable positions and expression references; command names
+  and option names remain unquoted keywords.
+- Parser structural checks now inspect token kind, so quoted names containing `,`, `=`, `(`, `)`, or
+  expression operators remain single identifiers.
+- Backend execution reuses the existing identifier quoting boundary, so no successful transformation
+  or SQL identifier behavior changes.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'failed_polars_write_validation_preserves_lazy_state or write_target or transformations_report_user_facing_errors or recode_validation_errors' -q` — passed, 6 tests.
-- `uv run pytest` — passed, 970 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_parser.py -q` — passed, 487 tests.
+- `uv run pytest tests/test_executor.py -k 'quoted_identifiers_execute' -q` — passed, 1 test.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed, including
-  canonical replay with exact stdout/table equivalence and 4.324 seconds composite duration.
+- `uv run pytest` — passed, 972 tests, with 314 existing third-party warnings.
+- `uv run python integrated_testing/run_e2e.py` — passed; all six integrated scenarios completed,
+  including exact canonical replay.
 
 ## Known Limits And Follow-Up Work
 
-- Identifier case/quoting, missing values, coercion, arithmetic, categories, ordering, randomness,
-  estimation samples, machine output, and exit semantics remain separate contracts.
-- Operation lineage and broader execution transparency remain future Phase 24 work.
+- Missing values, coercion, arithmetic, categories, ordering, randomness, estimation samples,
+  machine output, exit semantics, and full operation lineage remain separate Phase 24 slices.
+- SQL identifiers retain SQL's own grammar and are intentionally outside this command-language slice.

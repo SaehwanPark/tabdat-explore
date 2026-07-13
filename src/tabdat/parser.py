@@ -185,6 +185,17 @@ class _Token:
   text: str
   start: int
   end: int
+  quoted: bool = False
+
+
+def _is_unquoted_identifier(token: _Token, value: str | None = None) -> bool:
+  if token.kind != "identifier" or token.quoted:
+    return False
+  return value is None or token.text.lower() == value
+
+
+def _is_symbol(token: _Token, value: str | None = None) -> bool:
+  return token.kind == "symbol" and (value is None or token.text == value)
 
 
 @dataclass(frozen=True)
@@ -2597,8 +2608,8 @@ def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
 def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
   stream = _TokenStream(tokens)
   first = stream.consume()
-  if first.kind != "identifier":
-    raise ParseError("command must start with a command name")
+  if not _is_unquoted_identifier(first):
+    raise ParseError("command must start with an unquoted command name")
 
   name = first.text.lower()
   if name not in _EXECUTABLE_COMMANDS and name not in _PARSED_ONLY_COMMANDS:
@@ -2611,11 +2622,11 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
 
   while not stream.at_end:
     token = stream.peek
-    if token.text == ",":
+    if _is_symbol(token, ","):
       options = _parse_options(stream.remaining_after_current())
       stream.advance_to_end()
       break
-    if token.kind == "identifier" and token.text.lower() == "if":
+    if _is_unquoted_identifier(token, "if"):
       if condition is not None:
         raise ParseError("duplicate if clause")
       stream.consume()
@@ -2626,7 +2637,7 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
       options = _parse_options(option_tokens) if option_tokens else options
       stream.advance_to_end()
       break
-    if token.text == "=":
+    if _is_symbol(token, "="):
       if not arguments:
         raise ParseError(f"{name} assignment requires a target before =")
       stream.consume()
@@ -2660,9 +2671,9 @@ def _parse_argument(stream: "_TokenStream") -> str:
   previous: _Token | None = None
   while not stream.at_end:
     token = stream.peek
-    if token.text in {",", "="}:
+    if token.kind == "symbol" and token.text in {",", "="}:
       break
-    if token.kind == "identifier" and token.text.lower() == "if":
+    if _is_unquoted_identifier(token, "if"):
       break
     if previous is not None and token.start > previous.end:
       break
@@ -2678,13 +2689,13 @@ def _split_expression_and_options(
 ) -> tuple[tuple[_Token, ...], tuple[_Token, ...]]:
   depth = 0
   for index, token in enumerate(tokens):
-    if token.text == "(":
+    if _is_symbol(token, "("):
       depth += 1
-    elif token.text == ")":
+    elif _is_symbol(token, ")"):
       depth -= 1
-    elif token.kind == "identifier" and token.text.lower() == "if" and depth == 0:
+    elif _is_unquoted_identifier(token, "if") and depth == 0:
       raise ParseError("duplicate if clause")
-    elif token.text == "," and depth == 0:
+    elif _is_symbol(token, ",") and depth == 0:
       return tokens[:index], tokens[index + 1 :]
   return tokens, ()
 
@@ -2694,14 +2705,14 @@ def _split_replace_expression(
 ) -> tuple[tuple[_Token, ...], tuple[_Token, ...], tuple[_Token, ...]]:
   depth = 0
   for index, token in enumerate(tokens):
-    if token.text == "(":
+    if _is_symbol(token, "("):
       depth += 1
-    elif token.text == ")":
+    elif _is_symbol(token, ")"):
       depth -= 1
-    elif token.kind == "identifier" and token.text.lower() == "if" and depth == 0:
+    elif _is_unquoted_identifier(token, "if") and depth == 0:
       condition_tokens, option_tokens = _split_expression_and_options(tokens[index + 1 :])
       return tokens[:index], condition_tokens, option_tokens
-    elif token.text == "," and depth == 0:
+    elif _is_symbol(token, ",") and depth == 0:
       return tokens[:index], (), tokens[index + 1 :]
   return tokens, (), ()
 
@@ -2714,18 +2725,18 @@ def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
   options: list[CommandOption] = []
   while not stream.at_end:
     name = stream.consume()
-    if name.kind != "identifier":
+    if not _is_unquoted_identifier(name):
       raise ParseError("option names must be identifiers")
     value: str | int | float | bool | tuple[str, ...] = True
-    if not stream.at_end and stream.peek.text == "(":
+    if not stream.at_end and _is_symbol(stream.peek, "("):
       stream.consume()
       value_tokens: list[_Token] = []
       depth = 1
       while not stream.at_end and depth > 0:
-        peek_text = stream.peek.text
-        if peek_text == "(":
+        peek = stream.peek
+        if _is_symbol(peek, "("):
           depth += 1
-        elif peek_text == ")":
+        elif _is_symbol(peek, ")"):
           depth -= 1
           if depth == 0:
             stream.consume()
@@ -2736,12 +2747,12 @@ def _parse_options(tokens: tuple[_Token, ...]) -> tuple[CommandOption, ...]:
       if not value_tokens:
         raise ParseError(f"option {name.text} expects at least one value")
       value = _parenthesized_option_value(name.text, tuple(value_tokens))
-    if not stream.at_end and stream.peek.text == "=":
+    if not stream.at_end and _is_symbol(stream.peek, "="):
       stream.consume()
       if stream.at_end:
         raise ParseError(f"option {name.text} requires a value after =")
       value_token = stream.consume()
-      if value_token.text in {",", "=", "(", ")"}:
+      if value_token.kind == "symbol" and value_token.text in {",", "=", "(", ")"}:
         raise ParseError(f"option {name.text} has malformed value")
       value = _option_value(value_token)
     elif not stream.at_end and stream.peek.kind in {"number", "string"}:
@@ -2772,6 +2783,7 @@ def _parenthesized_option_value(
     if (
       len(tokens) != 1
       or tokens[0].kind != "identifier"
+      or tokens[0].quoted
       or tokens[0].text.lower() not in {"true", "false"}
     ):
       raise ParseError("option has_header expects true or false")
@@ -2810,7 +2822,7 @@ def _parenthesized_option_value(
       raise ParseError("prior option expects prior(variable, distribution)")
     comma_index = -1
     for i, token in enumerate(tokens):
-      if token.text == ",":
+      if _is_symbol(token, ","):
         comma_index = i
         break
     if comma_index <= 0 or comma_index == len(tokens) - 1:
@@ -2888,6 +2900,27 @@ def _tokenize(text: str) -> tuple[_Token, ...]:
         index += 1
       tokens.append(_Token("identifier", text[start:index], start, index))
       continue
+    if char == "`":
+      start = index
+      index += 1
+      identifier_value: list[str] = []
+      while index < len(text):
+        if text[index] != "`":
+          identifier_value.append(text[index])
+          index += 1
+          continue
+        if index + 1 < len(text) and text[index + 1] == "`":
+          identifier_value.append("`")
+          index += 2
+          continue
+        index += 1
+        if not identifier_value:
+          raise ParseError("quoted identifier cannot be empty")
+        tokens.append(_Token("identifier", "".join(identifier_value), start, index, quoted=True))
+        break
+      else:
+        raise ParseError("unterminated quoted identifier")
+      continue
     if char.isdigit() or (char == "." and index + 1 < len(text) and text[index + 1].isdigit()):
       start = index
       index += 1
@@ -2954,7 +2987,7 @@ class _ExpressionParser:
     left = self._parse_primary()
     while not self._stream.at_end:
       operator = self._stream.peek.text
-      precedence = _BINARY_PRECEDENCE.get(operator)
+      precedence = _BINARY_PRECEDENCE.get(operator) if self._stream.peek.kind == "symbol" else None
       if precedence is None or precedence < min_precedence:
         break
       self._stream.consume()
@@ -2974,19 +3007,19 @@ class _ExpressionParser:
 
     token = self._stream.consume()
     if token.kind == "identifier":
-      if not self._stream.at_end and self._stream.peek.text == "(":
+      if not token.quoted and not self._stream.at_end and _is_symbol(self._stream.peek, "("):
         return self._parse_function_call(token.text)
       return IdentifierExpression(token.text)
     if token.kind == "number":
       return NumberExpression(_parse_number(token.text))
     if token.kind == "string":
       return StringExpression(token.text)
-    if token.text == "-":
+    if _is_symbol(token, "-"):
       operand = self._parse_primary()
       return UnaryExpression(operator="-", operand=operand)
-    if token.text == "(":
+    if _is_symbol(token, "("):
       expression = self._parse_binary(min_precedence=1)
-      if self._stream.at_end or self._stream.consume().text != ")":
+      if self._stream.at_end or not _is_symbol(self._stream.consume(), ")"):
         raise ParseError("missing closing ) in expression")
       return expression
     raise ParseError(f"unsupported token in expression: {token.text}")
@@ -2994,7 +3027,7 @@ class _ExpressionParser:
   def _parse_function_call(self, name: str) -> FunctionCallExpression:
     self._stream.consume()
     arguments: list[Expression] = []
-    if not self._stream.at_end and self._stream.peek.text == ")":
+    if not self._stream.at_end and _is_symbol(self._stream.peek, ")"):
       self._stream.consume()
       return FunctionCallExpression(name=name, arguments=())
 
@@ -3003,9 +3036,9 @@ class _ExpressionParser:
       if self._stream.at_end:
         raise ParseError(f"missing closing ) in function call: {name}")
       separator = self._stream.consume()
-      if separator.text == ")":
+      if _is_symbol(separator, ")"):
         break
-      if separator.text != ",":
+      if not _is_symbol(separator, ","):
         raise ParseError(f"function call {name} arguments must be separated by commas")
     return FunctionCallExpression(name=name, arguments=tuple(arguments))
 
@@ -3046,7 +3079,7 @@ def _parse_test(text: str) -> TestCommand:
     raise ParseError("test command expects a list of variables or constraints")
 
   tokens = _tokenize(body)
-  has_parens = any(t.text == "(" for t in tokens)
+  has_parens = any(_is_symbol(t, "(") for t in tokens)
   constraints: list[Expression] = []
 
   if has_parens:
@@ -3054,13 +3087,13 @@ def _parse_test(text: str) -> TestCommand:
     current_group: list[_Token] = []
     depth = 0
     for token in tokens:
-      if token.text == "(":
+      if _is_symbol(token, "("):
         if depth == 0:
           current_group = []
         else:
           current_group.append(token)
         depth += 1
-      elif token.text == ")":
+      elif _is_symbol(token, ")"):
         depth -= 1
         if depth == 0:
           groups.append(tuple(current_group))
@@ -3079,7 +3112,9 @@ def _parse_test(text: str) -> TestCommand:
         raise ParseError("test command: empty constraint inside parentheses")
       constraints.append(_parse_single_constraint(group_tokens))
   else:
-    equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+    equal_indices = [
+      i for i, t in enumerate(tokens) if t.kind == "symbol" and t.text in {"=", "=="}
+    ]
     if equal_indices:
       if len(equal_indices) > 1:
         raise ParseError(
@@ -3106,7 +3141,7 @@ def _parse_test(text: str) -> TestCommand:
 
 
 def _parse_single_constraint(tokens: tuple[_Token, ...]) -> Expression:
-  equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+  equal_indices = [i for i, t in enumerate(tokens) if t.kind == "symbol" and t.text in {"=", "=="}]
   if equal_indices:
     if len(equal_indices) > 1:
       raise ParseError("test command: multiple '=' in a constraint")
@@ -3137,7 +3172,7 @@ def _parse_ttest(text: str) -> TtestCommand:
     raise ParseError("ttest command expects a variable comparison or a variable with by() option")
 
   tokens = _tokenize(body)
-  comma_indices = [i for i, t in enumerate(tokens) if t.text == ","]
+  comma_indices = [i for i, t in enumerate(tokens) if _is_symbol(t, ",")]
 
   if comma_indices:
     if len(comma_indices) > 1:
@@ -3167,7 +3202,9 @@ def _parse_ttest(text: str) -> TtestCommand:
     return TtestCommand(varname1=varname1, by_variable=by_variable, welch=welch)
 
   else:
-    equal_indices = [i for i, t in enumerate(tokens) if t.text in {"=", "=="}]
+    equal_indices = [
+      i for i, t in enumerate(tokens) if t.kind == "symbol" and t.text in {"=", "=="}
+    ]
     if not equal_indices:
       raise ParseError("ttest command expects comparison (e.g. ttest var == value) or by() option")
     if len(equal_indices) > 1:
@@ -3183,7 +3220,11 @@ def _parse_ttest(text: str) -> TtestCommand:
 
     is_signed_number = False
     if len(rhs_tokens) == 2:
-      if rhs_tokens[0].text in {"-", "+"} and rhs_tokens[1].kind == "number":
+      if (
+        _is_symbol(rhs_tokens[0])
+        and rhs_tokens[0].text in {"-", "+"}
+        and rhs_tokens[1].kind == "number"
+      ):
         is_signed_number = True
 
     if len(rhs_tokens) == 1:
@@ -3218,11 +3259,11 @@ def _parse_recode(text: str) -> RecodeCommand:
   depth = 0
   comma_idx = -1
   for idx, token in enumerate(tokens):
-    if token.text == "(":
+    if _is_symbol(token, "("):
       depth += 1
-    elif token.text == ")":
+    elif _is_symbol(token, ")"):
       depth -= 1
-    elif token.text == "," and depth == 0:
+    elif _is_symbol(token, ",") and depth == 0:
       comma_idx = idx
       break
 
@@ -3260,7 +3301,7 @@ def _parse_recode(text: str) -> RecodeCommand:
   # Find variables and rules
   first_paren_idx = -1
   for idx, token in enumerate(body_tokens):
-    if token.text == "(":
+    if _is_symbol(token, "("):
       first_paren_idx = idx
       break
 
@@ -3290,9 +3331,9 @@ def _parse_recode(text: str) -> RecodeCommand:
     paren_depth = 1
     j = i + 1
     while j < len(rule_tokens) and paren_depth > 0:
-      if rule_tokens[j].text == "(":
+      if _is_symbol(rule_tokens[j], "("):
         paren_depth += 1
-      elif rule_tokens[j].text == ")":
+      elif _is_symbol(rule_tokens[j], ")"):
         paren_depth -= 1
       if paren_depth == 0:
         break
@@ -3303,7 +3344,7 @@ def _parse_recode(text: str) -> RecodeCommand:
 
     block_tokens = rule_tokens[i + 1 : j]
 
-    eq_indices = [idx for idx, t in enumerate(block_tokens) if t.text == "="]
+    eq_indices = [idx for idx, t in enumerate(block_tokens) if _is_symbol(t, "=")]
     if not eq_indices:
       raise ParseError("recode rule expects '=' between inputs and output")
     if len(eq_indices) > 1:
@@ -3326,7 +3367,12 @@ def _parse_recode(text: str) -> RecodeCommand:
     k = 0
     while k < len(lhs_toks):
       tok = lhs_toks[k]
-      if tok.text in {"-", "+"} and k + 1 < len(lhs_toks) and lhs_toks[k + 1].kind == "number":
+      if (
+        _is_symbol(tok)
+        and tok.text in {"-", "+"}
+        and k + 1 < len(lhs_toks)
+        and lhs_toks[k + 1].kind == "number"
+      ):
         val = (
           float(lhs_toks[k + 1].text) if "." in lhs_toks[k + 1].text else int(lhs_toks[k + 1].text)
         )
@@ -3344,7 +3390,7 @@ def _parse_recode(text: str) -> RecodeCommand:
       elif tok.kind == "identifier":
         lhs_primitives.append(tok.text.lower())
         k += 1
-      elif tok.text == "/":
+      elif _is_symbol(tok, "/"):
         lhs_primitives.append(_Slash)
         k += 1
       else:
@@ -3383,7 +3429,12 @@ def _parse_recode(text: str) -> RecodeCommand:
     k = 0
     while k < len(rhs_toks):
       tok = rhs_toks[k]
-      if tok.text in {"-", "+"} and k + 1 < len(rhs_toks) and rhs_toks[k + 1].kind == "number":
+      if (
+        _is_symbol(tok)
+        and tok.text in {"-", "+"}
+        and k + 1 < len(rhs_toks)
+        and rhs_toks[k + 1].kind == "number"
+      ):
         val = (
           float(rhs_toks[k + 1].text) if "." in rhs_toks[k + 1].text else int(rhs_toks[k + 1].text)
         )
