@@ -1062,9 +1062,13 @@ class Executor:
   def _execute_keep(self, command: KeepCommand) -> TransformResult:
     dataset = self._require_active_dataset("keep")
     if command.condition is not None:
+      self.backend.validate_predicate(dataset, command.condition)
+      overflow_count = self.backend.exact_integer_overflow_count(dataset, command.condition)
       next_dataset = self.backend.filter_rows(dataset, command.condition, keep=True)
       next_dataset = _preserve_panel_metadata(dataset, next_dataset)
-      return self._record_transform("Kept matching rows", next_dataset)
+      return self._record_transform(
+        "Kept matching rows", next_dataset, overflow_count=overflow_count
+      )
     next_dataset = self.backend.keep_columns(dataset, command.variables)
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform("Kept selected columns", next_dataset)
@@ -1072,9 +1076,13 @@ class Executor:
   def _execute_drop(self, command: DropCommand) -> TransformResult:
     dataset = self._require_active_dataset("drop")
     if command.condition is not None:
+      self.backend.validate_predicate(dataset, command.condition)
+      overflow_count = self.backend.exact_integer_overflow_count(dataset, command.condition)
       next_dataset = self.backend.filter_rows(dataset, command.condition, keep=False)
       next_dataset = _preserve_panel_metadata(dataset, next_dataset)
-      return self._record_transform("Dropped matching rows", next_dataset)
+      return self._record_transform(
+        "Dropped matching rows", next_dataset, overflow_count=overflow_count
+      )
     next_dataset = self.backend.drop_columns(dataset, command.variables)
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     return self._record_transform("Dropped selected columns", next_dataset)
@@ -1144,12 +1152,22 @@ class Executor:
 
   def _execute_generate(self, command: GenerateCommand) -> TransformResult:
     dataset = self._require_active_dataset("generate")
+    self.backend.validate_expression(dataset, command.expression)
+    overflow_count = self.backend.exact_integer_overflow_count(dataset, command.expression)
     next_dataset = self.backend.generate_column(dataset, command.variable, command.expression)
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
-    return self._record_transform(f"Generated {command.variable}", next_dataset)
+    return self._record_transform(
+      f"Generated {command.variable}", next_dataset, overflow_count=overflow_count
+    )
 
   def _execute_replace(self, command: ReplaceCommand) -> TransformResult:
     dataset = self._require_active_dataset("replace")
+    self.backend.validate_replace(dataset, command.variable, command.expression, command.condition)
+    overflow_count = self.backend.exact_integer_overflow_count(
+      dataset,
+      command.expression,
+      condition=command.condition,
+    )
     metadata = dataset.panel_metadata
     if _touches_panel_metadata(metadata, command.variable) and metadata is not None:
       next_dataset = self.backend.replace_column_with_panel_validation(
@@ -1167,7 +1185,9 @@ class Executor:
         command.condition,
       )
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
-    return self._record_transform(f"Replaced {command.variable}", next_dataset)
+    return self._record_transform(
+      f"Replaced {command.variable}", next_dataset, overflow_count=overflow_count
+    )
 
   def _execute_collapse(self, command: CollapseCommand) -> TransformResult:
     dataset = self._require_active_dataset("collapse")
@@ -1258,9 +1278,15 @@ class Executor:
     self._set_active_dataset(updated)
     return PanelResult(action="set", metadata=metadata)
 
-  def _record_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
+  def _record_transform(
+    self,
+    message: str,
+    dataset: DatasetInfo,
+    *,
+    overflow_count: int = 0,
+  ) -> TransformResult:
     self._set_active_dataset(dataset)
-    return TransformResult(message, dataset)
+    return TransformResult(message, dataset, overflow_count=overflow_count)
 
   def _record_detached_transform(self, message: str, dataset: DatasetInfo) -> TransformResult:
     self.state.active_dataset = dataset

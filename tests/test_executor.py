@@ -7073,31 +7073,31 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(
+    exact_sum_result = executor.execute(
       GenerateCommand(
         "exact_sum",
         BinaryExpression(IdentifierExpression("amount"), "+", IdentifierExpression("adjustment")),
       )
     )
-    executor.execute(
+    exact_product_result = executor.execute(
       GenerateCommand(
         "exact_product",
         BinaryExpression(IdentifierExpression("factor"), "*", IdentifierExpression("factor")),
       )
     )
-    executor.execute(
+    exact_difference_result = executor.execute(
       GenerateCommand(
         "exact_difference",
         BinaryExpression(IdentifierExpression("amount"), "-", IdentifierExpression("adjustment")),
       )
     )
-    executor.execute(
+    exact_negated_result = executor.execute(
       GenerateCommand(
         "exact_negated",
         UnaryExpression("-", IdentifierExpression("amount")),
       )
     )
-    executor.execute(
+    unsigned_sum_result = executor.execute(
       GenerateCommand(
         "unsigned_sum",
         BinaryExpression(
@@ -7107,7 +7107,7 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
         ),
       )
     )
-    executor.execute(
+    unsigned_product_result = executor.execute(
       GenerateCommand(
         "unsigned_product",
         BinaryExpression(
@@ -7123,6 +7123,17 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  for result in (
+    exact_sum_result,
+    exact_product_result,
+    exact_difference_result,
+    exact_negated_result,
+    unsigned_sum_result,
+  ):
+    assert isinstance(result, TransformResult)
+    assert result.overflow_count == 0
+  assert isinstance(unsigned_product_result, TransformResult)
+  assert unsigned_product_result.overflow_count == 1
   assert dataset is not None
   for variable in (
     "exact_sum",
@@ -7238,13 +7249,15 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("unsigned_left", expression))
+    replace_result = executor.execute(ReplaceCommand("unsigned_left", expression))
     preview = executor.execute(HeadCommand(10))
     dataset = executor.state.active_dataset
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(replace_result, TransformResult)
+  assert replace_result.overflow_count == 1
   assert dataset is not None
   result_type = next(
     column.data_type for column in dataset.columns if column.name == "unsigned_left"
@@ -7294,7 +7307,7 @@ def test_integral_arithmetic_predicate_uses_exact_missing_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(command_type(condition=condition))
+    filter_result = executor.execute(command_type(condition=condition))
     status = executor.execute(StatusCommand())
     preview = executor.execute(HeadCommand(10))
   finally:
@@ -7302,6 +7315,8 @@ def test_integral_arithmetic_predicate_uses_exact_missing_policy(
 
   assert isinstance(preview, PreviewResult)
   assert isinstance(status, StatusResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 1
   assert tuple(row[-1] for row in preview.rows) == expected_labels
   if engine == "polars":
     assert status.last_materialization_reason == "polars_fallback"
@@ -7436,12 +7451,14 @@ def test_replace_normalizes_row_level_arithmetic_results(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("numerator", ratio))
+    replace_result = executor.execute(ReplaceCommand("numerator", ratio))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(replace_result, TransformResult)
+  assert replace_result.overflow_count == 0
   actual_numerators = tuple(row[0] for row in preview.rows)
   assert actual_numerators[0] == pytest.approx(2.0)
   assert actual_numerators[1:4] == (None, None, None)
@@ -7483,12 +7500,14 @@ def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(command_type(condition=condition))
+    filter_result = executor.execute(command_type(condition=condition))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 0
   assert tuple(row[-1] for row in preview.rows) == expected_labels
 
 
@@ -7537,12 +7556,14 @@ def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(KeepCommand(condition=condition))
+    filter_result = executor.execute(KeepCommand(condition=condition))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 0
   assert tuple(row[-1] for row in preview.rows) == expected_labels
 
 

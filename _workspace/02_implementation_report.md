@@ -1,47 +1,42 @@
-# Implementation Report: Phase 24 P0 Exact Integer Arithmetic Result Widths
+# Implementation Report: Phase 24 P0 Stable Arithmetic Overflow Diagnostics
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — exact `DECIMAL(38,0)` integral results, row-level
-  overflow missingness, existing division/non-finite behavior, and no new syntax.
+- `_workspace/01_product_command-contract.md` — informational `overflow rows: N` diagnostics for
+  exact integral arithmetic in `generate`, `replace`, `keep`, and `drop`, with unchanged values and
+  missingness.
 
 ## Delivered Boundary
 
+- `src/tabdat/models.py` and `src/tabdat/formatter.py`
+  - Added typed `overflow_count` to `TransformResult` with a zero-compatible default.
+  - Appended `overflow rows: N` only for positive counts, preserving all existing zero-count output.
 - `src/tabdat/backend.py`
-  - Classified integral arithmetic subtrees independently from floating and scale-bearing decimal
-    expressions.
-  - Cast integral `+`, `-`, `*`, and unary minus operands to `DECIMAL(38,0)` before evaluation so
-    values do not inherit narrow backend integer widths; signed, unsigned, `UHUGEINT`, and Arrow
-    `UINT128` aliases are classified consistently.
-  - Kept the existing `try`/finite normalization boundary so out-of-domain results become missing.
-  - Exposed exact-arithmetic detection to route Polars-lazy predicates through the existing DuckDB
-    fallback when exact evaluation is required.
+  - Added a typed overflow probe that identifies exact integral arithmetic subexpressions, excludes
+    bare identifiers, and counts only nonmissing rows before mutation.
+  - Applied optional replacement-condition scoping and preserved existing invalid/nonfinite/division
+    policies.
 - `src/tabdat/executor.py`
-  - Validated complete `keep`/`drop` predicates before any fallback or state change.
-  - Preserved normal Polars-lazy filtering for ordinary predicates while materializing exact integer
-    arithmetic predicates through the validated fallback path and recording its reason.
-- `tests/test_executor.py`, `tests/test_cli.py`, and `tests/test_help.py`
-  - Covered signed/unsigned/`UHUGEINT` boundary values, widened multiplication, subtraction, unary
-    minus, overflow, replace overflow, keep/drop predicates, failed-state atomicity, CLI output, and
-    help text across eager/DuckDB-lazy/Polars-lazy paths.
-- `docs/language-semantics.md`, help topics, command reference, `SPEC.md`, `CHANGELOG.md`, and
-  `_workspace/`
-  - Record exact integer width and row-level overflow semantics while deferring scale, float width,
-    arbitrary precision, and stable overflow diagnostics.
+  - Counts diagnostics before successful `generate`, `replace`, `keep`, and `drop` commits.
+  - Keeps validation and fallback atomicity intact across eager, DuckDB-lazy, and Polars-lazy paths.
+- Help/docs/tests
+  - Documented the terminal diagnostic and its exclusions in language semantics, command reference,
+    and generate/replace/keep/drop help.
+  - Added positive overflow, zero-count, missing/false predicate, division, decimal-scale, floating,
+    CLI, help, and cross-engine coverage.
 
 ## Functional-First Notes
 
-The pure expression classifiers make the exact-width decision from the typed dataset schema and AST;
-DuckDB remains the effectful materialization boundary. Complete predicate validation occurs before the
-fallback, and Polars-lazy predicates that need exact integer arithmetic use the existing explicit
-fallback rather than silently accepting a backend-specific wrap.
+The overflow probe is a pure AST/schema classification followed by one read-only backend count before
+the impure relation mutation. The typed transform result carries the diagnostic explicitly instead of
+encoding it in an unstructured side channel.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy or integral_replace_preserves_exact_width or integral_arithmetic_predicate_uses_exact_missing_policy or invalid_exact_integer_predicate_preserves_polars_lazy_state or uhugeint_arithmetic_uses_exact_integer_policy' -q` — passed, 15 tests.
+- `uv run pytest tests/test_executor.py -k 'integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy or integral_replace_preserves_exact_width or integral_arithmetic_predicate_uses_exact_missing_policy' -q` — passed, 12 tests.
+- `uv run pytest tests/test_executor.py -k 'numeric_expression_compatibility or arithmetic_results_normalize or replace_normalizes_row_level_arithmetic_results or arithmetic_predicates_treat_nonfinite_results_as_missing or decimal_arithmetic_predicates_use_numeric_missing_policy' -q` — passed, 21 tests.
 - `uv run pytest tests/test_cli.py -k exact_integer_arithmetic -q` — passed, 1 test.
-- `uv run pytest tests/test_help.py -k help_topics_document_expression_domains -q` — passed, 1 test.
-- `uv run pytest tests/test_executor.py -k 'arithmetic or numeric_expression_compatibility' -q` — passed, 46 tests.
+- `uv run pytest tests/test_help.py -k 'help_topics_document_explicit_missing_values or help_topics_document_expression_domains' -q` — passed, 2 tests.
 - `uv run pytest` — passed, 1,122 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
@@ -52,7 +47,6 @@ fallback rather than silently accepting a backend-specific wrap.
 
 ## Known Limits And Follow-Up Work
 
-Decimal-scale/precision propagation, floating result widths, arbitrary precision, stable overflow
-error/warning diagnostics, randomness, estimation samples, machine output, and full operation lineage
-remain separate Phase 24 contracts. The three required review passes are complete; merge and branch
-cleanup remain for this slice.
+Machine-readable diagnostics, SQL-result metadata, decimal-scale/floating diagnostics, arbitrary
+precision, operation lineage, randomness, estimation samples, and exit-code redesign remain separate
+Phase 24 contracts. PR review is the remaining handoff step for this slice.

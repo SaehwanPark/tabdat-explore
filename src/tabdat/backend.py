@@ -1010,6 +1010,38 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def exact_integer_overflow_count(
+    self,
+    dataset: DatasetInfo,
+    expression: Expression,
+    *,
+    condition: Expression | None = None,
+  ) -> int:
+    probes = _exact_integer_overflow_subexpressions(dataset, expression)
+    if not probes:
+      return 0
+    identifier_names = list(_expression_identifier_names(expression))
+    if condition is not None:
+      for name in _expression_identifier_names(condition):
+        if name not in identifier_names:
+          identifier_names.append(name)
+    nonmissing_sql = " and ".join(
+      f"{_quote_identifier(name)} is not null" for name in identifier_names
+    )
+    overflow_sql = " or ".join(
+      f"try({self._compile_expression_raw(dataset, probe)}) is null" for probe in probes
+    )
+    where_parts = [f"({overflow_sql})"]
+    if nonmissing_sql:
+      where_parts.append(nonmissing_sql)
+    if condition is not None:
+      where_parts.append(f"({self._compile_expression(dataset, condition)})")
+    row = self._fetch_one(
+      f"select count(*) from {ACTIVE_TABLE} where {' and '.join(where_parts)}",
+      "arithmetic overflow",
+    )
+    return cast(int, row[0])
+
   def replace_column(
     self,
     dataset: DatasetInfo,
@@ -2809,6 +2841,63 @@ def _is_integral_expression_for_types(
       and _is_integral_expression_for_types(column_types, expression.right)
     )
   return False
+
+
+def _exact_integer_overflow_subexpressions(
+  dataset: DatasetInfo,
+  expression: Expression,
+) -> tuple[Expression, ...]:
+  if _is_exact_integer_arithmetic_expression(dataset, expression):
+    return (expression,)
+  if isinstance(expression, BinaryExpression) and expression.operator in {
+    "==",
+    "!=",
+    "<",
+    "<=",
+    ">",
+    ">=",
+  }:
+    return tuple(
+      operand
+      for operand in (expression.left, expression.right)
+      if _is_exact_integer_arithmetic_expression(dataset, operand)
+    )
+  return ()
+
+
+def _is_exact_integer_arithmetic_expression(dataset: DatasetInfo, expression: Expression) -> bool:
+  return isinstance(expression, (UnaryExpression, BinaryExpression)) and _is_integral_expression(
+    dataset, expression
+  )
+
+
+def _expression_identifier_names(expression: Expression) -> tuple[str, ...]:
+  if isinstance(expression, IdentifierExpression):
+    return (expression.name,)
+  if isinstance(expression, (NumberExpression, StringExpression, NullExpression)):
+    return ()
+  if isinstance(expression, UnaryExpression):
+    return _expression_identifier_names(expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _merge_identifier_names(
+      _expression_identifier_names(expression.left),
+      _expression_identifier_names(expression.right),
+    )
+  if isinstance(expression, FunctionCallExpression):
+    names: tuple[str, ...] = ()
+    for argument in expression.arguments:
+      names = _merge_identifier_names(names, _expression_identifier_names(argument))
+    return names
+  return ()
+
+
+def _merge_identifier_names(*name_groups: tuple[str, ...]) -> tuple[str, ...]:
+  names: list[str] = []
+  for group in name_groups:
+    for name in group:
+      if name not in names:
+        names.append(name)
+  return tuple(names)
 
 
 def _cast_exact_integer_sql(expression_sql: str) -> str:

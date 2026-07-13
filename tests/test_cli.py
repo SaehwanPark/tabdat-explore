@@ -2522,6 +2522,7 @@ def test_cli_normalizes_nonfinite_arithmetic_results(sample_parquet: Path, capsy
   assert "invalid_ratio" in captured.out
   assert "inf" not in captured.out.lower()
   assert "nan" not in captured.out.lower()
+  assert "overflow rows:" not in captured.out
   assert captured.err == ""
 
 
@@ -2556,6 +2557,7 @@ def test_cli_reports_exact_integer_arithmetic_values(tmp_path: Path, capsys) -> 
   assert exit_code == 0
   assert "9223372036854775808" in captured.out
   assert "9223372036854775808.0" not in captured.out
+  assert "overflow rows: 1" in captured.out
   assert captured.err == ""
 
 

@@ -35,7 +35,8 @@ paths, and more).
 
 Integral `+`, `-`, `*`, and unary minus expressions use exact `DECIMAL(38,0)` results; values beyond
 that width become missing for the affected row rather than wrapping. Decimal-scale, floating-width,
-and stable overflow-diagnostic policies remain separate contracts.
+and stable machine-readable overflow-diagnostic policies remain separate contracts. Successful
+`generate`, `replace`, `keep`, and `drop` results append `overflow rows: N` when applicable.
 
 ## Combine and reshape
 
