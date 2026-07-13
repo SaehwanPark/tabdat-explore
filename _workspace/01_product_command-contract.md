@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P1 — Batch JSON Result Envelopes
+# Product Contract: Phase 24 P1 — Structured JSON Error Envelopes
 
 ## Request Summary
 
-Expose a versioned JSON/JSONL result stream for non-interactive CLI execution without changing
-command semantics or existing terminal output.
+Add machine-readable failure envelopes to the existing batch/script JSONL output without changing
+fail-fast execution, stderr diagnostics, terminal output, or exit status.
 
 ## Roadmap Phase
 
@@ -11,64 +11,50 @@ Phase 24 P1: Agent and automation interface.
 
 ## Roadmap Fit
 
-This is the first narrow automation-output contract after the Phase 24 terminal semantics and
-diagnostics slices. It establishes a stable success-result envelope while leaving discovery,
-explainability, structured failures, and richer metadata to later slices.
+This closes the first success/failure pair for the bounded JSON output interface. It does not add
+recovery, new exit codes, command discovery, explainability, or repair behavior.
 
-## Existing Invocation
+## Error Envelope Rules
 
-Valid forms add one CLI output flag:
-
-- `tabdat --json -c "use data.parquet" -c "count"`
-- `tabdat --json -f analysis.td`
-- `tabdat --json analysis.td`
-
-`--json` cannot be used with an interactive session. Existing invocations without `--json` retain
-their terminal output byte-for-byte.
-
-## Envelope Rules
-
-- Every successful structured `Result` emits exactly one compact JSON object on stdout:
+- On the first parse or execution failure in `--json` `-c`/script execution, stdout emits exactly one
+  compact deterministic object:
 
   ```json
-  {"data":{...},"result_type":"CountResult","schema_version":1}
+  {"error":{"message":"...","type":"UnknownVariableError"},"schema_version":1}
   ```
 
-- Envelope keys are serialized deterministically. `schema_version` is the integer `1`; `result_type`
-  is the stable public result label; `data` is the JSON-safe result payload.
-- Multiple `-c` commands, scripts, and nested scripts emit one envelope per line in execution order.
-  A command that returns no structured result emits no line. `exit`/`quit` retain their control
-  behavior; terminal-only `help` is rejected with a clear error in JSON mode.
-- Missing values become JSON `null`; tuples become arrays; `Path` values become strings; exact
-  `Decimal` values become lossless text rather than binary floating-point values; non-finite floats
-  become JSON `null`; bytes become `base64:<payload>` strings.
-- Script metadata, command dot-echoes, macro/directive notices, human tables, and plot auto-opening
-  do not add stdout content in JSON mode.
-- Parse and execution errors retain the existing stderr text and nonzero exit status. No structured
-  error envelope is introduced in this slice.
+- Script failures add `path` as a string and `line` as an integer inside `error`. Top-level `-c`
+  failures have no source location.
+- `type` uses an explicit stable label for the existing user-facing `TabDatError` hierarchy. The
+  `message` is concise user-facing text; raw backend exception details and tracebacks are excluded.
+- Successful result envelopes emitted before the failure remain in JSONL execution order. Execution
+  remains fail-fast; no later command or script line runs.
+- Existing human-readable stderr text and exit status `1` remain unchanged. Terminal mode and
+  interactive mode remain unchanged.
+- No error envelope is emitted in terminal mode. `--json` remains invalid for interactive sessions.
 
 ## State And Compatibility Assumptions
 
-- JSON serialization runs only after a successful Executor result is available, so it cannot mutate
-  active data or alter validation atomicity.
-- The output flag changes presentation only; parser grammar, Executor results, state transitions,
-  materialization behavior, and terminal formatting remain unchanged.
-- Interactive shell output remains terminal-only and does not accept `--json`.
+- Error serialization occurs only at the CLI boundary after Executor/parser failure; it does not
+  change Executor state or validation atomicity.
+- Nested script failures are emitted once by the outermost JSON batch boundary, retaining the original
+  script path and line.
+- Existing success-envelope schema version and payload policies remain unchanged.
 
 ## Acceptance Criteria
 
-- [ ] `--json` emits deterministic single-command envelopes for representative load, status, table,
-  preview, and transform results.
-- [ ] Multiple commands and nested scripts produce clean JSONL in execution order without metadata or
-  dot echoes, while commands returning no result emit no line.
-- [ ] Missing values, paths, tuples, exact decimals, and non-finite floats follow the explicit JSON
-  conversion policy.
-- [ ] Terminal output remains unchanged and interactive `--json` misuse is rejected clearly.
-- [ ] Parse/execution errors preserve stderr, exit status, and existing atomicity.
+- [ ] Parse, execution, help-mode, and script failures emit one stable JSON error envelope with the
+  expected message/type and script location when applicable.
+- [ ] Prior success envelopes remain ordered, execution stops at the first failure, and no duplicate
+  nested error envelope is emitted.
+- [ ] Stderr, exit status `1`, terminal output, interactive behavior, and Executor atomicity remain
+  unchanged.
+- [ ] Error labels cover the existing user-facing error hierarchy exhaustively without tracebacks or
+  raw backend details.
 - [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Interactive JSON mode, structured error envelopes, command discovery, dry-run/explain, repair
-  diagnostics, SQL-result metadata, operation lineage, retained estimation samples, new syntax,
-  new commands, new backends, or exit-code redesign.
+- Interactive JSON mode, error recovery, multi-error aggregation, new exit codes, SQL-result metadata,
+  command discovery, dry-run/explain, repair diagnostics, operation lineage, new syntax, or new
+  commands.

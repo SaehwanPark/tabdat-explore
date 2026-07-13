@@ -64,8 +64,10 @@ All notable project changes are tracked here.
   row-level overflow missingness, native unsigned-width coverage, and atomic Polars fallback tests.
 - Completed the Phase 24 arithmetic overflow-diagnostics slice with typed transform counts, recursive
   nested-expression coverage, scoped replacement predicates, and Polars fallback atomicity.
-- Started the Phase 24 batch JSON result-envelope slice; non-interactive `-c` and script output will
-  gain versioned JSONL envelopes while terminal and interactive output remain unchanged.
+- Completed the Phase 24 batch JSON result-envelope slice with deterministic success envelopes,
+  explicit result labels, exact/non-finite/binary serialization policies, and nested-script coverage.
+- Started the Phase 24 structured JSON error-envelope slice; batch failures will gain machine-readable
+  error details while stderr and exit status remain unchanged.
 
 ### Added
 

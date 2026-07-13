@@ -615,32 +615,40 @@ and describe the active work with concise verification criteria.
     state when diagnostic counting fails
   - explicitly deferred JSON/JSONL envelopes, SQL-result metadata, broader numeric diagnostics,
     operation lineage, and exit-code redesign
+- Implemented Phase 24 P1 batch JSON result envelopes:
+  - added `--json` for non-interactive `-c`, `-f`, and positional scripts with deterministic JSONL
+    success envelopes and nested-script ordering
+  - preserved terminal output and interactive behavior while defining exact decimal, non-finite,
+    path, tuple, and binary-cell serialization policies
+  - stabilized result labels with an exhaustive map and retained existing stderr/exit behavior
+  - explicitly deferred structured error envelopes, discovery, explainability, repair diagnostics,
+    SQL metadata, operation lineage, and exit-code redesign
 
 ## Present
 
-- Feature: Phase 24 P1 batch JSON result envelopes
+- Feature: Phase 24 P1 structured JSON error envelopes
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-output
+  Branch: feat/phase24-json-errors
 
   Summary:
-  Add a versioned machine-readable result envelope for non-interactive `-c` and script execution
-  without changing command semantics or terminal output.
+  Add a versioned machine-readable error envelope to the existing non-interactive JSONL mode without
+  changing fail-fast behavior, human stderr diagnostics, or the current exit status.
 
   Verification:
-  - `--json` emits one compact deterministic JSON object per successful result in `-c` and script
-    modes, with a version, stable result type, and JSON-safe data payload
-  - multiple commands and nested scripts produce clean JSONL stdout without script metadata or dot
-    echoes; missing results produce no envelope
-  - paths, tuples, missing values, exact decimals, and non-finite numeric values serialize by explicit
-    policy without changing terminal formatting
-  - interactive mode remains terminal-only and rejects incompatible `--json` usage clearly
-  - parse/execution failures retain stderr diagnostics, nonzero exit status, and existing atomicity
+  - `--json` parse, execution, help-mode, and script failures emit one compact error envelope with
+    schema version, stable error type, message, and script path/line when available
+  - successful envelopes before a failure remain in order; execution remains fail-fast and later
+    commands do not run
+  - human-readable stderr, exit status `1`, terminal output, and interactive behavior remain unchanged
+  - error classification covers the existing user-facing TabDat error hierarchy without leaking
+    tracebacks or raw backend exception details
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - interactive JSON mode, structured error envelopes, SQL-result metadata, command discovery,
-    dry-run/explain, repair diagnostics, operation lineage, estimation samples, and exit-code redesign
+  - interactive JSON mode, error recovery or multi-error aggregation, SQL-result metadata, command
+    discovery, dry-run/explain, repair diagnostics, operation lineage, estimation samples, and new
+    exit codes
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

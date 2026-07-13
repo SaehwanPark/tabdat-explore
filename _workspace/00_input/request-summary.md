@@ -1,44 +1,41 @@
-# Request Summary: Phase 24 P1 Batch JSON Result Envelopes
+# Request Summary: Phase 24 P1 Structured JSON Error Envelopes
 
 ## Goal
 
-Add a versioned machine-readable result envelope for non-interactive `-c` and script execution while
-preserving existing command semantics, terminal formatting, and interactive behavior.
+Extend the existing non-interactive `--json` result stream with versioned error envelopes while
+preserving fail-fast execution, human-readable stderr, terminal output, and current exit status.
 
 ## Phase Fit
 
-Phase 24 P1 Agent and automation interface. This is the first bounded output contract after the
-completed terminal diagnostics slice; discovery, explainability, and structured errors remain later
-contracts.
+Phase 24 P1 Agent and automation interface. This follows the completed JSON success-envelope slice
+and closes the first machine-readable failure boundary before discovery, explainability, and repair
+diagnostics.
 
 ## Touched Surfaces
 
-- `src/tabdat/cli.py`: `--json` batch/script routing, clean JSONL output, and mode validation
-- `src/tabdat/formatter.py`: deterministic JSON envelope serialization alongside terminal formatting
-- `src/tabdat/help/topics/run.md`, `docs/command-reference.md`, `docs/user-guide.md`:
-  usage and output contract
-- `tests/test_cli.py`, `tests/test_help.py`: single-command, multi-command, script, nested-script,
-  serialization, error, and incompatible-mode coverage
+- `src/tabdat/cli.py`: JSON error emission at command and script boundaries without duplicate output
+- `src/tabdat/formatter.py`: stable error labels and JSON-safe error envelopes
+- `src/tabdat/errors.py`, `src/tabdat/script.py`: existing error hierarchy/location fields only if
+  needed for explicit serialization
+- `src/tabdat/help/topics/run.md`, `docs/command-reference.md`, `docs/user-guide.md`: failure-mode
+  documentation
+- `tests/test_cli.py`, `tests/test_help.py`: parse, execution, help, script-location, ordering, and
+  terminal-compatibility coverage
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- `--json` is a CLI output-mode flag valid only with `-c/--command`, `-f`, or a positional script;
-  interactive sessions remain terminal-only.
-- Each successful structured `Result` emits one compact JSON object line. Multiple commands and nested
-  scripts form JSONL in execution order; commands returning no `Result` emit no line. `exit`/`quit`
-  retain control behavior, while terminal-only `help` is rejected in JSON mode.
-- Each envelope has `schema_version: 1`, a stable result-type label, and a `data` object containing
-  the result payload. Missing values become JSON `null`, tuples become arrays, paths become strings,
-  exact `Decimal` values remain lossless text, non-finite floats become JSON `null`, and bytes become
-  `base64:<payload>` strings.
-- Script metadata, command dot-echoes, macro/directive notices, and human tables are suppressed in
-  JSON mode. Existing stderr errors and exit codes remain unchanged.
-- Terminal output and all Executor state transitions are unchanged; JSON serialization occurs only
-  after successful command execution.
+- JSON success envelopes remain unchanged: `schema_version: 1`, stable `result_type`, and `data`.
+- On the first parse or execution failure in a JSON batch/script run, stdout emits exactly one error
+  envelope with `schema_version: 1` and an `error` object containing stable `type` and `message`;
+  script failures also include string `path` and integer `line`.
+- Successful envelopes emitted before the failure remain in execution order; later commands do not
+  run. A top-level `-c` failure has no source location.
+- Existing human-readable stderr text and exit status `1` remain unchanged. No traceback or raw
+  backend exception details are emitted.
+- Terminal mode and interactive mode remain unchanged; `--json` remains batch/script-only.
 
 ## Non-Goals
 
-- Interactive JSON mode, structured error envelopes, command discovery, dry-run/explain, repair
-  diagnostics, SQL-result metadata, operation lineage, retained estimation samples, new commands,
-  new backends, or exit-code redesign.
+- Interactive JSON mode, error recovery, multi-error aggregation, new exit codes, structured SQL
+  metadata, command discovery, dry-run/explain, repair diagnostics, operation lineage, or new commands.
