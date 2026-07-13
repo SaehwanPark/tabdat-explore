@@ -1,17 +1,18 @@
 # QA Report: Phase 24 P1 Structured JSON Error Envelopes
 
-Status: implementation validation complete; PR review pending
+Status: implementation validation complete; exactly three independent PR reviews complete
 
 ## Boundaries Checked
 
 - **Envelope contract:** the first JSON batch/script failure emits one deterministic error object with
-  schema version, stable type, and concise message; script errors include path and line.
+  schema version, stable type, and concise sanitized message; script errors include resolved path and
+  source line.
 - **Ordering and fail-fast:** prior success envelopes remain ordered, nested failures are emitted once,
   and later commands do not execute.
 - **Compatibility:** stderr retains the existing human-readable diagnostic and exit status remains
   `1`; terminal and interactive behavior remain unchanged.
-- **Classification:** all existing user-facing TabDat errors have explicit labels without tracebacks
-  or raw backend details.
+- **Classification:** all existing user-facing TabDat errors have explicit labels without tracebacks or
+  raw backend/OS details in machine messages.
 - **Atomicity:** serialization happens after parser/Executor failure and does not change existing
   active-data or validation state behavior.
 
@@ -21,9 +22,9 @@ Status: implementation validation complete; PR review pending
 
 ## Validation Evidence
 
-- JSON CLI regressions: 16 passed.
+- JSON CLI regressions: 19 passed.
 - JSON help regression: 1 passed.
-- `uv run pytest -q` — 1,158 passed, 314 existing third-party warnings.
+- `uv run pytest -q` — 1,161 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -32,10 +33,10 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-Exactly three independent review passes are required after the PR is opened. Reviewers must check
-error-envelope stability, source-location preservation, duplicate nested failures, stderr/exit
-compatibility, fail-fast ordering, hierarchy coverage, and regression tests. No fourth review pass is
-permitted.
+Exactly three independent review passes were completed after the PR was opened. They checked error
+envelope stability, source-location preservation, duplicate nested failures, stderr/exit compatibility,
+fail-fast ordering, hierarchy coverage, raw-detail sanitization, and regression tests. All findings
+were fixed; no fourth review pass was permitted or started.
 
 ## Non-Blocking Follow-Ups
 
@@ -46,5 +47,4 @@ Future.
 
 ## Recommended Next Action
 
-Commit the validated error-envelope slice, push it, open the PR, and complete exactly three independent
-review passes before any merge.
+Push the review fixes, verify the PR is clean, merge it, and remove the feature branch.

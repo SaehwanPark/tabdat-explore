@@ -404,7 +404,7 @@ def _run_script_status(
 ) -> _RunStatus:
   resolved_path = _resolve_script_path(path, base_dir)
   if resolved_path in active_stack:
-    raise ScriptError(path, 1, "recursive script inclusion is not supported")
+    raise ScriptError(resolved_path, 1, "recursive script inclusion is not supported")
 
   commands = read_script(resolved_path)
   if output_format == "terminal":

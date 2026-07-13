@@ -1224,7 +1224,7 @@ def format_error_json(error: TabDatError) -> str:
   """Serialize one user-facing failure as a deterministic machine-readable envelope."""
   error_data: dict[str, object] = {
     "type": _error_type_label(error),
-    "message": error.message if isinstance(error, ScriptError) else str(error),
+    "message": _machine_error_message(error),
   }
   if isinstance(error, ScriptError):
     error_data["path"] = str(error.path)
@@ -1251,6 +1251,13 @@ def _error_type_label(error: TabDatError) -> str:
     return ERROR_TYPE_LABELS[type(error)]
   except KeyError as exc:
     raise TypeError(f"Unsupported error: {type(error).__name__}") from exc
+
+
+def _machine_error_message(error: TabDatError) -> str:
+  message = error.message if isinstance(error, ScriptError) else str(error)
+  if error.__cause__ is not None and not isinstance(error.__cause__, TabDatError):
+    return message.split(": ", maxsplit=1)[0]
+  return message
 
 
 def _json_safe_value(value: object) -> object:

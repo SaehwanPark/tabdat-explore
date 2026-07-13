@@ -25,7 +25,7 @@ from tabdat.errors import (
   UnknownVariableError,
 )
 from tabdat.executor import Executor
-from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS
+from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS, format_error_json
 from tabdat.models import PlotResult, Result
 from tabdat.script import ScriptError
 
@@ -412,6 +412,50 @@ def test_cli_json_nested_script_failure_emits_one_error_envelope(
   assert envelopes[1]["error"]["path"] == str(child_path.resolve())
   assert envelopes[1]["error"]["line"] == 1
   assert "CountResult" not in captured.out
+
+
+def test_cli_json_invalid_utf8_script_reports_source_line(tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "invalid-utf8.td"
+  script_path.write_bytes(b"# " + b"x" * 40 + b"\n\xff\n")
+
+  exit_code = main(["--json", "-f", str(script_path)])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+
+  assert exit_code == 1
+  assert envelope["error"]["type"] == "ScriptError"
+  assert envelope["error"]["path"] == str(script_path.resolve())
+  assert envelope["error"]["line"] == 2
+  assert "script file must be UTF-8 text" in captured.err
+
+
+def test_cli_json_recursive_script_error_uses_resolved_path(tmp_path: Path, capsys) -> None:
+  script_path = tmp_path / "loop.td"
+  script_path.write_text("run loop.td\n", encoding="utf-8")
+
+  exit_code = main(["--json", "-f", str(script_path)])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+
+  assert exit_code == 1
+  assert envelope["error"]["type"] == "ScriptError"
+  assert envelope["error"]["path"] == str(script_path.resolve())
+  assert envelope["error"]["line"] == 1
+
+
+def test_json_error_message_hides_raw_exception_details() -> None:
+  try:
+    try:
+      raise ValueError("backend secret")
+    except ValueError as cause:
+      raise ExecutionError("backend operation failed: backend secret") from cause
+  except ExecutionError as error:
+    envelope = json.loads(format_error_json(error))
+
+  assert envelope["error"]["message"] == "backend operation failed"
+  assert "backend secret" not in json.dumps(envelope)
 
 
 def test_cli_json_rejects_interactive_mode(capsys) -> None:

@@ -1,23 +1,25 @@
 # Delivery Summary: Phase 24 P1 Structured JSON Error Envelopes
 
-The structured JSON error-envelope slice is locally implemented and fully validated; PR review is
-pending.
+The structured JSON error-envelope slice is implemented, fully validated, and has completed exactly
+three independent PR reviews; all findings are fixed.
 
 ## Delivered
 
 - Added versioned error envelopes to non-interactive `--json` command and script failure paths.
-- Preserved prior success envelopes, fail-fast ordering, nested-script source locations, human stderr,
-  exit status `1`, terminal formatting, and interactive behavior.
-- Added explicit stable labels for the complete user-facing error hierarchy without tracebacks.
+- Preserved prior success envelopes, fail-fast ordering, nested-script resolved path/line, human
+  stderr, exit status `1`, terminal formatting, and interactive behavior.
+- Added explicit stable labels for the complete user-facing error hierarchy and sanitized raw causes
+  from machine messages without changing human stderr.
 
 ## Validation
 
-- JSON CLI regressions: 16 passed; JSON help regression: 1 passed.
-- Full suite: 1,158 passed, with 314 existing third-party warnings.
+- JSON CLI regressions: 19 passed; JSON help regression: 1 passed.
+- Full suite: 1,161 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully with all scenarios passing and canonical replay stdout
   matching.
-- Exactly three independent PR review passes are required before merge.
+- Exactly three independent PR review passes completed; all findings were fixed and no fourth review
+  was run.
 
 ## Remaining Phase 24 Work
 
