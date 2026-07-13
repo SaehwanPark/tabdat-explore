@@ -448,17 +448,11 @@ class DuckDBBackend:
     how: Literal["inner", "left"],
     suffix: str,
   ) -> DatasetInfo:
-    _validate_user_table_name(table_name)
-    left_types = {column.name: column.data_type for column in dataset.columns}
-    right_types = {column.name: column.data_type for column in right_dataset.columns}
-    _require_columns("join", left_types, keys)
-    missing_right = tuple(key for key in keys if key not in right_types)
-    if missing_right:
-      raise UnknownVariableError(
-        f"join unknown variable in {table_name}: {', '.join(missing_right)}"
-      )
+    self.validate_join(dataset, right_dataset, table_name=table_name, keys=keys)
 
     internal_name = _named_table_identifier(table_name)
+    left_order_name, right_order_name = _join_order_column_names(dataset, right_dataset)
+    left_types = {column.name: column.data_type for column in dataset.columns}
     right_selects = _right_join_selects(right_dataset, keys, left_types, suffix)
     select_sql = ", ".join(
       f"left_table.{_quote_identifier(column.name)}" for column in dataset.columns
@@ -472,19 +466,38 @@ class DuckDBBackend:
       f"""
       select {select_sql}
       from (
-        select row_number() over () as __tabdat_join_order, *
+        select row_number() over () as {_quote_identifier(left_order_name)}, *
         from {ACTIVE_TABLE}
       ) as left_table
       {how} join (
-        select row_number() over () as __tabdat_join_order, *
+        select row_number() over () as {_quote_identifier(right_order_name)}, *
         from {_quote_identifier(internal_name)}
       ) as right_table
         on {predicates}
-      order by left_table.__tabdat_join_order, right_table.__tabdat_join_order
+      order by left_table.{_quote_identifier(left_order_name)},
+        right_table.{_quote_identifier(right_order_name)}
       """,
       "join",
     )
     return self.active_dataset_info(dataset.path)
+
+  def validate_join(
+    self,
+    dataset: DatasetInfo,
+    right_dataset: DatasetInfo,
+    *,
+    table_name: str,
+    keys: tuple[str, ...],
+  ) -> None:
+    _validate_user_table_name(table_name)
+    left_types = {column.name: column.data_type for column in dataset.columns}
+    right_types = {column.name: column.data_type for column in right_dataset.columns}
+    _require_columns("join", left_types, keys)
+    missing_right = tuple(key for key in keys if key not in right_types)
+    if missing_right:
+      raise UnknownVariableError(
+        f"join unknown variable in {table_name}: {', '.join(missing_right)}"
+      )
 
   def append_named_table(
     self,
@@ -2503,6 +2516,27 @@ def _right_join_selects(
       f"right_table.{_quote_identifier(column.name)} as {_quote_identifier(output_name)}"
     )
   return tuple(selects)
+
+
+def _join_order_column_names(
+  dataset: DatasetInfo,
+  right_dataset: DatasetInfo,
+) -> tuple[str, str]:
+  used_names = {column.name for column in (*dataset.columns, *right_dataset.columns)}
+  left_name = _unique_internal_name("__tabdat_join_order", used_names)
+  used_names.add(left_name)
+  right_name = _unique_internal_name("__tabdat_join_right_order", used_names)
+  return left_name, right_name
+
+
+def _unique_internal_name(candidate: str, used_names: set[str]) -> str:
+  normalized_names = {name.casefold() for name in used_names}
+  name = candidate
+  counter = 2
+  while name.casefold() in normalized_names:
+    name = f"{candidate}_{counter}"
+    counter += 1
+  return name
 
 
 def _unique_output_name(candidate: str, used_names: set[str]) -> str:

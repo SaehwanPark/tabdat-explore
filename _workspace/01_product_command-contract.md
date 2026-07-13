@@ -35,6 +35,8 @@ No new options, commands, or output fields are introduced.
   row's matches, and duplicate right-side matches are preserved.
 - An `inner` join omits active rows with no match. A `left` join emits one row with missing right-side
   values for each active row with no match.
+- Join validates named-table existence and key columns before Polars fallback; a validation failure
+  preserves the active rows, execution mode, and materialization metadata.
 - Eager, DuckDB-lazy, and Polars-lazy inputs produce the same join result sequence. Join crosses the
   existing eager boundary where required and preserves current state reporting.
 
@@ -53,6 +55,7 @@ No new options, commands, or output fields are introduced.
 - [x] Duplicate right-side matches remain present for inner and left joins.
 - [x] Inner and left unmatched-row behavior remains unchanged and ordered.
 - [x] Eager, DuckDB-lazy, and Polars-lazy result previews agree.
+- [x] Failed table/key validation preserves active execution state before lazy fallback.
 - [x] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
   checks pass.
 

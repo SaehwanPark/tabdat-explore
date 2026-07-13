@@ -14,9 +14,10 @@ slices and bounds the first keyed relation-combination result without adding syn
 
 - `docs/language-semantics.md`: durable join result-sequence policy
 - `docs/command-reference.md`, `src/tabdat/help/topics/join.md`: user-facing join syntax and order
-- `src/tabdat/backend.py`: explicit active and named-table join ordinals
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: duplicate-match and
-  cross-engine regressions
+- `src/tabdat/backend.py`, `src/tabdat/executor.py`: collision-safe join ordinals and pre-materialized
+  key/table validation
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: duplicate-match, unmatched-row,
+  collision, failure-state, and cross-engine regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions

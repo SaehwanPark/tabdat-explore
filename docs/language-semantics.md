@@ -133,6 +133,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - An `inner` join omits active rows with no match. A `left` join emits one row with missing right-side
   values for each active row with no match.
 - Existing key equality, suffixing, output-column, and missing-key behavior remain unchanged.
+- Join validates named-table existence and key columns before Polars fallback; a validation failure
+  preserves the active rows, execution mode, and materialization metadata.
 - Reshape order and categorical order remain separate contracts.
 
 ## Append row order

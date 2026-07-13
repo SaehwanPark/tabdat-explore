@@ -49,7 +49,11 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "tie-breaker keys" in load_help_topic("sql")
   assert "no row-order guarantee" in load_help_topic("sql")
   assert "restores its stored row sequence" in load_help_topic("use")
-  assert "active-row order" in load_help_topic("join")
+  join_help = load_help_topic("join")
+  assert "active-row order" in join_help
+  assert "including duplicate matches" in join_help
+  assert "An inner join omits unmatched active rows" in join_help
+  assert "a left join keeps" in join_help
   assert "does not sort, deduplicate, or interleave" in load_help_topic("append")
 
 

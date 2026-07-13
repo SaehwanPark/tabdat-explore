@@ -6034,6 +6034,105 @@ def test_join_preserves_active_and_match_sequence(
   assert preview.rows == expected_rows
 
 
+def test_join_uses_collision_free_internal_order_columns(tmp_path: Path) -> None:
+  path = tmp_path / "join_order_collision.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select join_key, __tabdat_join_order, left_label
+    from (
+      values
+        (1, 'A', 101, 'left-a'),
+        (2, 'B', 102, 'left-b')
+    ) as active_rows(row_id, join_key, __tabdat_join_order, left_label)
+    order by row_id
+    """,
+  )
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SqlCommand(
+        """
+        select join_key, __tabdat_join_right_order, right_label
+        from (
+          values
+            (1, 'A', 201, 'right-a'),
+            (2, 'B', 202, 'right-b')
+        ) as lookup_rows(row_id, join_key, __tabdat_join_right_order, right_label)
+        order by row_id
+        """,
+        into="lookup",
+      )
+    )
+    executor.execute(UseCommand(path))
+    result = executor.execute(JoinCommand(table_name="lookup", keys=("join_key",)))
+    preview = executor.execute(HeadCommand(5))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert [column.name for column in result.dataset.columns] == [
+    "join_key",
+    "__tabdat_join_order",
+    "left_label",
+    "__tabdat_join_right_order",
+    "right_label",
+  ]
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    ("A", 101, "left-a", 201, "right-a"),
+    ("B", 102, "left-b", 202, "right-b"),
+  )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_failed_join_validation_preserves_active_state(tmp_path: Path, engine: str) -> None:
+  path = tmp_path / "join_validation.parquet"
+  _write_row_order_parquet(path)
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(SqlCommand("select value from active", into="missing_label"))
+
+    executor.execute(use_command())
+    with pytest.raises(UnknownTableError, match="unknown table: missing_table"):
+      executor.execute(JoinCommand(table_name="missing_table", keys=("label",)))
+    unknown_status = executor.execute(StatusCommand())
+
+    executor.execute(use_command())
+    with pytest.raises(UnknownVariableError, match="join unknown variable: missing"):
+      executor.execute(JoinCommand(table_name="missing_label", keys=("missing",)))
+    missing_status = executor.execute(StatusCommand())
+
+    executor.execute(use_command())
+    with pytest.raises(UnknownVariableError, match="join unknown variable in missing_label: label"):
+      executor.execute(JoinCommand(table_name="missing_label", keys=("label",)))
+    right_missing_status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  for status in (unknown_status, missing_status, right_missing_status):
+    assert isinstance(status, StatusResult)
+    assert status.last_operation == "use"
+    assert status.last_materialization_reason is None
+    if engine == "eager":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.row_count == 5
+    else:
+      assert status.execution_mode == "lazy"
+      assert status.lazy_engine == engine
+      assert status.row_count is None
+
+
 def test_phase_11_append_named_table_aligns_columns_by_active_order(
   sample_parquet: Path,
 ) -> None:

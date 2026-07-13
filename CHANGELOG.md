@@ -48,6 +48,8 @@ All notable project changes are tracked here.
   coverage, and pre-materialization validation for failed lazy appends.
 - Started the Phase 24 join row-order slice; active-row and named-table match ordering are being
   bounded before reshape and categorical ordering.
+- Completed the Phase 24 join row-order slice with collision-safe ordinals, lazy validation, and
+  duplicate/unmatched regression coverage.
 
 ### Added
 
