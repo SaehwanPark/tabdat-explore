@@ -71,7 +71,9 @@ def test_help_topics_document_expression_domains() -> None:
   assert "head 0" in load_help_topic("head")
   assert "tail 0" in load_help_topic("tail")
   assert "Arithmetic requires numeric operands" in load_help_topic("generate")
+  assert "exact `DECIMAL(38,0)` storage" in load_help_topic("generate")
   assert "numeric/string conversion is not" in load_help_topic("replace")
+  assert "exact `DECIMAL(38,0)` storage" in load_help_topic("replace")
   assert "if` conditions must produce boolean or missing" in load_help_topic("tabulate")
 
 

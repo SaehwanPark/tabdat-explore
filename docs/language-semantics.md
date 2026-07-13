@@ -55,7 +55,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
 ## Expression domains and coercion
 
 - Numeric columns and numeric literals share one `numeric` domain. Numeric widening within that
-  domain is allowed; values are not parsed from or stringified into text implicitly.
+  domain is allowed; values are not parsed from or stringified into text implicitly. Integral
+  arithmetic has the exact-width rule below.
 - Unsafe combinations of unsigned numeric columns and negative numeric literals are rejected
   consistently rather than relying on backend-specific signed/unsigned coercion.
 - Text values and string literals share the `string` domain. Boolean values and comparison results
@@ -75,12 +76,16 @@ unknown-variable error and follows the write-validation atomicity policy below.
 ## Arithmetic results and non-finite values
 
 - Arithmetic operators `+`, `-`, `*`, and `/`, plus unary minus, continue to require numeric
-  operands. A valid finite result remains in the numeric domain; exact backend-specific storage
-  widening is not promised.
+  operands. Integral `+`, `-`, `*`, and unary minus subtrees use exact `DECIMAL(38,0)` results for
+  signed and unsigned integer operands and integer literals.
+- An integral result outside `DECIMAL(38,0)` becomes missing for that row rather than wrapping. Other
+  rows remain eligible in `generate`, `replace`, and row predicates under their existing policies.
 - Missing operands propagate to missing results. The explicit `null` literal remains rejected by
   arithmetic and functions; this rule covers missing values supplied by data columns.
 - Division is real division. A zero denominator, including `0 / 0`, produces a missing result for
   that row rather than infinity or NaN.
+- Floating operands and decimal-scale arithmetic retain their existing backend numeric behavior; this
+  slice does not promise their storage widths or scale/precision propagation.
 - `sqrt(x)` produces missing when `x < 0`; `ln(x)` and `log(x)` produce missing when `x <= 0`.
 - Any computed NaN or infinity from supported arithmetic or numeric functions is normalized to
   missing. A direct identifier does not rewrite a non-finite value already present in the source.
@@ -197,6 +202,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Exact arithmetic storage widths, overflow diagnostics,
-SQL without explicit ordering, randomness, estimation samples, machine-readable output,
-and exit codes are not defined here yet.
+Stable overflow error/warning diagnostics, arbitrary-precision arithmetic, decimal-scale/precision
+propagation, floating storage widths, SQL without explicit ordering, randomness, estimation samples,
+machine-readable output, and exit codes are not defined here yet.

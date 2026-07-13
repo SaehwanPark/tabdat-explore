@@ -54,6 +54,7 @@ NUMERIC_TYPES = (
   "INTEGER",
   "BIGINT",
   "HUGEINT",
+  "UHUGEINT",
   "UTINYINT",
   "USMALLINT",
   "UINTEGER",
@@ -66,6 +67,7 @@ NUMERIC_TYPES = (
   "UINT16",
   "UINT32",
   "UINT64",
+  "UINT128",
   "FLOAT32",
   "FLOAT64",
   "FLOAT",
@@ -81,7 +83,31 @@ UNSIGNED_NUMERIC_TYPES = (
   "UINT16",
   "UINT32",
   "UINT64",
+  "UINT128",
+  "UHUGEINT",
 )
+INTEGER_NUMERIC_TYPES = (
+  "TINYINT",
+  "SMALLINT",
+  "INTEGER",
+  "BIGINT",
+  "HUGEINT",
+  "UHUGEINT",
+  "UTINYINT",
+  "USMALLINT",
+  "UINTEGER",
+  "UBIGINT",
+  "INT8",
+  "INT16",
+  "INT32",
+  "INT64",
+  "UINT8",
+  "UINT16",
+  "UINT32",
+  "UINT64",
+  "UINT128",
+)
+EXACT_INTEGER_RESULT_TYPE = "DECIMAL(38,0)"
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 TabulateCellKey = tuple[tuple[tuple[str, object], ...], tuple[tuple[str, object], ...]]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
@@ -1705,6 +1731,8 @@ class DuckDBBackend:
       if _has_unsafe_unsigned_arithmetic(column_types, expression):
         raise TypeMismatchExecutionError(UNSIGNED_ARITHMETIC_ERROR)
       operand_sql = self._compile_expression_raw(dataset, expression.operand)
+      if _is_integral_expression(dataset, expression):
+        operand_sql = _cast_exact_integer_sql(operand_sql)
       return f"-({operand_sql})"
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
@@ -1731,6 +1759,9 @@ class DuckDBBackend:
       else:
         left = self._compile_expression_raw(dataset, expression.left)
         right = self._compile_expression_raw(dataset, expression.right)
+        if _is_integral_expression(dataset, expression):
+          left = _cast_exact_integer_sql(left)
+          right = _cast_exact_integer_sql(right)
       return f"({left} {expression.operator} {right})"
     if isinstance(expression, FunctionCallExpression):
       if _contains_null_literal(expression):
@@ -1760,7 +1791,12 @@ class DuckDBBackend:
       if _contains_null_literal(expression.operand):
         raise ExecutionError(NULL_LITERAL_ERROR)
       operand_expr = self._compile_polars_expression(dataset, expression.operand)
-      return _normalize_polars_numeric_result(-operand_expr)
+      if _is_integral_expression(dataset, expression):
+        operand_expr = operand_expr.cast(pl.Decimal(38, 0))
+      return _normalize_polars_numeric_result(
+        -operand_expr,
+        preserve_type=_is_integral_expression(dataset, expression),
+      )
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
@@ -1774,12 +1810,16 @@ class DuckDBBackend:
         return other_expr.is_null() if expression.operator == "==" else other_expr.is_not_null()
       left = self._compile_polars_expression(dataset, expression.left)
       right = self._compile_polars_expression(dataset, expression.right)
+      exact_integer = _is_integral_expression(dataset, expression)
+      if exact_integer:
+        left = left.cast(pl.Decimal(38, 0))
+        right = right.cast(pl.Decimal(38, 0))
       if expression.operator == "+":
-        return _normalize_polars_numeric_result(left + right)
+        return _normalize_polars_numeric_result(left + right, preserve_type=exact_integer)
       if expression.operator == "-":
-        return _normalize_polars_numeric_result(left - right)
+        return _normalize_polars_numeric_result(left - right, preserve_type=exact_integer)
       if expression.operator == "*":
-        return _normalize_polars_numeric_result(left * right)
+        return _normalize_polars_numeric_result(left * right, preserve_type=exact_integer)
       if expression.operator == "/":
         denominator_is_zero = right == pl.lit(0)
         safe_right = pl.when(denominator_is_zero).then(pl.lit(1)).otherwise(right)
@@ -1819,6 +1859,13 @@ class DuckDBBackend:
     """Validate an expression without changing the active relation."""
     self._infer_expression_domain(dataset, expression)
     self._compile_polars_expression(dataset, expression)
+
+  def requires_exact_integer_arithmetic(
+    self,
+    dataset: DatasetInfo,
+    expression: Expression,
+  ) -> bool:
+    return _contains_integral_arithmetic(dataset, expression)
 
   def validate_predicate(self, dataset: DatasetInfo, expression: Expression) -> None:
     """Validate an expression used as a row-selection condition."""
@@ -2124,6 +2171,12 @@ def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper().strip()
   base = normalized.split("(", 1)[0]
   return base in NUMERIC_TYPES
+
+
+def _is_integer_type(data_type: str) -> bool:
+  normalized = data_type.upper().strip()
+  base = normalized.split("(", 1)[0]
+  return base in INTEGER_NUMERIC_TYPES
 
 
 def _is_unsigned_numeric_type(data_type: str) -> bool:
@@ -2528,6 +2581,7 @@ def _canonical_data_type(data_type: str) -> str:
     "UINT16": "USMALLINT",
     "UINT32": "UINTEGER",
     "UINT64": "UBIGINT",
+    "UINT128": "UHUGEINT",
     "FLOAT32": "FLOAT",
     "FLOAT64": "DOUBLE",
     "STRING": "VARCHAR",
@@ -2720,12 +2774,61 @@ def _is_numeric_result_expression(expression: Expression) -> bool:
   return False
 
 
-def _normalize_polars_numeric_result(expression: pl.Expr) -> pl.Expr:
-  finite_value = expression.cast(pl.Float64)
+def _normalize_polars_numeric_result(
+  expression: pl.Expr,
+  *,
+  preserve_type: bool = False,
+) -> pl.Expr:
+  finite_value = expression if preserve_type else expression.cast(pl.Float64)
   # Keep the cast in the finite probe; Polars can otherwise move it after is_finite when the
   # result branch reuses the same expression, which is unsupported for Decimal inputs.
   finite_probe = (finite_value + pl.lit(0.0)).is_finite()
   return pl.when(finite_probe).then(finite_value).otherwise(pl.lit(None))
+
+
+def _is_integral_expression(dataset: DatasetInfo, expression: Expression) -> bool:
+  column_types = {column.name: column.data_type for column in dataset.columns}
+  return _is_integral_expression_for_types(column_types, expression)
+
+
+def _is_integral_expression_for_types(
+  column_types: dict[str, str],
+  expression: Expression,
+) -> bool:
+  if isinstance(expression, IdentifierExpression):
+    data_type = column_types.get(expression.name)
+    return data_type is not None and _is_integer_type(data_type)
+  if isinstance(expression, NumberExpression):
+    return type(expression.value) is int
+  if isinstance(expression, UnaryExpression):
+    return _is_integral_expression_for_types(column_types, expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return (
+      expression.operator in {"+", "-", "*"}
+      and _is_integral_expression_for_types(column_types, expression.left)
+      and _is_integral_expression_for_types(column_types, expression.right)
+    )
+  return False
+
+
+def _cast_exact_integer_sql(expression_sql: str) -> str:
+  return f"cast({expression_sql} as {EXACT_INTEGER_RESULT_TYPE})"
+
+
+def _contains_integral_arithmetic(dataset: DatasetInfo, expression: Expression) -> bool:
+  if isinstance(expression, (UnaryExpression, BinaryExpression)):
+    if _is_integral_expression(dataset, expression):
+      return True
+    if isinstance(expression, UnaryExpression):
+      return _contains_integral_arithmetic(dataset, expression.operand)
+    return _contains_integral_arithmetic(dataset, expression.left) or _contains_integral_arithmetic(
+      dataset, expression.right
+    )
+  if isinstance(expression, FunctionCallExpression):
+    return any(
+      _contains_integral_arithmetic(dataset, argument) for argument in expression.arguments
+    )
+  return False
 
 
 def _contains_null_literal(expression: Expression) -> bool:
@@ -2819,6 +2922,7 @@ def _null_cast_type(data_type: str) -> str:
     "UINT16": "USMALLINT",
     "UINT32": "UINTEGER",
     "UINT64": "UBIGINT",
+    "UINT128": "UHUGEINT",
     "FLOAT32": "FLOAT",
     "FLOAT64": "DOUBLE",
     "STRING": "VARCHAR",

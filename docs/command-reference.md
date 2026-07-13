@@ -33,6 +33,10 @@ paths, and more).
 | `rename` | Rename a variable | `rename cost charges` |
 | `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), generate(age_grp)` |
 
+Integral `+`, `-`, `*`, and unary minus expressions use exact `DECIMAL(38,0)` results; values beyond
+that width become missing for the affected row rather than wrapping. Decimal-scale, floating-width,
+and stable overflow-diagnostic policies remain separate contracts.
+
 ## Combine and reshape
 
 | Command | Purpose | Minimal invocation |

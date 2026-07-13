@@ -2525,6 +2525,40 @@ def test_cli_normalizes_nonfinite_arithmetic_results(sample_parquet: Path, capsy
   assert captured.err == ""
 
 
+def test_cli_reports_exact_integer_arithmetic_values(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "exact-integer-cli.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (cast(9223372036854775807 as bigint), cast(1 as bigint),
+         cast(18446744073709551615 as ubigint), cast(18446744073709551615 as ubigint)),
+        (cast(2 as bigint), cast(3 as bigint), cast(2 as ubigint), cast(3 as ubigint))
+    ) as exact_cli_data(amount, adjustment, unsigned_left, unsigned_right)
+    """,
+  )
+  exit_code = main(
+    [
+      "-c",
+      f"use {path}",
+      "-c",
+      "generate exact_sum = amount + adjustment",
+      "-c",
+      "generate overflow_product = unsigned_left * unsigned_right",
+      "-c",
+      "head",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "9223372036854775808" in captured.out
+  assert "9223372036854775808.0" not in captured.out
+  assert captured.err == ""
+
+
 def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> None:
   path = tmp_path / "ordering.parquet"
   _write_sql_parquet(

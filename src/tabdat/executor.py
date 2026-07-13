@@ -6061,8 +6061,6 @@ class Executor:
         TailCommand,
         TestCommand,
         TestResult,
-        KeepCommand,
-        DropCommand,
         SelectCommand,
         ExitCommand,
         SetCommand,
@@ -6072,6 +6070,14 @@ class Executor:
       ),
     ):
       return
+    if isinstance(command, (KeepCommand, DropCommand)):
+      dataset = self._require_active_dataset("materialize")
+      if command.condition is not None:
+        self.backend.validate_predicate(dataset, command.condition)
+      if command.condition is None or not self.backend.requires_exact_integer_arithmetic(
+        dataset, command.condition
+      ):
+        return
     dataset = self._require_active_dataset("materialize")
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
