@@ -6285,7 +6285,7 @@ def test_missing_predicates_are_consistent_across_execution_engines(
     dropped_preview = executor.execute(HeadCommand(3))
 
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("cost", NumberExpression(0), condition=condition))
+    replaced = executor.execute(ReplaceCommand("cost", NumberExpression(0), condition=condition))
     replaced_preview = executor.execute(HeadCommand(3))
   finally:
     executor.close()
@@ -6294,6 +6294,9 @@ def test_missing_predicates_are_consistent_across_execution_engines(
   assert tuple((row[0], row[3]) for row in kept_preview.rows) == ((30, 100.0), (42, 150.0))
   assert isinstance(dropped_preview, PreviewResult)
   assert tuple((row[0], row[3]) for row in dropped_preview.rows) == ((54, None),)
+  assert isinstance(replaced, TransformResult)
+  assert replaced.dataset.execution_mode == "eager"
+  assert replaced.dataset.lazy_engine is None
   assert isinstance(replaced_preview, PreviewResult)
   assert tuple((row[0], row[3]) for row in replaced_preview.rows) == (
     (30, 0),
@@ -6430,6 +6433,33 @@ def test_codebook_profiles_requested_columns(sample_parquet: Path) -> None:
   assert cost.nonmissing == 2
   assert cost.missing == 1
   assert cost.distinct == 2
+
+
+def test_summarize_and_codebook_handle_all_missing_numeric_column(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        "select cast(null as double) as cost from range(2)",
+        into="all_missing",
+      )
+    )
+    summary = executor.execute(SummarizeCommand(("cost",)))
+    profile = executor.execute(CodebookCommand(("cost",)))
+  finally:
+    executor.close()
+
+  assert isinstance(summary, SummarizeResult)
+  assert summary.rows[0].count == 0
+  assert summary.rows[0].mean is None
+  assert summary.rows[0].minimum is None
+  assert summary.rows[0].maximum is None
+  assert isinstance(profile, CodebookResult)
+  assert profile.rows[0].nonmissing == 0
+  assert profile.rows[0].missing == 2
+  assert profile.rows[0].distinct == 0
+  assert profile.rows[0].examples == ()
 
 
 def test_codebook_without_variables_profiles_all_columns(sample_parquet: Path) -> None:
@@ -6637,6 +6667,23 @@ def test_tabulate_missing_option_controls_missing_categories(sample_parquet: Pat
   assert isinstance(with_missing, TableResult)
   assert all(row[0] is not None for row in without_missing.rows)
   assert any(row[0] is None for row in with_missing.rows)
+
+
+def test_phase_24_bar_missing_category_is_rendered(
+  sample_parquet: Path,
+  tmp_path: Path,
+) -> None:
+  bar_path = tmp_path / "plots" / "cost-missing.svg"
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    bar = executor.execute(BarCommand("cost", saving=bar_path, include_missing=True))
+  finally:
+    executor.close()
+
+  assert isinstance(bar, PlotResult)
+  assert bar_path.read_text(encoding="utf-8").startswith("<svg")
+  assert "cost: &lt;missing&gt;" in bar_path.read_text(encoding="utf-8")
 
 
 def test_tabulate_multilevel_if_by_and_value_aggregation(tmp_path: Path) -> None:

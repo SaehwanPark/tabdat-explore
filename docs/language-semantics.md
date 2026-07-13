@@ -38,7 +38,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `summarize` counts nonmissing numeric values; its means, minima, and maxima ignore missing values.
   `codebook` reports nonmissing and missing counts explicitly.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
-  categories where the command supports it.
+  categories where the command supports it; bar charts display that category as `<missing>`.
 
 Explicit missing-value predicates, null literals, coercion, and arithmetic-result policy remain
 separate contracts.

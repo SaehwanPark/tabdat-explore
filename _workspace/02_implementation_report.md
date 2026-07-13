@@ -14,9 +14,10 @@
 - `tests/test_executor.py`
   - Covers keep/drop/replace missing-condition behavior across eager, DuckDB-lazy, and Polars-lazy
     sessions.
-  - Covers `summarize`, `codebook`, and `tabulate ..., missing` behavior on existing null data.
+  - Covers `summarize`, `codebook`, `tabulate ..., missing`, and the rendered `bar ..., missing`
+    behavior on existing null data, including all-missing numeric input.
 - `tests/test_cli.py`
-  - Covers the user-facing `drop if` result.
+  - Covers the user-facing `drop if` result in both `-c` and script execution.
 - `docs/language-semantics.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
   - Record the stable missingness policy and bounded follow-up scope.
 
@@ -32,9 +33,9 @@
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'missing_predicates_are_consistent or tabulate_missing_option_controls' -q` — passed, 4 tests.
-- `uv run pytest tests/test_cli.py -k 'missing_drop_predicate' -q` — passed, 1 test.
-- `uv run pytest` — passed, 981 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'missing_predicates_are_consistent or tabulate_missing_option_controls or all_missing_numeric or phase_24_bar_missing' -q` — passed, 6 tests.
+- `uv run pytest tests/test_cli.py -k 'missing_drop_predicate' -q` — passed, 2 tests.
+- `uv run pytest` — passed, 984 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.

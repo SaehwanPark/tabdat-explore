@@ -9,16 +9,17 @@ The missing-predicate slice is implemented and fully validated locally.
 - Made `drop if` remove only true predicates and retain false/missing rows across eager, DuckDB-lazy,
   and Polars-lazy execution.
 - Covered replace-if preservation, summarize/codebook missing counts, tabulate missing categories,
-  and CLI output.
+  a stable `<missing>` bar label, and CLI output in `-c` and script modes.
 
 ## Validation
 
-- Focused backend/aggregate regressions: 4 passed.
-- Focused CLI regression: 1 passed.
-- Full suite: 981 passed, with 314 existing third-party warnings.
+- Focused backend/aggregate regressions: 6 passed.
+- Focused CLI regressions: 2 passed.
+- Full suite: 984 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow: all six scenarios passed, including exact canonical replay.
-- Three independent PR reviews remain before merge.
+- Exactly three independent PR reviews completed; all findings were fixed, with no Critical or High
+  findings remaining.
 
 ## Remaining Phase 24 Work
 
