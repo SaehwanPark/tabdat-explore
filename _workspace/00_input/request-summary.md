@@ -26,6 +26,8 @@ discovered help topic before option schemas or dry-run/explain work.
 - `tabdat --json --help-topic <topic>` is the only invocation for this slice; it emits one success
   envelope with `schema_version: 1`, stable `result_type`, and `data.help_topic`/`data.text`.
 - Topic matching is case-insensitive and normalized to the existing lowercase help-topic name.
+- Blank or whitespace-only topics fail with the stable message `help topic cannot be empty`; packaged
+  resource failures fail with `unable to load help topic: <topic>` rather than a traceback.
 - Only topics returned by the existing `available_help_topics()` registry are valid. Unknown topics
   emit one existing structured JSON error envelope and exit status `1`.
 - Retrieval happens before config or `Executor` construction and has no dataset or session side

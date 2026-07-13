@@ -1,4 +1,4 @@
-from tabdat.help import available_help_topics, load_help_topic
+from tabdat.help import available_help_topics, load_help_topic, load_help_topic_text
 from tabdat.shell import COMMAND_NAMES
 
 
@@ -33,6 +33,13 @@ def test_help_topic_text_is_loaded_from_package_data() -> None:
   assert "How to invoke" in text
   assert "What it does" in text
   assert "Examples" in text
+
+
+def test_help_topic_raw_text_preserves_packaged_whitespace() -> None:
+  text = load_help_topic_text("summarize")
+
+  assert text.endswith("\n")
+  assert text.strip() == load_help_topic("summarize")
 
 
 def test_run_help_documents_batch_json_output() -> None:

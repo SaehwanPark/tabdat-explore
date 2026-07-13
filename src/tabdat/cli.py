@@ -16,7 +16,7 @@ from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_error_json, format_result, format_result_json
-from tabdat.help import available_help_topics, load_help_topic
+from tabdat.help import available_help_topics, load_help_topic, load_help_topic_text
 from tabdat.models import (
   BarCommand,
   BayesPlotCommand,
@@ -172,12 +172,16 @@ def _run_help_topic_json(topic: str) -> int:
 
 def _help_topic_result(topic: str) -> HelpTopicResult:
   normalized = topic.strip().lower()
-  if normalized not in set(available_help_topics()):
-    raise TabDatError(f"unknown help topic: {normalized}")
+  if not normalized:
+    raise TabDatError("help topic cannot be empty")
   try:
-    text = load_help_topic(normalized)
-  except KeyError as exc:
-    raise TabDatError(f"unknown help topic: {normalized}") from exc
+    if normalized not in set(available_help_topics()):
+      raise TabDatError(f"unknown help topic: {normalized}")
+    text = load_help_topic_text(normalized)
+  except KeyError:
+    raise TabDatError(f"unknown help topic: {normalized}") from None
+  except (OSError, UnicodeError):
+    raise TabDatError(f"unable to load help topic: {normalized}") from None
   return HelpTopicResult(help_topic=normalized, text=text)
 
 

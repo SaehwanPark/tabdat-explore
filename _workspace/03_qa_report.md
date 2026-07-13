@@ -1,13 +1,16 @@
 # QA Report: Phase 24 P1 Structured JSON Help-Topic Retrieval
 
-Status: implementation validation complete; PR review pending
+Status: implementation validation complete; exactly three independent PR reviews complete
 
 ## Boundaries Checked
 
 - **Success contract:** `--json --help-topic <topic>` emits exactly one versioned
-  `HelpTopicResult` envelope with canonical topic name and exact packaged help text.
+  `HelpTopicResult` envelope with canonical topic name and raw packaged help text, including its
+  trailing newline.
 - **Lookup behavior:** matching is case-insensitive and restricted to the existing help-topic
-  registry; unknown topics emit one `TabDatError` JSON envelope with exit status `1`.
+  registry; unknown and blank topics emit stable `TabDatError` JSON envelopes with exit status `1`.
+- **Resource safety:** packaged `OSError`/Unicode failures are translated into a concise structured
+  error rather than a traceback; a fresh-wheel smoke invokes the actual built artifact.
 - **Read-only behavior:** retrieval happens before config/`Executor` setup and does not read data,
   materialize a relation, or alter session state.
 - **Invocation safety:** missing `--json` and combinations with `-c`, `-f`, a positional script, or
@@ -17,13 +20,14 @@ Status: implementation validation complete; PR review pending
 
 ## Blocking Issues
 
-- None remain from implementation validation.
+- None remain.
 
 ## Validation Evidence
 
-- Focused JSON/catalog/help-topic CLI checks: 32 passed.
-- Focused help/docs checks: 2 passed.
-- `uv run pytest -q` — 1,173 passed, 314 existing third-party warnings.
+- Focused JSON/catalog/help-topic CLI checks: 34 passed.
+- Focused help/docs checks: 3 passed.
+- `uv run python scripts/verify_wheel_help_topic.py` — fresh wheel smoke passed.
+- `uv run pytest -q` — 1,176 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -35,8 +39,10 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-No independent PR review passes have started yet. The required loop is exactly three reviews after
-the PR is opened; findings will be fixed and validated without starting a fourth review.
+Exactly three independent reviews completed. Review 1 reported no findings. Review 2 found exact raw
+text preservation and packaged-resource error handling. Review 3 found blank-topic clarity, stale
+handoff wording, and fresh-wheel smoke coverage. All findings were fixed and the complete validation
+set was rerun. No fourth review was started.
 
 ## Non-Blocking Follow-Ups
 
@@ -47,4 +53,5 @@ in `SPEC.md` Future.
 
 ## Recommended Next Action
 
-Commit and push the implementation, open the PR, then run exactly three independent review passes.
+Merge the reviewed PR, then remove the local and remote feature branch and return to `SPEC.md` for the
+next bounded slice.

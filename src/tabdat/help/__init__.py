@@ -16,8 +16,13 @@ def available_help_topics() -> tuple[str, ...]:
 
 
 def load_help_topic(topic: str) -> str:
+  return load_help_topic_text(topic).strip()
+
+
+def load_help_topic_text(topic: str) -> str:
+  """Load a help topic without changing its packaged whitespace."""
   package = resources.files(__name__).joinpath("topics")
   candidate = package.joinpath(f"{topic}.md")
   if not candidate.is_file():
     raise KeyError(topic)
-  return candidate.read_text(encoding="utf-8").strip()
+  return candidate.read_text(encoding="utf-8")

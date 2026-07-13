@@ -15,9 +15,12 @@ Phase 24 P1: Agent and automation interface.
 - The envelope uses `schema_version: 1`, stable `result_type: "HelpTopicResult"`, and a `data`
   payload containing `help_topic` and `text`.
 - Topic matching is case-insensitive; output uses the canonical lowercase topic name and the exact
-  text loaded from the existing packaged help topic.
+  raw text loaded from the existing packaged help topic, including its trailing newline.
 - Only names returned by `available_help_topics()` are valid. An unknown topic emits one existing
   structured JSON error envelope with type `TabDatError`, a concise message, and exit status `1`.
+- Blank or whitespace-only topics emit one `TabDatError` JSON envelope with message
+  `help topic cannot be empty`. Packaged resource or UTF-8 failures emit one `TabDatError` envelope
+  with message `unable to load help topic: <topic>` and no traceback.
 - Retrieval occurs before config or `Executor` construction, reads no dataset, changes no session
   state, and materializes nothing. Existing terminal help, command execution, and JSON envelopes
   remain unchanged.

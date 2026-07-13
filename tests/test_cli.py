@@ -26,7 +26,7 @@ from tabdat.errors import (
 )
 from tabdat.executor import Executor
 from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS, format_error_json
-from tabdat.help import available_help_topics, load_help_topic
+from tabdat.help import available_help_topics, load_help_topic_text
 from tabdat.models import PlotResult, Result
 from tabdat.script import ScriptError
 from tabdat.shell import COMMAND_NAMES
@@ -210,7 +210,7 @@ def test_cli_json_emits_help_topic_without_starting_a_session(monkeypatch, capsy
   assert envelope["schema_version"] == 1
   assert envelope["result_type"] == "HelpTopicResult"
   assert envelope["data"]["help_topic"] == "summarize"
-  assert envelope["data"]["text"] == load_help_topic("summarize")
+  assert envelope["data"]["text"] == load_help_topic_text("summarize")
 
 
 def test_cli_json_unknown_help_topic_emits_error(capsys) -> None:
@@ -226,6 +226,41 @@ def test_cli_json_unknown_help_topic_emits_error(capsys) -> None:
     "type": "TabDatError",
   }
   assert captured.err == "Error: unknown help topic: does-not-exist\n"
+
+
+def test_cli_json_blank_help_topic_emits_clear_error(capsys) -> None:
+  exit_code = main(["--json", "--help-topic", "   "])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+
+  assert exit_code == 1
+  assert envelope["error"] == {
+    "message": "help topic cannot be empty",
+    "type": "TabDatError",
+  }
+  assert captured.err == "Error: help topic cannot be empty\n"
+
+
+def test_cli_json_help_topic_resource_failure_emits_error(monkeypatch, capsys) -> None:
+  monkeypatch.setattr("tabdat.cli.available_help_topics", lambda: ("summarize",))
+
+  def fail_to_load(_topic: str) -> str:
+    raise OSError("packaged resource missing")
+
+  monkeypatch.setattr("tabdat.cli.load_help_topic_text", fail_to_load)
+
+  exit_code = main(["--json", "--help-topic", "summarize"])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+
+  assert exit_code == 1
+  assert envelope["error"] == {
+    "message": "unable to load help topic: summarize",
+    "type": "TabDatError",
+  }
+  assert captured.err == "Error: unable to load help topic: summarize\n"
 
 
 def test_cli_help_topic_requires_json(capsys) -> None:
