@@ -2331,6 +2331,28 @@ def test_cli_reports_expression_type_mismatch_in_script(
   assert "expression type mismatch: cannot compare string and numeric values" in captured.err
 
 
+def test_cli_normalizes_nonfinite_arithmetic_results(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "generate invalid_ratio = cost / 0",
+      "-c",
+      "head",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Generated invalid_ratio: 3 rows, 5 columns" in captured.out
+  assert "invalid_ratio" in captured.out
+  assert "inf" not in captured.out.lower()
+  assert "nan" not in captured.out.lower()
+  assert captured.err == ""
+
+
 def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
   exit_code = main(["-c", "status"])
 

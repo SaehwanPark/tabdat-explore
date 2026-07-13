@@ -1,13 +1,46 @@
-# Product Contract: Phase 24 P0 — Expression Coercion
+# Product Contract: Phase 24 P0 — Arithmetic Results
 
 ## Request Summary
 
-Make existing expression syntax obey stable scalar-domain compatibility across eager, DuckDB-lazy,
-and Polars-lazy execution.
+Make existing arithmetic and numeric-function syntax produce stable missing and finite results
+across eager, DuckDB-lazy, and Polars-lazy execution.
 
 ## Roadmap Phase
 
 Phase 24 P0: stable language semantics before broader command and estimator expansion.
+
+## Roadmap Fit
+
+This is a bounded follow-up to the Phase 24 expression-coercion slice. It defines the result policy
+for the existing expression grammar without adding syntax, commands, or new numeric types.
+
+## Existing Syntax
+
+Valid forms retain the current grammar:
+
+- `generate ratio = numerator / denominator`
+- `replace score = sqrt(raw_score) if eligible == "yes"`
+- `keep if numerator / denominator > 0`
+
+No new operators, functions, options, or output columns are introduced by this slice.
+
+## Result Rules
+
+- Arithmetic operators `+`, `-`, `*`, and `/`, plus unary minus, continue to require numeric
+  operands under the expression-coercion contract.
+- A missing operand produces a missing result for arithmetic and numeric functions. The explicit
+  `null` literal remains rejected by arithmetic and functions; missing values from data columns are
+  handled as results.
+- Division is real division. A zero denominator produces a missing result for that row, including
+  `0 / 0`; it does not expose infinity or NaN.
+- `sqrt(x)` produces missing when `x < 0`; `ln(x)` and `log(x)` produce missing when `x <= 0`.
+- Any computed NaN or infinity from supported arithmetic or numeric functions becomes missing.
+- A direct identifier expression does not rewrite an existing source NaN or infinity. Normalization
+  applies to values produced by arithmetic or numeric-function nodes.
+- Subtraction involving an unsigned numeric column and unary minus of an unsigned numeric expression
+  are rejected before execution; this slice does not infer a signed widening or wraparound policy.
+- A valid finite result remains numeric. Exact backend-specific storage widening and overflow
+  diagnostics are not promised by this slice.
 
 ## Expression Domains
 
@@ -50,24 +83,28 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 ## Error Contract
 
 Mixed-domain failures use `TypeMismatchExecutionError` with stable expression diagnostics. Existing
-command-specific error wording remains unchanged outside this slice.
+command-specific error wording remains unchanged outside this slice. Row-level arithmetic domain
+errors handled by this contract become missing values rather than command failures.
 
 ## Execution Semantics
 
 - Predicate semantics apply consistently in eager and supported lazy paths.
 - Null-aware comparisons compile to `is null`/`is not null` in SQL and equivalent Polars expressions.
-- No implicit numeric/string coercion is introduced; validation occurs before Polars-lazy fallback
-  materialization, including tabulate dimensions, values/statistics, and `by:` duplicate checks.
+- No implicit numeric/string coercion is introduced; existing validation occurs before Polars-lazy
+  fallback materialization. Numeric result normalization is compiled in both DuckDB SQL and Polars
+  expressions before the backend executes a supported operation.
 
 ## Acceptance Criteria
 
-- [x] Durable language-semantics documentation covers expression domains and coercion boundaries.
-- [x] Numeric-family expressions remain compatible across eager, DuckDB-lazy, and Polars-lazy paths.
-- [x] Mixed-domain comparisons/arithmetic/functions fail deterministically before mutation.
-- [x] Predicate and replacement target-domain validation is covered, including Polars-lazy state.
-- [x] CLI/script/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
+- [x] Durable language-semantics documentation covers arithmetic result and non-finite policy.
+- [x] Missing operands, zero denominators, invalid numeric-function domains, and computed non-finite
+  results agree across eager, DuckDB-lazy, and Polars-lazy paths.
+- [x] Row-level arithmetic edge cases remain usable in `generate`, `replace`, and predicate flows.
+- [x] Invalid expression validation remains atomic and occurs before Polars-lazy fallback.
+- [x] CLI/script/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- New expression syntax, categorical conversion, string concatenation, ordering, randomness,
-  estimation samples, machine output, exit codes, or new commands.
+- New expression syntax, categorical conversion, string concatenation, exact arithmetic storage-width
+  guarantees, overflow reporting, ordering, randomness, estimation samples, machine output, exit
+  codes, or new commands.

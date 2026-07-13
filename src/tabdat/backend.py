@@ -83,7 +83,11 @@ UNSIGNED_NUMERIC_TYPES = (
 )
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
+NUMERIC_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "round", "sqrt"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
+UNSIGNED_ARITHMETIC_ERROR = (
+  "expression type mismatch: unsigned numeric values do not support subtraction or unary minus"
+)
 ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
 NEXT_ACTIVE_TABLE = "__tabdat_next"
@@ -1558,6 +1562,36 @@ class DuckDBBackend:
 
   def _compile_expression(self, dataset: DatasetInfo, expression: Expression) -> str:
     self._infer_expression_domain(dataset, expression)
+    if isinstance(expression, BinaryExpression) and expression.operator in {
+      "==",
+      "!=",
+      "<",
+      "<=",
+      ">",
+      ">=",
+    }:
+      left_is_null = isinstance(expression.left, NullExpression)
+      right_is_null = isinstance(expression.right, NullExpression)
+      if left_is_null or right_is_null:
+        if left_is_null and right_is_null:
+          return "TRUE" if expression.operator == "==" else "FALSE"
+        other = expression.right if left_is_null else expression.left
+        other_sql = self._compile_expression(dataset, other)
+        comparator = "is null" if expression.operator == "==" else "is not null"
+        return f"({other_sql} {comparator})"
+      left = self._compile_expression_operand(dataset, expression.left)
+      right = self._compile_expression_operand(dataset, expression.right)
+      return f"({left} {expression.operator} {right})"
+    if _is_numeric_result_expression(expression):
+      return _safe_sql_numeric_result(self._compile_expression_raw(dataset, expression))
+    return self._compile_expression_raw(dataset, expression)
+
+  def _compile_expression_operand(self, dataset: DatasetInfo, expression: Expression) -> str:
+    if _is_numeric_result_expression(expression):
+      return _safe_sql_numeric_result(self._compile_expression_raw(dataset, expression))
+    return self._compile_expression_raw(dataset, expression)
+
+  def _compile_expression_raw(self, dataset: DatasetInfo, expression: Expression) -> str:
     column_types = {column.name: column.data_type for column in dataset.columns}
     if isinstance(expression, IdentifierExpression):
       _require_columns("expression", column_types, (expression.name,))
@@ -1571,10 +1605,15 @@ class DuckDBBackend:
     if isinstance(expression, UnaryExpression):
       if _contains_null_literal(expression.operand):
         raise ExecutionError(NULL_LITERAL_ERROR)
-      return f"-({self._compile_expression(dataset, expression.operand)})"
+      if _has_unsafe_unsigned_arithmetic(column_types, expression):
+        raise TypeMismatchExecutionError(UNSIGNED_ARITHMETIC_ERROR)
+      operand_sql = self._compile_expression_raw(dataset, expression.operand)
+      return f"-({operand_sql})"
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
+      if _has_unsafe_unsigned_arithmetic(column_types, expression):
+        raise TypeMismatchExecutionError(UNSIGNED_ARITHMETIC_ERROR)
       if _has_unsafe_unsigned_numeric_pair(column_types, expression):
         raise TypeMismatchExecutionError(
           "expression type mismatch: unsigned numeric values cannot be combined with negative "
@@ -1586,11 +1625,15 @@ class DuckDBBackend:
         if left_is_null and right_is_null:
           return "TRUE" if expression.operator == "==" else "FALSE"
         other = expression.right if left_is_null else expression.left
-        other_sql = self._compile_expression(dataset, other)
+        other_sql = self._compile_expression_operand(dataset, other)
         comparator = "is null" if expression.operator == "==" else "is not null"
         return f"({other_sql} {comparator})"
-      left = self._compile_expression(dataset, expression.left)
-      right = self._compile_expression(dataset, expression.right)
+      if expression.operator in {"==", "!=", "<", "<=", ">", ">="}:
+        left = self._compile_expression_operand(dataset, expression.left)
+        right = self._compile_expression_operand(dataset, expression.right)
+      else:
+        left = self._compile_expression_raw(dataset, expression.left)
+        right = self._compile_expression_raw(dataset, expression.right)
       return f"({left} {expression.operator} {right})"
     if isinstance(expression, FunctionCallExpression):
       if _contains_null_literal(expression):
@@ -1599,7 +1642,7 @@ class DuckDBBackend:
       if function_name not in SUPPORTED_FUNCTIONS:
         raise ExecutionError(f"unsupported function in expression: {expression.name}")
       arguments = ", ".join(
-        self._compile_expression(dataset, argument) for argument in expression.arguments
+        self._compile_expression_raw(dataset, argument) for argument in expression.arguments
       )
       return f"{function_name}({arguments})"
     raise ExecutionError("unsupported expression")
@@ -1619,7 +1662,8 @@ class DuckDBBackend:
     if isinstance(expression, UnaryExpression):
       if _contains_null_literal(expression.operand):
         raise ExecutionError(NULL_LITERAL_ERROR)
-      return -self._compile_polars_expression(dataset, expression.operand)
+      operand_expr = self._compile_polars_expression(dataset, expression.operand)
+      return _normalize_polars_numeric_result(-operand_expr)
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
@@ -1634,13 +1678,16 @@ class DuckDBBackend:
       left = self._compile_polars_expression(dataset, expression.left)
       right = self._compile_polars_expression(dataset, expression.right)
       if expression.operator == "+":
-        return left + right
+        return _normalize_polars_numeric_result(left + right)
       if expression.operator == "-":
-        return left - right
+        return _normalize_polars_numeric_result(left - right)
       if expression.operator == "*":
-        return left * right
+        return _normalize_polars_numeric_result(left * right)
       if expression.operator == "/":
-        return left / right
+        denominator_is_zero = right == pl.lit(0)
+        safe_right = pl.when(denominator_is_zero).then(pl.lit(1)).otherwise(right)
+        normalized_division = _normalize_polars_numeric_result(left / safe_right)
+        return pl.when(denominator_is_zero).then(pl.lit(None)).otherwise(normalized_division)
       if expression.operator == "==":
         return left == right
       if expression.operator == "!=":
@@ -1662,7 +1709,10 @@ class DuckDBBackend:
       arguments = tuple(
         self._compile_polars_expression(dataset, argument) for argument in expression.arguments
       )
-      return _compile_polars_function(function_name, arguments)
+      compiled = _compile_polars_function(function_name, arguments)
+      if function_name in NUMERIC_FUNCTIONS:
+        return _normalize_polars_numeric_result(compiled)
+      return compiled
     raise ExecutionError("unsupported expression")
 
   def is_polars_lazy_active(self) -> bool:
@@ -1717,6 +1767,8 @@ class DuckDBBackend:
       operand_domain = self._infer_expression_domain(dataset, expression.operand)
       if operand_domain == "null":
         raise ExecutionError(NULL_LITERAL_ERROR)
+      if _has_unsafe_unsigned_arithmetic(column_types, expression):
+        raise TypeMismatchExecutionError(UNSIGNED_ARITHMETIC_ERROR)
       if operand_domain != "numeric":
         raise TypeMismatchExecutionError(
           "expression type mismatch: unary minus requires numeric operand"
@@ -1725,6 +1777,8 @@ class DuckDBBackend:
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
+      if _has_unsafe_unsigned_arithmetic(column_types, expression):
+        raise TypeMismatchExecutionError(UNSIGNED_ARITHMETIC_ERROR)
       if _has_unsafe_unsigned_numeric_pair(column_types, expression):
         raise TypeMismatchExecutionError(
           "expression type mismatch: unsigned numeric values cannot be combined with negative "
@@ -2408,6 +2462,33 @@ def _compile_polars_function(function_name: str, arguments: tuple[pl.Expr, ...])
   raise ExecutionError(f"unsupported function in expression: {function_name}")
 
 
+def _safe_sql_numeric_result(expression_sql: str) -> str:
+  return (
+    "(select case when isfinite(cast(__tabdat_numeric_value as double)) "
+    "then __tabdat_numeric_value else NULL end "
+    f"from (select try({expression_sql}) as __tabdat_numeric_value) "
+    "as __tabdat_numeric_result)"
+  )
+
+
+def _is_numeric_result_expression(expression: Expression) -> bool:
+  if isinstance(expression, UnaryExpression):
+    return True
+  if isinstance(expression, BinaryExpression):
+    return expression.operator in {"+", "-", "*", "/"}
+  if isinstance(expression, FunctionCallExpression):
+    return expression.name.lower() in NUMERIC_FUNCTIONS
+  return False
+
+
+def _normalize_polars_numeric_result(expression: pl.Expr) -> pl.Expr:
+  finite_value = expression.cast(pl.Float64)
+  # Keep the cast in the finite probe; Polars can otherwise move it after is_finite when the
+  # result branch reuses the same expression, which is unsupported for Decimal inputs.
+  finite_probe = (finite_value + pl.lit(0.0)).is_finite()
+  return pl.when(finite_probe).then(finite_value).otherwise(pl.lit(None))
+
+
 def _contains_null_literal(expression: Expression) -> bool:
   if isinstance(expression, NullExpression):
     return True
@@ -2427,7 +2508,8 @@ def _contains_unsigned_identifier(
   expression: Expression,
 ) -> bool:
   if isinstance(expression, IdentifierExpression):
-    return _is_unsigned_numeric_type(column_types[expression.name])
+    data_type = column_types.get(expression.name)
+    return data_type is not None and _is_unsigned_numeric_type(data_type)
   if isinstance(expression, (NumberExpression, StringExpression, NullExpression)):
     return False
   if isinstance(expression, UnaryExpression):
@@ -2439,6 +2521,29 @@ def _contains_unsigned_identifier(
   if isinstance(expression, FunctionCallExpression):
     return any(
       _contains_unsigned_identifier(column_types, argument) for argument in expression.arguments
+    )
+  return False
+
+
+def _has_unsafe_unsigned_arithmetic(
+  column_types: dict[str, str],
+  expression: Expression,
+) -> bool:
+  if isinstance(expression, UnaryExpression):
+    return _contains_unsigned_identifier(column_types, expression.operand)
+  if isinstance(expression, BinaryExpression):
+    if expression.operator == "-" and (
+      _contains_unsigned_identifier(column_types, expression.left)
+      or _contains_unsigned_identifier(column_types, expression.right)
+    ):
+      return True
+    return _has_unsafe_unsigned_arithmetic(
+      column_types,
+      expression.left,
+    ) or _has_unsafe_unsigned_arithmetic(column_types, expression.right)
+  if isinstance(expression, FunctionCallExpression):
+    return any(
+      _has_unsafe_unsigned_arithmetic(column_types, argument) for argument in expression.arguments
     )
   return False
 

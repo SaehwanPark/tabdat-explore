@@ -1,8 +1,8 @@
 # TabDat Language Semantics
 
 This document records stable cross-command behavior. It covers identifier spelling, quoting, explicit
-missing values, expression domains, write-target, and failure semantics; ordering, randomness,
-estimation samples, and exit behavior remain separate contracts.
+missing values, expression domains, arithmetic results, write-target, and failure semantics;
+ordering, randomness, estimation samples, and exit behavior remain separate contracts.
 
 ## Identifier spelling and quoting
 
@@ -72,6 +72,23 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - Mixed-domain failures use deterministic type-mismatch diagnostics, and Polars-lazy validation
   occurs before fallback materialization.
 
+## Arithmetic results and non-finite values
+
+- Arithmetic operators `+`, `-`, `*`, and `/`, plus unary minus, continue to require numeric
+  operands. A valid finite result remains in the numeric domain; exact backend-specific storage
+  widening is not promised.
+- Missing operands propagate to missing results. The explicit `null` literal remains rejected by
+  arithmetic and functions; this rule covers missing values supplied by data columns.
+- Division is real division. A zero denominator, including `0 / 0`, produces a missing result for
+  that row rather than infinity or NaN.
+- `sqrt(x)` produces missing when `x < 0`; `ln(x)` and `log(x)` produce missing when `x <= 0`.
+- Any computed NaN or infinity from supported arithmetic or numeric functions is normalized to
+  missing. A direct identifier does not rewrite a non-finite value already present in the source.
+- Subtraction involving an unsigned numeric column and unary minus of an unsigned numeric expression
+  are rejected before execution; wraparound and implicit signed widening are not inferred.
+- The policy is row-level: valid rows remain usable in `generate`, `replace`, and arithmetic
+  predicates while affected rows become missing and follow the existing predicate rules.
+
 ## Write targets
 
 | Command family | Target rule | Failure behavior |
@@ -99,5 +116,5 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, ordering, randomness, estimation samples, machine-readable output, exit codes,
-and broader arithmetic-result policy are not defined here yet.
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics, ordering, randomness,
+estimation samples, machine-readable output, and exit codes are not defined here yet.

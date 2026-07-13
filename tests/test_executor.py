@@ -165,6 +165,49 @@ def _write_sql_parquet(path: Path, query: str) -> None:
     connection.close()
 
 
+def _write_arithmetic_edge_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (4.0, 2.0, 4.0, 'valid'),
+        (1.0, 0.0, -1.0, 'zero'),
+        (0.0, 0.0, 0.0, 'zero_zero'),
+        (null::double, 2.0, null::double, 'missing'),
+        (-1.0, 2.0, -1.0, 'negative')
+    ) as arithmetic_data(numerator, denominator, raw, label)
+    """,
+  )
+
+
+def _write_nonfinite_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (cast('infinity' as double)),
+        (cast('nan' as double))
+    ) as nonfinite_data(value)
+    """,
+  )
+
+
+def _write_decimal_arithmetic_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (cast(4.0 as decimal(10, 2)), cast(2.0 as decimal(10, 2)), 'valid'),
+        (cast(1.0 as decimal(10, 2)), cast(0.0 as decimal(10, 2)), 'zero'),
+        (cast(null as decimal(10, 2)), cast(2.0 as decimal(10, 2)), 'missing')
+    ) as decimal_data(amount, divisor, label)
+    """,
+  )
+
+
 def _write_regression_parquet(path: Path) -> None:
   _write_sql_parquet(
     path,
@@ -6500,6 +6543,285 @@ def test_numeric_expression_compatibility_is_consistent_across_engines(
     (42, 25.0, "M", 150.0, 151.5),
     (54, 27.5, "F", None, None),
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engines(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "arithmetic.parquet"
+  _write_arithmetic_edge_parquet(path)
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(
+      GenerateCommand(
+        "shifted",
+        BinaryExpression(
+          IdentifierExpression("numerator"), "+", IdentifierExpression("denominator")
+        ),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "ratio",
+        BinaryExpression(
+          IdentifierExpression("numerator"), "/", IdentifierExpression("denominator")
+        ),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "root",
+        FunctionCallExpression("sqrt", (IdentifierExpression("raw"),)),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "natural_log",
+        FunctionCallExpression("ln", (IdentifierExpression("raw"),)),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "common_log",
+        FunctionCallExpression("log", (IdentifierExpression("raw"),)),
+      )
+    )
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  expected = (
+    (6.0, 2.0, 2.0, math.log(4.0), math.log10(4.0)),
+    (1.0, None, None, None, None),
+    (0.0, None, 0.0, None, None),
+    (None, None, None, None, None),
+    (1.0, -0.5, None, None, None),
+  )
+  for row, expected_values in zip(preview.rows, expected):
+    for actual, expected_value in zip(row[-5:], expected_values):
+      if expected_value is None:
+        assert actual is None
+      else:
+        assert actual == pytest.approx(expected_value)
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_replace_normalizes_row_level_arithmetic_results(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "arithmetic-replace.parquet"
+  _write_arithmetic_edge_parquet(path)
+  ratio = BinaryExpression(
+    IdentifierExpression("numerator"),
+    "/",
+    IdentifierExpression("denominator"),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(ReplaceCommand("numerator", ratio))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  actual_numerators = tuple(row[0] for row in preview.rows)
+  assert actual_numerators[0] == pytest.approx(2.0)
+  assert actual_numerators[1:4] == (None, None, None)
+  assert actual_numerators[4] == pytest.approx(-0.5)
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  ("command_type", "expected_labels"),
+  [
+    (KeepCommand, ("valid",)),
+    (DropCommand, ("zero", "zero_zero", "missing", "negative")),
+  ],
+)
+def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
+  tmp_path: Path,
+  engine: str,
+  command_type: type[KeepCommand] | type[DropCommand],
+  expected_labels: tuple[str, ...],
+) -> None:
+  path = tmp_path / "arithmetic-predicate.parquet"
+  _write_arithmetic_edge_parquet(path)
+  condition = BinaryExpression(
+    BinaryExpression(
+      IdentifierExpression("numerator"),
+      "/",
+      IdentifierExpression("denominator"),
+    ),
+    ">",
+    NumberExpression(0),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(command_type(condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[-1] for row in preview.rows) == expected_labels
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  ("expression", "expected_labels"),
+  [
+    (
+      BinaryExpression(
+        IdentifierExpression("amount"),
+        "/",
+        IdentifierExpression("divisor"),
+      ),
+      ("valid",),
+    ),
+    (
+      BinaryExpression(
+        NumberExpression(1),
+        "/",
+        IdentifierExpression("amount"),
+      ),
+      ("valid", "zero"),
+    ),
+  ],
+)
+def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
+  tmp_path: Path,
+  engine: str,
+  expression: Expression,
+  expected_labels: tuple[str, ...],
+) -> None:
+  path = tmp_path / "decimal-arithmetic.parquet"
+  _write_decimal_arithmetic_parquet(path)
+  condition = BinaryExpression(
+    expression,
+    ">",
+    NumberExpression(0),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(KeepCommand(condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[-1] for row in preview.rows) == expected_labels
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_direct_nonfinite_source_values_are_not_rewritten(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "nonfinite.parquet"
+  _write_nonfinite_parquet(path)
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(GenerateCommand("copied", IdentifierExpression("value")))
+    executor.execute(
+      GenerateCommand(
+        "normalized",
+        BinaryExpression(IdentifierExpression("value"), "+", NumberExpression(0)),
+      )
+    )
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert math.isinf(cast(float, preview.rows[0][0]))
+  assert math.isnan(cast(float, preview.rows[1][0]))
+  assert math.isinf(cast(float, preview.rows[0][1]))
+  assert math.isnan(cast(float, preview.rows[1][1]))
+  assert tuple(row[2] for row in preview.rows) == (None, None)
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize("arithmetic_case", ["unary", "subtraction"])
+def test_unsigned_subtraction_and_unary_like_arithmetic_are_rejected_consistently(
+  tmp_path: Path,
+  engine: str,
+  arithmetic_case: str,
+) -> None:
+  path = tmp_path / "unsigned-arithmetic.parquet"
+  _write_sql_parquet(
+    path,
+    "select cast(value as ubigint) as u from (values (0), (2)) as values_table(value)",
+  )
+  if arithmetic_case == "unary":
+    expression: Expression = UnaryExpression("-", IdentifierExpression("u"))
+  else:
+    expression = BinaryExpression(IdentifierExpression("u"), "-", NumberExpression(1))
+  condition = BinaryExpression(expression, ">", NumberExpression(0))
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(
+      TypeMismatchExecutionError,
+      match="unsigned numeric values do not support subtraction or unary minus",
+    ):
+      executor.execute(KeepCommand(condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[0] for row in preview.rows) == (0, 2)
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
