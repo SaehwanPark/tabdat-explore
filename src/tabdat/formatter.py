@@ -29,6 +29,7 @@ from tabdat.models import (
   CfRegressionResult,
   CodebookResult,
   CommandCatalogResult,
+  CommandEffectCatalogResult,
   CommandExplainResult,
   CountResult,
   CvelasticnetRegressionResult,
@@ -82,6 +83,7 @@ from tabdat.script import ScriptError
 
 RESULT_TYPE_LABELS: dict[type[object], str] = {
   CommandCatalogResult: "CommandCatalogResult",
+  CommandEffectCatalogResult: "CommandEffectCatalogResult",
   HelpTopicResult: "HelpTopicResult",
   CommandExplainResult: "CommandExplainResult",
   LoadResult: "LoadResult",
@@ -150,6 +152,14 @@ ERROR_TYPE_LABELS: dict[type[object], str] = {
 
 
 def format_result(result: Result) -> str:
+  if isinstance(result, CommandEffectCatalogResult):
+    return "\n".join(
+      _table(
+        ("Command", "Effects"),
+        ((entry.name, ", ".join(entry.effects)) for entry in result.commands),
+      )
+    )
+
   if isinstance(result, CommandExplainResult):
     return f"Command: {result.command_name}\nExecution: {result.execution}"
 

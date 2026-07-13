@@ -648,32 +648,40 @@ and describe the active work with concise verification criteria.
   - completed exactly three independent reviews, fixed all findings, and merged the validated slice
     as PR #108
   - explicitly deferred syntax previews, full dry-run/effect analysis, option schemas, and new exits
+- Implemented Phase 24 P1 structured JSON syntax preview:
+  - added parser-only `--json --explain -c <command>` for exactly one batch command with stable
+    normalized `command_name` and `execution: "not_run"`
+  - preserved parse errors, conventional argparse help precedence, terminal behavior, and all
+    existing execution/session boundaries
+  - completed exactly three independent reviews, fixed all findings, and merged the validated slice
+    as PR #109
+  - explicitly deferred declared effect categories, data-dependent planning, estimates, and full
+    dry-run/explain behavior
 
 ## Present
 
-- Feature: Phase 24 P1 structured JSON syntax preview
+- Feature: Phase 24 P1 structured JSON declared effect categories
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-explain
+  Branch: feat/phase24-json-effects
 
   Summary:
-  Add a syntax-only machine-readable preview for one batch command through the JSON interface without
-  executing the command, creating a session, or reading data.
+  Add a small stable command-level effect vocabulary for machine clients without claiming
+  data-dependent plans, estimates, or execution.
 
   Verification:
-  - `--json --explain -c <command>` emits one deterministic `CommandExplainResult` envelope with the
-    stable normalized command name and `execution: "not_run"`
-  - syntax errors use the existing JSON error envelope and exit status `1`; no command execution,
-    config load, Executor construction, dataset read, or materialization occurs
-  - incompatible combinations with terminal mode, zero/multiple `-c`, scripts, discovery,
-    help-topic retrieval, or interactive mode fail clearly without changing existing envelopes
+  - one deterministic machine-readable envelope maps each advertised command to one or more declared
+    effect categories from a finite documented vocabulary
+  - categories are command-level declarations only, are deterministic, and never inspect active data,
+    estimate cost, or imply execution planning
+  - unknown/unclassified commands use an explicit `unknown` category; existing command execution and
+    JSON envelopes remain unchanged
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - command execution, effect classification, estimates, state/resource plans, scripts, multiple
-    commands, option/argument schemas, catalog examples, plugin discovery, interactive JSON mode,
-    full dry-run/explain behavior, repair diagnostics, operation lineage, estimation samples, and
-    new exit codes
+  - data-dependent effects, resource/state plans, estimates, command execution, scripts, option/
+    argument schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain,
+    repair diagnostics, operation lineage, estimation samples, and new exit codes
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

@@ -919,6 +919,39 @@ class CommandCatalogResult:
   commands: tuple[CommandCatalogEntry, ...]
 
 
+EffectCategory = Literal["read", "write", "control", "plot", "unknown"]
+EFFECT_CATEGORY_ORDER: tuple[EffectCategory, ...] = ("read", "write", "control", "plot", "unknown")
+_EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(EFFECT_CATEGORY_ORDER)}
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandEffectEntry:
+  """A command name and its declared command-level effects."""
+
+  name: str
+  effects: tuple[EffectCategory, ...]
+
+  def __post_init__(self) -> None:
+    if not self.effects:
+      raise ValueError("command effects must not be empty")
+    if len(set(self.effects)) != len(self.effects):
+      raise ValueError("command effects must be unique")
+    if self.effects == ("unknown",) and len(self.effects) == 1:
+      return
+    if "unknown" in self.effects:
+      raise ValueError("unknown must be the only command effect")
+    expected = tuple(sorted(self.effects, key=_EFFECT_CATEGORY_RANK.__getitem__))
+    if self.effects != expected:
+      raise ValueError("command effects must use canonical order")
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandEffectCatalogResult:
+  """The deterministic command-effect catalog exposed to machine clients."""
+
+  commands: tuple[CommandEffectEntry, ...]
+
+
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class HelpTopicResult:
   """The packaged text for one canonical in-app help topic."""
@@ -1498,6 +1531,7 @@ class TtestResult:
 
 Result = (
   CommandCatalogResult
+  | CommandEffectCatalogResult
   | HelpTopicResult
   | CommandExplainResult
   | LoadResult

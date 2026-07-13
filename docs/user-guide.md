@@ -125,6 +125,11 @@ For a syntax-only preview of one batch command, use `uv run tabdat --json --expl
 "summarize age"`; this returns the normalized `command_name` with `execution: "not_run"` and does
 not create a session or execute the command. Exactly one `-c` is required, standard `--help` keeps
 argparse precedence, and full effect analysis remains future work.
+For the finite declared effect vocabulary, use `uv run tabdat --json --list-command-effects`; it
+returns one catalog envelope without starting a session or reading data. These are command-level
+declarations of possible top-level effects, including delegated commands and output/artifact writes;
+the canonical category order is `read`, `write`, `control`, `plot`, `unknown`, and they are not
+data-dependent execution plans.
 
 ### Canonical Parquet-first workflow
 
