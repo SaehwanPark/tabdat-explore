@@ -11,10 +11,10 @@ and exit behavior remain separate contracts.
 | `generate name = expression` | `name` must not already exist | Reject the collision; do not replace the active relation |
 | `rename old new` | `old` must exist and `new` must not exist | Reject either invalid source/destination before replacement |
 | `replace name = expression` | `name` must already exist | Reject the missing target; do not create it implicitly |
-| `recode ..., generate(names)` | one output per input; every output must be new | Validate all outputs before changing the active relation |
+| `recode ..., generate(names)` | one output per input; outputs must be unique and new | Validate all outputs before changing the active relation |
 
-The command-specific diagnostics identify the failing command and target/source problem. Existing
-wording is covered by focused tests and can only change through a later language-error contract.
+The diagnostics identify the target/source problem. Existing wording is covered by focused tests
+and can only change through a later language-error contract.
 
 ## Atomic validation failures
 

@@ -10,9 +10,11 @@
   - Records generate, rename, replace, and recode-generated target rules.
   - Defines active-dataset atomicity and explicitly lists deferred semantic areas.
 - `tests/test_executor.py`
-  - Adds a cross-command regression comparing `DescribeResult` before and after generate, rename,
-    replace, and recode-generate validation failures.
-  - Covers existing collision/source diagnostics through the focused error tests.
+  - Adds a cross-command regression comparing `DescribeResult`, `HeadResult`, and `StatusResult`
+    before and after generate, rename, replace, and recode-generate validation failures across eager,
+    DuckDB-lazy, and Polars-lazy sessions.
+  - Covers existing collision/source diagnostics, unknown expressions, and duplicate generated
+    identifiers through focused error tests.
 - `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
   - Link and describe the durable semantics policy, scope, acceptance criteria, and evidence.
 
@@ -21,20 +23,22 @@
 - Target policy: generate/recode-generate outputs must be new; rename sources must exist and
   destinations must be new; replace targets must already exist.
 - Atomicity: validation failures leave the active schema, rows, execution metadata, active table,
-  last operation, and materialization reason unchanged.
+  last operation, and materialization reason unchanged. Polars-lazy write validation now runs before
+  the fallback materialization hook.
+- Duplicate recode outputs are rejected before backend execution.
 - Scope: this slice documents and hardens existing behavior; successful transformation semantics and
   error wording are unchanged.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'write_target or transformations_report_user_facing_errors or recode_validation_errors' -q` — passed, 3 tests.
-- `uv run pytest` — passed, 968 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'failed_polars_write_validation_preserves_lazy_state or write_target or transformations_report_user_facing_errors or recode_validation_errors' -q` — passed, 6 tests.
+- `uv run pytest` — passed, 970 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed, including
-  canonical replay with exact stdout/table equivalence and 4.334 seconds composite duration.
+  canonical replay with exact stdout/table equivalence and 4.324 seconds composite duration.
 
 ## Known Limits And Follow-Up Work
 

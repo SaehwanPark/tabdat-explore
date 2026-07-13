@@ -1,6 +1,6 @@
 # QA Report: Phase 24 P0 Identifier Overwrite and Atomic Error Semantics
 
-Status: implementation validation pass; PR review loop pending
+Status: implementation and three-pass review complete; ready to merge
 
 ## Boundaries Checked
 
@@ -8,10 +8,11 @@ Status: implementation validation pass; PR review loop pending
   on the four write-target rules and the active-dataset atomicity guarantee.
 - **Executor behavior to policy:** generate/recode collisions, rename source/destination errors,
   and replace missing targets are all rejected before successful active-relation replacement.
-- **Atomicity evidence:** the focused regression compares schema/rows before and after four failed
-  write validations; existing tests retain exact command-specific diagnostics.
-- **Scope control:** no successful transformation, lazy/eager, backend, or error-message behavior
-  was changed by this documentation/test slice.
+- **Atomicity evidence:** the focused regression compares schema/rows/status before and after failed
+  write validations across eager, DuckDB-lazy, and Polars-lazy sessions; existing tests retain exact
+  target/source diagnostics.
+- **Scope control:** successful transformation behavior remains unchanged; the implementation adds
+  preflight validation only to preserve the documented failure boundary before Polars fallback.
 
 ## Blocking Issues
 
@@ -19,18 +20,28 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 968 passed, 314 existing third-party warnings.
+- `uv run pytest` — 970 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
-  exact stdout/table equivalence with 4.334 seconds composite duration.
+  exact stdout/table equivalence with 4.324 seconds composite duration.
 
 ## PR Review Loop
 
-- Three independent code-review passes will run after the PR is opened.
-- Findings, fixes, and final disposition will be recorded here before merge.
+Three independent review passes completed. All findings were addressed before merge readiness:
+
+- **Pass 1:** fixed Polars-lazy validation materializing before failure, rejected duplicate recode
+  outputs, and strengthened the atomicity snapshot to include rows and status metadata.
+- **Pass 2:** independently confirmed the same high/medium issues; added expression preflight,
+  duplicate-output coverage, exact rename diagnostics, and narrowed the documented error contract
+  to the supported target/source guarantee.
+- **Pass 3:** fixed the command-reference `gen(...)` example, while retaining the preflight and
+  duplicate-output fixes and the focused diagnostics coverage.
+
+No Critical or High findings remain. The stale fallback regression was updated after the review loop
+to assert that failed Polars-lazy writes preserve lazy state; the final full suite passed.
 
 ## Non-Blocking Follow-Ups
 
@@ -39,4 +50,5 @@ Status: implementation validation pass; PR review loop pending
 
 ## Recommended Next Action
 
-Commit the validated slice, open the PR, and run the three independent review passes.
+Push the reviewed fix commit, mark the PR ready, merge it, then fast-forward `main` and clean up the
+feature branch.

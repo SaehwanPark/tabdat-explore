@@ -717,6 +717,7 @@ class Executor:
     ):
       raise ExecutionError("by only supports summarize, count, and tabulate")
 
+    self._validate_write_before_materialization(command)
     self._materialize_polars_lazy_if_needed(command)
 
     if isinstance(command, DescribeCommand):
@@ -1103,6 +1104,8 @@ class Executor:
         raise ExecutionError(
           "number of generate variables must match number of variables to recode"
         )
+      if len(set(command.generate_variables)) != len(command.generate_variables):
+        raise ExecutionError("recode generate variables must be unique")
       for gen_var in command.generate_variables:
         if gen_var in col_names:
           raise ExecutionError(f"generate variable already exists: {gen_var}")
@@ -5873,6 +5876,29 @@ class Executor:
     if self.state.active_dataset is None:
       raise NoActiveDatasetError(f"{command_name} requires an active dataset; run use <path> first")
     return self.state.active_dataset
+
+  def _validate_write_before_materialization(self, command: Command) -> None:
+    if not self.backend.is_polars_lazy_active():
+      return
+    dataset = self._require_active_dataset("validate")
+    column_names = {column.name for column in dataset.columns}
+    if isinstance(command, GenerateCommand):
+      if command.variable in column_names:
+        raise ExecutionError(f"generate target already exists: {command.variable}")
+      self.backend.validate_expression(dataset, command.expression)
+      return
+    if isinstance(command, RenameCommand):
+      if command.old_name not in column_names:
+        raise UnknownVariableError(f"rename unknown variable: {command.old_name}")
+      if command.new_name in column_names:
+        raise ExecutionError(f"rename target already exists: {command.new_name}")
+      return
+    if isinstance(command, ReplaceCommand):
+      if command.variable not in column_names:
+        raise UnknownVariableError(f"replace unknown variable: {command.variable}")
+      self.backend.validate_expression(dataset, command.expression)
+      if command.condition is not None:
+        self.backend.validate_expression(dataset, command.condition)
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

@@ -31,7 +31,7 @@ paths, and more).
 | `generate` | Create a new variable from an expression | `generate bmi_sq = bmi^2` |
 | `replace` | Replace values in an existing variable | `replace age = . if age < 0` |
 | `rename` | Rename a variable | `rename cost charges` |
-| `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), gen(age_grp)` |
+| `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), generate(age_grp)` |
 
 ## Combine and reshape
 

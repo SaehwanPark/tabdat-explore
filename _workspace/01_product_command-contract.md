@@ -20,15 +20,18 @@ Phase 24 P0, workstream 2: stable language semantics before broader command and 
 
 ## Error Contract
 
-Existing command-specific errors remain the public diagnostics. The contract requires the failure
-to identify the command and target/source problem; exact wording remains covered by focused tests
-and may be refined only through a future language-error policy slice.
+Existing command-specific errors remain the public diagnostics. The contract requires the failure to
+identify the target/source problem; exact wording remains covered by focused tests and may be
+refined only through a future language-error policy slice.
 
 ## Execution Semantics
 
 - Validation happens before the active relation is replaced.
+- For Polars-lazy sessions, write validation happens before lazy materialization, so a failed write
+  preserves the lazy engine as well as the active relation.
 - A failed write command does not update the last successful operation or materialization reason.
-- The policy applies in eager and supported lazy paths; no lazy/eager behavior changes are introduced.
+- The policy applies in eager and supported lazy paths; successful command materialization behavior is
+  unchanged.
 
 ## Acceptance Criteria
 

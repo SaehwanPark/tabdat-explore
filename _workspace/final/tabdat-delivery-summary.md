@@ -5,16 +5,19 @@ The first cross-command language-semantics slice is implemented and locally vali
 ## Delivered
 
 - Documented write-target rules for `generate`, `rename`, `replace`, and `recode generate(...)`.
-- Added regression coverage proving representative validation failures preserve active schema/rows.
+- Added regression coverage proving representative validation failures preserve active schema/rows,
+  execution metadata, and last-successful-operation state across all supported execution paths.
+- Added Polars-lazy write preflight and duplicate recode-output validation.
 - Linked the durable semantics document from the user guide and updated SPEC/QA handoff evidence.
 
 ## Validation
 
-- `uv run pytest` — 968 passed, 314 existing third-party warnings.
+- `uv run pytest` — 970 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` and `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed.
+- `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay retained
+  exact stdout/table equivalence.
 
 ## Remaining Phase 24 Work
 

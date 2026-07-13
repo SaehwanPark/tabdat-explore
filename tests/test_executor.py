@@ -827,7 +827,7 @@ def test_lazy_to_eager_reason_requires_duckdb_lazy_engine(sample_parquet: Path) 
     executor.close()
 
 
-def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> None:
+def test_failed_polars_write_validation_preserves_lazy_state(sample_parquet: Path) -> None:
   executor = Executor()
   try:
     executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
@@ -838,7 +838,8 @@ def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> 
     executor.close()
 
   assert isinstance(result, StatusResult)
-  assert result.execution_mode == "eager"
+  assert result.execution_mode == "lazy"
+  assert result.lazy_engine == "polars"
   assert result.last_operation == "use"
   assert result.last_materialization_reason is None
 
@@ -7058,16 +7059,26 @@ def test_phase_3_transformations_report_user_facing_errors(sample_parquet: Path)
     executor.close()
 
 
-def test_write_target_validation_failures_are_atomic(sample_parquet: Path) -> None:
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_write_target_validation_failures_are_atomic(sample_parquet: Path, engine: str) -> None:
   executor = Executor()
   try:
-    executor.execute(UseCommand(sample_parquet))
+    if engine == "eager":
+      executor.execute(UseCommand(sample_parquet))
+    else:
+      executor.execute(
+        UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+      )
     before = executor.execute(DescribeCommand())
+    before_head = executor.execute(HeadCommand(3))
+    before_status = executor.execute(StatusCommand())
     with pytest.raises(ExecutionError):
       executor.execute(GenerateCommand("age", NumberExpression(1)))
     with pytest.raises(ExecutionError):
+      executor.execute(GenerateCommand("age2", IdentifierExpression("missing")))
+    with pytest.raises(ExecutionError, match="rename target already exists: bmi"):
       executor.execute(RenameCommand("age", "bmi"))
-    with pytest.raises(ExecutionError):
+    with pytest.raises(ExecutionError, match="rename unknown variable: missing"):
       executor.execute(RenameCommand("missing", "age"))
     with pytest.raises(ExecutionError):
       executor.execute(ReplaceCommand("missing", NumberExpression(1)))
@@ -7079,13 +7090,25 @@ def test_write_target_validation_failures_are_atomic(sample_parquet: Path) -> No
           generate_variables=("bmi",),
         )
       )
+    with pytest.raises(ExecutionError, match="recode generate variables must be unique"):
+      executor.execute(
+        RecodeCommand(
+          variables=("age", "bmi"),
+          rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+          generate_variables=("age_cat", "age_cat"),
+        )
+      )
     after = executor.execute(DescribeCommand())
+    after_head = executor.execute(HeadCommand(3))
+    after_status = executor.execute(StatusCommand())
   finally:
     executor.close()
 
   assert isinstance(before, DescribeResult)
   assert isinstance(after, DescribeResult)
   assert after == before
+  assert after_head == before_head
+  assert after_status == before_status
 
 
 @pytest.mark.parametrize(
@@ -7504,6 +7527,16 @@ def test_execute_recode_validation_errors(sample_parquet: Path) -> None:
           variables=("age",),
           rules=(RecodeRule(inputs=(1.0,), output=0.0),),
           generate_variables=("bmi",),
+        )
+      )
+
+    # 3b. Duplicate generated variables
+    with pytest.raises(ExecutionError, match="recode generate variables must be unique"):
+      executor.execute(
+        RecodeCommand(
+          variables=("age", "bmi"),
+          rules=(RecodeRule(inputs=(1.0,), output=0.0),),
+          generate_variables=("age_cat", "age_cat"),
         )
       )
 
