@@ -5939,6 +5939,17 @@ class Executor:
       if append_dataset is None:
         raise UnknownTableError(f"unknown table: {command.table_name}")
       self.backend.validate_append(dataset, append_dataset, table_name=command.table_name)
+      return
+    if isinstance(command, JoinCommand):
+      right_dataset = self.state.tables.get(command.table_name)
+      if right_dataset is None:
+        raise UnknownTableError(f"unknown table: {command.table_name}")
+      self.backend.validate_join(
+        dataset,
+        right_dataset,
+        table_name=command.table_name,
+        keys=command.keys,
+      )
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

@@ -585,26 +585,30 @@ and describe the active work with concise verification criteria.
   - preserved duplicate rows and made head/tail consume the combined sequence deterministically
   - validated append table/schema failures before Polars fallback materialization
   - explicitly deferred join/reshape and categorical ordering
+- Implemented Phase 24 P0 join row-order semantics:
+  - explicitly preserved active-row order and named-table match order for inner and left joins
+  - preserved duplicate right-side matches without global sorting or deduplication
+  - kept append, reshape, and categorical ordering as separate contracts
 
 ## Present
 
-- Feature: Phase 24 P0 append row-order semantics
+- Feature: Phase 24 P0 join row-order semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-append-order
+  Branch: feat/phase24-join-order
 
   Summary:
-  Define and regression-test left-then-right row sequence for `append table_name` across supported
-  execution paths.
+  Define and regression-test deterministic result sequence for `join table_name on keyvars` across
+  supported execution paths.
 
   Verification:
-  - append emits active rows before named-table rows across eager, DuckDB-lazy, and Polars-lazy inputs
-  - head/tail preserve the combined left-then-right sequence
-  - append does not sort, deduplicate, or interleave inputs
-  - CLI, script, help, docs, full tests, and type/lint checks pass
+  - join groups output by active-row sequence and preserves named-table match sequence within each group
+  - duplicate right-side matches remain present for inner and left joins
+  - eager, DuckDB-lazy, and Polars-lazy inputs produce the same preview sequence
+  - CLI, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new sort syntax, row-ID persistence, join/reshape ordering, unordered SQL guarantees,
+  - new sort syntax, row-ID persistence, append/reshape ordering, unordered SQL guarantees,
     categorical ordering, exact arithmetic storage widths, overflow reporting, randomness,
     estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins

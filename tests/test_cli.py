@@ -442,11 +442,12 @@ def test_cli_runs_phase_11_join_named_table_flow(sample_parquet: Path, capsys) -
       "-c",
       f"use {sample_parquet}",
       "-c",
-      "sql select sex, avg(bmi) as mean_bmi from active group by sex into sex_lookup",
+      "sql select sex, label from (values (1, 'F', 'female-first'), (2, 'F', 'female-second')) "
+      "as lookup(row_id, sex, label) order by row_id into sex_lookup",
       "-c",
       f"use {sample_parquet}",
       "-c",
-      "join sex_lookup on sex",
+      "join sex_lookup on sex, how=left",
       "-c",
       "head 5",
     ],
@@ -456,10 +457,16 @@ def test_cli_runs_phase_11_join_named_table_flow(sample_parquet: Path, capsys) -
 
   assert exit_code == 0
   assert "Created sex_lookup: 2 rows, 2 columns" in captured.out
-  assert "Joined sex_lookup: 3 rows, 5 columns" in captured.out
-  assert "age  bmi   sex  cost   mean_bmi" in captured.out
-  assert "30   22.5  F    100.0  25" in captured.out
-  assert "42   25.0  M    150.0  25" in captured.out
+  assert "Joined sex_lookup: 5 rows, 5 columns" in captured.out
+  assert "age  bmi   sex  cost   label" in captured.out
+  head_output = captured.out[captured.out.index("age  bmi   sex  cost   label") :]
+  assert tuple(line.strip() for line in head_output.splitlines()[1:] if line.strip()) == (
+    "30   22.5  F    100.0  female-first",
+    "30   22.5  F    100.0  female-second",
+    "42   25.0  M    150.0  .",
+    "54   27.5  F    .      female-first",
+    "54   27.5  F    .      female-second",
+  )
   assert captured.err == ""
 
 

@@ -37,7 +37,7 @@ paths, and more).
 
 | Command | Purpose | Minimal invocation |
 |---------|---------|-------------------|
-| `join` | Join the active dataset with another table | `join patients using id` |
+| `join` | Join the active dataset with another table | `join lookup on id` |
 | `append` | Append rows from a named table | `append followup` |
 | `reshape` | Reshape data between wide and long layouts | `reshape long value, i(id) j(year)` |
 

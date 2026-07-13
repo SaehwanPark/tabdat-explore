@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Append Row Order
+# Product Contract: Phase 24 P0 — Join Row Order
 
 ## Request Summary
 
-Make existing `append table_name` behavior sequence-preserving and predictable without adding new
-syntax.
+Make existing `join table_name on keyvars` result ordering sequence-preserving and predictable
+without adding new syntax.
 
 ## Roadmap Phase
 
@@ -11,8 +11,8 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This is a bounded follow-up to SQL/named-table order. It covers vertical stacking while leaving join,
-reshape, and categorical order decisions for later.
+This is a bounded follow-up to the completed active, SQL/named-table, and append order contracts. It
+covers keyed relation combination while leaving reshape and categorical order decisions for later.
 
 ## Existing Syntax
 
@@ -20,41 +20,46 @@ Valid forms retain the current grammar:
 
 - `sql select value, label from active order by value desc nulls last into followup`
 - `use source.parquet`
-- `append followup`
+- `sql select key, label from active order by key, label into lookup`
+- `use source.parquet`
+- `join lookup on key, how=left`
 - `head 5`
-- `tail 3`
 
 No new options, commands, or output fields are introduced.
 
-## Append-Order Rules
+## Join-Order Rules
 
-- The active dataset is the left input. `append name` emits every active row first, then every row
-  from named table `name` in its stored sequence.
-- Append does not sort, deduplicate, or interleave rows. The combined sequence is consumed by
-  `head`/`tail` using the active row-order contract.
-- Append validates the named table and schema before replacing the active relation; a failed append
+- The active dataset is the left input. For each active row, `join name on keys` emits matching rows
+  from named table `name` in that table's stored sequence.
+- Output is grouped by active-row sequence. A later active row never appears before an earlier active
+  row's matches, and duplicate right-side matches are preserved.
+- An `inner` join omits active rows with no match. A `left` join emits one row with missing right-side
+  values for each active row with no match.
+- Join validates named-table existence and key columns before Polars fallback; a validation failure
   preserves the active rows, execution mode, and materialization metadata.
-- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same combined row sequence. Append crosses
-  the existing eager boundary for relation combination and preserves its current state reporting.
+- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same join result sequence. Join crosses the
+  existing eager boundary where required and preserves current state reporting.
 
 ## Data And Execution Assumptions
 
-- The active dataset and named table must exist, and current append schema compatibility checks remain
-  unchanged.
+- The active dataset and named table must exist. Existing key validation, equality behavior, suffixing,
+  and output-column rules remain unchanged.
 - Both inputs use their already established sequences; SQL source creation should use explicit order
   and tie-breakers when a reproducible named-table sequence is required.
-- Join/reshape order, unordered SQL, categorical order, and a new sort command remain outside this
+- Append, reshape order, unordered SQL, categorical order, and a new sort command remain outside this
   slice.
 
 ## Acceptance Criteria
 
-- [x] Append emits active rows before named-table rows across supported execution paths.
-- [x] Head/tail of the combined sequence preserve left-then-right order.
-- [x] Append does not sort, deduplicate, or interleave inputs.
-- [x] Failed table/schema validation preserves active execution state before lazy fallback.
-- [x] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
+- [x] Join groups results by active-row order and preserves named-table match order.
+- [x] Duplicate right-side matches remain present for inner and left joins.
+- [x] Inner and left unmatched-row behavior remains unchanged and ordered.
+- [x] Eager, DuckDB-lazy, and Polars-lazy result previews agree.
+- [x] Failed table/key validation preserves active execution state before lazy fallback.
+- [x] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
+  checks pass.
 
 ## Non-Goals For This Slice
 
-- New sort syntax or commands, row-ID persistence, join/reshape ordering, unordered SQL guarantees,
+- New sort syntax or commands, row-ID persistence, append/reshape ordering, unordered SQL guarantees,
   categorical ordering, or estimators.

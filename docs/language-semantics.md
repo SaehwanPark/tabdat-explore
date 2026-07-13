@@ -108,7 +108,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
   results follow the existing keep/drop policy and never reorder survivors.
 - Column projection and row-preserving value transformations preserve the current row sequence.
-- Grouped or relation-changing commands such as `collapse`, join, and reshape establish
+- Grouped or relation-changing commands such as `collapse` and reshape establish
   separate result-sequence contracts; this slice does not redefine their later preview order.
 - Categorical order remains a separate contract.
 
@@ -122,7 +122,20 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
   fallback path before the query executes, and successful named-table activation resets the prior
   materialization reason.
-- Join/reshape order and categorical order remain separate contracts.
+- Reshape order and categorical order remain separate contracts.
+
+## Join row order
+
+- The active dataset is the left input. For each active row, `join name on keys` emits matching rows
+  from named table `name` in its stored sequence.
+- Output is grouped by active-row sequence. Duplicate right-side matches remain present, and a later
+  active row never appears before an earlier active row's matches.
+- An `inner` join omits active rows with no match. A `left` join emits one row with missing right-side
+  values for each active row with no match.
+- Existing key equality, suffixing, output-column, and missing-key behavior remain unchanged.
+- Join validates named-table existence and key columns before Polars fallback; a validation failure
+  preserves the active rows, execution mode, and materialization metadata.
+- Reshape order and categorical order remain separate contracts.
 
 ## Append row order
 
@@ -130,7 +143,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
   `name` in its stored sequence.
 - Append does not sort, deduplicate, or interleave the two inputs. `head`/`tail` consume the combined
   sequence using the active row-order rules.
-- Join/reshape order and categorical order remain separate contracts.
+- Reshape order and categorical order remain separate contracts.
 
 ## Write targets
 
@@ -159,6 +172,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics, join/reshape ordering,
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics, reshape ordering,
 SQL without explicit ordering, randomness, estimation samples, machine-readable output,
 and exit codes are not defined here yet.
