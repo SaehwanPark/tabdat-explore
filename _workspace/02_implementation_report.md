@@ -3,37 +3,40 @@
 ## Contract Consumed
 
 - `_workspace/01_product_command-contract.md` — a parser-only JSON preview for exactly one batch
-  command, with `not_run` execution and existing structured parse errors.
+  command, with stable normalized command names, `not_run` execution, and existing parse errors.
 
 ## Delivered Boundary
 
 - `src/tabdat/models.py`
-  - Added strict typed `CommandExplainResult` and included it in the public `Result` union.
+  - Added strict typed `CommandExplainResult` with stable `command_name` and `execution` fields.
+  - Included it in the public `Result` union.
 - `src/tabdat/formatter.py`
   - Added the stable `CommandExplainResult` label to the exhaustive result-label map and a total
     terminal formatter branch.
 - `src/tabdat/cli.py`
   - Added `--explain`, requiring exactly one `-c/--command` and `--json`.
-  - Parses one command before config or `Executor` construction and emits its stable dataclass type
-    with `execution: "not_run"`.
+  - Parses one command before config or `Executor` construction and emits its normalized leading
+    command name with `execution: "not_run"`.
   - Routes parser failures through the existing JSON error envelope while preserving human stderr.
+  - Preserves conventional argparse `--help` precedence without executing or previewing a command.
 - Help/docs/tests
-  - Documented syntax-only preview limits in the command reference, user guide, and `run` help.
-  - Added success, parser-error, no-session, exact-cardinality, and incompatible-invocation coverage
-    while preserving existing terminal and JSON behavior.
+  - Documented syntax-only preview limits and help precedence in the command reference, user guide,
+    and `run` help.
+  - Added success, parser-error, empty/built-in/conditional/run command, config-bypass,
+    exact-cardinality, help-precedence, and incompatible-invocation coverage.
 
 ## Functional-First Notes
 
-The preview is a pure parser/presentation boundary. It deliberately makes no claims about effects,
-resource plans, estimates, state transitions, or execution equivalence, and it never instantiates an
-`Executor` or loads config/data.
+The preview is a pure parser/presentation boundary. It deliberately exposes a stable semantic
+command name rather than Python AST class names and makes no claims about effects, resource plans,
+estimates, state transitions, or execution equivalence.
 
 ## Validation Commands And Outcomes
 
 - `uv run pytest tests/test_cli.py -k 'json or list_commands or help_topic or explain' -q` — passed,
-  43 tests.
+  49 tests.
 - `uv run pytest tests/test_help.py -k 'run_help or current_commands' -q` — passed, 2 tests.
-- `uv run pytest -q` — passed, 1,185 tests, with 314 existing third-party warnings.
+- `uv run pytest -q` — passed, 1,191 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 35 files already formatted.
@@ -42,11 +45,13 @@ resource plans, estimates, state transitions, or execution equivalence, and it n
   s3_taxi_lazy_scale s4_penguins_script_repro s5_titanic_phase13_dogfood
   s6_canonical_parquet_workflow` — passed with exit code 0; all six scenarios passed and canonical
   replay stdout matched.
-- PR review loop: pending; no review passes have been started for this slice.
+- Exactly three independent PR reviews completed: one reported help precedence, one reported unstable
+  AST-type labels, and one reported stale handoff text plus edge-case coverage. All findings were fixed
+  and validated; no fourth review was started.
 
 ## Known Limits And Follow-Up Work
 
 Effect classification, estimates, state/resource plans, scripts, multiple commands, option/argument
 schemas, plugin discovery, interactive JSON mode, full dry-run/explain, repair diagnostics, lineage,
 new exits, and new syntax remain separate Phase 24 contracts. The implementation is ready for PR
-review.
+merge.

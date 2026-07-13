@@ -122,9 +122,9 @@ help topic for a machine client, use `uv run tabdat --json --help-topic summariz
 single `HelpTopicResult` envelope with the canonical topic and exact packaged help text. Topic names
 are case-insensitive, and unknown topics use the existing JSON error envelope.
 For a syntax-only preview of one batch command, use `uv run tabdat --json --explain -c
-"summarize age"`; this returns the parsed command type with `execution: "not_run"` and does not
-create a session or execute the command. Exactly one `-c` is required; full effect analysis remains
-future work.
+"summarize age"`; this returns the normalized `command_name` with `execution: "not_run"` and does
+not create a session or execute the command. Exactly one `-c` is required, standard `--help` keeps
+argparse precedence, and full effect analysis remains future work.
 
 ### Canonical Parquet-first workflow
 

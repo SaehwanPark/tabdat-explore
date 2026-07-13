@@ -931,7 +931,7 @@ class HelpTopicResult:
 class CommandExplainResult:
   """A syntax-only preview of one parsed command that was not executed."""
 
-  command_type: str
+  command_name: str
   execution: Literal["not_run"]
 
 

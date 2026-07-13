@@ -217,8 +217,15 @@ def _run_explain_json(command_text: str) -> int:
 
 
 def _command_explain_result(command_text: str) -> CommandExplainResult:
-  command = parse_command(command_text)
-  return CommandExplainResult(command_type=type(command).__name__, execution="not_run")
+  parse_command(command_text)
+  return CommandExplainResult(command_name=_preview_command_name(command_text), execution="not_run")
+
+
+def _preview_command_name(command_text: str) -> str:
+  first_token = command_text.strip().split(maxsplit=1)[0].lower()
+  if first_token == "?":
+    return "help"
+  return first_token.rstrip(",:")
 
 
 def _run_commands(

@@ -662,7 +662,7 @@ and describe the active work with concise verification criteria.
 
   Verification:
   - `--json --explain -c <command>` emits one deterministic `CommandExplainResult` envelope with the
-    stable parsed command type and `execution: "not_run"`
+    stable normalized command name and `execution: "not_run"`
   - syntax errors use the existing JSON error envelope and exit status `1`; no command execution,
     config load, Executor construction, dataset read, or materialization occurs
   - incompatible combinations with terminal mode, zero/multiple `-c`, scripts, discovery,

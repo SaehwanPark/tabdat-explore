@@ -151,7 +151,7 @@ ERROR_TYPE_LABELS: dict[type[object], str] = {
 
 def format_result(result: Result) -> str:
   if isinstance(result, CommandExplainResult):
-    return f"Command: {result.command_type}\nExecution: {result.execution}"
+    return f"Command: {result.command_name}\nExecution: {result.execution}"
 
   if isinstance(result, HelpTopicResult):
     return result.text

@@ -14,9 +14,10 @@ Phase 24 P1: Agent and automation interface.
 - `tabdat --json --explain -c "summarize age"` emits exactly one compact deterministic success
   envelope.
 - The envelope uses `schema_version: 1`, stable `result_type: "CommandExplainResult"`, and a `data`
-  payload containing `command_type: "SummarizeCommand"` and `execution: "not_run"`.
-- `command_type` is the existing parsed command dataclass name. This contract does not claim command
-  effect classification, option expansion, state planning, or execution equivalence.
+  payload containing `command_name: "summarize"` and `execution: "not_run"`.
+- `command_name` is the normalized leading command token; `?` maps to `help`, and prefix punctuation
+  such as `bayes:` is removed. This contract does not expose parser implementation classes or claim
+  command effect classification, option expansion, state planning, or execution equivalence.
 - Exactly one `-c/--command` is required. Parse failures emit one existing `ParseError` JSON
   envelope, retain the existing human stderr message, and exit with status `1`.
 - Preview routing occurs before config or `Executor` construction, reads no dataset, changes no
@@ -25,6 +26,8 @@ Phase 24 P1: Agent and automation interface.
 - `--explain` without `--json`, with zero/multiple `-c`, combined with `-f`, a positional script,
   `--list-commands`, or `--help-topic`, and use in an interactive session are rejected clearly with
   existing CLI usage semantics.
+- Standard argparse `--help` retains conventional precedence and exits with CLI usage text; it does
+  not execute or preview a command.
 
 ## Examples
 
@@ -37,7 +40,7 @@ uv run tabdat --json --explain -c "summarize age"
 Expected shape:
 
 ```json
-{"data":{"command_type":"SummarizeCommand","execution":"not_run"},"result_type":"CommandExplainResult","schema_version":1}
+{"data":{"command_name":"summarize","execution":"not_run"},"result_type":"CommandExplainResult","schema_version":1}
 ```
 
 Syntax failure:
@@ -51,7 +54,7 @@ contains one `ParseError` envelope, and the process exits with status `1`.
 
 ## Acceptance Criteria
 
-- [x] One valid versioned success envelope reports the parsed command type and `not_run` execution.
+- [x] One valid versioned success envelope reports the normalized command name and `not_run` execution.
 - [x] Preview parses exactly one `-c` command without config/Executor/data/session side effects.
 - [x] Syntax failures emit one stable JSON error envelope with exit status `1` and unchanged stderr.
 - [x] Incompatible invocation combinations fail clearly without contaminating JSON output or changing

@@ -27,9 +27,10 @@ are case-insensitive; unknown topics emit the existing JSON error envelope. Help
 requires `--json` and cannot be combined with command or script execution or `--list-commands`.
 
 Use `tabdat --json --explain -c "summarize age"` for a syntax-only preview. It emits one
-`CommandExplainResult` with the parsed command type and `execution: "not_run"`; it never executes the
-command or creates a session. Exactly one `-c` is required, and parse failures use the existing JSON
-error envelope. Effect classification, estimates, and full dry-run planning remain out of scope.
+`CommandExplainResult` with the normalized command name and `execution: "not_run"`; it never executes
+the command or creates a session. Exactly one `-c` is required, and parse failures use the existing
+JSON error envelope. Standard `--help` retains argparse help precedence. Effect classification,
+estimates, and full dry-run planning remain out of scope.
 
 ## Load and inspect
 

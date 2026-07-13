@@ -20,5 +20,5 @@ sorted command catalog without starting a session or reading data; discovery can
 command or script execution. Use `tabdat --json --help-topic summarize` to retrieve one existing
 help topic as a single JSON envelope; topic names are case-insensitive and unknown topics emit the
 existing JSON error envelope. Use `tabdat --json --explain -c "summarize age"` for a syntax-only
-preview that reports the parsed command type with `execution: "not_run"`; exactly one `-c` is required
-and the command is not executed.
+preview that reports the normalized command name with `execution: "not_run"`; exactly one `-c` is
+required and the command is not executed. Standard `--help` keeps argparse help precedence.

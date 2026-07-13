@@ -295,8 +295,9 @@ def test_cli_json_explains_one_command_without_starting_a_session(monkeypatch, c
 
   monkeypatch.setattr("tabdat.cli.Executor", fail_setup)
   monkeypatch.setattr("tabdat.cli.load_default_config", fail_setup)
+  monkeypatch.setattr("tabdat.cli.load_config", fail_setup)
 
-  exit_code = main(["--json", "--explain", "-c", "summarize age"])
+  exit_code = main(["--config", "missing.toml", "--json", "--explain", "-c", "summarize age"])
 
   captured = capsys.readouterr()
   envelope = json.loads(captured.out)
@@ -304,7 +305,7 @@ def test_cli_json_explains_one_command_without_starting_a_session(monkeypatch, c
   assert exit_code == 0
   assert captured.err == ""
   assert envelope == {
-    "data": {"command_type": "SummarizeCommand", "execution": "not_run"},
+    "data": {"command_name": "summarize", "execution": "not_run"},
     "result_type": "CommandExplainResult",
     "schema_version": 1,
   }
@@ -320,6 +321,35 @@ def test_cli_json_explain_parse_error_emits_error(capsys) -> None:
   assert envelope["error"]["type"] == "ParseError"
   assert "unknown command" in envelope["error"]["message"]
   assert captured.err == "Error: unknown command: not_a_tabdat_command\n"
+
+
+@pytest.mark.parametrize(
+  ("command_text", "command_name"),
+  (
+    ("", ""),
+    ("help run", "help"),
+    ("exit", "exit"),
+    ("run script.td", "run"),
+    ("summarize age if age > 0", "summarize"),
+  ),
+)
+def test_cli_json_explain_preserves_stable_command_names(
+  command_text, command_name, capsys
+) -> None:
+  exit_code = main(["--json", "--explain", "-c", command_text])
+
+  captured = capsys.readouterr()
+
+  if not command_text:
+    envelope = json.loads(captured.out)
+    assert exit_code == 1
+    assert envelope["error"]["type"] == "ParseError"
+    return
+
+  envelope = json.loads(captured.out)
+  assert exit_code == 0
+  assert envelope["data"] == {"command_name": command_name, "execution": "not_run"}
+  assert captured.err == ""
 
 
 def test_cli_explain_requires_json(capsys) -> None:
@@ -364,6 +394,17 @@ def test_cli_explain_rejects_incompatible_arguments(execution_args, capsys) -> N
   assert error.value.code == 2
   assert captured.out == ""
   assert "--explain" in captured.err
+
+
+def test_cli_explain_preserves_argparse_help_precedence(capsys) -> None:
+  with pytest.raises(SystemExit) as error:
+    main(["--explain", "--help"])
+
+  captured = capsys.readouterr()
+
+  assert error.value.code == 0
+  assert "usage: tabdat" in captured.out
+  assert captured.err == ""
 
 
 def test_json_result_labels_cover_the_result_union() -> None:

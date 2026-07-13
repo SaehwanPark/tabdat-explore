@@ -24,15 +24,18 @@ dry-run/explain behavior before effect analysis or option schemas.
 ## Assumptions
 
 - `tabdat --json --explain -c <command>` is the only valid invocation for this slice; it emits one
-  success envelope with `schema_version: 1`, stable `result_type`, `data.command_type`, and
+  success envelope with `schema_version: 1`, stable `result_type`, `data.command_name`, and
   `data.execution: "not_run"`.
-- The existing `parse_command()` result class name is the stable parsed command type. No command
-  execution, effect inference, normalization beyond parsing, or data inspection is promised.
+- `command_name` is the normalized leading command token (`?` maps to `help`, and `bayes:`/option
+  punctuation is removed). No command execution, effect inference, AST class exposure, or data
+  inspection is promised.
 - Exactly one `-c/--command` is required. Syntax failures emit one existing structured JSON error
   envelope and exit status `1`; terminal stderr retains the existing parse message.
 - Routing occurs before config or `Executor` construction and has no dataset or session side effects.
 - Combining `--explain` with terminal mode, zero/multiple `-c`, `-f`, a positional script,
   `--list-commands`, `--help-topic`, or interactive mode fails clearly.
+- Standard argparse `--help` retains conventional precedence and prints CLI usage without executing
+  or previewing a command.
 
 ## Non-Goals
 
