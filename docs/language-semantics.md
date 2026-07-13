@@ -1,8 +1,8 @@
 # TabDat Language Semantics
 
-This document records stable cross-command behavior. It covers identifier spelling, quoting, missing
-values, write-target, and failure semantics; coercion, ordering, randomness, estimation samples, and
-exit behavior remain separate contracts.
+This document records stable cross-command behavior. It covers identifier spelling, quoting, explicit
+missing values, write-target, and failure semantics; coercion, ordering, randomness, estimation
+samples, and exit behavior remain separate contracts.
 
 ## Identifier spelling and quoting
 
@@ -25,6 +25,18 @@ replace `weight kg` = `weight kg` * 2 if `status flag` == "active"
 Quoted identifiers are not command names or option names. An exact spelling mismatch remains an
 unknown-variable error and follows the write-validation atomicity policy below.
 
+## Explicit missing values and predicates
+
+- The unquoted token `null` is a case-insensitive missing-value literal. A quoted `` `null` `` is
+  still an ordinary identifier with exact spelling.
+- `value == null` and `null == value` are true only for missing values; `value != null` and
+  `null != value` are true only for nonmissing values.
+- `null == null` is true and `null != null` is false.
+- A direct `null` expression can generate or replace an all-missing value and can be used as a row
+  predicate. It follows the existing keep/drop policy below.
+- Null used with another comparison operator, unary arithmetic, or a function is rejected with a
+  stable execution error. This slice does not add `is null`, `missing()`, or `nonmissing()` syntax.
+
 ## Missing values and predicates
 
 - Missing values are represented as null values (`None` at the Python boundary); this slice does not
@@ -40,8 +52,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 
-Explicit missing-value predicates, null literals, coercion, and arithmetic-result policy remain
-separate contracts.
+Implicit coercion and broader arithmetic-result policy remain separate contracts.
 
 ## Write targets
 

@@ -1,18 +1,22 @@
-# QA Report: Phase 24 P0 Missing Predicate Semantics
+# QA Report: Phase 24 P0 Explicit Missing Predicates
 
 Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, and the product contract
-  agree on true/false/missing predicate behavior and aggregate missingness.
-- **Backend behavior:** eager/DuckDB and Polars paths agree that drop predicates retain missing
-  results while keep predicates exclude them.
-- **Existing aggregate behavior:** summarize counts nonmissing numeric values, codebook reports
-  missing counts, tabulate's `missing` option includes null categories, and missing bar categories
-  render with the stable `<missing>` label.
-- **Scope control:** no new missing syntax, null literal, coercion policy, estimator behavior, or
-  backend was added.
+- **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, help topics, and the
+  product contract agree on `null` literal spelling, null-aware equality/inequality, and deferred
+  coercion.
+- **Parser to AST:** unquoted `null` becomes a null literal while quoted `` `null` `` remains a
+  variable identifier.
+- **Backend behavior:** eager, DuckDB-lazy, and Polars-lazy paths agree for explicit missing
+  predicates and direct null assignment, including direct `null` row predicates.
+- **Failure behavior:** unsupported null arithmetic/function use fails before mutation with a stable
+  diagnostic; invalid tabulate conditions fail before Polars-lazy materialization.
+- **User-facing paths:** CLI `-c`, script execution, and command help document and exercise the
+  contract.
+- **Scope control:** no `is null`/function syntax, coercion policy, new command, or estimator was
+  added.
 
 ## Blocking Issues
 
@@ -20,9 +24,13 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_executor.py -k 'missing_predicates_are_consistent or tabulate_missing_option_controls or all_missing_numeric or phase_24_bar_missing' -q` — 6 passed.
-- `uv run pytest tests/test_cli.py -k 'missing_drop_predicate' -q` — 2 passed.
-- `uv run pytest` — 984 passed, 314 existing third-party warnings.
+- `uv run pytest tests/test_parser.py -k 'null_literal' -q` — 1 passed.
+- `uv run pytest tests/test_executor.py -k 'explicit_null_predicates or null_literal_rejects' -q` —
+  9 passed.
+- `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — 2 passed.
+- `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — 1 passed.
+- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — 2 passed.
+- `uv run pytest` — 999 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -34,20 +42,19 @@ Status: final; implementation validation and exactly three independent PR review
 
 Three independent review passes completed before merge readiness:
 
-- **Pass 1:** fixed the documented-but-unrendered missing bar category by normalizing it to
-  `<missing>` and added an SVG artifact regression. Clarified Polars replace coverage by asserting
-  the supported fallback materializes to eager state.
-- **Pass 2:** independently confirmed the same fallback evidence gap, then verified the script CLI
-  path and added all-missing aggregate and bar-output regressions.
-- **Pass 3:** no actionable findings.
+- **Pass 1:** PASS; no actionable cross-boundary findings.
+- **Pass 2:** found a Medium atomicity issue where invalid tabulate null conditions materialized
+  Polars-lazy state before rejection. Fixed by validating direct and `by:` tabulate conditions before
+  fallback materialization, with two state-preservation regressions.
+- **Pass 3:** PASS; no actionable release-readiness findings.
 
-No Critical or High findings remain. All Medium and Low findings were addressed and revalidated.
+No Critical or High findings remain. The single Medium finding was fixed and revalidated.
 
 ## Non-Blocking Follow-Ups
 
-- Explicit missing predicates/null literals, coercion, arithmetic/categories, ordering/randomness,
-  estimation samples, machine output, exit semantics, lineage, differential assurance, and
-  public-preview readiness remain queued in `SPEC.md`.
+- Implicit coercion, broader arithmetic, categories, ordering/randomness, estimation samples,
+  machine output, exit semantics, lineage, differential assurance, and public-preview readiness
+  remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 

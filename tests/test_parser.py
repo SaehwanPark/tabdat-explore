@@ -44,6 +44,7 @@ from tabdat.models import (
   LowessCommand,
   NbregCommand,
   NlCommand,
+  NullExpression,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -1353,6 +1354,25 @@ def test_parse_quoted_identifiers_preserves_exact_names() -> None:
     parse_expression("``")
   with pytest.raises(ParseError, match="unterminated quoted identifier"):
     parse_expression("`body mass")
+
+
+def test_parse_null_literal_preserves_quoted_identifier() -> None:
+  assert parse_expression("cost == null") == BinaryExpression(
+    left=IdentifierExpression("cost"),
+    operator="==",
+    right=NullExpression(),
+  )
+  assert parse_expression("NULL != cost") == BinaryExpression(
+    left=NullExpression(),
+    operator="!=",
+    right=IdentifierExpression("cost"),
+  )
+  assert parse_expression("`null`") == IdentifierExpression("null")
+  assert parse_expression("null") == NullExpression()
+  assert parse_command("generate all_missing = NULL") == GenerateCommand(
+    variable="all_missing",
+    expression=NullExpression(),
+  )
 
 
 def test_parse_quoted_identifiers_across_wrappers_and_controls() -> None:

@@ -24,6 +24,8 @@ All notable project changes are tracked here.
   coercion, and broader language policy remain queued.
 - Started the Phase 24 missing-predicate semantics slice; explicit missing predicates and coercion
   remain queued.
+- Started the Phase 24 explicit missing-predicate slice; null-aware equality is bounded separately
+  from coercion and broader arithmetic policy.
 
 ### Added
 

@@ -68,6 +68,7 @@ from tabdat.models import (
   EstatCommand,
   ExportCommand,
   ExportResult,
+  Expression,
   FunctionCallExpression,
   GenerateCommand,
   HeadCommand,
@@ -89,6 +90,7 @@ from tabdat.models import (
   NbregRegressionResult,
   NlCommand,
   NlRegressionResult,
+  NullExpression,
   NumberExpression,
   PanelCommand,
   PanelMetadata,
@@ -834,6 +836,37 @@ def test_failed_polars_write_validation_preserves_lazy_state(sample_parquet: Pat
     executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
     with pytest.raises(ExecutionError):
       executor.execute(GenerateCommand("age2", IdentifierExpression("missing")))
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.execution_mode == "lazy"
+  assert result.lazy_engine == "polars"
+  assert result.last_operation == "use"
+  assert result.last_materialization_reason is None
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_failed_polars_tabulate_null_validation_preserves_lazy_state(
+  sample_parquet: Path,
+  wrapped: bool,
+) -> None:
+  condition = BinaryExpression(
+    left=IdentifierExpression("cost"),
+    operator="<",
+    right=NullExpression(),
+  )
+  tabulate = TabulateCommand(("sex",), condition=condition)
+  command = ByCommand(("sex",), tabulate) if wrapped else tabulate
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(
+      ExecutionError,
+      match="null literal only supports equality and inequality comparisons",
+    ):
+      executor.execute(command)
     result = executor.execute(StatusCommand())
   finally:
     executor.close()
@@ -6303,6 +6336,131 @@ def test_missing_predicates_are_consistent_across_execution_engines(
     (42, 0),
     (54, None),
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_explicit_null_predicates_and_assignment_are_consistent_across_execution_engines(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  condition_missing = BinaryExpression(
+    left=IdentifierExpression("cost"),
+    operator="==",
+    right=NullExpression(),
+  )
+  condition_nonmissing = BinaryExpression(
+    left=NullExpression(),
+    operator="!=",
+    right=IdentifierExpression("cost"),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+
+    executor.execute(use_command)
+    executor.execute(KeepCommand(condition=condition_missing))
+    kept_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    executor.execute(DropCommand(condition=condition_missing))
+    dropped_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    replaced = executor.execute(ReplaceCommand("cost", NumberExpression(0), condition_nonmissing))
+    replaced_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    generated = executor.execute(GenerateCommand("all_missing", NullExpression()))
+    generated_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    executor.execute(KeepCommand(condition=NullExpression()))
+    null_keep_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    executor.execute(DropCommand(condition=NullExpression()))
+    null_drop_preview = executor.execute(HeadCommand(3))
+
+    executor.execute(use_command)
+    executor.execute(
+      KeepCommand(
+        condition=BinaryExpression(NullExpression(), "==", NullExpression()),
+      )
+    )
+    null_self_preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(kept_preview, PreviewResult)
+  assert tuple((row[0], row[3]) for row in kept_preview.rows) == ((54, None),)
+  assert isinstance(dropped_preview, PreviewResult)
+  assert tuple((row[0], row[3]) for row in dropped_preview.rows) == ((30, 100.0), (42, 150.0))
+  assert isinstance(replaced, TransformResult)
+  assert replaced.dataset.execution_mode == "eager"
+  assert replaced.dataset.lazy_engine is None
+  assert isinstance(replaced_preview, PreviewResult)
+  assert tuple((row[0], row[3]) for row in replaced_preview.rows) == (
+    (30, 0),
+    (42, 0),
+    (54, None),
+  )
+  assert isinstance(generated, TransformResult)
+  assert isinstance(generated_preview, PreviewResult)
+  assert generated_preview.columns[-1] == "all_missing"
+  assert all(row[-1] is None for row in generated_preview.rows)
+  assert isinstance(null_keep_preview, PreviewResult)
+  assert null_keep_preview.rows == ()
+  assert isinstance(null_drop_preview, PreviewResult)
+  assert len(null_drop_preview.rows) == 3
+  assert isinstance(null_self_preview, PreviewResult)
+  assert len(null_self_preview.rows) == 3
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  "expression",
+  [
+    BinaryExpression(NullExpression(), "+", NumberExpression(1)),
+    FunctionCallExpression("sqrt", (NullExpression(),)),
+  ],
+)
+def test_null_literal_rejects_unsupported_arithmetic_before_mutation(
+  sample_parquet: Path,
+  engine: str,
+  expression: Expression,
+) -> None:
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(
+      ExecutionError,
+      match="null literal only supports equality and inequality comparisons",
+    ):
+      executor.execute(
+        GenerateCommand(
+          "invalid_null_arithmetic",
+          expression,
+        )
+      )
+    preview = executor.execute(HeadCommand(1))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert "invalid_null_arithmetic" not in preview.columns
 
 
 def test_describe_requires_active_dataset() -> None:

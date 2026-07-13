@@ -2259,6 +2259,43 @@ def test_cli_reports_missing_drop_predicate_behavior_in_script(
   assert captured.err == ""
 
 
+def test_cli_reports_explicit_missing_predicate_behavior(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "keep if cost == null",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Kept matching rows: 1 rows, 4 columns" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_reports_explicit_missing_predicate_behavior_in_script(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "explicit-missing.td"
+  script_path.write_text(
+    f"use {sample_parquet}\ndrop if null == cost\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Dropped matching rows: 2 rows, 4 columns" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
   exit_code = main(["-c", "status"])
 

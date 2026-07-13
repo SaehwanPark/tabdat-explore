@@ -11,4 +11,7 @@ How do I remove variables or observations I do not need?
 
 Examples:
 - `drop cost`
-- `drop if missing(cost)`
+- `drop if cost == null`
+
+`null` is the explicit missing-value literal. Use `== null` to remove missing values; use `!= null`
+to remove nonmissing values.

@@ -1,41 +1,41 @@
-# Implementation Report: Phase 24 P0 Missing Predicate Semantics
+# Implementation Report: Phase 24 P0 Explicit Missing Predicates
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — missing values, row predicates, and aggregate
-  policy.
+- `_workspace/01_product_command-contract.md` — `null` literal, null-aware equality/inequality, and
+  bounded invalid-null diagnostics.
 
 ## Delivered Boundary
 
+- `src/tabdat/models.py`, `src/tabdat/parser.py`
+  - Added a typed `NullExpression` AST node.
+  - Parsed unquoted `null` case-insensitively while preserving quoted `` `null` `` identifiers.
 - `src/tabdat/backend.py`
-  - Makes `keep if` treat missing predicates as false.
-  - Makes `drop if` remove only true predicates and retain false/missing predicate rows in DuckDB
-    and Polars execution.
-- `tests/test_executor.py`
-  - Covers keep/drop/replace missing-condition behavior across eager, DuckDB-lazy, and Polars-lazy
-    sessions.
-  - Covers `summarize`, `codebook`, `tabulate ..., missing`, and the rendered `bar ..., missing`
-    behavior on existing null data, including all-missing numeric input.
-- `tests/test_cli.py`
-  - Covers the user-facing `drop if` result in both `-c` and script execution.
-- `docs/language-semantics.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Record the stable missingness policy and bounded follow-up scope.
-
-## Implementation Notes By Boundary
-
-- SQL uses `(not (condition)) or (condition) is null` for `drop if`.
-- Polars fills a missing keep predicate with false and a missing drop predicate with true before
-  filtering.
-- Existing replace-if behavior already preserves values when the condition is false or missing and
-  is now covered as part of the cross-engine contract.
-- Aggregate/profiling behavior remains backend-native and is documented with focused evidence rather
-  than introducing a new missing-value type or syntax.
+  - Compiled null-aware equality/inequality to SQL `is null`/`is not null` and equivalent Polars
+    expressions in either operand order.
+  - Supported direct all-missing generation/replacement.
+  - Rejected null arithmetic and function arguments before state-changing execution.
+  - Filled Polars predicate nulls before negation so direct `drop if null` remains cross-engine
+    consistent.
+- `src/tabdat/executor.py`
+  - Validated direct and `by:` tabulate conditions before Polars-lazy fallback materialization,
+    preserving lazy state on invalid null expressions.
+- `tests/test_parser.py`, `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`
+  - Covered parser, eager/DuckDB-lazy/Polars-lazy behavior, direct assignment, invalid operations,
+    CLI/script execution, and discoverable help examples.
+- `docs/language-semantics.md`, help topics, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
+  - Record the stable explicit-missing contract and deferred coercion boundary.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'missing_predicates_are_consistent or tabulate_missing_option_controls or all_missing_numeric or phase_24_bar_missing' -q` — passed, 6 tests.
-- `uv run pytest tests/test_cli.py -k 'missing_drop_predicate' -q` — passed, 2 tests.
-- `uv run pytest` — passed, 984 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_parser.py -k 'null_literal' -q` — passed, 1 test.
+- `uv run pytest tests/test_executor.py -k 'explicit_null_predicates or null_literal_rejects' -q` —
+  passed, 9 tests.
+- `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — passed, 2 tests.
+- `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — passed, 1 test.
+- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — passed, 2
+  tests.
+- `uv run pytest` — passed, 999 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
@@ -45,7 +45,6 @@
 
 ## Known Limits And Follow-Up Work
 
-- Explicit missing predicates/null literals, coercion, arithmetic, categorical behavior, ordering,
-  randomness, estimation samples, machine output, exit semantics, and full operation lineage remain
-  separate Phase 24 slices.
-- Missing values continue to use the existing SQL NULL/Python None representation.
+Implicit numeric/string coercion, broader arithmetic-result policy, categories, ordering, randomness,
+estimation samples, machine output, exit semantics, and full operation lineage remain separate Phase
+24 slices.

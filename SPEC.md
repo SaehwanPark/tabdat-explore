@@ -541,30 +541,34 @@ and describe the active work with concise verification criteria.
   - defined exact case-sensitive bare identifiers and backtick quoting
   - preserved quoted names through command wrappers, control-word parsing, CLI/script paths, and
     Bayes formula construction
+- Implemented Phase 24 P0 missing predicate semantics:
+  - defined SQL NULL/Python None behavior for keep, drop, replace, summarize, codebook, tabulate,
+    and bar
+  - aligned eager, DuckDB-lazy, and Polars-lazy keep/drop filtering for missing predicate results
+  - documented and regression-tested aggregate missingness and stable missing bar rendering
 
 ## Present
 
-- Feature: Phase 24 P0 missing predicate semantics
+- Feature: Phase 24 P0 explicit missing predicates
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-missing-predicate-semantics
+  Branch: feat/phase24-explicit-missing-predicates
 
   Summary:
-  Define and regression-test how missing predicate results affect keep/drop/replace and how existing
-  summarize, codebook, tabulate, and bar outputs treat missing values.
+  Define and regression-test an explicit `null` literal with null-aware equality and inequality in
+  row predicates and direct assignments.
 
   Verification:
-  - keep-if excludes false and missing predicate results
-  - drop-if removes true results and retains false and missing results across eager, DuckDB-lazy,
-    and Polars-lazy execution
-  - replace-if preserves values for false and missing conditions
-  - summarize/codebook missing-count behavior is documented and tested
-  - the policy is documented as the first missingness semantics slice
+  - `null` parses as a case-insensitive literal while quoted `` `null` `` remains an identifier
+  - `== null` and `!= null` are null-aware in either operand order
+  - direct null assignment and existing keep/drop/replace behavior are consistent across supported
+    eager, DuckDB-lazy, and Polars-lazy paths
+  - unsupported null arithmetic/function use has a stable diagnostic
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - explicit missing predicates/null literals, coercion, arithmetic, categories, ordering/randomness,
-    estimation samples, operation lineage, machine output, and exit-code redesign
+  - `is null`, `missing()`, `nonmissing()`, implicit coercion, broader arithmetic, categories,
+    ordering/randomness, estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
