@@ -13,9 +13,21 @@ from tabdat.cli import (
   _run_shell,
   main,
 )
+from tabdat.errors import (
+  BackendExecutionError,
+  ExecutionError,
+  NoActiveDatasetError,
+  ParseError,
+  ReservedNameError,
+  TabDatError,
+  TypeMismatchExecutionError,
+  UnknownTableError,
+  UnknownVariableError,
+)
 from tabdat.executor import Executor
-from tabdat.formatter import RESULT_TYPE_LABELS
+from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS
 from tabdat.models import PlotResult, Result
+from tabdat.script import ScriptError
 
 
 def _write_sql_parquet(path: Path, query: str) -> None:
@@ -135,6 +147,24 @@ def test_json_result_labels_cover_the_result_union() -> None:
   assert len(set(RESULT_TYPE_LABELS.values())) == len(result_types)
 
 
+def test_json_error_labels_cover_the_user_facing_error_hierarchy() -> None:
+  error_types = {
+    TabDatError,
+    ParseError,
+    ExecutionError,
+    NoActiveDatasetError,
+    UnknownVariableError,
+    TypeMismatchExecutionError,
+    UnknownTableError,
+    ReservedNameError,
+    BackendExecutionError,
+    ScriptError,
+  }
+
+  assert set(ERROR_TYPE_LABELS) == error_types
+  assert len(set(ERROR_TYPE_LABELS.values())) == len(error_types)
+
+
 def test_cli_terminal_output_remains_unchanged_without_json(
   sample_parquet: Path,
   capsys,
@@ -201,9 +231,11 @@ def test_cli_json_rejects_terminal_help(capsys) -> None:
   exit_code = main(["--json", "-c", "help run"])
 
   captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
 
   assert exit_code == 1
-  assert captured.out == ""
+  assert envelope["error"]["type"] == "TabDatError"
+  assert envelope["error"]["message"] == "help is not available with --json"
   assert "help is not available with --json" in captured.err
 
 
@@ -307,10 +339,79 @@ def test_cli_json_errors_keep_stderr_and_nonzero_exit(sample_parquet: Path, caps
   envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
 
   assert exit_code == 1
-  assert len(envelopes) == 1
+  assert len(envelopes) == 2
   assert envelopes[0]["result_type"] == "LoadResult"
+  assert envelopes[1]["error"]["type"] == "UnknownVariableError"
+  assert envelopes[1]["error"]["message"] == "expression unknown variable: missing"
   assert "Error:" in captured.err
   assert "unknown" in captured.err
+
+
+def test_cli_json_parse_error_emits_one_error_envelope(capsys) -> None:
+  exit_code = main(["--json", "-c", "not_a_tabdat_command"])
+
+  captured = capsys.readouterr()
+  envelope = json.loads(captured.out)
+
+  assert exit_code == 1
+  assert envelope["schema_version"] == 1
+  assert envelope["error"]["type"] == "ParseError"
+  assert "unknown command" in envelope["error"]["message"]
+  assert captured.err == "Error: unknown command: not_a_tabdat_command\n"
+
+
+def test_cli_json_script_error_includes_source_location(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "json-error.td"
+  script_path.write_text(
+    f"use {sample_parquet}\ngenerate broken = missing\ncount\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["--json", "-f", str(script_path)])
+
+  captured = capsys.readouterr()
+  envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
+
+  assert exit_code == 1
+  assert tuple(envelope["result_type"] for envelope in envelopes[:1]) == ("LoadResult",)
+  assert len(envelopes) == 2
+  assert envelopes[1]["error"]["type"] == "ScriptError"
+  assert envelopes[1]["error"]["path"] == str(script_path.resolve())
+  assert envelopes[1]["error"]["line"] == 2
+  assert envelopes[1]["error"]["message"] == "expression unknown variable: missing"
+  assert "CountResult" not in captured.out
+  assert f"{script_path}:2:" in captured.err
+
+
+def test_cli_json_nested_script_failure_emits_one_error_envelope(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  child_path = tmp_path / "child-error.td"
+  child_path.write_text("generate broken = missing\n", encoding="utf-8")
+  parent_path = tmp_path / "parent-error.td"
+  parent_path.write_text(
+    f"use {sample_parquet}\nrun {child_path.name}\ncount\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["--json", "-f", str(parent_path)])
+
+  captured = capsys.readouterr()
+  envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
+
+  assert exit_code == 1
+  assert len(envelopes) == 2
+  assert envelopes[0]["result_type"] == "LoadResult"
+  assert envelopes[1]["error"]["type"] == "ScriptError"
+  assert envelopes[1]["error"]["path"] == str(child_path.resolve())
+  assert envelopes[1]["error"]["line"] == 1
+  assert "CountResult" not in captured.out
 
 
 def test_cli_json_rejects_interactive_mode(capsys) -> None:

@@ -11,6 +11,17 @@ from pathlib import Path
 
 from pydantic import TypeAdapter
 
+from tabdat.errors import (
+  BackendExecutionError,
+  ExecutionError,
+  NoActiveDatasetError,
+  ParseError,
+  ReservedNameError,
+  TabDatError,
+  TypeMismatchExecutionError,
+  UnknownTableError,
+  UnknownVariableError,
+)
 from tabdat.models import (
   ActivateResult,
   BayesMcmcResult,
@@ -64,6 +75,7 @@ from tabdat.models import (
   ZinbRegressionResult,
   ZipRegressionResult,
 )
+from tabdat.script import ScriptError
 
 RESULT_TYPE_LABELS: dict[type[object], str] = {
   LoadResult: "LoadResult",
@@ -115,6 +127,19 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   TestResult: "TestResult",
   LincomResult: "LincomResult",
   TtestResult: "TtestResult",
+}
+
+ERROR_TYPE_LABELS: dict[type[object], str] = {
+  TabDatError: "TabDatError",
+  ParseError: "ParseError",
+  ExecutionError: "ExecutionError",
+  NoActiveDatasetError: "NoActiveDatasetError",
+  UnknownVariableError: "UnknownVariableError",
+  TypeMismatchExecutionError: "TypeMismatchExecutionError",
+  UnknownTableError: "UnknownTableError",
+  ReservedNameError: "ReservedNameError",
+  BackendExecutionError: "BackendExecutionError",
+  ScriptError: "ScriptError",
 }
 
 
@@ -1195,11 +1220,37 @@ def format_result_json(result: Result) -> str:
   )
 
 
+def format_error_json(error: TabDatError) -> str:
+  """Serialize one user-facing failure as a deterministic machine-readable envelope."""
+  error_data: dict[str, object] = {
+    "type": _error_type_label(error),
+    "message": error.message if isinstance(error, ScriptError) else str(error),
+  }
+  if isinstance(error, ScriptError):
+    error_data["path"] = str(error.path)
+    error_data["line"] = error.line
+  envelope = {"schema_version": 1, "error": error_data}
+  return json.dumps(
+    envelope,
+    ensure_ascii=False,
+    allow_nan=False,
+    sort_keys=True,
+    separators=(",", ":"),
+  )
+
+
 def _result_type_label(result: Result) -> str:
   try:
     return RESULT_TYPE_LABELS[type(result)]
   except KeyError as exc:
     raise TypeError(f"Unsupported result: {type(result).__name__}") from exc
+
+
+def _error_type_label(error: TabDatError) -> str:
+  try:
+    return ERROR_TYPE_LABELS[type(error)]
+  except KeyError as exc:
+    raise TypeError(f"Unsupported error: {type(error).__name__}") from exc
 
 
 def _json_safe_value(value: object) -> object:

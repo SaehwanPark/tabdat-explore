@@ -15,7 +15,7 @@ from tabdat import __version__
 from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
-from tabdat.formatter import format_result, format_result_json
+from tabdat.formatter import format_error_json, format_result, format_result_json
 from tabdat.help import available_help_topics, load_help_topic
 from tabdat.models import (
   BarCommand,
@@ -238,6 +238,8 @@ def _run_one(
     )
   except TabDatError as exc:
     print(f"Error: {exc}", file=sys.stderr)
+    if output_format == "json":
+      print(format_error_json(exc))
     return _RunStatus.ERROR
 
   if status is not _RunStatus.CONTINUE:
@@ -385,6 +387,8 @@ def _run_script(
     )
   except ScriptError as exc:
     print(f"Error: {exc}", file=sys.stderr)
+    if output_format == "json":
+      print(format_error_json(exc))
     return 1
   return 1 if status is _RunStatus.ERROR else 0
 
