@@ -151,12 +151,13 @@ def save_bar(
   Raises:
     ExecutionError: If Altair fails to compile or write the file.
   """
-  chart_rows = tuple(("<missing>" if row[0] is None else row[0], row[1]) for row in rows)
+  category_order = tuple("<missing>" if row[0] is None else str(row[0]) for row in rows)
+  chart_rows = tuple((category, row[1]) for category, row in zip(category_order, rows, strict=True))
   chart = (
     alt.Chart(alt.Data(values=_rows_to_records(chart_rows, (variable, "count"))))
     .mark_bar()
     .encode(
-      x=alt.X(f"{variable}:N", title=variable, sort="-y"),
+      x=alt.X(f"{variable}:N", title=variable, sort=list(category_order)),
       y=alt.Y("count:Q", title="Count"),
     )
   )

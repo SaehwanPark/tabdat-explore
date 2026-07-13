@@ -9,8 +9,8 @@ Save a bar chart for a categorical variable.
 What problem it answers:
 How are category counts distributed?
 
-Bars are ordered by descending count; ties use the category's native order and missing categories
-remain last.
+Nonmissing bars are ordered by descending count; ties use the category's native order and the
+missing category is always last.
 
 Examples:
 - `bar sex`

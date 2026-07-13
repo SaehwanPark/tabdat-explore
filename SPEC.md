@@ -562,7 +562,8 @@ and describe the active work with concise verification criteria.
     and computed NaN/infinity normalization
   - preserved direct source non-finite values while rejecting unsigned subtraction/unary minus
   - aligned eager, DuckDB-lazy, and Polars-lazy arithmetic predicates, including Decimal operands
-  - bounded exact arithmetic widths, overflow diagnostics, row order, and broader ordering policy
+  - explicitly deferred exact arithmetic widths, overflow diagnostics, active row order, and
+    broader ordering policy
 
 ## Present
 

@@ -96,8 +96,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
   lexicographically; booleans sort false before true.
 - Wide-form `tabulate` uses the same native order for row keys and column headers. Numeric labels are
   not ordered by their rendered text, so `2` precedes `10`.
-- `bar` sorts categories by descending count, then native category order for ties, with missing
-  categories last.
+- `bar` sorts nonmissing categories by descending count, then native category order for ties; the
+  missing category is always last.
 - Active row order, `head`/`tail`, arbitrary SQL ordering, and categorical ordering are not defined
   by this slice.
 

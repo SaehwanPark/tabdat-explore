@@ -26,8 +26,8 @@ coercion, arithmetic-result, and overwrite contracts, and it adds no new command
   native scalar order with missing values last.
 - Wide-form `tabulate` uses the same native order for row keys and column headers; numeric labels
   are not sorted by their display strings.
-- `bar` sorts categories by descending count, then native category order for ties, with missing
-  categories last.
+- `bar` sorts nonmissing categories by descending count, then native category order for ties; the
+  missing category is always last.
 - Row-preserving active-dataset order, `head`/`tail` guarantees, arbitrary SQL `order by`, and
   categorical ordering remain separate contracts.
 

@@ -32,8 +32,8 @@ No new options, commands, or output fields are introduced.
   ascending in their native scalar domain; missing values sort last.
 - Wide-form `tabulate` preserves that same native order for row keys and column headers. Numeric keys
   are ordered numerically, not by their rendered text labels.
-- `bar` categories are ordered by descending count; equal-count categories use native scalar order,
-  with missing categories last.
+- `bar` nonmissing categories are ordered by descending count; equal-count categories use native
+  scalar order, and the missing category is always last.
 - String values use lexicographic order. Boolean values use false before true. Numeric values use
   numeric order.
 - Row-preserving active-dataset order, `head`/`tail`, arbitrary SQL `order by`, and categorical
@@ -51,11 +51,11 @@ No new options, commands, or output fields are introduced.
 
 ## Acceptance Criteria
 
-- [ ] Numeric tabulate keys appear in numeric order (`2`, then `10`) in both long and wide output.
-- [ ] Text keys remain lexicographic and missing keys are last in grouped outputs.
-- [ ] Bar ties use native category order and missing categories remain last.
-- [ ] Eager, DuckDB-lazy, and Polars-lazy tabulate outputs agree for mixed numeric/missing fixtures.
-- [ ] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
+- [x] Numeric tabulate keys appear in numeric order (`2`, then `10`) in both long and wide output.
+- [x] Text keys remain lexicographic and missing keys are last in grouped outputs.
+- [x] Bar ties use native category order and missing categories remain last.
+- [x] Eager, DuckDB-lazy, and Polars-lazy tabulate outputs agree for mixed numeric/missing fixtures.
+- [x] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 

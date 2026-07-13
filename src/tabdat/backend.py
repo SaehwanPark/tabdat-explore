@@ -83,6 +83,7 @@ UNSIGNED_NUMERIC_TYPES = (
   "UINT64",
 )
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
+TabulateCellKey = tuple[tuple[tuple[str, object], ...], tuple[tuple[str, object], ...]]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
 NUMERIC_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "round", "sqrt"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
@@ -1235,7 +1236,7 @@ class DuckDBBackend:
       from {ACTIVE_TABLE}
       {where_sql}
       group by {quoted}
-      order by count desc, {quoted} nulls last
+      order by ({quoted} is null), count desc, {quoted} nulls last
       """,
       "bar",
     )
@@ -2125,11 +2126,12 @@ def _tabulate_wide_result(
   )
   index_keys = _unique_tuple_values(tuple(row[:index_width] for row in long_rows))
   cell_values = {
-    (row[:index_width], row[column_start:value_index]): row[value_index] for row in long_rows
+    _tabulate_cell_key(row[:index_width], row[column_start:value_index]): row[value_index]
+    for row in long_rows
   }
   row_percent_values = (
     {
-      (row[:index_width], row[column_start:value_index]): row[row_percent_index]
+      _tabulate_cell_key(row[:index_width], row[column_start:value_index]): row[row_percent_index]
       for row in long_rows
     }
     if include_row_percent
@@ -2137,7 +2139,9 @@ def _tabulate_wide_result(
   )
   column_percent_values = (
     {
-      (row[:index_width], row[column_start:value_index]): row[column_percent_index]
+      _tabulate_cell_key(row[:index_width], row[column_start:value_index]): row[
+        column_percent_index
+      ]
       for row in long_rows
     }
     if include_column_percent
@@ -2172,29 +2176,61 @@ def _tabulate_wide_result(
 
 
 def _unique_tuple_values(rows: tuple[tuple[object, ...], ...]) -> tuple[tuple[object, ...], ...]:
-  seen: set[tuple[object, ...]] = set()
+  seen: set[tuple[tuple[str, object], ...]] = set()
   values: list[tuple[object, ...]] = []
   for row in rows:
-    if row in seen:
+    canonical_row = _canonical_tuple_key(row)
+    if canonical_row in seen:
       continue
-    seen.add(row)
+    seen.add(canonical_row)
     values.append(row)
   return tuple(values)
 
 
-def _tabulate_sort_key(row: tuple[object, ...]) -> tuple[tuple[int, float | str], ...]:
-  keys: list[tuple[int, float | str]] = []
+def _tabulate_sort_key(row: tuple[object, ...]) -> tuple[tuple[int, object], ...]:
+  keys: list[tuple[int, object]] = []
   for value in row:
     if value is None:
       keys.append((2, ""))
     elif isinstance(value, bool):
-      keys.append((0, float(value)))
+      keys.append((0, int(value)))
     elif isinstance(value, (int, float, Decimal)):
-      numeric_value = float(value)
-      keys.append((2, "") if math.isnan(numeric_value) else (0, numeric_value))
+      if _is_nan_value(value):
+        keys.append((2, ""))
+      else:
+        keys.append((0, value))
     else:
       keys.append((1, str(value)))
   return tuple(keys)
+
+
+def _is_nan_value(value: object) -> bool:
+  return (isinstance(value, float) and math.isnan(value)) or (
+    isinstance(value, Decimal) and value.is_nan()
+  )
+
+
+def _canonical_value_key(value: object) -> tuple[str, object]:
+  if value is None:
+    return ("null", "")
+  if _is_nan_value(value):
+    return ("nan", "")
+  try:
+    hash(value)
+  except TypeError:
+    return ("value", repr(value))
+  return ("value", value)
+
+
+def _canonical_tuple_key(values: tuple[object, ...]) -> tuple[tuple[str, object], ...]:
+  return tuple(_canonical_value_key(value) for value in values)
+
+
+def _tabulate_cell_key(
+  index_key: tuple[object, ...],
+  column_key: tuple[object, ...],
+) -> TabulateCellKey:
+  return _canonical_tuple_key(index_key), _canonical_tuple_key(column_key)
 
 
 def _wide_value_headers(
@@ -2219,16 +2255,16 @@ def _wide_row_cells(
   index_key: tuple[object, ...],
   column_keys: tuple[tuple[object, ...], ...],
   *,
-  cell_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
-  row_percent_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
-  column_percent_values: dict[tuple[tuple[object, ...], tuple[object, ...]], object],
+  cell_values: dict[TabulateCellKey, object],
+  row_percent_values: dict[TabulateCellKey, object],
+  column_percent_values: dict[TabulateCellKey, object],
   include_row_percent: bool,
   include_column_percent: bool,
   missing_cell_value: object,
 ) -> tuple[object, ...]:
   cells: list[object] = []
   for column_key in column_keys:
-    key = (index_key, column_key)
+    key = _tabulate_cell_key(index_key, column_key)
     cells.append(cell_values.get(key, missing_cell_value))
     if include_row_percent:
       cells.append(row_percent_values.get(key, 0.0))

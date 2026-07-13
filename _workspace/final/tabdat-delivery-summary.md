@@ -4,15 +4,17 @@ The grouped-result ordering slice is implemented and fully validated locally.
 
 ## Delivered
 
-- Numeric grouped keys sort numerically instead of lexically; text and boolean ordering is explicit.
-- Missing and NaN grouped keys sort last in wide tabulate headers.
-- Bar categories sort by count descending, then native category value for ties, with missing last.
-- Eager, DuckDB-lazy, and Polars-lazy tabulate behavior, CLI output, help, and docs are covered.
+- Numeric grouped keys sort numerically without float precision loss; text and boolean ordering is
+  explicit.
+- Missing and NaN grouped keys sort last and use canonical wide-tabulate cell keys.
+- Bar categories sort nonmissing counts/ties deterministically, with missing last.
+- Altair preserves backend category order; eager, DuckDB-lazy, and Polars-lazy tabulate behavior,
+  CLI output, help, and docs are covered.
 
 ## Validation
 
-- Focused ordering regressions: 5 executor, 2 CLI, and 1 help test passed.
-- Full suite: 1,058 passed, with 314 existing third-party warnings.
+- Final review-fix ordering regressions: 9 executor, 1 CLI, and 1 help test passed.
+- Full suite: 1,062 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully.
 
