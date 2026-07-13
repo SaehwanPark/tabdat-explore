@@ -5882,12 +5882,31 @@ class Executor:
       return
     dataset = self._require_active_dataset("validate")
     column_names = {column.name for column in dataset.columns}
-    if isinstance(command, TabulateCommand) and command.condition is not None:
-      self.backend.validate_expression(dataset, command.condition)
+    if isinstance(command, TabulateCommand):
+      self.backend.validate_tabulate(
+        dataset,
+        command.row_variables,
+        command.column_variables,
+        condition=command.condition,
+        value_variable=command.value_variable,
+        statistic=command.statistic,
+      )
       return
     if isinstance(command, ByCommand) and isinstance(command.command, TabulateCommand):
-      if command.command.condition is not None:
-        self.backend.validate_expression(dataset, command.command.condition)
+      duplicate_dimensions = _duplicate_names(
+        command.groups + command.command.row_variables + command.command.column_variables
+      )
+      if duplicate_dimensions:
+        raise ExecutionError(f"by tabulate duplicate variable: {duplicate_dimensions[0]}")
+      self.backend.validate_tabulate(
+        dataset,
+        command.command.row_variables,
+        command.command.column_variables,
+        condition=command.command.condition,
+        value_variable=command.command.value_variable,
+        statistic=command.command.statistic,
+        by_variables=command.groups,
+      )
       return
     if isinstance(command, GenerateCommand):
       if command.variable in column_names:
@@ -5903,9 +5922,12 @@ class Executor:
     if isinstance(command, ReplaceCommand):
       if command.variable not in column_names:
         raise UnknownVariableError(f"replace unknown variable: {command.variable}")
-      self.backend.validate_expression(dataset, command.expression)
-      if command.condition is not None:
-        self.backend.validate_expression(dataset, command.condition)
+      self.backend.validate_replace(
+        dataset,
+        command.variable,
+        command.expression,
+        command.condition,
+      )
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

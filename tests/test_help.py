@@ -42,6 +42,13 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "cost != null" in load_help_topic("replace")
 
 
+def test_help_topics_document_expression_domains() -> None:
+  assert "numeric and string truthiness is rejected" in load_help_topic("keep")
+  assert "Arithmetic requires numeric operands" in load_help_topic("generate")
+  assert "numeric/string conversion is not" in load_help_topic("replace")
+  assert "if` conditions must produce boolean or missing" in load_help_topic("tabulate")
+
+
 def test_estat_help_mentions_bayes_diagnostics() -> None:
   text = load_help_topic("estat")
 

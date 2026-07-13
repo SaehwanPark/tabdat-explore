@@ -14,3 +14,8 @@ Examples:
 - `replace cost = 0 if cost != null`
 
 `null` is the explicit missing-value literal. Use `== null` or `!= null` for missingness checks.
+
+Replacement expressions must stay in the target variable's domain; numeric/string conversion is not
+implicit.
+
+`if` conditions must produce boolean or missing values; numeric and string truthiness is rejected.

@@ -15,3 +15,5 @@ Examples:
 
 `null` is the explicit missing-value literal. Use `== null` to remove missing values; use `!= null`
 to remove nonmissing values.
+
+Conditions must produce boolean or missing values; numeric and string truthiness is rejected.

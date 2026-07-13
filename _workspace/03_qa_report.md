@@ -1,36 +1,33 @@
-# QA Report: Phase 24 P0 Explicit Missing Predicates
+# QA Report: Phase 24 P0 Expression Coercion
 
 Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
 - **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, help topics, and the
-  product contract agree on `null` literal spelling, null-aware equality/inequality, and deferred
-  coercion.
-- **Parser to AST:** unquoted `null` becomes a null literal while quoted `` `null` `` remains a
-  variable identifier.
-- **Backend behavior:** eager, DuckDB-lazy, and Polars-lazy paths agree for explicit missing
-  predicates and direct null assignment, including direct `null` row predicates.
-- **Failure behavior:** unsupported null arithmetic/function use fails before mutation with a stable
-  diagnostic; invalid tabulate conditions fail before Polars-lazy materialization.
-- **User-facing paths:** CLI `-c`, script execution, and command help document and exercise the
+  product contract agree on numeric, string, boolean, other, and null domains.
+- **AST/backend typing:** comparisons, arithmetic, functions, predicates, replacement targets, and
+  tabulate inputs enforce the declared domains before execution.
+- **Cross-engine behavior:** compatible numeric expressions agree across eager, DuckDB-lazy, and
+  Polars-lazy paths; unsafe unsigned/negative combinations are rejected consistently.
+- **Failure behavior:** mixed-domain expressions, invalid replacement NULLs, and invalid tabulate
+  commands fail before active-dataset mutation or Polars-lazy fallback materialization.
+- **User-facing paths:** CLI `-c`, script execution, command help, and documentation cover the
   contract.
-- **Scope control:** no `is null`/function syntax, coercion policy, new command, or estimator was
-  added.
+- **Scope control:** no new syntax, categorical conversion, string concatenation, command, or
+  estimator was added.
 
 ## Blocking Issues
 
-- None found in implementation validation.
+- None remain.
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_parser.py -k 'null_literal' -q` — 1 passed.
-- `uv run pytest tests/test_executor.py -k 'explicit_null_predicates or null_literal_rejects' -q` —
-  9 passed.
-- `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — 2 passed.
-- `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — 1 passed.
-- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — 2 passed.
-- `uv run pytest` — 999 passed, 314 existing third-party warnings.
+- Focused expression executor regressions: 17 passed.
+- Focused review-fix executor regressions: 8 passed.
+- Focused CLI regressions: 2 passed.
+- Focused help regression: 1 passed.
+- `uv run pytest` — 1,025 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -40,21 +37,24 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## PR Review Loop
 
-Three independent review passes completed before merge readiness:
+Exactly three independent review passes completed before merge readiness:
 
-- **Pass 1:** PASS; no actionable cross-boundary findings.
-- **Pass 2:** found a Medium atomicity issue where invalid tabulate null conditions materialized
-  Polars-lazy state before rejection. Fixed by validating direct and `by:` tabulate conditions before
-  fallback materialization, with two state-preservation regressions.
-- **Pass 3:** PASS; no actionable release-readiness findings.
+- **Pass 1:** found a Medium direct-null target-type change and a Low missing tabulate-help rule.
+  Fixed with typed NULL casts and help documentation/assertion.
+- **Pass 2:** found Medium unsigned/negative parity, incomplete tabulate preflight, and direct-null
+  type issues; also found Low Arrow/Polars type normalization and help coverage gaps. Fixed with
+  deterministic unsigned rejection, complete non-materializing tabulate validation, canonical type
+  domains, typed NULL casts, and help updates.
+- **Pass 3:** independently confirmed the Medium direct-null type issue and a Low stale “coercion is
+  undefined” sentence. Fixed with typed NULL casts and the corrected deliberate-limits text.
 
-No Critical or High findings remain. The single Medium finding was fixed and revalidated.
+No Critical or High findings remain. All Medium and Low findings were fixed and revalidated.
 
 ## Non-Blocking Follow-Ups
 
-- Implicit coercion, broader arithmetic, categories, ordering/randomness, estimation samples,
-  machine output, exit semantics, lineage, differential assurance, and public-preview readiness
-  remain queued in `SPEC.md`.
+- Categorical conversion beyond storage normalization, string concatenation, ordering/randomness,
+  estimation samples, machine output, exit semantics, lineage, differential assurance, and
+  public-preview readiness remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 

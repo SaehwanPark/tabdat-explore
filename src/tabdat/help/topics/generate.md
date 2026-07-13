@@ -16,3 +16,6 @@ Examples:
 
 `null` creates an all-missing value. Null-aware `==` and `!=` comparisons are supported; null
 arithmetic and null function arguments are rejected.
+
+Arithmetic requires numeric operands. Numeric functions require numeric arguments; `lower` and
+`upper` require string arguments.

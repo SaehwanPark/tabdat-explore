@@ -13,6 +13,8 @@ What problem it answers:
 How are categorical values distributed, or how does a numeric value aggregate across row and
 column categories?
 
+`if` conditions must produce boolean or missing values; numeric and string truthiness is rejected.
+
 Examples:
 - `tabulate sex`
 - `tabulate sex outcome, row col`
