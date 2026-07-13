@@ -640,32 +640,41 @@ and describe the active work with concise verification criteria.
     and merged the validated slice as PR #107
   - explicitly deferred machine-readable help content, option/argument schemas, dry-run/explain,
     repair diagnostics, interactive JSON mode, and new exit codes
+- Implemented Phase 24 P1 structured JSON help-topic retrieval:
+  - added case-insensitive `--json --help-topic <topic>` retrieval of raw packaged help text without
+    creating a session, reading data, or changing terminal help behavior
+  - emitted stable JSON errors for unknown, blank, and packaged-resource failures and added a
+    fresh-wheel smoke check for help resources
+  - completed exactly three independent reviews, fixed all findings, and merged the validated slice
+    as PR #108
+  - explicitly deferred syntax previews, full dry-run/effect analysis, option schemas, and new exits
 
 ## Present
 
-- Feature: Phase 24 P1 structured JSON help-topic retrieval
+- Feature: Phase 24 P1 structured JSON syntax preview
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-help
+  Branch: feat/phase24-json-explain
 
   Summary:
-  Add read-only machine-readable retrieval of one existing in-app help topic through the JSON
-  interface without creating a session, executing a command, or changing terminal behavior.
+  Add a syntax-only machine-readable preview for one batch command through the JSON interface without
+  executing the command, creating a session, or reading data.
 
   Verification:
-  - `--json --help-topic <topic>` emits one deterministic `HelpTopicResult` envelope containing the
-    normalized topic name and the existing help text
-  - retrieval accepts only an existing help topic, reports unknown topics through the existing JSON
-    error envelope, and does not launch `Executor`, load config, read data, or materialize anything
-  - incompatible combinations with terminal mode, `-c`, scripts, `--list-commands`, or interactive
-    mode fail clearly without changing existing success/error envelopes
+  - `--json --explain -c <command>` emits one deterministic `CommandExplainResult` envelope with the
+    stable normalized command name and `execution: "not_run"`
+  - syntax errors use the existing JSON error envelope and exit status `1`; no command execution,
+    config load, Executor construction, dataset read, or materialization occurs
+  - incompatible combinations with terminal mode, zero/multiple `-c`, scripts, discovery,
+    help-topic retrieval, or interactive mode fail clearly without changing existing envelopes
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - command execution, scripts, multiple-topic retrieval, option/argument schemas, catalog examples,
-    plugin discovery, interactive JSON mode, dry-run/explain, repair diagnostics, operation lineage,
-    estimation samples, and new exit codes
-  - new help topics, new commands, new backends, estimators, connectors, or plugins
+  - command execution, effect classification, estimates, state/resource plans, scripts, multiple
+    commands, option/argument schemas, catalog examples, plugin discovery, interactive JSON mode,
+    full dry-run/explain behavior, repair diagnostics, operation lineage, estimation samples, and
+    new exit codes
+  - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
 

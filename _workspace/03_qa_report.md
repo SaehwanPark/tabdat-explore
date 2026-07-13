@@ -1,22 +1,22 @@
-# QA Report: Phase 24 P1 Structured JSON Help-Topic Retrieval
+# QA Report: Phase 24 P1 Structured JSON Syntax Preview
 
 Status: implementation validation complete; exactly three independent PR reviews complete
 
 ## Boundaries Checked
 
-- **Success contract:** `--json --help-topic <topic>` emits exactly one versioned
-  `HelpTopicResult` envelope with canonical topic name and raw packaged help text, including its
-  trailing newline.
-- **Lookup behavior:** matching is case-insensitive and restricted to the existing help-topic
-  registry; unknown and blank topics emit stable `TabDatError` JSON envelopes with exit status `1`.
-- **Resource safety:** packaged `OSError`/Unicode failures are translated into a concise structured
-  error rather than a traceback; a fresh-wheel smoke invokes the actual built artifact.
-- **Read-only behavior:** retrieval happens before config/`Executor` setup and does not read data,
-  materialize a relation, or alter session state.
-- **Invocation safety:** missing `--json` and combinations with `-c`, `-f`, a positional script, or
-  `--list-commands` fail through argparse without contaminating JSON stdout.
-- **Compatibility:** terminal help, existing command execution, existing success/error envelopes, and
-  interactive behavior remain unchanged.
+- **Preview contract:** `--json --explain -c <command>` emits exactly one versioned
+  `CommandExplainResult` with a stable normalized `command_name` and `execution: "not_run"`.
+- **Parser failure:** invalid or empty syntax emits one existing `ParseError` JSON envelope, retains
+  human stderr, and exits `1`.
+- **Read-only behavior:** preview runs before config/`Executor` setup and does not read data,
+  materialize a relation, or alter session state, including explicit invalid config paths.
+- **Stable naming:** built-ins, conditional forms, and `run` previews use normalized command names;
+  Python parser class names are not exposed as schema values.
+- **Invocation safety:** missing JSON, zero/multiple `-c`, scripts, positional paths, discovery,
+  help-topic retrieval, and interactive mode fail clearly; standard `--help` retains argparse
+  precedence without previewing.
+- **Compatibility:** existing command execution, terminal output, interactive behavior, and JSON
+  success/error envelopes remain unchanged.
 
 ## Blocking Issues
 
@@ -24,10 +24,9 @@ Status: implementation validation complete; exactly three independent PR reviews
 
 ## Validation Evidence
 
-- Focused JSON/catalog/help-topic CLI checks: 34 passed.
-- Focused help/docs checks: 3 passed.
-- `uv run python scripts/verify_wheel_help_topic.py` — fresh wheel smoke passed.
-- `uv run pytest -q` — 1,176 passed, 314 existing third-party warnings.
+- Focused JSON/catalog/help-topic/explain CLI checks: 49 passed.
+- Focused help/docs checks: 2 passed.
+- `uv run pytest -q` — 1,191 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -39,17 +38,17 @@ Status: implementation validation complete; exactly three independent PR reviews
 
 ## PR Review Loop
 
-Exactly three independent reviews completed. Review 1 reported no findings. Review 2 found exact raw
-text preservation and packaged-resource error handling. Review 3 found blank-topic clarity, stale
-handoff wording, and fresh-wheel smoke coverage. All findings were fixed and the complete validation
-set was rerun. No fourth review was started.
+Exactly three independent reviews completed. Review 1 found conventional `--help` precedence; Review 2
+found unstable Python AST-type labels; Review 3 found stale handoff wording and missing edge-case
+regressions. The behavior/documentation and tests were updated, and the complete validation set was
+rerun. No fourth review was started.
 
 ## Non-Blocking Follow-Ups
 
-Multiple-topic retrieval, option/argument schemas, catalog examples, plugin discovery, interactive
-JSON mode, dry-run/explain, repair diagnostics, SQL-result metadata, operation lineage, retained
-estimation samples, differential assurance, dependency layering, and preview readiness remain queued
-in `SPEC.md` Future.
+Effect classification, estimates, state/resource plans, scripts, multiple commands, option/argument
+schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain, repair
+diagnostics, SQL-result metadata, operation lineage, retained estimation samples, differential
+assurance, dependency layering, and preview readiness remain queued in `SPEC.md` Future.
 
 ## Recommended Next Action
 

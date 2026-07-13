@@ -928,6 +928,14 @@ class HelpTopicResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandExplainResult:
+  """A syntax-only preview of one parsed command that was not executed."""
+
+  command_name: str
+  execution: Literal["not_run"]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class LoadResult:
   dataset: DatasetInfo
 
@@ -1491,6 +1499,7 @@ class TtestResult:
 Result = (
   CommandCatalogResult
   | HelpTopicResult
+  | CommandExplainResult
   | LoadResult
   | ActivateResult
   | DescribeResult

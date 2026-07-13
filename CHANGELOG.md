@@ -71,8 +71,10 @@ All notable project changes are tracked here.
 - Completed the Phase 24 structured JSON command-discovery slice with a deterministic read-only
   catalog derived from the existing command/help registry, without starting a session or executing
   data commands.
-- Started the Phase 24 structured JSON help-topic retrieval slice; one existing in-app help topic
-  will become available through a read-only JSON envelope without creating a session.
+- Completed the Phase 24 structured JSON help-topic retrieval slice with case-insensitive raw-text
+  envelopes, stable resource errors, and a fresh-wheel packaged-resource smoke check.
+- Started the Phase 24 structured JSON syntax-preview slice; one batch command will be parsed and
+  described without execution or session setup.
 
 ### Added
 
