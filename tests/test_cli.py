@@ -65,6 +65,33 @@ def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_script_preserves_active_row_order(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "row_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (3, 'first'),
+        (null::integer, 'missing'),
+        (1, 'second')
+    ) as row_order_data(value, label)
+    """,
+  )
+  script_path = tmp_path / "row_order.td"
+  script_path.write_text(f"use {path}\nhead 2\n", encoding="utf-8")
+
+  exit_code = main(["-f", str(script_path)])
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "first" in captured.out
+  assert "missing" in captured.out
+  assert captured.out.index("first") < captured.out.index("missing")
+  assert "second" not in captured.out
+  assert captured.err == ""
+
+
 def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   class InterruptThenEofSession:
     def __init__(self) -> None:

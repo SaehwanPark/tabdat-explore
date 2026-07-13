@@ -564,29 +564,33 @@ and describe the active work with concise verification criteria.
   - aligned eager, DuckDB-lazy, and Polars-lazy arithmetic predicates, including Decimal operands
   - explicitly deferred exact arithmetic widths, overflow diagnostics, active row order, and
     broader ordering policy
+- Implemented Phase 24 P0 grouped-result ordering:
+  - defined native numeric/text/boolean ordering, missing-last behavior, and deterministic bar ties
+  - preserved exact integer/Decimal keys and canonicalized NaN keys in wide tabulate assembly
+  - kept visualization category order aligned with backend output across eager and lazy paths
+  - explicitly deferred active row order, arbitrary SQL ordering, and categorical ordering
 
 ## Present
 
-- Feature: Phase 24 P0 grouped-result ordering semantics
+- Feature: Phase 24 P0 active row-order semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-grouped-ordering
+  Branch: feat/phase24-row-order
 
   Summary:
-  Define and regression-test native ordering for grouped summaries, tabulate keys, and category-count
-  ties without adding sort syntax or changing active row-order behavior.
+  Define and regression-test the current active row sequence for head, tail, keep/drop filters, and
+  row-preserving transformations across all execution paths.
 
   Verification:
-  - numeric tabulate keys are ordered numerically in long and wide output
-  - text keys remain lexicographic and missing grouped keys sort last
-  - bar ties use native category order and missing categories remain last
-  - eager, DuckDB-lazy, and Polars-lazy tabulate output agrees
+  - unsorted fixtures return identical head/tail rows across eager, DuckDB-lazy, and Polars-lazy
+  - keep/drop filters preserve retained relative order and missing predicate behavior
+  - successful row-preserving transformations retain sequence order
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new sort syntax, active row-order guarantees, `head`/`tail` ordering, arbitrary SQL ordering,
-    categorical ordering, exact arithmetic storage widths, overflow reporting, randomness, estimation
-    samples, operation lineage, machine output, and exit-code redesign
+  - new sort syntax, row-ID persistence, append/join/reshape ordering, named-table order, arbitrary
+    SQL ordering, categorical ordering, exact arithmetic storage widths, overflow reporting, randomness,
+    estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

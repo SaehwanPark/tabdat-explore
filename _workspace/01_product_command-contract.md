@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Grouped-Result Ordering
+# Product Contract: Phase 24 P0 — Active Row Order
 
 ## Request Summary
 
-Make existing grouped outputs deterministic and type-aware without adding ordering syntax or a new
-command.
+Make the current active row sequence observable and consistent for previews and row filters without
+adding a sorting command or new syntax.
 
 ## Roadmap Phase
 
@@ -11,53 +11,51 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This is a bounded ordering increment after the identifier, missing-value, coercion, arithmetic-result,
-and overwrite contracts. It fixes display ordering where the current implementation can stringify
-numeric keys and sort `10` before `2`.
+This is a bounded follow-up to grouped-result ordering. It covers the existing preview and filter
+commands while leaving relation-combination and user-SQL order decisions for later.
 
 ## Existing Syntax
 
 Valid forms retain the current grammar:
 
-- `tabulate, rows(region) columns(code)`
-- `by region: count`
-- `collapse mean value, by(region)`
-- `bar code`
+- `head 2`
+- `tail 2`
+- `keep if value != 1`
+- `drop if value == 1`
 
 No new options, commands, or output fields are introduced.
 
-## Ordering Rules
+## Row-Order Rules
 
-- Grouping dimensions in `by summarize`, `by count`, `collapse`, and long-form `tabulate` are sorted
-  ascending in their native scalar domain; missing values sort last.
-- Wide-form `tabulate` preserves that same native order for row keys and column headers. Numeric keys
-  are ordered numerically, not by their rendered text labels.
-- `bar` nonmissing categories are ordered by descending count; equal-count categories use native
-  scalar order, and the missing category is always last.
-- String values use lexicographic order. Boolean values use false before true. Numeric values use
-  numeric order.
-- Row-preserving active-dataset order, `head`/`tail`, arbitrary SQL `order by`, and categorical
-  ordering remain outside this slice.
+- The active dataset exposes one current row sequence. Source order is the initial sequence.
+- `head n` returns the first `n` rows in sequence order; `tail n` returns the last `n` rows in
+  sequence order, restored to their original relative order. `head 0` and `tail 0` return no rows.
+- `keep if` retains matching rows in their prior relative order. `drop if` removes matching rows and
+  retains the rest in their prior relative order.
+- False and missing filter results follow the existing predicate contract and never reorder retained
+  rows.
+- `select`, `keep`/`drop` column projection, `rename`, `generate`, `replace`, and `recode` preserve
+  the current row sequence when they succeed.
+- Eager, DuckDB-lazy, and Polars-lazy paths produce the same row sequence for this supported surface.
 
 ## Data And Execution Assumptions
 
-- The active dataset must exist and referenced grouping/category variables must exist, following
-  existing command validation and error wording.
-- Eager and DuckDB-lazy grouped commands use the existing DuckDB `ORDER BY` boundary.
-- Polars-lazy `tabulate` validation still occurs before fallback; supported grouped output uses the
-  same DuckDB ordering boundary after fallback.
-- The pure wide-result assembly preserves the already ordered long-form key stream instead of
-  re-sorting rendered labels.
+- The active dataset must exist and referenced variables must exist, following current errors.
+- DuckDB preview/filter queries consume the active relation sequence; Polars lazy frames use their
+  native sequence-preserving `head`, `tail`, and `filter` operations.
+- Missing conditions use the already defined keep/drop behavior; no additional missing syntax is
+  introduced.
+- Append/join/reshape order, named-table storage order, arbitrary SQL `order by`, categorical order,
+  and a new sort command remain outside this slice.
 
 ## Acceptance Criteria
 
-- [x] Numeric tabulate keys appear in numeric order (`2`, then `10`) in both long and wide output.
-- [x] Text keys remain lexicographic and missing keys are last in grouped outputs.
-- [x] Bar ties use native category order and missing categories remain last.
-- [x] Eager, DuckDB-lazy, and Polars-lazy tabulate outputs agree for mixed numeric/missing fixtures.
+- [x] Unsorted fixtures return identical head/tail rows across all three execution paths.
+- [x] Keep/drop filters retain relative order and treat missing conditions consistently across paths.
+- [x] Successful row-preserving transformations retain sequence order.
 - [x] CLI/help/docs, full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- New sort syntax or commands, active row-order guarantees, `head`/`tail` ordering, arbitrary SQL
-  ordering, categorical ordering, exact arithmetic storage widths, overflow reporting, or estimators.
+- New sort syntax or commands, row-ID persistence, append/join/reshape ordering, named-table order,
+  arbitrary SQL ordering, categorical ordering, or estimators.

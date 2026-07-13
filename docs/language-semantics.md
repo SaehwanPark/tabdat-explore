@@ -98,8 +98,18 @@ unknown-variable error and follows the write-validation atomicity policy below.
   not ordered by their rendered text, so `2` precedes `10`.
 - `bar` sorts nonmissing categories by descending count, then native category order for ties; the
   missing category is always last.
-- Active row order, `head`/`tail`, arbitrary SQL ordering, and categorical ordering are not defined
-  by this slice.
+- Arbitrary SQL ordering and categorical ordering remain separate contracts.
+
+## Active row order
+
+- The active dataset has one current row sequence; source order is the initial sequence.
+- `head n` returns the first `n` rows and `tail n` returns the last `n` rows in sequence order,
+  restoring the tail rows to their original relative order. A zero limit returns no rows.
+- `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
+  results follow the existing keep/drop policy and never reorder survivors.
+- Column projection and row-preserving value transformations preserve the current row sequence.
+- Append/join/reshape order, named-table storage order, arbitrary SQL order, and categorical order
+  remain separate contracts.
 
 ## Write targets
 
@@ -128,6 +138,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics, active row ordering,
-arbitrary SQL ordering, randomness, estimation samples, machine-readable output, and exit codes are
-not defined here yet.
+Categorical behavior, exact arithmetic storage widths, overflow diagnostics, append/join/reshape
+ordering, named-table storage order, arbitrary SQL ordering, randomness, estimation samples,
+machine-readable output, and exit codes are not defined here yet.
