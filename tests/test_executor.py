@@ -8309,6 +8309,27 @@ def test_bar_visualization_preserves_backend_category_order(
   assert captured["sort"] == ["2", "10", "<missing>"]
 
 
+def test_bar_visualization_disambiguates_missing_label_collision(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  captured: dict[str, Any] = {}
+
+  def capture_chart(chart: Any, path: Path) -> Path:
+    captured["sort"] = chart.to_dict()["encoding"]["x"]["sort"]
+    return path
+
+  monkeypatch.setattr(visualization_module, "_save_chart", capture_chart)
+  path = tmp_path / "plots" / "collision-bar.svg"
+  result = visualization_module.save_bar((("<missing>", 1), (None, 1)), "code", path)
+
+  labels = captured["sort"]
+  assert result == path
+  assert len(labels) == 2
+  assert len(set(labels)) == 2
+  assert all(label.startswith("<missing> [") for label in labels)
+
+
 def test_phase_24_bar_missing_category_is_rendered(
   sample_parquet: Path,
   tmp_path: Path,
@@ -8490,6 +8511,91 @@ def test_grouped_results_use_native_numeric_text_and_missing_order(
   )
   assert isinstance(grouped_count, TableResult)
   assert grouped_count.rows == ((1, 3), (2, 2))
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_categorical_order_is_native_and_missing_last(tmp_path: Path, engine: str) -> None:
+  path = tmp_path / "categorical-ordering.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (2, 'z', true),
+        (10, 'a', false),
+        (null::integer, null::varchar, null::boolean),
+        (10, 'a', false),
+        (2, 'z', true)
+    ) as categories(code, label, flag)
+    """,
+  )
+
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    executor.execute(use_command)
+    without_missing = executor.execute(TabulateCommand(("code",)))
+    with_missing = executor.execute(TabulateCommand(("code",), include_missing=True))
+    text_categories = executor.execute(TabulateCommand(("label",), include_missing=True))
+    boolean_categories = executor.execute(TabulateCommand(("flag",), include_missing=True))
+    bar_path = tmp_path / f"{engine}-bar.svg"
+    bar = executor.execute(
+      BarCommand("code", saving=bar_path, include_missing=True, open_artifact=False)
+    )
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    bar_rows = executor.backend.bar_counts(dataset, "code", include_missing=True)
+  finally:
+    executor.close()
+
+  assert isinstance(without_missing, TableResult)
+  assert tuple(row[0] for row in without_missing.rows) == (2, 10)
+  assert isinstance(with_missing, TableResult)
+  assert tuple(row[0] for row in with_missing.rows) == (2, 10, None)
+  assert isinstance(text_categories, TableResult)
+  assert tuple(row[0] for row in text_categories.rows) == ("a", "z", None)
+  assert isinstance(boolean_categories, TableResult)
+  assert tuple(row[0] for row in boolean_categories.rows) == (False, True, None)
+  assert isinstance(bar, PlotResult)
+  assert bar_path.exists()
+  assert "code: &lt;missing&gt;" in bar_path.read_text(encoding="utf-8")
+  assert bar_rows == (("2", 2), ("10", 2), (None, 1))
+
+
+def test_wide_tabulate_disambiguates_rendered_category_collisions(tmp_path: Path) -> None:
+  path = tmp_path / "tabulate-label-collisions.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (1, 'missing', 'x'),
+        (1, null::varchar, 'x'),
+        (1, 'a | b', 'c'),
+        (1, 'a', 'b | c')
+    ) as collision_data(group_id, left_label, right_label)
+    """,
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    result = executor.execute(
+      TabulateCommand(
+        ("group_id",),
+        column_variables=("left_label", "right_label"),
+        include_missing=True,
+      )
+    )
+  finally:
+    executor.close()
+
+  assert isinstance(result, TableResult)
+  category_headers = result.headers[1:]
+  assert len(category_headers) == 4
+  assert len(set(category_headers)) == 4
+  assert all("[" in header for header in category_headers)
 
 
 def test_wide_tabulate_preserves_exact_decimal_key_order(tmp_path: Path) -> None:

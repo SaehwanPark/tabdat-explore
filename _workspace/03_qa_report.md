@@ -1,23 +1,20 @@
-# QA Report: Phase 24 P0 Reshape Row Order
+# QA Report: Phase 24 P0 Categorical Ordering
 
-Status: final; implementation validation and exactly three independent PR review passes complete
+Status: three-review pass complete; fixes validated; PR #102 ready for merge
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, language semantics, reshape help, command reference, and
-  the product contract agree on long source-row/j-value order and wide first-group order.
-- **Long semantics:** non-sorted source rows and wide-column j order are preserved.
-- **Wide semantics:** identifier groups follow the first active row belonging to each group.
-- **Internal safety:** public identifiers and generated columns cannot be renamed by internal order
-  aliases.
-- **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy inputs produce the same reshape
-  preview sequence after the existing materialization boundary.
-- **Failure atomicity:** invalid long/wide identifiers, stubs, j-values, and output conflicts preserve
-  active rows, execution mode, and materialization metadata before Polars fallback.
-- **Regression safety:** existing wide/long column layout and duplicate-cell aggregation tests stay
-  green.
-- **Scope control:** no new syntax, row IDs, sort abstraction, append/join rewrite, categorical order,
-  or estimator behavior was added.
+- **Roadmap/docs to contract:** `SPEC.md`, language semantics, tabulate/bar help, command reference,
+  and the product contract agree on native scalar order and missing placement.
+- **Native values:** numeric labels are ordered numerically, text lexicographically, and booleans
+  false before true rather than by rendered text.
+- **Missing categories:** tabulate omission/inclusion and bar missing-last display are covered.
+- **Bar ties:** descending counts are followed by native category order.
+- **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy outputs agree.
+- **Scope control:** no category metadata, level syntax, recoding, sort abstraction, relation-order
+  rewrite, or estimator behavior was added.
+- **Presentation safety:** missing and reserved-looking labels remain distinct in bar charts and wide
+  tabulate headers, including multi-key separator collisions.
 
 ## Blocking Issues
 
@@ -25,10 +22,10 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- Cross-engine reshape regression: 3 passed; review-fix regression set: 10 passed; reshape-focused
-  executor/CLI suite: 15 passed.
+- Cross-engine categorical regression: 3 passed, each executing a fresh `BarCommand` artifact.
+- Collision regressions: bar label and wide tabulate header tests passed.
 - CLI regression: 1 passed; focused help regression: 1 passed.
-- `uv run pytest` — 1,101 passed, 314 existing third-party warnings.
+- `uv run pytest` — 1,106 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -38,25 +35,21 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## PR Review Loop
 
-Exactly three independent review passes completed before merge readiness:
+Exactly three independent review passes completed on PR #102. All findings were addressed:
 
-- **Pass 1:** found long-reshape aliases colliding with valid generated output names; fixed by
-  reserving identifiers, j names, and stubs before allocating ordinals, with collision tests.
-- **Pass 2:** found Polars-lazy validation mutation and public alias collisions; fixed with pure
-  long/wide prevalidation, Polars j-value discovery, and cross-engine failure-state tests.
-- **Pass 3:** found underspecified j-value discovery, weak null/duplicate coverage, and missing
-  command-reference guidance; fixed with an exact scan-order contract, edge fixtures, and reference
-  documentation.
+- Collision-safe rendering was added for bar labels and wide tabulate headers.
+- Fresh per-engine `BarCommand` artifact coverage and stronger CLI assertions were added.
+- Command-reference wording and workspace handoff state were corrected.
 
-No Critical or unresolved High/Medium findings remain.
+No fourth review pass is planned.
 
 ## Non-Blocking Follow-Ups
 
-Categorical ordering, unordered SQL, exact arithmetic widths, overflow diagnostics, randomness,
-estimation samples, errors and exits, lineage, differential assurance, and public-preview readiness
-remain queued in `SPEC.md` Future.
+Unordered SQL, exact arithmetic widths, overflow diagnostics, randomness, estimation samples, errors
+and exits, lineage, differential assurance, and public-preview readiness remain queued in `SPEC.md`
+Future.
 
 ## Recommended Next Action
 
-The reshape slice is merged. Bind the categorical-order contract in the new feature branch and
-continue the SPEC loop.
+Commit and push the validated review fixes, update PR #102, wait for its required checks, merge it to
+`main`, delete the local and remote feature branch, and return to the next `SPEC.md` item.

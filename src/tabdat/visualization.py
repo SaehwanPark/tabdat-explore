@@ -151,7 +151,7 @@ def save_bar(
   Raises:
     ExecutionError: If Altair fails to compile or write the file.
   """
-  category_order = tuple("<missing>" if row[0] is None else str(row[0]) for row in rows)
+  category_order = _bar_category_labels(rows)
   chart_rows = tuple((category, row[1]) for category, row in zip(category_order, rows, strict=True))
   chart = (
     alt.Chart(alt.Data(values=_rows_to_records(chart_rows, (variable, "count"))))
@@ -162,6 +162,33 @@ def save_bar(
     )
   )
   return _save_chart(chart, path)
+
+
+def _bar_category_labels(rows: tuple[tuple[object, ...], ...]) -> tuple[str, ...]:
+  base_labels = tuple("<missing>" if row[0] is None else str(row[0]) for row in rows)
+  label_counts: dict[str, int] = {}
+  for label in base_labels:
+    label_counts[label] = label_counts.get(label, 0) + 1
+  if all(count == 1 for count in label_counts.values()):
+    return base_labels
+
+  reserved_labels = set(base_labels)
+  used_labels: set[str] = set()
+  labels: list[str] = []
+  for row, base_label in zip(rows, base_labels, strict=True):
+    if label_counts[base_label] == 1:
+      label = base_label
+    else:
+      value = row[0]
+      disambiguator = "None" if value is None else f"{type(value).__name__}={value!r}"
+      label = f"{base_label} [{disambiguator}]"
+      suffix = 2
+      while label in reserved_labels or label in used_labels:
+        label = f"{base_label} [{disambiguator}; {suffix}]"
+        suffix += 1
+    labels.append(label)
+    used_labels.add(label)
+  return tuple(labels)
 
 
 def save_bayes_diagnostic_plot(

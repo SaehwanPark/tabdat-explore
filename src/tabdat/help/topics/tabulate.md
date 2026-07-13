@@ -16,7 +16,9 @@ column categories?
 `if` conditions must produce boolean or missing values; numeric and string truthiness is rejected.
 
 Grouped keys use native ordering: numeric values sort numerically, text values lexicographically,
-and missing values last. Wide table headers follow the same order.
+and booleans false before true; numeric labels are not ordered by rendered text. Missing values are excluded by default; they appear last with `missing`. Wide table headers follow the same order.
+Rendered multi-key labels are disambiguated when missing or separator text would otherwise make
+distinct categories look identical.
 
 Examples:
 - `tabulate sex`

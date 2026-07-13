@@ -53,6 +53,10 @@ j-value sequence rule.
 | `collapse` | Grouped aggregation into a new dataset | `collapse (mean) bmi, by(sex)` |
 | `by` | Run a command within groups | `by sex: summarize bmi` |
 
+Tabulate categories use native scalar order; missing categories are omitted by default and appear last
+when explicitly included. Bar categories use descending counts, then native-order ties; missing bars
+appear last when explicitly included.
+
 ## Linear and quantile models
 
 | Command | Purpose | Minimal invocation |

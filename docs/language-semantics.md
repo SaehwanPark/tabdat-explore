@@ -98,7 +98,21 @@ unknown-variable error and follows the write-validation atomicity policy below.
   not ordered by their rendered text, so `2` precedes `10`.
 - `bar` sorts nonmissing categories by descending count, then native category order for ties; the
   missing category is always last.
-- SQL without explicit `order by` and categorical ordering remain separate contracts.
+- SQL without explicit `order by` remains a separate contract.
+
+## Categorical ordering
+
+- Category labels use native scalar order: numeric values sort numerically, text values
+  lexicographically, and booleans false before true. Numeric labels are not compared by rendered text.
+- `tabulate` excludes missing categories by default. With `missing`, missing categories appear after
+  all nonmissing row keys and column headers.
+- `bar` orders nonmissing categories by descending count, then native category order for ties. With
+  `missing`, the missing category remains last and displays as `<missing>`.
+- Rendered labels are collision-safe: a missing label and a literal reserved-looking text label remain
+  distinct, and multi-key tabulate labels remain distinct even when their separator text would collide.
+- Source arrival order and user-defined category levels are not ordering contracts; no category
+  metadata is persisted by this slice.
+- Eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree; formatting does not alter order.
 
 ## Active row order
 
@@ -110,7 +124,6 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - Column projection and row-preserving value transformations preserve the current row sequence.
 - Grouped or relation-changing commands such as `collapse` establish separate result-sequence
   contracts; this slice does not redefine their later preview order.
-- Categorical order remains a separate contract.
 
 ## SQL and named-table row order
 
@@ -122,7 +135,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
   fallback path before the query executes, and successful named-table activation resets the prior
   materialization reason.
-- Reshape row order and categorical order remain separate contracts.
+- Reshape row order remains a separate contract.
 
 ## Join row order
 
@@ -155,7 +168,7 @@ unknown-variable error and follows the write-validation atomicity policy below.
   `name` in its stored sequence.
 - Append does not sort, deduplicate, or interleave the two inputs. `head`/`tail` consume the combined
   sequence using the active row-order rules.
-- Categorical order remains a separate contract.
+- Reshape row order remains a separate contract.
 
 ## Write targets
 
@@ -184,6 +197,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Categorical behavior, exact arithmetic storage widths, overflow diagnostics,
+Exact arithmetic storage widths, overflow diagnostics,
 SQL without explicit ordering, randomness, estimation samples, machine-readable output,
 and exit codes are not defined here yet.

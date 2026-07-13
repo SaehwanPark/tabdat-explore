@@ -1,36 +1,35 @@
-# Request Summary: Phase 24 Reshape Row-Order Contract
+# Request Summary: Phase 24 Categorical Ordering Contract
 
 ## Goal
 
-Define and verify how existing `reshape long` and `reshape wide` commands order their result rows
-without adding syntax.
+Define and verify how categorical labels are ordered and displayed by existing `tabulate` and `bar`
+commands without adding category-management syntax.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This follows the completed active, SQL/named-table, append, and join
-order slices and closes the remaining relation-changing row-order boundary before categorical order.
+Phase 24 P0 language semantics. This follows the completed grouped-result, active-row, SQL, append,
+join, and reshape ordering slices and closes the remaining basic label-order boundary.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md`: durable long/wide result-sequence policy
-- `src/tabdat/help/topics/reshape.md`, `docs/command-reference.md`: user guidance
-- `src/tabdat/backend.py`, `src/tabdat/executor.py`: collision-safe ordinals and pre-materialized
-  long/wide validation
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: non-sorted source,
-  collision, null/duplicate-cell, failure-state, and cross-engine regressions
+- `docs/language-semantics.md`: durable categorical order and missing-label policy
+- `src/tabdat/help/topics/tabulate.md`, `src/tabdat/help/topics/bar.md`, `docs/command-reference.md`:
+  user guidance
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine native-order and
+  missing-placement regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- `reshape long` preserves current active-row order; for each source row, generated rows follow the
-  established wide-column j-value sequence.
-- `reshape wide` emits one row per identifier group in the order of the first active row belonging
-  to each group; existing generated-column and duplicate-cell behavior remains unchanged.
-- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same result sequence after the existing
-  reshape materialization boundary.
-- Append/join order, categorical order, and a new sort command remain separate contracts.
+- Categorical labels use native scalar order: numeric values numerically, text lexicographically, and
+  booleans false before true; rendered text is not used to compare numeric labels.
+- `tabulate` omits missing categories by default and places them last when `missing` is requested.
+- `bar` orders nonmissing categories by descending count, then native category order for ties; an
+  included missing category is always last and displays as `<missing>`.
+- No user-defined category levels or metadata exist in this slice; source arrival order is not a
+  category-order contract.
 
 ## Non-Goals
 
-- Adding row IDs, sort syntax, a `sort` command, SQL rewriting, append/join order, categorical order,
-  duplicate-cell aggregation changes, or estimator behavior.
+- Adding category metadata/level syntax, recoding, sort syntax, append/join/reshape order, unordered
+  SQL guarantees, or estimator behavior.
