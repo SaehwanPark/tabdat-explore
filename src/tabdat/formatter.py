@@ -31,6 +31,7 @@ from tabdat.models import (
   CommandCatalogResult,
   CommandEffectCatalogResult,
   CommandExplainResult,
+  CommandSchemaResult,
   CountResult,
   CvelasticnetRegressionResult,
   CvlassoRegressionResult,
@@ -84,6 +85,7 @@ from tabdat.script import ScriptError
 RESULT_TYPE_LABELS: dict[type[object], str] = {
   CommandCatalogResult: "CommandCatalogResult",
   CommandEffectCatalogResult: "CommandEffectCatalogResult",
+  CommandSchemaResult: "CommandSchemaResult",
   HelpTopicResult: "HelpTopicResult",
   CommandExplainResult: "CommandExplainResult",
   LoadResult: "LoadResult",
@@ -158,6 +160,21 @@ def format_result(result: Result) -> str:
         ("Command", "Effects"),
         ((entry.name, ", ".join(entry.effects)) for entry in result.commands),
       )
+    )
+
+  if isinstance(result, CommandSchemaResult):
+    args_str = ", ".join(
+      f"{arg.name}{'' if arg.required else ' (optional)'}" for arg in result.arguments
+    )
+    opts_str = ", ".join(
+      f"{opt.name}{'' if opt.required else ' (optional)'}" for opt in result.options
+    )
+    return (
+      f"Command: {result.name}\n"
+      f"Syntax: {result.syntax}\n"
+      f"Help Topic: {result.help_topic or '.'}\n"
+      f"Arguments: {args_str or '.'}\n"
+      f"Options: {opts_str or '.'}"
     )
 
   if isinstance(result, CommandExplainResult):
