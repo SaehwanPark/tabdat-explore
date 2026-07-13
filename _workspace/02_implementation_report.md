@@ -8,31 +8,38 @@
 ## Delivered Boundary
 
 - `src/tabdat/backend.py`
-  - Added collision-safe source-row and j-value ordinals for `reshape long`.
-  - Added a collision-safe first-source-row group ordinal for `reshape wide`.
+  - Added collision-safe source-row and j-value ordinals for `reshape long`, reserving all public
+    output names.
+  - Added a collision-safe first-source-row group ordinal for `reshape wide`, reserving generated
+    output names.
   - Preserved existing generated-column order and duplicate-cell aggregation.
+- `src/tabdat/executor.py`
+  - Prevalidates long/wide identifiers, stubs, j-values, and output conflicts before Polars fallback
+    so validation failures preserve active execution state.
 - `tests/test_executor.py`
-  - Verified eager, DuckDB-lazy, and Polars-lazy long/wide results using non-sorted source rows and
-    non-lexicographic wide-column order.
+  - Verified eager, DuckDB-lazy, and Polars-lazy long/wide results using non-sorted source rows,
+    non-lexicographic wide-column order, collision-prone names, null/duplicate cells, and failed
+    validation state.
 - `tests/test_cli.py` and `tests/test_help.py`
   - Covered exact CLI long output and documented source/group sequence behavior.
 - `src/tabdat/help/topics/reshape.md`, `docs/language-semantics.md`, `SPEC.md`, `CHANGELOG.md`,
   and `_workspace/`
-  - Record reshape sequence semantics while keeping append, join, and categorical ordering separate.
+  - Record reshape sequence and validation semantics while keeping append, join, and categorical
+    ordering separate.
 
 ## Functional-First Notes
 
 Reshape now materializes explicit implementation-only sequence boundaries rather than relying on
-identifier sorting or backend grouping order. No row IDs, sort syntax, or duplicate-cell aggregation
-policy changes were introduced.
+identifier sorting or backend grouping order. Validation remains pure and precedes Polars fallback;
+no row IDs, sort syntax, or duplicate-cell aggregation policy changes were introduced.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k reshape_preserves_source_and_group_sequence -q` — passed, 3 tests.
-- `uv run pytest tests/test_executor.py tests/test_cli.py -k reshape -q` — passed, 8 tests.
+- `uv run pytest tests/test_executor.py -k 'reshape_preserves_source_and_group_sequence or reshape_internal_order_names_do_not_overwrite_public_columns or reshape_wide_preserves_null_and_duplicate_cell_behavior or failed_reshape_validation_preserves_active_state' -q` — passed, 10 tests.
+- `uv run pytest tests/test_executor.py tests/test_cli.py -k reshape -q` — passed, 15 tests.
 - `uv run pytest tests/test_cli.py -k phase_11_reshape_long_flow -q` — passed, 1 test.
 - `uv run pytest tests/test_help.py -k help_topics_document_explicit_missing_values -q` — passed, 1 test.
-- `uv run pytest` — passed, 1,094 tests, with 314 existing third-party warnings.
+- `uv run pytest` — passed, 1,101 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.

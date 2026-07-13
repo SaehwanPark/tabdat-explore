@@ -14,9 +14,10 @@ order slices and closes the remaining relation-changing row-order boundary befor
 
 - `docs/language-semantics.md`: durable long/wide result-sequence policy
 - `src/tabdat/help/topics/reshape.md`, `docs/command-reference.md`: user guidance
-- `src/tabdat/backend.py`: explicit source-row and first-group ordering for reshape results
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: non-sorted source and
-  cross-engine regressions
+- `src/tabdat/backend.py`, `src/tabdat/executor.py`: collision-safe ordinals and pre-materialized
+  long/wide validation
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: non-sorted source,
+  collision, null/duplicate-cell, failure-state, and cross-engine regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions

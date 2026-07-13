@@ -8,8 +8,12 @@ Status: implementation validation complete; PR review pending
   the product contract agree on long source-row/j-value order and wide first-group order.
 - **Long semantics:** non-sorted source rows and wide-column j order are preserved.
 - **Wide semantics:** identifier groups follow the first active row belonging to each group.
+- **Internal safety:** public identifiers and generated columns cannot be renamed by internal order
+  aliases.
 - **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy inputs produce the same reshape
   preview sequence after the existing materialization boundary.
+- **Failure atomicity:** invalid long/wide identifiers, stubs, j-values, and output conflicts preserve
+  active rows, execution mode, and materialization metadata before Polars fallback.
 - **Regression safety:** existing wide/long column layout and duplicate-cell aggregation tests stay
   green.
 - **Scope control:** no new syntax, row IDs, sort abstraction, append/join rewrite, categorical order,
@@ -21,9 +25,10 @@ Status: implementation validation complete; PR review pending
 
 ## Validation Evidence
 
-- Cross-engine reshape regression: 3 passed; reshape-focused executor/CLI suite: 8 passed.
+- Cross-engine reshape regression: 3 passed; review-fix regression set: 10 passed; reshape-focused
+  executor/CLI suite: 15 passed.
 - CLI regression: 1 passed; focused help regression: 1 passed.
-- `uv run pytest` — 1,094 passed, 314 existing third-party warnings.
+- `uv run pytest` — 1,101 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.

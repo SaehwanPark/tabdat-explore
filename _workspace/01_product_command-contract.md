@@ -29,7 +29,9 @@ No new options, commands, or output fields are introduced.
 ## Reshape-Order Rules
 
 - `reshape long` preserves the active source-row sequence. For each source row, generated rows are
-  emitted in the established wide-column j-value sequence.
+  emitted in the established wide-column j-value sequence: scan requested stubs in command varlist
+  order, scan each stub's matching source columns in schema order, and keep each suffix's first
+  appearance once.
 - `reshape wide` emits one row per identifier group in the order of the first active row belonging to
   that group. Existing generated-column order and duplicate-cell aggregation remain unchanged.
 - `head`/`tail` consume each reshape result using the active row-order contract.
