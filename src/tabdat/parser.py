@@ -205,6 +205,7 @@ class _CommandParts:
   condition: Expression | None
   options: tuple[CommandOption, ...]
   expression: Expression | None = None
+  argument_quoted: tuple[bool, ...] = ()
 
 
 def parse_command(text: str) -> Command:
@@ -361,13 +362,21 @@ def _parse_ttest_result(text: str) -> Result[Command, str]:
 
 @result.block
 def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
-  before, separator, after = text.partition(":")
-  if not separator:
+  prefix_tokens = yield _tokenize_result(text)
+  colon_index = next(
+    (index for index, token in enumerate(prefix_tokens) if _is_symbol(token, ":")),
+    None,
+  )
+  if colon_index is None:
     return cast(Command, (yield Err("by expects syntax: by group_vars: command")))
-  groups = tuple(before.split()[1:])
-  if not groups:
+  if not prefix_tokens or not _is_unquoted_identifier(prefix_tokens[0], "by"):
+    return cast(Command, (yield Err("by expects syntax: by group_vars: command")))
+  group_tokens = prefix_tokens[1:colon_index]
+  if not group_tokens or any(token.kind != "identifier" for token in group_tokens):
     return cast(Command, (yield Err("by expects at least one grouping variable")))
-  if not after.strip():
+  groups = tuple(token.text for token in group_tokens)
+  after = text[prefix_tokens[colon_index].end :].strip()
+  if not after:
     return cast(Command, (yield Err("by expects a command after :")))
 
   command = yield _parse_command_result(after.strip())
@@ -382,9 +391,16 @@ def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
 
 @result.block
 def _parse_bayes_prefix_result(text: str) -> Generator[Result[Any, str], Any, Command]:
-  before, separator, after = text.partition(":")
-  if not separator:
+  prefix_tokens = yield _tokenize_result(text)
+  colon_index = next(
+    (index for index, token in enumerate(prefix_tokens) if _is_symbol(token, ":")),
+    None,
+  )
+  if colon_index is None:
     return cast(Command, (yield Err("bayes prefix expects syntax: bayes [, options]: command")))
+  colon_token = prefix_tokens[colon_index]
+  before = text[: colon_token.start]
+  after = text[colon_token.end :].strip()
 
   before_stripped = before.strip()
   if before_stripped == "bayes":
@@ -397,9 +413,9 @@ def _parse_bayes_prefix_result(text: str) -> Generator[Result[Any, str], Any, Co
     if not options_part.startswith(","):
       return cast(Command, (yield Err("bayes prefix options must start with a comma")))
 
-    tokens = yield _tokenize_result(options_part[1:].strip())
+    option_tokens = yield _tokenize_result(options_part[1:].strip())
     try:
-      parsed_options = _parse_options(tokens)
+      parsed_options = _parse_options(option_tokens)
     except ParseError as exc:
       return cast(Command, (yield Err(str(exc))))
 
@@ -433,7 +449,7 @@ def _parse_bayes_prefix_result(text: str) -> Generator[Result[Any, str], Any, Co
       else:
         return cast(Command, (yield Err(f"unsupported bayes option: {option.name}")))
 
-  if not after.strip():
+  if not after:
     return cast(Command, (yield Err("bayes expects a command after :")))
 
   inner_command = yield _parse_command_result(after.strip())
@@ -870,7 +886,7 @@ def _parse_set(parts: _CommandParts) -> SetCommand:
     raise ParseError("set expects syntax: set name value")
   if len(parts.arguments) != 2:
     raise ParseError("set expects syntax: set name value")
-  name = parts.arguments[0].lower()
+  name = _unquoted_argument_lower(parts, 0)
   if name not in {"graph_format", "artifact_dir", "graph_open"}:
     raise ParseError(f"unknown setting: {parts.arguments[0]}")
   return SetCommand(
@@ -889,6 +905,14 @@ def _parse_keep_or_drop(parts: _CommandParts, command_name: str) -> KeepCommand 
   if command_name == "keep":
     return KeepCommand(variables=parts.arguments, condition=parts.condition)
   return DropCommand(variables=parts.arguments, condition=parts.condition)
+
+
+def _unquoted_argument_lower(parts: _CommandParts, index: int) -> str | None:
+  if index >= len(parts.arguments) or index >= len(parts.argument_quoted):
+    return None
+  if parts.argument_quoted[index]:
+    return None
+  return parts.arguments[index].lower()
 
 
 def _parse_tabulate(parts: _CommandParts) -> TabulateCommand:
@@ -1015,7 +1039,7 @@ def _parse_collapse(parts: _CommandParts) -> CollapseCommand:
   if len(parts.arguments) < 2:
     raise ParseError("collapse expects syntax: collapse stat varlist, by(group_vars)")
 
-  statistic = parts.arguments[0].lower()
+  statistic = _unquoted_argument_lower(parts, 0)
   if statistic not in _COLLAPSE_STATS:
     raise ParseError(f"collapse unsupported statistic: {parts.arguments[0]}")
   statistic_literal = cast(Literal["count", "mean", "sum", "min", "max"], statistic)
@@ -1040,7 +1064,7 @@ def _parse_join(parts: _CommandParts) -> JoinCommand:
   if len(parts.arguments) < 3:
     raise ParseError("join expects syntax: join <table> on <keylist>")
   table_name = parts.arguments[0]
-  if parts.arguments[1].lower() != "on":
+  if _unquoted_argument_lower(parts, 1) != "on":
     raise ParseError("join expects syntax: join <table> on <keylist>")
   keys = parts.arguments[2:]
   if len(set(keys)) != len(keys):
@@ -1081,7 +1105,7 @@ def _parse_reshape(parts: _CommandParts) -> ReshapeCommand:
   if len(parts.arguments) < 2:
     raise ParseError("reshape expects syntax: reshape long|wide varlist, i(id_vars) j(name)")
 
-  direction = parts.arguments[0].lower()
+  direction = _unquoted_argument_lower(parts, 0)
   if direction not in {"long", "wide"}:
     raise ParseError("reshape direction must be long or wide")
   variables = parts.arguments[1:]
@@ -1119,7 +1143,7 @@ def _parse_panel(parts: _CommandParts) -> PanelCommand:
     raise ParseError("panel expects syntax: panel [<id_var> <time_var>|clear]")
   if not parts.arguments:
     return PanelCommand(action="report")
-  if parts.arguments[0] == "clear":
+  if _unquoted_argument_lower(parts, 0) == "clear":
     if parts.arguments == ("clear",):
       return PanelCommand(action="clear")
     raise ParseError("panel expects syntax: panel [<id_var> <time_var>|clear]")
@@ -1199,7 +1223,7 @@ def _parse_bayesplot(parts: _CommandParts) -> BayesPlotCommand:
     raise ParseError("bayesplot does not accept if clauses or assignment syntax")
   if len(parts.arguments) != 1:
     raise ParseError("bayesplot expects syntax: bayesplot <trace|density|autocorrelation>")
-  kind = parts.arguments[0]
+  kind = parts.arguments[0] if _unquoted_argument_lower(parts, 0) is not None else ""
   if kind not in ("trace", "density", "autocorrelation"):
     raise ParseError("bayesplot kind must be trace, density, or autocorrelation")
 
@@ -1282,7 +1306,7 @@ def _parse_lasso(parts: _CommandParts) -> LassoCommand:
     raise ParseError("lasso expects syntax: lasso linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("lasso expects syntax: lasso linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("lasso model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1308,7 +1332,7 @@ def _parse_postlasso(parts: _CommandParts) -> PostlassoCommand:
     raise ParseError("postlasso expects syntax: postlasso linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("postlasso expects syntax: postlasso linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("postlasso model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1335,7 +1359,7 @@ def _parse_ridge(parts: _CommandParts) -> RidgeCommand:
     raise ParseError("ridge expects syntax: ridge linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("ridge expects syntax: ridge linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("ridge model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1361,7 +1385,7 @@ def _parse_elasticnet(parts: _CommandParts) -> ElasticnetCommand:
     raise ParseError("elasticnet expects syntax: elasticnet linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("elasticnet expects syntax: elasticnet linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("elasticnet model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1425,7 +1449,7 @@ def _parse_cvlasso(parts: _CommandParts) -> CvlassoCommand:
     raise ParseError("cvlasso expects syntax: cvlasso linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("cvlasso expects syntax: cvlasso linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("cvlasso model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1449,7 +1473,7 @@ def _parse_cvridge(parts: _CommandParts) -> CvridgeCommand:
     raise ParseError("cvridge expects syntax: cvridge linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("cvridge expects syntax: cvridge linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("cvridge model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1473,7 +1497,7 @@ def _parse_cvelasticnet(parts: _CommandParts) -> CvelasticnetCommand:
     raise ParseError("cvelasticnet expects syntax: cvelasticnet linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("cvelasticnet expects syntax: cvelasticnet linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("cvelasticnet model must be linear")
   option_names = {option.name for option in parts.options}
@@ -1501,7 +1525,7 @@ def _parse_bayes(parts: _CommandParts) -> BayesCommand:
     raise ParseError("bayes expects syntax: bayes linear <y> <xvars>")
   if len(parts.arguments) < 3:
     raise ParseError("bayes expects syntax: bayes linear <y> <xvars>")
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("bayes model must be linear")
   option_names = {option.name for option in parts.options}
@@ -2004,7 +2028,7 @@ def _parse_estat(parts: _CommandParts) -> EstatCommand:
     raise ParseError(expected_estat_syntax)
   if len(parts.arguments) != 1:
     raise ParseError(expected_estat_syntax)
-  subcommand = parts.arguments[0].lower()
+  subcommand = _unquoted_argument_lower(parts, 0)
   if subcommand not in {
     "residuals",
     "ovtest",
@@ -2133,7 +2157,7 @@ def _parse_ivregress(parts: _CommandParts) -> IvRegressCommand:
     raise ParseError(
       "ivregress expects syntax: ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)"
     )
-  estimator = parts.arguments[0].lower()
+  estimator = _unquoted_argument_lower(parts, 0)
   if estimator not in {"2sls", "gmm"}:
     raise ParseError("ivregress estimator must be 2sls or gmm")
   option_names = {option.name for option in parts.options}
@@ -2388,7 +2412,7 @@ def _parse_dml(parts: _CommandParts) -> DmlCommand:
       "dml expects syntax: dml linear <y> <controls>, treat(<var>) "
       "[folds(<int>) alpha(<num>) robust seed(<int>) noconstant]"
     )
-  model = parts.arguments[0].lower()
+  model = _unquoted_argument_lower(parts, 0)
   if model != "linear":
     raise ParseError("dml model must be linear")
   option_names = {option.name for option in parts.options}
@@ -2616,6 +2640,7 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
     raise ParseError(f"unknown command: {name}")
 
   arguments: list[str] = []
+  argument_quoted: list[bool] = []
   condition: Expression | None = None
   options: tuple[CommandOption, ...] = ()
   expression: Expression | None = None
@@ -2655,7 +2680,9 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
       options = _parse_options(option_tokens) if option_tokens else options
       stream.advance_to_end()
       break
-    arguments.append(_parse_argument(stream))
+    argument, quoted = _parse_argument(stream, allow_symbols=name in {"save", "export", "set"})
+    arguments.append(argument)
+    argument_quoted.append(quoted)
 
   return _CommandParts(
     name=name,
@@ -2663,15 +2690,19 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
     condition=condition,
     options=options,
     expression=expression,
+    argument_quoted=tuple(argument_quoted),
   )
 
 
-def _parse_argument(stream: "_TokenStream") -> str:
+def _parse_argument(stream: "_TokenStream", *, allow_symbols: bool) -> tuple[str, bool]:
   parts: list[str] = []
+  quoted = False
   previous: _Token | None = None
   while not stream.at_end:
     token = stream.peek
     if token.kind == "symbol" and token.text in {",", "="}:
+      break
+    if token.kind == "symbol" and not allow_symbols:
       break
     if _is_unquoted_identifier(token, "if"):
       break
@@ -2679,9 +2710,10 @@ def _parse_argument(stream: "_TokenStream") -> str:
       break
     previous = stream.consume()
     parts.append(previous.text)
+    quoted = quoted or previous.quoted
   if not parts:
     raise ParseError(f"unsupported token in command: {stream.peek.text}")
-  return "".join(parts)
+  return "".join(parts), quoted
 
 
 def _split_expression_and_options(
@@ -3324,7 +3356,7 @@ def _parse_recode(text: str) -> RecodeCommand:
   rules = []
   i = 0
   while i < len(rule_tokens):
-    if rule_tokens[i].text != "(":
+    if not _is_symbol(rule_tokens[i], "("):
       raise ParseError(f"expected '(' at start of rule, got: {rule_tokens[i].text}")
 
     # Matching parenthesis

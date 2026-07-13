@@ -29,7 +29,7 @@ from tabdat.errors import (
   UnknownVariableError,
 )
 from tabdat.estimation import CoefficientEstimate
-from tabdat.executor import Executor, _xtabond_sample
+from tabdat.executor import Executor, _bayes_formula_identifier, _xtabond_sample
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -6304,6 +6304,13 @@ def test_quoted_identifiers_execute_with_exact_spelling(sample_parquet: Path) ->
     (44, 42),
     (56, 54),
   )
+
+
+def test_bayes_formula_identifier_quotes_and_rejects_unrepresentable_names() -> None:
+  assert _bayes_formula_identifier("age") == "`age`"
+  assert _bayes_formula_identifier("age group+x") == "`age group+x`"
+  with pytest.raises(ExecutionError, match="bayes does not support backticks"):
+    _bayes_formula_identifier("age`group")
 
 
 def test_summarize_requested_numeric_columns(sample_parquet: Path) -> None:

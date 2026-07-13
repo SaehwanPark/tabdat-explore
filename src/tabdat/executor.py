@@ -2131,10 +2131,10 @@ class Executor:
     if not include_intercept:
       formula_parts.append("0")
     for pred in predictors:
-      formula_parts.append(pred)
+      formula_parts.append(_bayes_formula_identifier(pred))
 
     formula_rhs = " + ".join(formula_parts) if formula_parts else "1"
-    formula = f"{outcome} ~ {formula_rhs}"
+    formula = f"{_bayes_formula_identifier(outcome)} ~ {formula_rhs}"
 
     import pandas as pd
 
@@ -7115,6 +7115,12 @@ def _median(values: tuple[float, ...]) -> float:
   if len(sorted_values) % 2 == 1:
     return sorted_values[midpoint]
   return (sorted_values[midpoint - 1] + sorted_values[midpoint]) / 2.0
+
+
+def _bayes_formula_identifier(name: str) -> str:
+  if "`" in name:
+    raise ExecutionError("bayes does not support backticks inside variable names")
+  return f"`{name}`"
 
 
 def _require_numeric_columns(

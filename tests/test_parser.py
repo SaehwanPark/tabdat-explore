@@ -192,7 +192,7 @@ def test_parse_summarize_command_with_variables() -> None:
 
 
 def test_parse_summarize_preserves_punctuated_variable_names() -> None:
-  assert parse_command("summarize bmi-zscore cost.2024 x/y") == SummarizeCommand(
+  assert parse_command("summarize `bmi-zscore` `cost.2024` `x/y`") == SummarizeCommand(
     ("bmi-zscore", "cost.2024", "x/y")
   )
 
@@ -215,7 +215,7 @@ def test_parse_phase_3_inspection_commands() -> None:
 
 
 def test_parse_summarize_with_if_as_structured_phase_2_command() -> None:
-  assert parse_command("summarize age bmi-zscore if age >= 18") == ParsedCommand(
+  assert parse_command("summarize age `bmi-zscore` if age >= 18") == ParsedCommand(
     name="summarize",
     arguments=("age", "bmi-zscore"),
     condition=BinaryExpression(
@@ -1353,6 +1353,31 @@ def test_parse_quoted_identifiers_preserves_exact_names() -> None:
     parse_expression("``")
   with pytest.raises(ParseError, match="unterminated quoted identifier"):
     parse_expression("`body mass")
+
+
+def test_parse_quoted_identifiers_across_wrappers_and_controls() -> None:
+  assert parse_command("by `group:key`: summarize `value col`") == ByCommand(
+    groups=("group:key",),
+    command=SummarizeCommand(("value col",)),
+  )
+  assert parse_command("bayes, prior(`x:y`, normal): regress `outcome col` `x:y`") == (
+    BayesPrefixCommand(
+      command=RegressCommand(outcome="outcome col", predictors=("x:y",)),
+      priors=(("x:y", "normal"),),
+    )
+  )
+  assert parse_command("panel `clear` year") == PanelCommand(
+    action="set",
+    id_variable="clear",
+    time_variable="year",
+  )
+
+  with pytest.raises(ParseError, match="collapse unsupported statistic: mean"):
+    parse_command("collapse `mean` age, by(sex)")
+  with pytest.raises(ParseError, match="join expects syntax"):
+    parse_command("join lookup `on` id")
+  with pytest.raises(ParseError, match="unsupported token in command"):
+    parse_command("select bmi-zscore")
 
 
 def test_parse_exit_aliases() -> None:

@@ -8,16 +8,20 @@ The identifier grammar slice is implemented and focused validation is green.
 - Added backtick-quoted identifiers with whitespace/punctuation support and doubled-backtick
   escaping.
 - Preserved quoted keywords and punctuation across parser targets, variable lists, and expressions.
-- Verified exact-name execution through generate, replace, select, and unknown-variable diagnostics.
+- Made `by` and Bayes-prefix framing quote-aware and preserved positional keyword boundaries.
+- Quoted Bayes formula identifiers safely, with a clear limitation for names containing backticks.
+- Verified exact-name execution through generate, replace, select, CLI `-c`, scripts, Unicode, and
+  unknown-variable diagnostics.
 
 ## Validation
 
-- Parser suite: 487 passed.
-- Quoted-identifier executor regression: 1 passed.
-- Full suite: 972 passed, with 314 existing third-party warnings.
+- Parser suite: 488 passed.
+- Quoted-identifier executor regressions: 2 passed.
+- Quoted-identifier CLI/script regressions: 2 passed.
+- Full suite: 976 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow: all six scenarios passed, including exact canonical replay.
-- Three independent PR reviews remain before merge.
+- Three independent PR reviews completed; findings are recorded in `_workspace/03_qa_report.md`.
 
 ## Remaining Phase 24 Work
 
