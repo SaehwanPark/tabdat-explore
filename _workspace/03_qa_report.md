@@ -1,12 +1,12 @@
 # QA Report: Phase 24 P1 Structured JSON Command Discovery
 
-Status: implementation validation complete; PR review pending
+Status: implementation validation complete; exactly three independent PR reviews complete
 
 ## Boundaries Checked
 
 - **Catalog contract:** `--json --list-commands` emits exactly one versioned
   `CommandCatalogResult` envelope containing complete, lexicographically sorted names and help-topic
-  availability.
+  availability, including `lincom`, `test`, and `ttest` with `null` help topics.
 - **Read-only behavior:** catalog construction uses existing registries and occurs before config or
   `Executor` construction; no dataset is read and no session state changes.
 - **Invocation safety:** missing `--json` and combinations with `-c`, `-f`, or a positional script
@@ -36,8 +36,10 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-No independent PR review passes have started yet. The required loop is exactly three reviews after
-the PR is opened; findings will be fixed and validated without starting a fourth review.
+Exactly three independent reviews completed. Review 1 found the incomplete command registry; Review 2
+reported no findings; Review 3 found the same registry omission plus stale pre-PR handoff wording.
+The registry/test and handoff fixes were applied and the complete validation set was rerun. No fourth
+review was started.
 
 ## Non-Blocking Follow-Ups
 
@@ -47,4 +49,5 @@ differential assurance, dependency layering, and preview readiness remain queued
 
 ## Recommended Next Action
 
-Commit and push the implementation, open the PR, then run exactly three independent review passes.
+Merge the reviewed PR, then remove the local and remote feature branch and return to `SPEC.md` for the
+next bounded slice.

@@ -18,10 +18,14 @@
   - Emits one compact catalog envelope before config or `Executor` construction.
   - Sorts the existing `COMMAND_NAMES` registry and maps each name to its available help topic or
     JSON `null`.
+- `src/tabdat/shell.py`
+  - Kept the executable command registry complete for the catalog by adding `lincom`, `test`, and
+    `ttest`, which have no dedicated help topics and therefore report `null`.
 - Help/docs/tests
   - Documented discovery in the command reference, user guide, and `run` help topic.
   - Added catalog ordering/help availability, no-session construction, and incompatible-invocation
-    coverage while preserving existing JSON and terminal tests.
+    coverage, including explicit assertions for the three previously omitted executable commands,
+    while preserving existing JSON and terminal tests.
 
 ## Functional-First Notes
 
@@ -42,11 +46,13 @@ or change command execution and existing success/error envelopes.
   s3_taxi_lazy_scale s4_penguins_script_repro s5_titanic_phase13_dogfood
   s6_canonical_parquet_workflow` — passed with exit code 0; all six scenarios passed and canonical
   replay stdout matched.
-- PR review loop: pending; no review passes have been started for this slice.
+- Exactly three independent PR reviews completed: two reviewers identified the same incomplete
+  registry issue and one reported no findings. The registry/test fix and stale handoff wording were
+  applied; no fourth review was started.
 
 ## Known Limits And Follow-Up Work
 
 Option/argument schemas, command examples in the catalog, plugin discovery, interactive JSON mode,
 dry-run/explain, repair diagnostics, SQL-result metadata, operation lineage, estimation samples,
 new exit codes, and new commands remain separate Phase 24 contracts. The implementation is ready for
-PR review.
+PR merge.

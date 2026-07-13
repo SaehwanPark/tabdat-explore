@@ -161,6 +161,7 @@ def test_cli_json_lists_commands_without_starting_a_session(monkeypatch, capsys)
   assert envelope["schema_version"] == 1
   assert envelope["result_type"] == "CommandCatalogResult"
   assert [entry["name"] for entry in entries] == sorted(COMMAND_NAMES)
+  assert {entry["name"] for entry in entries} >= {"lincom", "test", "ttest"}
   assert [entry["help_topic"] for entry in entries] == [
     name if name in help_topics else None for name in sorted(COMMAND_NAMES)
   ]
