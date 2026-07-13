@@ -1575,6 +1575,10 @@ class DuckDBBackend:
   def is_polars_lazy_active(self) -> bool:
     return self._polars_lazy_frame is not None
 
+  def validate_expression(self, dataset: DatasetInfo, expression: Expression) -> None:
+    """Validate an expression without changing the active relation."""
+    self._compile_polars_expression(dataset, expression)
+
   def materialize_polars_lazy(self, path: Path | str) -> DatasetInfo:
     frame = self._collect_polars_frame("materialize", path)
     self._replace_active_with_frame(frame, command_name="materialize")

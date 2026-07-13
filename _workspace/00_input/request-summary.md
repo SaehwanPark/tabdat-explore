@@ -1,35 +1,31 @@
-# Request Summary: Phase 24 Materialization-Reason Taxonomy
+# Request Summary: Phase 24 Identifier Overwrite and Atomic Error Semantics
 
 ## Goal
 
-Extend the existing `status` materialization reason with one additional deterministic category:
-`eager operation` for a successful command that starts with a DuckDB-lazy active dataset and ends
-with an eager active dataset.
+Define and verify the first stable cross-command write policy for `generate`, `rename`, `replace`,
+and `recode ... generate(...)`: explicit identifier target rules and no active-dataset mutation on
+validation failure.
 
 ## Phase Fit
 
-Phase 24 P0 product-center stabilization. This follows the canonical workflow, status, Polars
-fallback, and last-operation slices, and makes the remaining user-visible lazy-to-eager transition
-explainable without introducing a backend-internal trace.
+Phase 24 P0 language semantics. This follows the execution-transparency sequence and starts the
+roadmap's cross-command semantic contract without changing successful command behavior.
 
 ## Touched Surfaces
 
-- `src/tabdat/executor.py` and `src/tabdat/models.py`: typed reason taxonomy and transition detection
-- `src/tabdat/formatter.py`: public reason mapping
-- `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, and `docs/user-guide.md`
-- `tests/test_executor.py` and `tests/test_cli.py`
+- `docs/language-semantics.md` and `docs/user-guide.md`: durable write/atomicity policy
+- `tests/test_executor.py`: collision, target, and schema-preservation regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
 
 ## Assumptions
 
-- A successful transition from lazy DuckDB state to eager state is the authoritative `eager operation`
-  signal for this slice.
-- Polars fallback remains the more specific reason when the existing fallback hook staged it.
-- New source/table activation resets the reason to `none`, as already contracted.
+- Existing command errors are the public policy; this slice documents and hardens them rather than
+  redesigning error wording.
+- Validation failures are atomic at the active-dataset boundary: schema, rows, execution metadata,
+  and current active table remain unchanged.
+- Identifier case, quoting, missing-value coercion, and ordering semantics remain separate slices.
 
 ## Non-Goals
 
-- A complete operation/materialization trace, timings, active progress, retained estimation samples,
-  JSON/JSONL, explain/dry-run, or stable exit-code redesign.
-- Changing lazy/eager semantics, backend behavior, command output beyond `status`, or adding new
-  backends, estimators, connectors, plugins, or dependency layers.
+- Adding commands, changing successful transformations, broad identifier grammar, missingness or
+  coercion policy, machine output, exit codes, lineage, or estimator behavior.

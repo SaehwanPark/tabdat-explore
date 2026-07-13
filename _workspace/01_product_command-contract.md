@@ -1,86 +1,47 @@
-# Product Contract: Phase 24 P0 — Materialization-Reason Taxonomy
+# Product Contract: Phase 24 P0 — Identifier Overwrite and Atomic Error Semantics
 
 ## Request Summary
 
-Extend `status` with a deterministic `eager operation` reason for successful DuckDB-lazy to eager
-command transitions, while preserving the existing `polars fallback` reason.
+Document and regression-test the initial cross-command write contract for generated, renamed,
+replaced, and recode-generated identifiers.
 
 ## Roadmap Phase
 
-Phase 24 P0, workstream 3: execution transparency before broader semantic and automation work.
+Phase 24 P0, workstream 2: stable language semantics before broader command and estimator expansion.
 
-## Command Syntax
+## Stable Write Policy
 
-```text
-status
-```
+- `generate <name> = <expression>` requires a new output identifier. Existing targets are rejected.
+- `rename <old> <new>` requires an existing source and a destination that does not already exist.
+- `replace <name> = <expression>` requires an existing target; it never implicitly creates a column.
+- `recode ..., generate(<names>)` requires one output per input and rejects output collisions before
+  changing the active dataset.
+- Validation failures leave the active dataset's schema and rows unchanged.
 
-The command syntax is unchanged. `status` accepts no arguments, options, conditions, or assignment
-syntax.
+## Error Contract
 
-## Output Contract
-
-The status field remains in the existing position and expands its public taxonomy:
-
-```text
-Last materialization reason: <polars fallback|eager operation|none>
-```
-
-`polars fallback` means the existing Polars lazy frame was collected by the fallback hook.
-`eager operation` means a successful command began with an active DuckDB-lazy dataset and ended
-with an eager active dataset, outside the more-specific Polars fallback path. `none` means no
-tracked reason is attached to the current session state.
-
-## State Semantics
-
-- A new session, successful source load, and named-table/`sql ... into` activation report `none`.
-- DuckDB-lazy `status`, `count`, and other operations that preserve lazy state do not set a new
-  reason.
-- A successful DuckDB-lazy to eager command transition reports `eager operation`.
-- A successful Polars fallback continues to report `polars fallback`, taking precedence over the
-  generic eager transition.
-- Failed commands do not commit a new reason; the active backend state may still reflect any
-  physical transition that occurred before the failure.
-- Existing last-operation behavior is unchanged.
+Existing command-specific errors remain the public diagnostics. The contract requires the failure to
+identify the target/source problem; exact wording remains covered by focused tests and may be
+refined only through a future language-error policy slice.
 
 ## Execution Semantics
 
-- `StatusResult` carries an optional typed reason value; the formatter maps it to exact public text.
-- The executor compares the active dataset execution mode before and after a successful command.
-- The existing success-only pending metadata boundary commits the specific reason after command
-  completion, with reset operations taking precedence.
-- `status` remains dispatched before lazy materialization and never queries the backend.
-
-## Examples
-
-```text
-tabdat> use data.parquet, lazy engine=duckdb
-tabdat> generate age2 = age + 1
-tabdat> status
-Execution mode: eager
-Materialization: materialized
-Last materialization reason: eager operation
-```
-
-```text
-tabdat> use data.parquet, lazy engine=polars
-tabdat> generate age2 = age + 1
-tabdat> status
-Last materialization reason: polars fallback
-```
+- Validation happens before the active relation is replaced.
+- For Polars-lazy sessions, write validation happens before lazy materialization, so a failed write
+  preserves the lazy engine as well as the active relation.
+- A failed write command does not update the last successful operation or materialization reason.
+- The policy applies in eager and supported lazy paths; successful command materialization behavior is
+  unchanged.
 
 ## Acceptance Criteria
 
-- [x] The typed reason taxonomy includes `polars_fallback`, `eager_operation`, and `none`.
-- [x] A successful DuckDB-lazy to eager command reports `eager operation`.
-- [x] A successful Polars fallback still reports `polars fallback`.
-- [x] Source/table activation resets the reason and status/count preserve existing semantics.
-- [x] Failed commands do not commit a new reason.
-- [x] CLI, script, help, command-reference, user-guide, full tests, type/lint, and integrated
-  workflow checks pass.
+- [x] Durable language-semantics documentation covers all four write families and atomic failure.
+- [x] Existing-target generate and recode-generate collisions are covered.
+- [x] Rename source/destination errors and replace missing-target errors are covered.
+- [x] Tests compare active schema/rows before and after representative failures.
+- [x] Full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Full operation lineage/history, active-operation progress, backend-internal traces, timings,
-  retained estimation samples, machine-readable output, or explain/dry-run.
-- Changes to lazy/eager behavior, backends, estimators, connectors, plugins, or exit codes.
+- Identifier case/quoting grammar, missing values, coercion, arithmetic, categories, ordering,
+  randomness, estimation samples, machine output, exit codes, or new commands.

@@ -18,6 +18,8 @@ All notable project changes are tracked here.
   command while full operation lineage remains deferred.
 - Started the Phase 24 materialization-reason taxonomy slice; successful eager transitions will be
   distinguished from Polars fallback and source/table resets.
+- Started the Phase 24 identifier overwrite and atomic-error semantics slice; broader language
+  policy remains queued behind this initial write-contract increment.
 
 ### Added
 

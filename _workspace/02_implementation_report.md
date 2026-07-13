@@ -1,43 +1,38 @@
-# Implementation Report: Phase 24 P0 Materialization-Reason Taxonomy
+# Implementation Report: Phase 24 P0 Identifier Overwrite and Atomic Error Semantics
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — expanded `status` reason taxonomy.
+- `_workspace/01_product_command-contract.md` — initial stable write-target and failure policy.
 
 ## Delivered Boundary
 
-- `src/tabdat/executor.py` and `src/tabdat/models.py`
-  - Expanded the typed reason union with `eager_operation`.
-  - Detects a successful lazy-to-eager active-dataset transition after command execution.
-  - Restricts the generic transition category to a prior DuckDB-lazy dataset; Polars remains on
-    the specific fallback path.
-  - Keeps the specific staged `polars_fallback` reason ahead of the generic transition reason.
-  - Preserves success-only and reset precedence from the previous slice.
-- `src/tabdat/formatter.py`
-  - Maps internal reason values to exact public phrases: `polars fallback`, `eager operation`, and
-    `none`.
-- `tests/`
-  - Covers DuckDB-lazy eager transitions, Polars fallback precedence, source/table resets, CLI and
-    script output, and the existing status/operation/failure paths.
-- `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, `docs/user-guide.md`,
-  `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Documented the taxonomy, examples, limits, acceptance criteria, and validation evidence.
+- `docs/language-semantics.md`
+  - Records generate, rename, replace, and recode-generated target rules.
+  - Defines active-dataset atomicity and explicitly lists deferred semantic areas.
+- `tests/test_executor.py`
+  - Adds a cross-command regression comparing `DescribeResult`, `HeadResult`, and `StatusResult`
+    before and after generate, rename, replace, and recode-generate validation failures across eager,
+    DuckDB-lazy, and Polars-lazy sessions.
+  - Covers existing collision/source diagnostics, unknown expressions, and duplicate generated
+    identifiers through focused error tests.
+- `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
+  - Link and describe the durable semantics policy, scope, acceptance criteria, and evidence.
 
 ## Implementation Notes By Boundary
 
-- Transition boundary: the executor compares the active dataset mode before and after a successful
-  command; source/table reset operations take precedence.
-- Reason specificity: a staged Polars fallback is retained instead of being overwritten by the
-  generic lazy-to-eager transition category.
-- Failure boundary: failed commands do not commit a new reason, using the existing pending metadata
-  wrapper.
-- Scope: this is a user-visible taxonomy, not a backend-internal materialization trace.
+- Target policy: generate/recode-generate outputs must be new; rename sources must exist and
+  destinations must be new; replace targets must already exist.
+- Atomicity: validation failures leave the active schema, rows, execution metadata, active table,
+  last operation, and materialization reason unchanged. Polars-lazy write validation now runs before
+  the fallback materialization hook.
+- Duplicate recode outputs are rejected before backend execution.
+- Scope: this slice documents and hardens existing behavior; successful transformation semantics and
+  error wording are unchanged.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 9 tests.
-- `uv run pytest tests/test_cli.py -k 'phase_24_status or fallback_reason or eager_operation' -q` — passed, 7 tests.
-- `uv run pytest` — passed, 967 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'failed_polars_write_validation_preserves_lazy_state or write_target or transformations_report_user_facing_errors or recode_validation_errors' -q` — passed, 6 tests.
+- `uv run pytest` — passed, 970 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
@@ -47,7 +42,6 @@
 
 ## Known Limits And Follow-Up Work
 
-- The taxonomy intentionally does not identify backend-internal substeps, timings, or every
-  possible materialization cause.
-- Full operation lineage, retained estimation samples, machine-readable output, and explain/dry-run
-  remain future Phase 24 work.
+- Identifier case/quoting, missing values, coercion, arithmetic, categories, ordering, randomness,
+  estimation samples, machine output, and exit semantics remain separate contracts.
+- Operation lineage and broader execution transparency remain future Phase 24 work.

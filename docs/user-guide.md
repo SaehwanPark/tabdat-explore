@@ -265,6 +265,7 @@ column names, common options), and command history.
 ## See also
 
 - [Command reference](command-reference.md) — categorized command index
+- [Language semantics](language-semantics.md) — stable write-target and atomic-failure policy
 - [Project proposal](project_proposal.md) — product vision and target users
 - [CHANGELOG.md](../CHANGELOG.md) — release history
 - [ARCHITECTURE.md](../ARCHITECTURE.md) — technical design for contributors
