@@ -953,6 +953,29 @@ class CommandEffectCatalogResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ArgumentDescriptor:
+  name: str
+  required: bool
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class OptionDescriptor:
+  name: str
+  required: bool
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class CommandSchemaResult:
+  """The deterministic command schema metadata exposed to machine clients."""
+
+  name: str
+  syntax: str
+  help_topic: str | None
+  arguments: tuple[ArgumentDescriptor, ...]
+  options: tuple[OptionDescriptor, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class HelpTopicResult:
   """The packaged text for one canonical in-app help topic."""
 
@@ -1532,6 +1555,7 @@ class TtestResult:
 Result = (
   CommandCatalogResult
   | CommandEffectCatalogResult
+  | CommandSchemaResult
   | HelpTopicResult
   | CommandExplainResult
   | LoadResult

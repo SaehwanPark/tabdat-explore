@@ -4182,3 +4182,72 @@ def test_cli_shell_cancels_bare_help_without_printing_topic(monkeypatch, capsys)
   assert "Available help topics:" in captured.out
   assert "How to invoke" not in captured.out
   assert captured.err == ""
+
+
+def test_cli_json_describe_command_success(capsys) -> None:
+  exit_code = main(["--json", "--describe-command", "summarize"])
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  envelope = json.loads(captured.out)
+  assert envelope["schema_version"] == 1
+  assert envelope["result_type"] == "CommandSchemaResult"
+  assert envelope["data"]["name"] == "summarize"
+  assert envelope["data"]["syntax"] == "summarize [varlist]"
+  assert envelope["data"]["help_topic"] == "summarize"
+  assert envelope["data"]["arguments"] == [{"name": "variables", "required": False}]
+  assert envelope["data"]["options"] == []
+  assert captured.err == ""
+
+
+def test_cli_json_describe_command_unknown(capsys) -> None:
+  exit_code = main(["--json", "--describe-command", "does-not-exist"])
+  captured = capsys.readouterr()
+  assert exit_code == 1
+  assert "unknown command name: does-not-exist" in captured.err
+  envelope = json.loads(captured.out)
+  assert envelope["schema_version"] == 1
+  assert envelope["error"]["type"] == "TabDatError"
+  assert "unknown command name: does-not-exist" in envelope["error"]["message"]
+
+
+def test_cli_describe_command_requires_json(capsys) -> None:
+  with pytest.raises(SystemExit) as error:
+    main(["--describe-command", "summarize"])
+  captured = capsys.readouterr()
+  assert error.value.code == 2
+  assert "--describe-command requires --json" in captured.err
+
+
+@pytest.mark.parametrize(
+  "execution_args",
+  (
+    ("-c", "count"),
+    ("-f", "commands.td"),
+    ("commands.td",),
+    ("--list-commands",),
+    ("--list-command-effects",),
+    ("--help-topic", "summarize"),
+    ("--explain", "-c", "count"),
+  ),
+)
+def test_cli_describe_command_rejects_incompatible_arguments(execution_args, capsys) -> None:
+  with pytest.raises(SystemExit) as error:
+    main(["--json", "--describe-command", "summarize", *execution_args])
+  captured = capsys.readouterr()
+  assert error.value.code == 2
+  assert "cannot be combined" in captured.err
+
+
+def test_cli_json_describe_command_no_session(monkeypatch, capsys) -> None:
+  class FailingExecutor:
+    def __init__(self, *args, **kwargs) -> None:
+      raise AssertionError("describe-command must not construct an Executor")
+
+  monkeypatch.setattr("tabdat.cli.Executor", FailingExecutor)
+
+  exit_code = main(["--json", "--describe-command", "summarize"])
+  captured = capsys.readouterr()
+  assert exit_code == 0
+  assert captured.err == ""
+  envelope = json.loads(captured.out)
+  assert envelope["result_type"] == "CommandSchemaResult"
