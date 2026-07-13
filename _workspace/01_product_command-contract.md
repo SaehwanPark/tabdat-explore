@@ -33,6 +33,8 @@ No new options, commands, result fields, or category metadata are introduced.
   all nonmissing categories in row keys and column headers.
 - `bar` orders nonmissing categories by descending count, then native category order for ties. With
   `missing`, the missing category remains last and displays as `<missing>`.
+- Rendered labels are collision-safe: missing and literal reserved-looking labels, including
+  multi-key separator collisions in wide `tabulate`, remain visually distinct.
 - Source arrival order and user-defined category levels are not ordering contracts in this slice.
 - Eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree; output formatting does not alter
   ordering.

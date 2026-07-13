@@ -108,6 +108,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
   all nonmissing row keys and column headers.
 - `bar` orders nonmissing categories by descending count, then native category order for ties. With
   `missing`, the missing category remains last and displays as `<missing>`.
+- Rendered labels are collision-safe: a missing label and a literal reserved-looking text label remain
+  distinct, and multi-key tabulate labels remain distinct even when their separator text would collide.
 - Source arrival order and user-defined category levels are not ordering contracts; no category
   metadata is persisted by this slice.
 - Eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree; formatting does not alter order.

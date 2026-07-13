@@ -1,6 +1,6 @@
 # QA Report: Phase 24 P0 Categorical Ordering
 
-Status: implementation validation complete; PR review pending
+Status: three-review pass complete; fixes validated; PR #102 ready for merge
 
 ## Boundaries Checked
 
@@ -13,6 +13,8 @@ Status: implementation validation complete; PR review pending
 - **Cross-engine behavior:** eager, DuckDB-lazy, and Polars-lazy outputs agree.
 - **Scope control:** no category metadata, level syntax, recoding, sort abstraction, relation-order
   rewrite, or estimator behavior was added.
+- **Presentation safety:** missing and reserved-looking labels remain distinct in bar charts and wide
+  tabulate headers, including multi-key separator collisions.
 
 ## Blocking Issues
 
@@ -20,9 +22,10 @@ Status: implementation validation complete; PR review pending
 
 ## Validation Evidence
 
-- Cross-engine categorical regression: 3 passed.
+- Cross-engine categorical regression: 3 passed, each executing a fresh `BarCommand` artifact.
+- Collision regressions: bar label and wide tabulate header tests passed.
 - CLI regression: 1 passed; focused help regression: 1 passed.
-- `uv run pytest` — 1,104 passed, 314 existing third-party warnings.
+- `uv run pytest` — 1,106 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -32,7 +35,13 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-Review passes have not started; exactly three independent passes are required after the PR is opened.
+Exactly three independent review passes completed on PR #102. All findings were addressed:
+
+- Collision-safe rendering was added for bar labels and wide tabulate headers.
+- Fresh per-engine `BarCommand` artifact coverage and stronger CLI assertions were added.
+- Command-reference wording and workspace handoff state were corrected.
+
+No fourth review pass is planned.
 
 ## Non-Blocking Follow-Ups
 
@@ -42,5 +51,5 @@ Future.
 
 ## Recommended Next Action
 
-Commit the validated categorical slice, push it, open the PR, and complete exactly three independent
-review passes before any merge.
+Commit and push the validated review fixes, update PR #102, wait for its required checks, merge it to
+`main`, delete the local and remote feature branch, and return to the next `SPEC.md` item.

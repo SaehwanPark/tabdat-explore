@@ -2350,8 +2350,7 @@ def _wide_value_headers(
   include_column_percent: bool,
 ) -> tuple[str, ...]:
   headers: list[str] = []
-  for column_key in column_keys:
-    label = _column_key_label(column_key)
+  for label in _column_key_labels(column_keys):
     headers.append(f"{label} {value_header}")
     if include_row_percent:
       headers.append(f"{label} Row %")
@@ -2384,6 +2383,38 @@ def _wide_row_cells(
 
 def _column_key_label(column_key: tuple[object, ...]) -> str:
   return " | ".join("missing" if value is None else str(value) for value in column_key)
+
+
+def _column_key_labels(column_keys: tuple[tuple[object, ...], ...]) -> tuple[str, ...]:
+  base_labels = tuple(_column_key_label(column_key) for column_key in column_keys)
+  label_counts: dict[str, int] = {}
+  for label in base_labels:
+    label_counts[label] = label_counts.get(label, 0) + 1
+  if all(count == 1 for count in label_counts.values()):
+    return base_labels
+
+  reserved_labels = set(base_labels)
+  used_labels: set[str] = set()
+  labels: list[str] = []
+  for column_key, base_label in zip(column_keys, base_labels, strict=True):
+    if label_counts[base_label] == 1:
+      label = base_label
+    else:
+      disambiguator = _column_key_disambiguator(column_key)
+      label = f"{base_label} [{disambiguator}]"
+      suffix = 2
+      while label in reserved_labels or label in used_labels:
+        label = f"{base_label} [{disambiguator}; {suffix}]"
+        suffix += 1
+    labels.append(label)
+    used_labels.add(label)
+  return tuple(labels)
+
+
+def _column_key_disambiguator(column_key: tuple[object, ...]) -> str:
+  return ", ".join(
+    "None" if value is None else f"{type(value).__name__}={value!r}" for value in column_key
+  )
 
 
 def _linear_prediction_sql(

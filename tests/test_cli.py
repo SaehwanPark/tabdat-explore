@@ -2532,18 +2532,25 @@ def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> 
     """
     select * from (
       values
-        (1, 2),
-        (1, 10),
-        (1, null::integer)
-    ) as ordering_data(group_id, code)
+        (1, 2, false),
+        (1, 10, true),
+        (1, null::integer, null::boolean)
+    ) as ordering_data(group_id, code, flag)
     """,
   )
+  bar_path = tmp_path / "ordering-bar.svg"
   exit_code = main(
     [
       "-c",
       f"use {path}",
       "-c",
       "tabulate, rows(group_id) columns(code) missing",
+      "-c",
+      "tabulate flag",
+      "-c",
+      "tabulate flag, missing",
+      "-c",
+      f"bar code, missing saving({bar_path}) noopen",
     ],
   )
 
@@ -2552,6 +2559,9 @@ def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> 
   assert exit_code == 0
   assert captured.out.index("2 Count") < captured.out.index("10 Count")
   assert "missing Count" in captured.out
+  assert captured.out.index("False") < captured.out.index("True")
+  assert f"Saved plot: {bar_path}" in captured.out
+  assert bar_path.exists()
   assert captured.err == ""
 
 
