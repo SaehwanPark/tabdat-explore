@@ -1,35 +1,37 @@
-# Request Summary: Phase 24 Categorical Ordering Contract
+# Request Summary: Phase 24 Exact Integer Arithmetic Contract
 
 ## Goal
 
-Define and verify how categorical labels are ordered and displayed by existing `tabulate` and `bar`
-commands without adding category-management syntax.
+Define and verify exact result widths and deterministic overflow behavior for existing integral
+arithmetic expressions without adding command syntax.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This follows the completed grouped-result, active-row, SQL, append,
-join, and reshape ordering slices and closes the remaining basic label-order boundary.
+Phase 24 P0 language semantics. This follows the completed identifier, missingness, coercion,
+arithmetic-result, ordering, and categorical-ordering slices and closes the bounded integer-width
+boundary before broader numeric policy.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md`: durable categorical order and missing-label policy
-- `src/tabdat/help/topics/tabulate.md`, `src/tabdat/help/topics/bar.md`, `docs/command-reference.md`:
-  user guidance
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine native-order and
-  missing-placement regressions
+- `docs/language-semantics.md`, `src/tabdat/help/topics/generate.md`,
+  `src/tabdat/help/topics/replace.md`: exact integer result and overflow policy
+- `src/tabdat/backend.py`: typed arithmetic compilation across DuckDB and Polars validation
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine exactness and
+  user-visible regression coverage
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- Categorical labels use native scalar order: numeric values numerically, text lexicographically, and
-  booleans false before true; rendered text is not used to compare numeric labels.
-- `tabulate` omits missing categories by default and places them last when `missing` is requested.
-- `bar` orders nonmissing categories by descending count, then native category order for ties; an
-  included missing category is always last and displays as `<missing>`.
-- No user-defined category levels or metadata exist in this slice; source arrival order is not a
-  category-order contract.
+- Integral `+`, `-`, `*`, and unary minus results use `DECIMAL(38,0)` as the bounded exact domain.
+- Values within that domain remain exact; values outside it become missing for the affected row
+  rather than wrapping or aborting the entire row-preserving transformation.
+- Real division, floating arithmetic, decimal-scale arithmetic, and existing invalid-function and
+  non-finite policies remain unchanged.
+- Existing `generate`, `replace`, and predicate syntax is reused; no new arithmetic commands or
+  options are introduced.
 
 ## Non-Goals
 
-- Adding category metadata/level syntax, recoding, sort syntax, append/join/reshape order, unordered
-  SQL guarantees, or estimator behavior.
+- Stable overflow error/warning output, arbitrary-precision arithmetic, decimal-scale/precision
+  redesign, float-width guarantees, new operators/functions, estimator behavior, or execution
+  lineage.

@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Categorical Ordering
+# Product Contract: Phase 24 P0 — Exact Integer Arithmetic Result Widths
 
 ## Request Summary
 
-Make existing `tabulate` and `bar` category ordering and missing-label behavior predictable without
-adding category-management syntax.
+Make integral arithmetic in existing expressions exact within one explicit bounded result domain,
+with deterministic row-level overflow behavior and no new syntax.
 
 ## Roadmap Phase
 
@@ -11,51 +11,57 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This closes the basic label-order contract after grouped-result, active-row, SQL, append, join, and
-reshape ordering. It does not introduce a categorical data model or user-defined levels.
+This closes the exact-width boundary deferred by the earlier arithmetic-result slice. It does not
+redesign decimal scales, floating widths, or user-facing overflow diagnostics.
 
 ## Existing Syntax
 
 Valid forms retain the current grammar:
 
-- `use source.parquet`
-- `tabulate code, missing`
-- `tabulate, rows(group_id) columns(code) missing`
-- `bar code, missing noopen`
+- `generate total = amount + 1`
+- `replace amount = amount * 2 if active == true`
+- `keep if amount - adjustment > 0`
 
-No new options, commands, result fields, or category metadata are introduced.
+No new operators, options, commands, result fields, or numeric literals are introduced.
 
-## Categorical-Order Rules
+## Exact Integer Rules
 
-- Category labels use native scalar order: numeric values sort numerically, text values
-  lexicographically, and booleans false before true. Numeric labels are not compared by rendered text.
-- `tabulate` excludes missing categories by default. With `missing`, missing categories appear after
-  all nonmissing categories in row keys and column headers.
-- `bar` orders nonmissing categories by descending count, then native category order for ties. With
-  `missing`, the missing category remains last and displays as `<missing>`.
-- Rendered labels are collision-safe: missing and literal reserved-looking labels, including
-  multi-key separator collisions in wide `tabulate`, remain visually distinct.
-- Source arrival order and user-defined category levels are not ordering contracts in this slice.
-- Eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree; output formatting does not alter
-  ordering.
+- Integral `+`, `-`, `*`, and unary minus expressions use `DECIMAL(38,0)` as their exact result
+  domain. This includes signed and unsigned integer columns and integer literals when every operand
+  in the arithmetic subtree is integral.
+- Representable results preserve their exact integer value and result width across eager, DuckDB-lazy,
+  and Polars-lazy write paths. A normal terminal preview renders integral values without a fractional
+  suffix even though the stored result is decimal-backed.
+- A result outside `DECIMAL(38,0)` becomes missing for that row. There is no integer wraparound, and
+  other rows in `generate`, `replace`, or a row predicate remain eligible under their existing
+  missing/predicate policies.
+- Real division remains real division. Floating operands, decimal-scale operands, numeric functions,
+  zero-denominator behavior, invalid-domain behavior, and computed non-finite normalization retain
+  their existing contracts.
 
 ## Data And Execution Assumptions
 
-- Existing native type, missing-value, aggregate, percentage, and plotting behavior remains unchanged.
-- Category labels are represented by existing scalar columns; no categorical metadata is persisted.
-- Identifier spelling, expression coercion, active/reshape/relation order, and unordered SQL remain
-  separate contracts.
+- Existing native column types and parser ASTs identify integral subtrees; no categorical or numeric
+  metadata model is introduced.
+- DuckDB is the materialization and exact-result boundary. Polars-lazy writes continue through the
+  existing validated fallback path; Polars predicate compilation uses the same exact result domain
+  when the result is representable.
+- Overflow diagnostics as stable error/warning output, arbitrary precision, decimal-scale policy, and
+  floating-width guarantees remain separate contracts.
 
 ## Acceptance Criteria
 
-- [ ] Numeric, text, boolean, and missing category order follows the native policy.
-- [ ] Tabulate missing omission/inclusion and missing-last placement are covered.
-- [ ] Bar count/tie order and missing-last display are covered.
-- [ ] Eager, DuckDB-lazy, and Polars-lazy outputs agree.
+- [ ] Integral addition, subtraction, multiplication, and unary minus return exact decimal-backed
+  values rather than backend-width wraparound or float coercion.
+- [ ] Signed and unsigned boundary fixtures agree across eager, DuckDB-lazy, and Polars-lazy paths.
+- [ ] Out-of-domain results become row-level missing without mutating unrelated rows.
+- [ ] Existing real division, decimal-scale arithmetic, non-finite, and mixed-domain behavior remains
+  green.
 - [ ] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
   checks pass.
 
 ## Non-Goals For This Slice
 
-- New category metadata or level-management syntax, recoding changes, sort syntax, append/join/reshape
-  ordering, unordered SQL guarantees, or estimators.
+- New arithmetic syntax, arbitrary precision, stable overflow diagnostics, decimal-scale/precision
+  redesign, float-width guarantees, randomness, estimators, lineage, machine output, or exit-code
+  redesign.

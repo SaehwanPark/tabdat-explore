@@ -594,30 +594,38 @@ and describe the active work with concise verification criteria.
   - preserved first-appearance identifier-group order for wide output
   - prevalidated long/wide failures before Polars fallback and reserved public output names
   - explicitly deferred categorical ordering
+- Implemented Phase 24 P0 categorical ordering semantics:
+  - defined native numeric, text, and boolean category order independently of rendered text
+  - defined tabulate missing omission/inclusion and bar descending-count/tie order
+  - added collision-safe rendering for missing/reserved-looking labels and multi-key headers
+  - verified fresh eager, DuckDB-lazy, and Polars-lazy bar artifacts plus CLI/help/docs coverage
+  - explicitly deferred exact arithmetic result widths and overflow policy
 
 ## Present
 
-- Feature: Phase 24 P0 categorical ordering semantics
+- Feature: Phase 24 P0 exact integer arithmetic result widths
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-categorical-order
+  Branch: feat/phase24-exact-arithmetic
 
   Summary:
-  Define and regression-test categorical value ordering and missing-category placement across
-  tabulation and bar outputs without adding category-management syntax.
+  Define exact result widths and deterministic overflow behavior for integral arithmetic in existing
+  expressions without adding command syntax.
 
   Verification:
-  - categorical labels use native scalar order, not rendered text order or source arrival order
-  - missing categories are excluded by default and placed last when explicitly included
-  - bar ties use native category order after descending counts
-  - eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree
+  - integral `+`, `-`, `*`, and unary minus results use exact `DECIMAL(38,0)` storage
+  - representable signed and unsigned integer results preserve their exact values across eager,
+    DuckDB-lazy, and Polars-lazy write paths
+  - results outside the bounded exact width become missing rather than wrapping or failing the whole
+    row-preserving transformation
+  - real division, floating arithmetic, decimal-scale arithmetic, and invalid-function behavior keep
+    their existing contracts
   - CLI, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new category metadata or level-management syntax, sort syntax, row-ID persistence,
-    append/join/reshape ordering, unordered SQL guarantees, exact arithmetic storage widths,
-    overflow reporting, randomness,
-    estimation samples, operation lineage, machine output, and exit-code redesign
+  - stable overflow error/warning output, arbitrary-precision arithmetic, decimal-scale/precision
+    redesign, float-width guarantees, new operators or functions, randomness, estimation samples,
+    operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

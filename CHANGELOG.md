@@ -56,6 +56,10 @@ All notable project changes are tracked here.
   collision-safe ordinals, and lazy validation coverage.
 - Started the Phase 24 categorical ordering slice; native label order and missing-category placement
   are being bounded across tabulate and bar outputs.
+- Completed the Phase 24 categorical ordering slice with native scalar ordering, missing placement,
+  collision-safe labels, and fresh cross-engine bar-artifact coverage.
+- Started the Phase 24 exact integer arithmetic slice; integral result widths and bounded overflow
+  behavior are being defined before stable overflow diagnostics or broader numeric policy.
 
 ### Added
 
