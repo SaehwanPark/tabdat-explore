@@ -207,6 +207,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Stable overflow error/warning diagnostics, arbitrary-precision arithmetic, decimal-scale/precision
+Machine-readable overflow envelopes, arbitrary-precision arithmetic, decimal-scale/precision
 propagation, floating storage widths, SQL without explicit ordering, randomness, estimation samples,
-machine-readable output, and exit codes are not defined here yet.
+and exit codes are not defined here yet.

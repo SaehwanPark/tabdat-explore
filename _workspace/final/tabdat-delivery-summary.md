@@ -1,6 +1,7 @@
 # Delivery Summary: Phase 24 P0 Stable Arithmetic Overflow Diagnostics
 
-The overflow-diagnostics slice is locally implemented and fully validated; PR review is pending.
+The overflow-diagnostics slice is implemented, fully validated, and has completed exactly three
+independent PR reviews; all findings are fixed.
 
 ## Delivered
 
@@ -9,18 +10,20 @@ The overflow-diagnostics slice is locally implemented and fully validated; PR re
 - Preserved exact values, row-level missingness, false/missing predicate policy, and zero-count output.
 - Excluded missing operands, division/non-finite behavior, decimal-scale arithmetic, and floating
   arithmetic from integer overflow diagnostics.
-- Covered eager, DuckDB-lazy, and Polars-lazy paths, including fallback state and atomic failures.
+- Covered recursive/nested expressions, conditional and null-aware replacement, eager/DuckDB-lazy/
+  Polars-lazy paths, fallback state, and injected count-failure atomicity.
 
 ## Validation
 
 - Exact-width and overflow policy regressions: 12 passed across all engines.
 - Arithmetic/nonfinite/decimal compatibility regressions: 21 passed.
 - CLI and focused help regressions passed.
-- Full suite: 1,122 passed, with 314 existing third-party warnings.
+- Full suite: 1,141 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully with all scenarios passing and canonical replay stdout
   matching.
-- Exactly three independent PR review passes are required before merge.
+- Exactly three independent PR review passes completed; all findings were fixed and no fourth review
+  was run.
 
 ## Remaining Phase 24 Work
 
