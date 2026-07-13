@@ -565,10 +565,12 @@ and describe the active work with concise verification criteria.
 
   Verification:
   - numeric-family expressions are compatible across eager, DuckDB-lazy, and Polars-lazy paths
+  - unsafe unsigned-column/negative-literal combinations are rejected consistently
   - mixed numeric/string comparisons and arithmetic fail with deterministic type diagnostics
   - numeric and string functions enforce their argument domains
   - predicates reject numeric/string truthiness and replacement rejects cross-domain assignments
-  - validation preserves Polars-lazy state before unsupported-command fallback
+  - null replacement preserves target domains and tabulate validation preserves Polars-lazy state
+    before unsupported-command fallback
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:

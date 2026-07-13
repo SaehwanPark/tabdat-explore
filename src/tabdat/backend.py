@@ -71,6 +71,16 @@ NUMERIC_TYPES = (
   "DOUBLE",
   "DECIMAL",
 )
+UNSIGNED_NUMERIC_TYPES = (
+  "UTINYINT",
+  "USMALLINT",
+  "UINTEGER",
+  "UBIGINT",
+  "UINT8",
+  "UINT16",
+  "UINT32",
+  "UINT64",
+)
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
@@ -881,7 +891,10 @@ class DuckDBBackend:
     condition: Expression | None,
   ) -> DatasetInfo:
     self.validate_replace(dataset, variable, expression, condition)
+    column_types = {column.name: column.data_type for column in dataset.columns}
     expression_sql = self._compile_expression(dataset, expression)
+    if isinstance(expression, NullExpression):
+      expression_sql = f"cast(NULL as {_null_cast_type(column_types[variable])})"
     replacement_sql = expression_sql
     if condition is not None:
       condition_sql = self._compile_expression(dataset, condition)
@@ -1081,19 +1094,15 @@ class DuckDBBackend:
     include_missing: bool,
     by_variables: tuple[str, ...] = (),
   ) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
-    column_types = {column.name: column.data_type for column in dataset.columns}
-    dimensions = by_variables + row_variables + column_variables
-    _require_columns("tabulate", column_types, dimensions)
-    if value_variable is not None:
-      _require_columns("tabulate", column_types, (value_variable,))
-      if statistic in {"mean", "sum", "min", "max"} and not _is_numeric_type(
-        column_types[value_variable]
-      ):
-        raise TypeMismatchExecutionError(
-          f"tabulate {statistic} requires numeric variable: {value_variable}"
-        )
-    if condition is not None:
-      self.validate_predicate(dataset, condition)
+    self.validate_tabulate(
+      dataset,
+      row_variables,
+      column_variables,
+      condition=condition,
+      value_variable=value_variable,
+      statistic=statistic,
+      by_variables=by_variables,
+    )
     long_rows = self._tabulate_long(
       dataset,
       row_variables,
@@ -1121,6 +1130,32 @@ class DuckDBBackend:
       value_header="Count" if value_variable is None else statistic or "Value",
       missing_cell_value=0 if value_variable is None or statistic == "count" else None,
     )
+
+  def validate_tabulate(
+    self,
+    dataset: DatasetInfo,
+    row_variables: tuple[str, ...],
+    column_variables: tuple[str, ...] = (),
+    *,
+    condition: Expression | None = None,
+    value_variable: str | None = None,
+    statistic: Literal["count", "mean", "sum", "min", "max"] | None = None,
+    by_variables: tuple[str, ...] = (),
+  ) -> None:
+    """Validate tabulate inputs without querying or materializing the active relation."""
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    dimensions = by_variables + row_variables + column_variables
+    _require_columns("tabulate", column_types, dimensions)
+    if value_variable is not None:
+      _require_columns("tabulate", column_types, (value_variable,))
+      if statistic in {"mean", "sum", "min", "max"} and not _is_numeric_type(
+        column_types[value_variable]
+      ):
+        raise TypeMismatchExecutionError(
+          f"tabulate {statistic} requires numeric variable: {value_variable}"
+        )
+    if condition is not None:
+      self.validate_predicate(dataset, condition)
 
   def collapse(
     self,
@@ -1540,6 +1575,11 @@ class DuckDBBackend:
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
+      if _has_unsafe_unsigned_numeric_pair(column_types, expression):
+        raise TypeMismatchExecutionError(
+          "expression type mismatch: unsigned numeric values cannot be combined with negative "
+          "numeric literals"
+        )
       left_is_null = isinstance(expression.left, NullExpression)
       right_is_null = isinstance(expression.right, NullExpression)
       if left_is_null or right_is_null:
@@ -1685,6 +1725,11 @@ class DuckDBBackend:
     if isinstance(expression, BinaryExpression):
       if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
         raise ExecutionError(NULL_LITERAL_ERROR)
+      if _has_unsafe_unsigned_numeric_pair(column_types, expression):
+        raise TypeMismatchExecutionError(
+          "expression type mismatch: unsigned numeric values cannot be combined with negative "
+          "numeric literals"
+        )
       left_domain = self._infer_expression_domain(dataset, expression.left)
       right_domain = self._infer_expression_domain(dataset, expression.right)
       if expression.operator in {"==", "!=", "<", "<=", ">", ">="}:
@@ -1911,8 +1956,15 @@ class DuckDBBackend:
 
 
 def _is_numeric_type(data_type: str) -> bool:
-  normalized = data_type.upper()
-  return normalized.startswith(NUMERIC_TYPES)
+  normalized = data_type.upper().strip()
+  base = normalized.split("(", 1)[0]
+  return base in NUMERIC_TYPES
+
+
+def _is_unsigned_numeric_type(data_type: str) -> bool:
+  normalized = data_type.upper().strip()
+  base = normalized.split("(", 1)[0]
+  return base in UNSIGNED_NUMERIC_TYPES
 
 
 def _expression_domain_for_data_type(data_type: str) -> ExpressionDomain:
@@ -1920,6 +1972,8 @@ def _expression_domain_for_data_type(data_type: str) -> ExpressionDomain:
   if _is_numeric_type(normalized):
     return "numeric"
   if normalized.startswith(("VARCHAR", "CHAR", "TEXT", "STRING")):
+    return "string"
+  if normalized in {"CATEGORICAL", "DICTIONARY"}:
     return "string"
   if normalized in {"BOOLEAN", "BOOL"}:
     return "boolean"
@@ -2366,6 +2420,68 @@ def _contains_null_literal(expression: Expression) -> bool:
   if isinstance(expression, FunctionCallExpression):
     return any(_contains_null_literal(argument) for argument in expression.arguments)
   return False
+
+
+def _contains_unsigned_identifier(
+  column_types: dict[str, str],
+  expression: Expression,
+) -> bool:
+  if isinstance(expression, IdentifierExpression):
+    return _is_unsigned_numeric_type(column_types[expression.name])
+  if isinstance(expression, (NumberExpression, StringExpression, NullExpression)):
+    return False
+  if isinstance(expression, UnaryExpression):
+    return _contains_unsigned_identifier(column_types, expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _contains_unsigned_identifier(
+      column_types, expression.left
+    ) or _contains_unsigned_identifier(column_types, expression.right)
+  if isinstance(expression, FunctionCallExpression):
+    return any(
+      _contains_unsigned_identifier(column_types, argument) for argument in expression.arguments
+    )
+  return False
+
+
+def _contains_negative_numeric_literal(expression: Expression) -> bool:
+  if isinstance(expression, NumberExpression):
+    return expression.value < 0
+  if isinstance(expression, UnaryExpression) and isinstance(expression.operand, NumberExpression):
+    return expression.operand.value != 0
+  return False
+
+
+def _has_unsafe_unsigned_numeric_pair(
+  column_types: dict[str, str],
+  expression: BinaryExpression,
+) -> bool:
+  return (
+    _contains_unsigned_identifier(column_types, expression.left)
+    and _contains_negative_numeric_literal(expression.right)
+  ) or (
+    _contains_unsigned_identifier(column_types, expression.right)
+    and _contains_negative_numeric_literal(expression.left)
+  )
+
+
+def _null_cast_type(data_type: str) -> str:
+  normalized = data_type.upper().strip()
+  arrow_types = {
+    "INT8": "TINYINT",
+    "INT16": "SMALLINT",
+    "INT32": "INTEGER",
+    "INT64": "BIGINT",
+    "UINT8": "UTINYINT",
+    "UINT16": "USMALLINT",
+    "UINT32": "UINTEGER",
+    "UINT64": "UBIGINT",
+    "FLOAT32": "FLOAT",
+    "FLOAT64": "DOUBLE",
+    "STRING": "VARCHAR",
+    "CATEGORICAL": "VARCHAR",
+    "BOOL": "BOOLEAN",
+  }
+  return arrow_types.get(normalized, data_type)
 
 
 def _polars_dtype_name(dtype: pl.DataType) -> str:

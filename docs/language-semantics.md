@@ -56,6 +56,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
 
 - Numeric columns and numeric literals share one `numeric` domain. Numeric widening within that
   domain is allowed; values are not parsed from or stringified into text implicitly.
+- Unsafe combinations of unsigned numeric columns and negative numeric literals are rejected
+  consistently rather than relying on backend-specific signed/unsigned coercion.
 - Text values and string literals share the `string` domain. Boolean values and comparison results
   use the `boolean` domain. Other backend scalar types are not coerced into either domain.
 - Equality/inequality and ordering require matching domains, except for numeric pairs and the
@@ -97,5 +99,5 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Coercion, arithmetic, categorical behavior, ordering, randomness, estimation samples, machine-readable
-output, and exit codes are not defined here yet.
+Categorical behavior, ordering, randomness, estimation samples, machine-readable output, exit codes,
+and broader arithmetic-result policy are not defined here yet.

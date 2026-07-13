@@ -13,7 +13,11 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 - Numeric DuckDB types and numeric literals belong to one `numeric` domain. Numeric widening within
   that domain is allowed and remains backend-native.
+- Unsafe unsigned-column and negative-literal combinations are rejected deterministically to preserve
+  eager/lazy parity.
 - `VARCHAR`/text values and string literals belong to the `string` domain.
+- Polars categorical storage is canonicalized to the `string` domain; nested/list types are not
+  classified as numeric by prefix matching.
 - Boolean columns and comparison results belong to the `boolean` domain.
 - Other backend scalar types remain an `other` domain and are not coerced into numeric or string.
 - The existing `null` literal is a special missing domain. Null-aware `==`/`!=` behavior remains the
@@ -53,7 +57,7 @@ command-specific error wording remains unchanged outside this slice.
 - Predicate semantics apply consistently in eager and supported lazy paths.
 - Null-aware comparisons compile to `is null`/`is not null` in SQL and equivalent Polars expressions.
 - No implicit numeric/string coercion is introduced; validation occurs before Polars-lazy fallback
-  materialization.
+  materialization, including tabulate dimensions, values/statistics, and `by:` duplicate checks.
 
 ## Acceptance Criteria
 

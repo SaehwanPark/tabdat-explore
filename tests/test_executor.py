@@ -139,6 +139,7 @@ from tabdat.models import (
   TobitCommand,
   TobitRegressionResult,
   TransformResult,
+  UnaryExpression,
   UseCommand,
   XtAbondCommand,
   XtAbondRegressionResult,
@@ -857,7 +858,7 @@ def test_failed_polars_tabulate_null_validation_preserves_lazy_state(
     operator="<",
     right=NullExpression(),
   )
-  tabulate = TabulateCommand(("sex",), condition=condition)
+  tabulate = TabulateCommand(("age",), condition=condition)
   command = ByCommand(("sex",), tabulate) if wrapped else tabulate
   executor = Executor()
   try:
@@ -6622,6 +6623,76 @@ def test_predicate_truthiness_and_cross_domain_replace_are_rejected_atomically(
   assert status.last_operation == "use"
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_null_replacement_preserves_target_domain_across_engines(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(ReplaceCommand("sex", NullExpression()))
+    restored_sex = executor.execute(ReplaceCommand("sex", StringExpression("X")))
+
+    executor.execute(use_command)
+    executor.execute(ReplaceCommand("cost", NullExpression()))
+    restored_cost = executor.execute(ReplaceCommand("cost", NumberExpression(0)))
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(restored_sex, TransformResult)
+  assert isinstance(restored_cost, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[2:] for row in preview.rows) == (
+    ("F", 0.0),
+    ("M", 0.0),
+    ("F", 0.0),
+  )
+  sex_type = next(
+    column.data_type.upper() for column in restored_sex.dataset.columns if column.name == "sex"
+  )
+  cost_type = next(
+    column.data_type.upper() for column in restored_cost.dataset.columns if column.name == "cost"
+  )
+  assert sex_type.startswith(("VARCHAR", "STRING"))
+  assert cost_type.startswith(("DECIMAL", "DOUBLE", "FLOAT", "INTEGER", "BIGINT"))
+
+
+def test_unsigned_numeric_negative_literal_is_rejected_consistently(tmp_path: Path) -> None:
+  path = tmp_path / "unsigned.parquet"
+  _write_sql_parquet(
+    path,
+    "select cast(value as ubigint) as u from (values (0), (1)) as values_table(value)",
+  )
+  condition = BinaryExpression(
+    left=IdentifierExpression("u"),
+    operator=">=",
+    right=UnaryExpression("-", NumberExpression(1)),
+  )
+  for engine in ("eager", "duckdb", "polars"):
+    executor = Executor()
+    try:
+      use_command = UseCommand(path)
+      if engine != "eager":
+        use_command = UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+      executor.execute(use_command)
+      with pytest.raises(
+        TypeMismatchExecutionError,
+        match="unsigned numeric values cannot be combined with negative numeric literals",
+      ):
+        executor.execute(KeepCommand(condition=condition))
+    finally:
+      executor.close()
+
+
 @pytest.mark.parametrize("wrapped", [False, True])
 def test_tabulate_predicate_type_validation_preserves_polars_lazy_state(
   sample_parquet: Path,
@@ -6633,6 +6704,40 @@ def test_tabulate_predicate_type_validation_preserves_polars_lazy_state(
   try:
     executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
     with pytest.raises(TypeMismatchExecutionError, match="predicate requires boolean expression"):
+      executor.execute(command)
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == "lazy"
+  assert status.lazy_engine == "polars"
+  assert status.last_operation == "use"
+  assert status.last_materialization_reason is None
+
+
+@pytest.mark.parametrize(
+  ("command", "message"),
+  [
+    (
+      TabulateCommand(("age",), value_variable="sex", statistic="mean"),
+      "tabulate mean requires numeric variable: sex",
+    ),
+    (
+      ByCommand(("sex",), TabulateCommand(("sex",))),
+      "by tabulate duplicate variable: sex",
+    ),
+  ],
+)
+def test_invalid_polars_tabulate_validation_preserves_lazy_state(
+  sample_parquet: Path,
+  command,
+  message: str,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(ExecutionError, match=message):
       executor.execute(command)
     status = executor.execute(StatusCommand())
   finally:
