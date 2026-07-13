@@ -62,8 +62,10 @@ All notable project changes are tracked here.
   behavior are being defined before stable overflow diagnostics or broader numeric policy.
 - Completed the Phase 24 exact integer arithmetic slice with exact `DECIMAL(38,0)` results,
   row-level overflow missingness, native unsigned-width coverage, and atomic Polars fallback tests.
-- Started the Phase 24 arithmetic overflow-diagnostics slice; transform and row-filter results will
-  report deterministic overflow-row counts without changing the missing-result policy.
+- Completed the Phase 24 arithmetic overflow-diagnostics slice with typed transform counts, recursive
+  nested-expression coverage, scoped replacement predicates, and Polars fallback atomicity.
+- Started the Phase 24 batch JSON result-envelope slice; non-interactive `-c` and script output will
+  gain versioned JSONL envelopes while terminal and interactive output remain unchanged.
 
 ### Added
 

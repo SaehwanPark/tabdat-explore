@@ -1,66 +1,73 @@
-# Product Contract: Phase 24 P0 — Stable Arithmetic Overflow Diagnostics
+# Product Contract: Phase 24 P1 — Batch JSON Result Envelopes
 
 ## Request Summary
 
-Report deterministic row-level counts for exact integral arithmetic overflow without changing the
-existing missing-result policy or adding syntax.
+Expose a versioned JSON/JSONL result stream for non-interactive CLI execution without changing
+command semantics or existing terminal output.
 
 ## Roadmap Phase
 
-Phase 24 P0: stable language semantics before broader command and estimator expansion.
+Phase 24 P1: Agent and automation interface.
 
 ## Roadmap Fit
 
-This adds a small diagnostic layer on top of the completed exact integer-width contract. It does not
-turn overflow into a command failure or redesign numeric storage.
+This is the first narrow automation-output contract after the Phase 24 terminal semantics and
+diagnostics slices. It establishes a stable success-result envelope while leaving discovery,
+explainability, structured failures, and richer metadata to later slices.
 
-## Existing Syntax
+## Existing Invocation
 
-Valid forms retain the current grammar:
+Valid forms add one CLI output flag:
 
-- `generate total = amount * factor`
-- `replace amount = amount * factor if active == true`
-- `keep if amount * factor > 0`
-- `drop if amount * factor > 0`
+- `tabdat --json -c "use data.parquet" -c "count"`
+- `tabdat --json -f analysis.td`
+- `tabdat --json analysis.td`
 
-No new operators, options, commands, or numeric literals are introduced. Successful transform
-results expose an optional typed `TransformResult.overflow_count` diagnostic field, defaulting to
-zero; the terminal formatter appends it only when positive.
+`--json` cannot be used with an interactive session. Existing invocations without `--json` retain
+their terminal output byte-for-byte.
 
-## Diagnostic Rules
+## Envelope Rules
 
-- Exact integral arithmetic continues to use `DECIMAL(38,0)` and turns out-of-domain results into
-  missing values for affected rows.
-- A successful `generate`, `replace`, `keep`, or `drop` result reports `overflow rows: N` when one or
-  more rows overflowed an exact integral arithmetic expression. `N` counts only rows affected by the
-  command's expression or predicate.
-- A zero overflow count preserves the existing transform message and terminal shape; no noisy zero
-  diagnostic is added.
-- Missing operands are excluded from the overflow count. False or missing predicates, division by
-  zero, invalid numeric-function domains, computed non-finite values, scale-bearing decimal arithmetic,
-  and floating arithmetic are not classified as exact integer overflow.
-- Overflow diagnostics are informational: the command still succeeds, retains valid rows/values, and
-  applies existing missing/predicate policies.
+- Every successful structured `Result` emits exactly one compact JSON object on stdout:
 
-## Data And Execution Assumptions
+  ```json
+  {"data":{...},"result_type":"CountResult","schema_version":1}
+  ```
 
-- The backend counts overflow using the typed expression and active relation before the successful
-  row-preserving transformation commits. Failed validation leaves active data and status unchanged.
-- Polars-lazy exact arithmetic predicates continue through the existing validated fallback; the
-  diagnostic count and `polars_fallback` materialization reason remain consistent with eager/DuckDB.
-- Diagnostics are currently terminal transform-result text only; stable JSON/JSONL envelopes and SQL
-  result metadata remain separate automation contracts.
+- Envelope keys are serialized deterministically. `schema_version` is the integer `1`; `result_type`
+  is the stable public result label; `data` is the JSON-safe result payload.
+- Multiple `-c` commands, scripts, and nested scripts emit one envelope per line in execution order.
+  A command that returns no structured result emits no line.
+- Missing values become JSON `null`; tuples become arrays; `Path` values become strings; exact
+  `Decimal` values become lossless text rather than binary floating-point values; non-finite floats
+  become JSON `null`.
+- Script metadata, command dot-echoes, macro/directive notices, human tables, and plot auto-opening
+  do not add stdout content in JSON mode.
+- Parse and execution errors retain the existing stderr text and nonzero exit status. No structured
+  error envelope is introduced in this slice.
+
+## State And Compatibility Assumptions
+
+- JSON serialization runs only after a successful Executor result is available, so it cannot mutate
+  active data or alter validation atomicity.
+- The output flag changes presentation only; parser grammar, Executor results, state transitions,
+  materialization behavior, and terminal formatting remain unchanged.
+- Interactive shell output remains terminal-only and does not accept `--json`.
 
 ## Acceptance Criteria
 
-- [ ] Generate and replace report positive exact-integer overflow counts while preserving missing rows.
-- [ ] Keep and drop report predicate overflow counts with correct missing/false predicate behavior.
-- [ ] Missing operands, non-finite/zero-division/decimal-scale/floating cases are not misclassified.
-- [ ] Eager, DuckDB-lazy, and Polars-lazy output and fallback metadata agree.
-- [ ] Zero-count output remains backward compatible; CLI/help/docs, focused tests, full validation, and
-  integrated workflow checks pass.
+- [ ] `--json` emits deterministic single-command envelopes for representative load, status, table,
+  preview, and transform results.
+- [ ] Multiple commands and nested scripts produce clean JSONL in execution order without metadata or
+  dot echoes, while commands returning no result emit no line.
+- [ ] Missing values, paths, tuples, exact decimals, and non-finite floats follow the explicit JSON
+  conversion policy.
+- [ ] Terminal output remains unchanged and interactive `--json` misuse is rejected clearly.
+- [ ] Parse/execution errors preserve stderr, exit status, and existing atomicity.
+- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Changing overflow missingness, arbitrary precision, decimal-scale/floating diagnostics, SQL-only
-  diagnostics, machine-readable output, operation lineage, new syntax, estimators, or exit codes.
+- Interactive JSON mode, structured error envelopes, command discovery, dry-run/explain, repair
+  diagnostics, SQL-result metadata, operation lineage, retained estimation samples, new syntax,
+  new commands, new backends, or exit-code redesign.

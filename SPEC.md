@@ -606,30 +606,41 @@ and describe the active work with concise verification criteria.
   - made out-of-domain results row-level missing without integer wraparound
   - preserved atomic validation and explicit Polars fallback for exact arithmetic predicates
   - explicitly deferred stable overflow diagnostics and broader numeric-width policy
+- Implemented Phase 24 P0 stable arithmetic overflow diagnostics:
+  - added typed overflow counts and positive-only `overflow rows: N` terminal diagnostics for
+    successful `generate`, `replace`, `keep`, and `drop` results
+  - recursively counted nested exact-integral subexpressions with correct replacement-predicate and
+    null-aware condition scoping across eager, DuckDB-lazy, and Polars-lazy paths
+  - preserved missingness, exact widths, zero-count output, validation atomicity, and Polars lazy
+    state when diagnostic counting fails
+  - explicitly deferred JSON/JSONL envelopes, SQL-result metadata, broader numeric diagnostics,
+    operation lineage, and exit-code redesign
 
 ## Present
 
-- Feature: Phase 24 P0 stable arithmetic overflow diagnostics
+- Feature: Phase 24 P1 batch JSON result envelopes
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-overflow-diagnostics
+  Branch: feat/phase24-json-output
 
   Summary:
-  Report deterministic row-level counts for exact integral arithmetic overflow while preserving the
-  existing missing-result policy and command syntax.
+  Add a versioned machine-readable result envelope for non-interactive `-c` and script execution
+  without changing command semantics or terminal output.
 
   Verification:
-  - generate, replace, keep, and drop report affected overflow-row counts only when exact integral
-    arithmetic overflows
-  - missing operands, false/missing predicates, division by zero, non-finite values, and decimal-scale
-    or floating arithmetic are not misclassified as integer overflow
-  - eager, DuckDB-lazy, and Polars-lazy results agree, including validated fallback state
-  - CLI, help, docs, full tests, and type/lint checks pass
+  - `--json` emits one compact deterministic JSON object per successful result in `-c` and script
+    modes, with a version, stable result type, and JSON-safe data payload
+  - multiple commands and nested scripts produce clean JSONL stdout without script metadata or dot
+    echoes; missing results produce no envelope
+  - paths, tuples, missing values, exact decimals, and non-finite numeric values serialize by explicit
+    policy without changing terminal formatting
+  - interactive mode remains terminal-only and rejects incompatible `--json` usage clearly
+  - parse/execution failures retain stderr diagnostics, nonzero exit status, and existing atomicity
+  - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - changing overflow from row-level missingness, arbitrary-precision arithmetic, decimal-scale or
-    floating diagnostics, SQL-only diagnostics, machine-readable output, operation lineage, randomness,
-    estimation samples, and exit-code redesign
+  - interactive JSON mode, structured error envelopes, SQL-result metadata, command discovery,
+    dry-run/explain, repair diagnostics, operation lineage, estimation samples, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
