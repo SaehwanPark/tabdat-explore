@@ -21,6 +21,7 @@ Examples:
 Notes:
 - `lazy` mode remains Parquet-only.
 - `delimiter` and `has_header` are only supported for CSV files.
+- `use name` reactivates a session-local named table and restores its stored row sequence.
 
 Links:
 - `docs/project_proposal.md`

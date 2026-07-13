@@ -359,6 +359,12 @@ def test_parse_phase_4_sql_commands() -> None:
     query="select sex, count(*) as n\nfrom active",
     into="grouped",
   )
+  assert parse_command(
+    'sql """\nselect value, label\nfrom active\norder by value desc, label\n""" into ordered'
+  ) == SqlCommand(
+    query="select value, label\nfrom active\norder by value desc, label",
+    into="ordered",
+  )
 
 
 def test_parse_phase_8_run_command() -> None:

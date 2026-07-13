@@ -75,7 +75,8 @@ use summary
 ```
 
 `sql ... into <table>` creates a session-local named table, makes it active, and does not write a
-file.
+file. An explicit `order by` sequence is preserved; `use <table>` restores that sequence. Add
+tie-breaker keys when ordered values can tie.
 
 ## Scripts
 

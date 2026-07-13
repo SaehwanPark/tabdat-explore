@@ -1,24 +1,22 @@
-# QA Report: Phase 24 P0 Active Row Order
+# QA Report: Phase 24 P0 SQL and Named-Table Order
 
 Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, help topics, and the
-  product contract agree on current active row order, filter retention, explicit DuckDB insertion
-  ordering, Polars fallback boundaries, and relation-changing non-goals.
-- **Preview semantics:** explicitly ordered unsorted fixtures, head/tail relative order, and zero
-  limits agree across eager, DuckDB-lazy, and Polars-lazy execution.
-- **Filter semantics:** keep/drop preserve surviving relative order, and missing predicate results
-  follow the existing keep/drop policy in every supported execution path.
-- **Transform semantics:** select, keep/drop column projection, rename, generate, replace, and
-  recode retain row sequence on fresh executors; lazy materialization state is asserted per command.
-- **Polars fallback:** direct Polars-lazy recode validates before materialization and executes through
-  the existing fallback path instead of failing without a DuckDB active relation.
-- **User-facing paths:** script-mode CLI output covers head, tail, and row-filter order; help text
-  and language docs cover the contract.
-- **Scope control:** no sort syntax, row IDs, hidden ordering metadata, relation-combination rewrite,
-  arbitrary SQL rewrite, categorical ordering, or estimator behavior was added.
+- **Roadmap/docs to contract:** `SPEC.md`, language semantics, SQL/use help, user guide, and the
+  product contract agree on explicit SQL ordering, tie-breakers, named-table restoration, activation
+  reset semantics, and unordered SQL non-goals.
+- **Direct SQL:** ordered result rows agree across eager, DuckDB-lazy, and Polars-lazy inputs; tied
+  keys are deterministic only with an explicit secondary key.
+- **Active transition:** `sql ... into` preserves query sequence through head/tail, and reactivation
+  is tested after returning to the original source so a no-op activation cannot pass.
+- **Materialization:** the existing DuckDB eager boundary and Polars fallback/reset behavior are
+  asserted without adding hidden materialization behavior.
+- **User-facing paths:** multiline parser coverage, script-mode CLI output, exact preview rows, and
+  SQL/use help cover the contract.
+- **Scope control:** no SQL rewriting, new syntax, row IDs, sort command, append/join/reshape order,
+  categorical order, or estimator behavior was added.
 
 ## Blocking Issues
 
@@ -26,9 +24,9 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- Cross-engine row-order and isolated transformation/recode regressions: 8 passed.
-- Script-mode CLI regressions: 2 passed; help suite: 8 passed.
-- `uv run pytest` — 1,070 passed, 314 existing third-party warnings.
+- Ordered SQL executor regressions: 3 passed.
+- Ordered SQL parser regression: 1 passed; script-mode CLI regression: 1 passed; help suite: 8 passed.
+- `uv run pytest` — 1,074 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -40,26 +38,24 @@ Status: final; implementation validation and exactly three independent PR review
 
 Exactly three independent review passes completed before merge readiness:
 
-- **Pass 1:** identified implicit DuckDB scan-order reliance, missing cross-engine projection
-  coverage, and an unspecified collapse transition. Fixed by explicitly enabling insertion-order
-  preservation, isolating projection cases, and documenting relation-changing result sequences.
-- **Pass 2:** identified direct Polars-lazy recode failure, implicit DuckDB ordering, and masked
-  transformation-engine coverage. Fixed by moving recode after the fallback boundary with
-  pre-materialization validation, explicitly enforcing the DuckDB setting, and using fresh executors
-  with per-command state assertions.
-- **Pass 3:** identified the same ordering risk plus incidental fixture order and incomplete CLI
-  coverage. Fixed with explicit fixture ordinals and ordering, and script-mode tail/filter tests.
+- **Pass 1:** identified stale arbitrary-SQL wording, missing tie-breaker semantics, and missing use
+  help. Fixed the language/help wording and added tie-key/use-help coverage.
+- **Pass 2:** identified the existing Polars fallback-reason reset contradiction and repeated the tie
+  concern. Fixed the contract/docs to describe the activation reset and added a named-table status
+  assertion plus tied-key regression.
+- **Pass 3:** identified non-isolated reactivation coverage, missing multiline parser coverage, and
+  brittle CLI assertions. Fixed by reloading the source before reactivation, adding the parser case,
+  and asserting exact formatted rows in command-delimited output.
 
 No Critical or unresolved High/Medium findings remain.
 
 ## Non-Blocking Follow-Ups
 
-Collapse and append/join/reshape ordering, named-table storage order, arbitrary SQL ordering,
-categorical ordering, exact arithmetic widths, overflow diagnostics, randomness, estimation samples,
-errors and exits, lineage, differential assurance, and public-preview readiness remain queued in
-`SPEC.md`.
+SQL without explicit ordering, append/join/reshape ordering, categorical ordering, exact arithmetic
+widths, overflow diagnostics, randomness, estimation samples, errors and exits, lineage, differential
+assurance, and public-preview readiness remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 
-Push the review-fix commit, update PR #97, merge it, fast-forward `main`, and clean up the feature
+Push the review-fix commit, update PR #98, merge it, fast-forward `main`, and clean up the feature
 branch.
