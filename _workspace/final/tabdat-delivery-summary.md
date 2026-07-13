@@ -1,24 +1,20 @@
-# Delivery Summary: Phase 24 P0 Stable Arithmetic Overflow Diagnostics
+# Delivery Summary: Phase 24 P1 Batch JSON Result Envelopes
 
-The overflow-diagnostics slice is implemented, fully validated, and has completed exactly three
+The batch JSON result-envelope slice is implemented, fully validated, and has completed exactly three
 independent PR reviews; all findings are fixed.
 
 ## Delivered
 
-- Added typed overflow counts to successful `generate`, `replace`, `keep`, and `drop` results.
-- Appended stable terminal text `overflow rows: N` only when exact integral overflow affected rows.
-- Preserved exact values, row-level missingness, false/missing predicate policy, and zero-count output.
-- Excluded missing operands, division/non-finite behavior, decimal-scale arithmetic, and floating
-  arithmetic from integer overflow diagnostics.
-- Covered recursive/nested expressions, conditional and null-aware replacement, eager/DuckDB-lazy/
-  Polars-lazy paths, fallback state, and injected count-failure atomicity.
+- Added `--json` output for non-interactive `-c`, `-f`, and positional script execution.
+- Added deterministic versioned JSON envelopes and clean JSONL ordering through nested scripts.
+- Preserved exact decimals, missing values, paths, and non-finite-value policy in JSON-safe output;
+  encoded binary cells as explicit base64 strings and stabilized result labels with an exhaustive map.
+- Kept terminal output, interactive behavior, Executor state, stderr errors, and exit statuses stable.
 
 ## Validation
 
-- Exact-width and overflow policy regressions: 12 passed across all engines.
-- Arithmetic/nonfinite/decimal compatibility regressions: 21 passed.
-- CLI and focused help regressions passed.
-- Full suite: 1,141 passed, with 314 existing third-party warnings.
+- JSON CLI regressions: 12 passed; JSON help regression: 1 passed.
+- Full suite: 1,154 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully with all scenarios passing and canonical replay stdout
   matching.
@@ -27,6 +23,6 @@ independent PR reviews; all findings are fixed.
 
 ## Remaining Phase 24 Work
 
-Machine-readable diagnostics, SQL-result metadata, decimal-scale/floating diagnostics, arbitrary
-precision, unordered SQL, randomness, estimation samples, operation lineage, differential assurance,
-dependency layering, and preview readiness remain in `SPEC.md` Future.
+Structured error envelopes, interactive JSON mode, command discovery, dry-run/explain, repair
+diagnostics, SQL-result metadata, operation lineage, retained estimation samples, differential
+assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.

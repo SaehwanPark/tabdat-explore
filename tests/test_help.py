@@ -35,6 +35,14 @@ def test_help_topic_text_is_loaded_from_package_data() -> None:
   assert "Examples" in text
 
 
+def test_run_help_documents_batch_json_output() -> None:
+  text = load_help_topic("run")
+
+  assert "--json" in text
+  assert "JSON" in text
+  assert "interactive shell sessions remain terminal-only" in text
+
+
 def test_help_topics_document_explicit_missing_values() -> None:
   assert "cost == null" in load_help_topic("keep")
   assert "cost == null" in load_help_topic("drop")

@@ -26,10 +26,12 @@ contracts.
 - `--json` is a CLI output-mode flag valid only with `-c/--command`, `-f`, or a positional script;
   interactive sessions remain terminal-only.
 - Each successful structured `Result` emits one compact JSON object line. Multiple commands and nested
-  scripts form JSONL in execution order; commands returning no `Result` emit no line.
+  scripts form JSONL in execution order; commands returning no `Result` emit no line. `exit`/`quit`
+  retain control behavior, while terminal-only `help` is rejected in JSON mode.
 - Each envelope has `schema_version: 1`, a stable result-type label, and a `data` object containing
   the result payload. Missing values become JSON `null`, tuples become arrays, paths become strings,
-  exact `Decimal` values remain lossless text, and non-finite floats become JSON `null`.
+  exact `Decimal` values remain lossless text, non-finite floats become JSON `null`, and bytes become
+  `base64:<payload>` strings.
 - Script metadata, command dot-echoes, macro/directive notices, and human tables are suppressed in
   JSON mode. Existing stderr errors and exit codes remain unchanged.
 - Terminal output and all Executor state transitions are unchanged; JSON serialization occurs only
