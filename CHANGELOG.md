@@ -66,8 +66,10 @@ All notable project changes are tracked here.
   nested-expression coverage, scoped replacement predicates, and Polars fallback atomicity.
 - Completed the Phase 24 batch JSON result-envelope slice with deterministic success envelopes,
   explicit result labels, exact/non-finite/binary serialization policies, and nested-script coverage.
-- Started the Phase 24 structured JSON error-envelope slice; batch failures will gain machine-readable
-  error details while stderr and exit status remain unchanged.
+- Completed the Phase 24 structured JSON error-envelope slice with stable error labels, source
+  locations, fail-fast ordering, sanitized machine messages, and unchanged human stderr.
+- Started the Phase 24 structured JSON command-discovery slice; a read-only catalog will expose the
+  existing command/help registry without starting a session or executing data commands.
 
 ### Added
 

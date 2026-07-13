@@ -624,31 +624,38 @@ and describe the active work with concise verification criteria.
   - explicitly deferred structured error envelopes, discovery, explainability, repair diagnostics,
     SQL metadata, operation lineage, and exit-code redesign
 
+- Implemented Phase 24 P1 structured JSON error envelopes:
+  - added one versioned error envelope for the first non-interactive parse, execution, help, or script
+    failure while preserving prior successes, fail-fast behavior, stderr, and exit status `1`
+  - preserved resolved script path/line locations, sanitized raw causes from machine messages, and
+    exhaustively labeled the user-facing error hierarchy
+  - explicitly deferred structured command discovery, interactive JSON mode, recovery, explainability,
+    repair diagnostics, SQL metadata, lineage, and new exit codes
+
 ## Present
 
-- Feature: Phase 24 P1 structured JSON error envelopes
+- Feature: Phase 24 P1 structured JSON command discovery
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-errors
+  Branch: feat/phase24-json-discovery
 
   Summary:
-  Add a versioned machine-readable error envelope to the existing non-interactive JSONL mode without
-  changing fail-fast behavior, human stderr diagnostics, or the current exit status.
+  Add a read-only machine-readable command catalog to the existing JSON interface without changing
+  command execution, session state, or terminal behavior.
 
   Verification:
-  - `--json` parse, execution, help-mode, and script failures emit one compact error envelope with
-    schema version, stable error type, message, and script path/line when available
-  - successful envelopes before a failure remain in order; execution remains fail-fast and later
-    commands do not run
-  - human-readable stderr, exit status `1`, terminal output, and interactive behavior remain unchanged
-  - error classification covers the existing user-facing TabDat error hierarchy without leaking
-    tracebacks or raw backend exception details
+  - `--json --list-commands` emits one deterministic catalog envelope with schema version, stable
+    command names, and corresponding help-topic availability
+  - catalog ordering is stable and derived from the existing command/help registry without launching
+    an Executor or materializing data
+  - incompatible combinations with terminal mode, `-c`, scripts, or interactive mode fail clearly
+    without changing existing success/error envelopes
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - interactive JSON mode, error recovery or multi-error aggregation, SQL-result metadata, command
-    discovery, dry-run/explain, repair diagnostics, operation lineage, estimation samples, and new
-    exit codes
+  - command execution, plugin discovery, option/argument schemas, command examples in the catalog,
+    interactive JSON mode, dry-run/explain, repair diagnostics, operation lineage, estimation samples,
+    and new exit codes
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
