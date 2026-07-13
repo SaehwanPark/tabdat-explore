@@ -45,6 +45,11 @@ class StringExpression:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class NullExpression:
+  """AST node representing the explicit missing-value literal."""
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class UnaryExpression:
   """AST node representing a unary mathematical operation.
 
@@ -89,6 +94,7 @@ Expression = (
   IdentifierExpression
   | NumberExpression
   | StringExpression
+  | NullExpression
   | UnaryExpression
   | BinaryExpression
   | FunctionCallExpression

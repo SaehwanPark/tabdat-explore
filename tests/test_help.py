@@ -35,6 +35,13 @@ def test_help_topic_text_is_loaded_from_package_data() -> None:
   assert "Examples" in text
 
 
+def test_help_topics_document_explicit_missing_values() -> None:
+  assert "cost == null" in load_help_topic("keep")
+  assert "cost == null" in load_help_topic("drop")
+  assert "generate missing_cost = null" in load_help_topic("generate")
+  assert "cost != null" in load_help_topic("replace")
+
+
 def test_estat_help_mentions_bayes_diagnostics() -> None:
   text = load_help_topic("estat")
 

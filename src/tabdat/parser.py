@@ -49,6 +49,7 @@ from tabdat.models import (
   LowessCommand,
   NbregCommand,
   NlCommand,
+  NullExpression,
   NumberExpression,
   PanelCommand,
   ParsedCommand,
@@ -3039,6 +3040,8 @@ class _ExpressionParser:
 
     token = self._stream.consume()
     if token.kind == "identifier":
+      if not token.quoted and token.text.lower() == "null":
+        return NullExpression()
       if not token.quoted and not self._stream.at_end and _is_symbol(self._stream.peek, "("):
         return self._parse_function_call(token.text)
       return IdentifierExpression(token.text)
