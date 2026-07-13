@@ -147,6 +147,7 @@ class DuckDBBackend:
     self._active_storage: Literal["table", "view"] = "table"
     self._lazy_engine: Literal["duckdb", "polars"] | None = None
     self._polars_lazy_frame: pl.LazyFrame | None = None
+    self._polars_lazy_restore_frame: pl.LazyFrame | None = None
 
   def close(self) -> None:
     """Close the underlying DuckDB database connection."""
@@ -1000,15 +1001,67 @@ class DuckDBBackend:
     variable: str,
     expression: Expression,
   ) -> DatasetInfo:
-    column_types = {column.name: column.data_type for column in dataset.columns}
-    if variable in column_types:
-      raise ExecutionError(f"generate target already exists: {variable}")
+    self.validate_generate(dataset, variable, expression)
     expression_sql = self._compile_expression(dataset, expression)
     self._replace_active(
       f"select *, {expression_sql} as {_quote_identifier(variable)} from {ACTIVE_TABLE}",
       "generate",
     )
     return self.active_dataset_info(dataset.path)
+
+  def validate_generate(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+  ) -> None:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if variable in column_types:
+      raise ExecutionError(f"generate target already exists: {variable}")
+    self.validate_expression(dataset, expression)
+
+  def exact_integer_overflow_count(
+    self,
+    dataset: DatasetInfo,
+    expression: Expression,
+    *,
+    condition: Expression | None = None,
+  ) -> int:
+    expression_probes = _exact_integer_overflow_subexpressions(dataset, expression)
+    condition_probes = (
+      _exact_integer_overflow_subexpressions(dataset, condition) if condition is not None else ()
+    )
+    if not expression_probes and not condition_probes:
+      return 0
+    condition_sql = self._compile_expression(dataset, condition) if condition is not None else None
+
+    def overflow_clauses(
+      probes: tuple[Expression, ...],
+      scope_sql: str | None,
+    ) -> list[str]:
+      clauses: list[str] = []
+      for probe in probes:
+        overflow_sql = f"try({self._compile_expression_raw(dataset, probe)}) is null"
+        identifier_names = _expression_identifier_names(probe)
+        nonmissing_sql = " and ".join(
+          f"{_quote_identifier(name)} is not null" for name in identifier_names
+        )
+        probe_sql = f"({overflow_sql})"
+        if nonmissing_sql:
+          probe_sql = f"{probe_sql} and ({nonmissing_sql})"
+        if scope_sql is not None:
+          probe_sql = f"({scope_sql}) and ({probe_sql})"
+        clauses.append(f"({probe_sql})")
+      return clauses
+
+    overflow_sql = overflow_clauses(expression_probes, condition_sql) + overflow_clauses(
+      condition_probes, None
+    )
+    row = self._fetch_one(
+      f"select count(*) from {ACTIVE_TABLE} where {' or '.join(overflow_sql)}",
+      "arithmetic overflow",
+    )
+    return cast(int, row[0])
 
   def replace_column(
     self,
@@ -1855,6 +1908,24 @@ class DuckDBBackend:
   def is_polars_lazy_active(self) -> bool:
     return self._polars_lazy_frame is not None
 
+  def begin_polars_materialization(self) -> None:
+    if self._polars_lazy_frame is not None:
+      self._polars_lazy_restore_frame = self._polars_lazy_frame
+
+  def commit_polars_materialization(self) -> None:
+    self._polars_lazy_restore_frame = None
+
+  def rollback_polars_materialization(self) -> bool:
+    restore_frame = self._polars_lazy_restore_frame
+    if restore_frame is None:
+      return False
+    self._drop_active_relation()
+    self._polars_lazy_frame = restore_frame
+    self._lazy_engine = "polars"
+    self._active_storage = "view"
+    self._polars_lazy_restore_frame = None
+    return True
+
   def validate_expression(self, dataset: DatasetInfo, expression: Expression) -> None:
     """Validate an expression without changing the active relation."""
     self._infer_expression_domain(dataset, expression)
@@ -1971,6 +2042,8 @@ class DuckDBBackend:
     raise ExecutionError("unsupported expression")
 
   def materialize_polars_lazy(self, path: Path | str) -> DatasetInfo:
+    if self._polars_lazy_restore_frame is None:
+      self.begin_polars_materialization()
     frame = self._collect_polars_frame("materialize", path)
     self._replace_active_with_frame(frame, command_name="materialize")
     return self.active_dataset_info(path)
@@ -2809,6 +2882,74 @@ def _is_integral_expression_for_types(
       and _is_integral_expression_for_types(column_types, expression.right)
     )
   return False
+
+
+def _exact_integer_overflow_subexpressions(
+  dataset: DatasetInfo,
+  expression: Expression,
+) -> tuple[Expression, ...]:
+  if _is_exact_integer_arithmetic_expression(dataset, expression):
+    return (expression,)
+  if isinstance(expression, UnaryExpression):
+    return _exact_integer_overflow_subexpressions(dataset, expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _merge_expression_tuples(
+      _exact_integer_overflow_subexpressions(dataset, expression.left),
+      _exact_integer_overflow_subexpressions(dataset, expression.right),
+    )
+  if isinstance(expression, FunctionCallExpression):
+    probes: tuple[Expression, ...] = ()
+    for argument in expression.arguments:
+      probes = _merge_expression_tuples(
+        probes,
+        _exact_integer_overflow_subexpressions(dataset, argument),
+      )
+    return probes
+  return ()
+
+
+def _is_exact_integer_arithmetic_expression(dataset: DatasetInfo, expression: Expression) -> bool:
+  return isinstance(expression, (UnaryExpression, BinaryExpression)) and _is_integral_expression(
+    dataset, expression
+  )
+
+
+def _expression_identifier_names(expression: Expression) -> tuple[str, ...]:
+  if isinstance(expression, IdentifierExpression):
+    return (expression.name,)
+  if isinstance(expression, (NumberExpression, StringExpression, NullExpression)):
+    return ()
+  if isinstance(expression, UnaryExpression):
+    return _expression_identifier_names(expression.operand)
+  if isinstance(expression, BinaryExpression):
+    return _merge_identifier_names(
+      _expression_identifier_names(expression.left),
+      _expression_identifier_names(expression.right),
+    )
+  if isinstance(expression, FunctionCallExpression):
+    names: tuple[str, ...] = ()
+    for argument in expression.arguments:
+      names = _merge_identifier_names(names, _expression_identifier_names(argument))
+    return names
+  return ()
+
+
+def _merge_identifier_names(*name_groups: tuple[str, ...]) -> tuple[str, ...]:
+  names: list[str] = []
+  for group in name_groups:
+    for name in group:
+      if name not in names:
+        names.append(name)
+  return tuple(names)
+
+
+def _merge_expression_tuples(*expression_groups: tuple[Expression, ...]) -> tuple[Expression, ...]:
+  expressions: list[Expression] = []
+  for group in expression_groups:
+    for expression in group:
+      if expression not in expressions:
+        expressions.append(expression)
+  return tuple(expressions)
 
 
 def _cast_exact_integer_sql(expression_sql: str) -> str:

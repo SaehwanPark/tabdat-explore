@@ -980,6 +980,7 @@ class PreviewResult:
 class TransformResult:
   message: str
   dataset: DatasetInfo
+  overflow_count: int = 0
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

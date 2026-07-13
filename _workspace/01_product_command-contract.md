@@ -23,7 +23,9 @@ Valid forms retain the current grammar:
 - `keep if amount * factor > 0`
 - `drop if amount * factor > 0`
 
-No new operators, options, commands, result fields, or numeric literals are introduced.
+No new operators, options, commands, or numeric literals are introduced. Successful transform
+results expose an optional typed `TransformResult.overflow_count` diagnostic field, defaulting to
+zero; the terminal formatter appends it only when positive.
 
 ## Diagnostic Rules
 

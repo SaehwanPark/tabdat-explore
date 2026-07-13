@@ -93,6 +93,11 @@ unknown-variable error and follows the write-validation atomicity policy below.
   are rejected before execution; wraparound and implicit signed widening are not inferred.
 - The policy is row-level: valid rows remain usable in `generate`, `replace`, and arithmetic
   predicates while affected rows become missing and follow the existing predicate rules.
+- Successful `generate`, `replace`, `keep`, and `drop` results append `overflow rows: N` when exact
+  integral overflow affected one or more command rows. Missing operands, false/missing predicates,
+  zero division, non-finite values, and scale-bearing decimal/floating arithmetic are not counted.
+- A zero overflow count does not change the existing transform-result text; diagnostics are
+  informational and do not turn a successful command into an error.
 
 ## Grouped-result ordering
 
@@ -202,6 +207,6 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Stable overflow error/warning diagnostics, arbitrary-precision arithmetic, decimal-scale/precision
+Machine-readable overflow envelopes, arbitrary-precision arithmetic, decimal-scale/precision
 propagation, floating storage widths, SQL without explicit ordering, randomness, estimation samples,
-machine-readable output, and exit codes are not defined here yet.
+and exit codes are not defined here yet.

@@ -18,3 +18,5 @@ to remove nonmissing values.
 
 Conditions must produce boolean or missing values; numeric and string truthiness is rejected.
 Rows that remain are kept in their prior relative order.
+If the condition contains exact integral arithmetic overflow, the successful result appends
+`overflow rows: N`; missing and false predicates retain their existing drop policy.

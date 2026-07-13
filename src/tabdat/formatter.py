@@ -1048,7 +1048,11 @@ def format_result(result: Result) -> str:
 
   if isinstance(result, TransformResult):
     dataset = result.dataset
-    return f"{result.message}: {_row_count(dataset.row_count)} rows, {dataset.column_count} columns"
+    overflow = f", overflow rows: {result.overflow_count}" if result.overflow_count else ""
+    return (
+      f"{result.message}: {_row_count(dataset.row_count)} rows, {dataset.column_count} columns"
+      f"{overflow}"
+    )
 
   if isinstance(result, PanelResult):
     if result.action == "clear":

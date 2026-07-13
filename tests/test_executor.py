@@ -7044,12 +7044,14 @@ def test_numeric_expression_compatibility_is_consistent_across_engines(
       )
     executor.execute(use_command)
     executor.execute(KeepCommand(condition=condition))
-    executor.execute(GenerateCommand("cost_shift", shift))
+    shifted = executor.execute(GenerateCommand("cost_shift", shift))
     preview = executor.execute(HeadCommand(3))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(shifted, TransformResult)
+  assert shifted.overflow_count == 0
   assert preview.rows == (
     (42, 25.0, "M", 150.0, 151.5),
     (54, 27.5, "F", None, None),
@@ -7073,31 +7075,31 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(
+    exact_sum_result = executor.execute(
       GenerateCommand(
         "exact_sum",
         BinaryExpression(IdentifierExpression("amount"), "+", IdentifierExpression("adjustment")),
       )
     )
-    executor.execute(
+    exact_product_result = executor.execute(
       GenerateCommand(
         "exact_product",
         BinaryExpression(IdentifierExpression("factor"), "*", IdentifierExpression("factor")),
       )
     )
-    executor.execute(
+    exact_difference_result = executor.execute(
       GenerateCommand(
         "exact_difference",
         BinaryExpression(IdentifierExpression("amount"), "-", IdentifierExpression("adjustment")),
       )
     )
-    executor.execute(
+    exact_negated_result = executor.execute(
       GenerateCommand(
         "exact_negated",
         UnaryExpression("-", IdentifierExpression("amount")),
       )
     )
-    executor.execute(
+    unsigned_sum_result = executor.execute(
       GenerateCommand(
         "unsigned_sum",
         BinaryExpression(
@@ -7107,7 +7109,7 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
         ),
       )
     )
-    executor.execute(
+    unsigned_product_result = executor.execute(
       GenerateCommand(
         "unsigned_product",
         BinaryExpression(
@@ -7123,6 +7125,17 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  for result in (
+    exact_sum_result,
+    exact_product_result,
+    exact_difference_result,
+    exact_negated_result,
+    unsigned_sum_result,
+  ):
+    assert isinstance(result, TransformResult)
+    assert result.overflow_count == 0
+  assert isinstance(unsigned_product_result, TransformResult)
+  assert unsigned_product_result.overflow_count == 1
   assert dataset is not None
   for variable in (
     "exact_sum",
@@ -7178,6 +7191,60 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
     Decimal("6"),
     None,
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  "expression",
+  [
+    BinaryExpression(
+      BinaryExpression(
+        IdentifierExpression("unsigned_left"),
+        "*",
+        IdentifierExpression("unsigned_right"),
+      ),
+      "+",
+      NumberExpression(0.5),
+    ),
+    FunctionCallExpression(
+      "abs",
+      (
+        BinaryExpression(
+          IdentifierExpression("unsigned_left"),
+          "*",
+          IdentifierExpression("unsigned_right"),
+        ),
+      ),
+    ),
+  ],
+)
+def test_nested_integral_overflow_is_counted_inside_wrapped_expression(
+  tmp_path: Path,
+  engine: str,
+  expression: Expression,
+) -> None:
+  path = tmp_path / "nested-exact-integer-arithmetic.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    result = executor.execute(GenerateCommand("wrapped", expression))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.overflow_count == 1
+  assert isinstance(preview, PreviewResult)
+  assert all(row[-1] is not None for row in preview.rows[:3])
+  assert preview.rows[-1][-1] is None
 
 
 def test_uhugeint_arithmetic_uses_exact_integer_policy(sample_parquet: Path) -> None:
@@ -7238,13 +7305,15 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("unsigned_left", expression))
+    replace_result = executor.execute(ReplaceCommand("unsigned_left", expression))
     preview = executor.execute(HeadCommand(10))
     dataset = executor.state.active_dataset
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(replace_result, TransformResult)
+  assert replace_result.overflow_count == 1
   assert dataset is not None
   result_type = next(
     column.data_type for column in dataset.columns if column.name == "unsigned_left"
@@ -7257,6 +7326,99 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
     Decimal("6"),
     None,
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_integral_replace_counts_overflow_in_predicate(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "exact-integer-replace-predicate.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  expression = BinaryExpression(
+    IdentifierExpression("amount"),
+    "+",
+    NumberExpression(0),
+  )
+  condition = BinaryExpression(
+    BinaryExpression(
+      IdentifierExpression("unsigned_left"),
+      "*",
+      IdentifierExpression("unsigned_right"),
+    ),
+    ">",
+    NumberExpression(0),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    result = executor.execute(ReplaceCommand("amount", expression, condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.overflow_count == 1
+  assert isinstance(preview, PreviewResult)
+  amount_index = preview.columns.index("amount")
+  assert preview.rows[-1][amount_index] == 1
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_integral_replace_counts_overflow_under_null_aware_condition(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "exact-integer-null-aware-replace.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (cast(18446744073709551615 as ubigint), cast(18446744073709551615 as ubigint),
+         null::varchar, cast(10 as bigint)),
+        (cast(2 as ubigint), cast(3 as ubigint), cast('ready' as varchar), cast(20 as bigint))
+    ) as null_aware_replace(left_value, right_value, flag, amount)
+    """,
+  )
+  expression = BinaryExpression(
+    IdentifierExpression("left_value"),
+    "*",
+    IdentifierExpression("right_value"),
+  )
+  condition = BinaryExpression(
+    IdentifierExpression("flag"),
+    "==",
+    NullExpression(),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    result = executor.execute(ReplaceCommand("amount", expression, condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.overflow_count == 1
+  assert isinstance(preview, PreviewResult)
+  amount_index = preview.columns.index("amount")
+  assert preview.rows[0][amount_index] is None
+  assert preview.rows[1][amount_index] == 20
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
@@ -7294,7 +7456,7 @@ def test_integral_arithmetic_predicate_uses_exact_missing_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(command_type(condition=condition))
+    filter_result = executor.execute(command_type(condition=condition))
     status = executor.execute(StatusCommand())
     preview = executor.execute(HeadCommand(10))
   finally:
@@ -7302,6 +7464,8 @@ def test_integral_arithmetic_predicate_uses_exact_missing_policy(
 
   assert isinstance(preview, PreviewResult)
   assert isinstance(status, StatusResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 1
   assert tuple(row[-1] for row in preview.rows) == expected_labels
   if engine == "polars":
     assert status.last_materialization_reason == "polars_fallback"
@@ -7343,6 +7507,47 @@ def test_invalid_exact_integer_predicate_preserves_polars_lazy_state(
   assert status.last_materialization_reason is None
 
 
+def test_polars_overflow_count_failure_preserves_lazy_state(
+  tmp_path: Path,
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  path = tmp_path / "exact-integer-count-failure.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path, execution_mode="lazy", lazy_engine="polars"))
+    before = executor.execute(HeadCommand(10))
+
+    def fail_count(*args: object, **kwargs: object) -> int:
+      raise ExecutionError("arithmetic overflow count failed")
+
+    monkeypatch.setattr(executor.backend, "exact_integer_overflow_count", fail_count)
+    with pytest.raises(ExecutionError, match="arithmetic overflow count failed"):
+      executor.execute(
+        GenerateCommand(
+          "overflow_copy",
+          BinaryExpression(
+            IdentifierExpression("unsigned_left"),
+            "*",
+            IdentifierExpression("unsigned_right"),
+          ),
+        )
+      )
+    after = executor.execute(HeadCommand(10))
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before, PreviewResult)
+  assert isinstance(after, PreviewResult)
+  assert after == before
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == "lazy"
+  assert status.lazy_engine == "polars"
+  assert status.last_operation == "head"
+  assert status.last_materialization_reason is None
+
+
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
 def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engines(
   tmp_path: Path,
@@ -7360,7 +7565,7 @@ def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engine
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(
+    shifted = executor.execute(
       GenerateCommand(
         "shifted",
         BinaryExpression(
@@ -7368,7 +7573,7 @@ def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engine
         ),
       )
     )
-    executor.execute(
+    ratio = executor.execute(
       GenerateCommand(
         "ratio",
         BinaryExpression(
@@ -7376,19 +7581,19 @@ def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engine
         ),
       )
     )
-    executor.execute(
+    root = executor.execute(
       GenerateCommand(
         "root",
         FunctionCallExpression("sqrt", (IdentifierExpression("raw"),)),
       )
     )
-    executor.execute(
+    natural_log = executor.execute(
       GenerateCommand(
         "natural_log",
         FunctionCallExpression("ln", (IdentifierExpression("raw"),)),
       )
     )
-    executor.execute(
+    common_log = executor.execute(
       GenerateCommand(
         "common_log",
         FunctionCallExpression("log", (IdentifierExpression("raw"),)),
@@ -7399,6 +7604,9 @@ def test_arithmetic_results_normalize_missing_and_nonfinite_values_across_engine
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  for result in (shifted, ratio, root, natural_log, common_log):
+    assert isinstance(result, TransformResult)
+    assert result.overflow_count == 0
   expected = (
     (6.0, 2.0, 2.0, math.log(4.0), math.log10(4.0)),
     (1.0, None, None, None, None),
@@ -7436,12 +7644,14 @@ def test_replace_normalizes_row_level_arithmetic_results(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("numerator", ratio))
+    replace_result = executor.execute(ReplaceCommand("numerator", ratio))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(replace_result, TransformResult)
+  assert replace_result.overflow_count == 0
   actual_numerators = tuple(row[0] for row in preview.rows)
   assert actual_numerators[0] == pytest.approx(2.0)
   assert actual_numerators[1:4] == (None, None, None)
@@ -7483,20 +7693,23 @@ def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(command_type(condition=condition))
+    filter_result = executor.execute(command_type(condition=condition))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 0
   assert tuple(row[-1] for row in preview.rows) == expected_labels
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
 @pytest.mark.parametrize(
-  ("expression", "expected_labels"),
+  ("command_type", "expression", "expected_labels"),
   [
     (
+      KeepCommand,
       BinaryExpression(
         IdentifierExpression("amount"),
         "/",
@@ -7505,6 +7718,16 @@ def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
       ("valid",),
     ),
     (
+      DropCommand,
+      BinaryExpression(
+        IdentifierExpression("amount"),
+        "/",
+        IdentifierExpression("divisor"),
+      ),
+      ("zero", "missing"),
+    ),
+    (
+      KeepCommand,
       BinaryExpression(
         NumberExpression(1),
         "/",
@@ -7512,11 +7735,21 @@ def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
       ),
       ("valid", "zero"),
     ),
+    (
+      DropCommand,
+      BinaryExpression(
+        NumberExpression(1),
+        "/",
+        IdentifierExpression("amount"),
+      ),
+      ("missing",),
+    ),
   ],
 )
 def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
   tmp_path: Path,
   engine: str,
+  command_type: type[KeepCommand] | type[DropCommand],
   expression: Expression,
   expected_labels: tuple[str, ...],
 ) -> None:
@@ -7537,12 +7770,14 @@ def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(KeepCommand(condition=condition))
+    filter_result = executor.execute(command_type(condition=condition))
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(filter_result, TransformResult)
+  assert filter_result.overflow_count == 0
   assert tuple(row[-1] for row in preview.rows) == expected_labels
 
 
@@ -7563,8 +7798,8 @@ def test_direct_nonfinite_source_values_are_not_rewritten(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(GenerateCommand("copied", IdentifierExpression("value")))
-    executor.execute(
+    copied = executor.execute(GenerateCommand("copied", IdentifierExpression("value")))
+    normalized = executor.execute(
       GenerateCommand(
         "normalized",
         BinaryExpression(IdentifierExpression("value"), "+", NumberExpression(0)),
@@ -7575,6 +7810,10 @@ def test_direct_nonfinite_source_values_are_not_rewritten(
     executor.close()
 
   assert isinstance(preview, PreviewResult)
+  assert isinstance(copied, TransformResult)
+  assert copied.overflow_count == 0
+  assert isinstance(normalized, TransformResult)
+  assert normalized.overflow_count == 0
   assert math.isinf(cast(float, preview.rows[0][0]))
   assert math.isnan(cast(float, preview.rows[1][0]))
   assert math.isinf(cast(float, preview.rows[0][1]))
