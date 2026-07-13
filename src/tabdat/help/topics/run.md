@@ -17,4 +17,6 @@ result envelope per successful command. JSON mode suppresses script metadata and
 failures also emit one error envelope with a stable type/message and script location when available;
 interactive shell sessions remain terminal-only. Use `tabdat --json --list-commands` for a single
 sorted command catalog without starting a session or reading data; discovery cannot be combined with
-command or script execution.
+command or script execution. Use `tabdat --json --help-topic summarize` to retrieve one existing
+help topic as a single JSON envelope; topic names are case-insensitive and unknown topics emit the
+existing JSON error envelope.

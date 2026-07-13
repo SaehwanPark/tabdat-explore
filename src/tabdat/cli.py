@@ -16,7 +16,7 @@ from tabdat.config import TabDatConfig, load_config, load_default_config
 from tabdat.errors import TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_error_json, format_result, format_result_json
-from tabdat.help import available_help_topics, load_help_topic
+from tabdat.help import available_help_topics, load_help_topic, load_help_topic_text
 from tabdat.models import (
   BarCommand,
   BayesPlotCommand,
@@ -25,6 +25,7 @@ from tabdat.models import (
   CommandCatalogResult,
   ExitCommand,
   HelpCommand,
+  HelpTopicResult,
   HistogramCommand,
   PlotResult,
   Result,
@@ -90,23 +91,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     action="store_true",
     help="emit the available command catalog; requires --json",
   )
+  parser.add_argument(
+    "--help-topic",
+    metavar="TOPIC",
+    help="emit one packaged help topic; requires --json",
+  )
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
   if args.list_commands and not args.json:
     parser.error("--list-commands requires --json")
+  if args.help_topic is not None and not args.json:
+    parser.error("--help-topic requires --json")
   if args.list_commands and (args.command or args.file is not None or args.script is not None):
     parser.error("--list-commands cannot be combined with command or script execution")
+  if args.help_topic is not None and (
+    args.command or args.file is not None or args.script is not None or args.list_commands
+  ):
+    parser.error("--help-topic cannot be combined with command, script, or command discovery")
   if args.command and (args.file is not None or args.script is not None):
     parser.error("-c/--command cannot be combined with script execution")
   if args.file is not None and args.script is not None:
     parser.error("-f/--file cannot be combined with a positional script")
   script_path = args.file or args.script
-  if args.json and not (args.command or script_path is not None or args.list_commands):
+  if args.json and not (
+    args.command or script_path is not None or args.list_commands or args.help_topic is not None
+  ):
     parser.error("--json requires -c/--command or a script path")
   if args.list_commands:
     print(format_result_json(_command_catalog_result()))
     return 0
+  if args.help_topic is not None:
+    return _run_help_topic_json(args.help_topic)
 
   try:
     config = load_config(args.config) if args.config is not None else load_default_config()
@@ -141,6 +157,32 @@ def _command_catalog_result() -> CommandCatalogResult:
       for name in sorted(COMMAND_NAMES)
     )
   )
+
+
+def _run_help_topic_json(topic: str) -> int:
+  try:
+    result = _help_topic_result(topic)
+  except TabDatError as exc:
+    print(f"Error: {exc}", file=sys.stderr)
+    print(format_error_json(exc))
+    return 1
+  print(format_result_json(result))
+  return 0
+
+
+def _help_topic_result(topic: str) -> HelpTopicResult:
+  normalized = topic.strip().lower()
+  if not normalized:
+    raise TabDatError("help topic cannot be empty")
+  try:
+    if normalized not in set(available_help_topics()):
+      raise TabDatError(f"unknown help topic: {normalized}")
+    text = load_help_topic_text(normalized)
+  except KeyError:
+    raise TabDatError(f"unknown help topic: {normalized}") from None
+  except (OSError, UnicodeError):
+    raise TabDatError(f"unable to load help topic: {normalized}") from None
+  return HelpTopicResult(help_topic=normalized, text=text)
 
 
 def _run_commands(

@@ -920,6 +920,14 @@ class CommandCatalogResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class HelpTopicResult:
+  """The packaged text for one canonical in-app help topic."""
+
+  help_topic: str
+  text: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class LoadResult:
   dataset: DatasetInfo
 
@@ -1482,6 +1490,7 @@ class TtestResult:
 
 Result = (
   CommandCatalogResult
+  | HelpTopicResult
   | LoadResult
   | ActivateResult
   | DescribeResult

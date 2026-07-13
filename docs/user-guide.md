@@ -117,7 +117,10 @@ text and nonzero exit status while adding one error envelope with a stable type/
 location when available. Interactive sessions remain terminal-only. To discover the available
 commands without starting a session or reading data, use `uv run tabdat --json --list-commands`;
 the result is one sorted `CommandCatalogResult` envelope with each command's `help_topic` or `null`.
-This discovery mode cannot be combined with command or script execution.
+This discovery mode cannot be combined with command or script execution. To retrieve one discovered
+help topic for a machine client, use `uv run tabdat --json --help-topic summarize`; the result is a
+single `HelpTopicResult` envelope with the canonical topic and exact packaged help text. Topic names
+are case-insensitive, and unknown topics use the existing JSON error envelope.
 
 ### Canonical Parquet-first workflow
 

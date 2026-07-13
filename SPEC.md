@@ -631,32 +631,41 @@ and describe the active work with concise verification criteria.
     exhaustively labeled the user-facing error hierarchy
   - explicitly deferred structured command discovery, interactive JSON mode, recovery, explainability,
     repair diagnostics, SQL metadata, lineage, and new exit codes
+- Implemented Phase 24 P1 structured JSON command discovery:
+  - added a deterministic `CommandCatalogResult` envelope for `--json --list-commands` without
+    starting a session, reading data, or changing existing command execution and JSON envelopes
+  - derived sorted names and help-topic availability from the command/help registries, including
+    executable `lincom`, `test`, and `ttest` entries with `null` help topics
+  - completed exactly three independent reviews, fixed the registry omission and handoff wording,
+    and merged the validated slice as PR #107
+  - explicitly deferred machine-readable help content, option/argument schemas, dry-run/explain,
+    repair diagnostics, interactive JSON mode, and new exit codes
 
 ## Present
 
-- Feature: Phase 24 P1 structured JSON command discovery
+- Feature: Phase 24 P1 structured JSON help-topic retrieval
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-json-discovery
+  Branch: feat/phase24-json-help
 
   Summary:
-  Add a read-only machine-readable command catalog to the existing JSON interface without changing
-  command execution, session state, or terminal behavior.
+  Add read-only machine-readable retrieval of one existing in-app help topic through the JSON
+  interface without creating a session, executing a command, or changing terminal behavior.
 
   Verification:
-  - `--json --list-commands` emits one deterministic catalog envelope with schema version, stable
-    command names, and corresponding help-topic availability
-  - catalog ordering is stable and derived from the existing command/help registry without launching
-    an Executor or materializing data
-  - incompatible combinations with terminal mode, `-c`, scripts, or interactive mode fail clearly
-    without changing existing success/error envelopes
+  - `--json --help-topic <topic>` emits one deterministic `HelpTopicResult` envelope containing the
+    normalized topic name and the existing help text
+  - retrieval accepts only an existing help topic, reports unknown topics through the existing JSON
+    error envelope, and does not launch `Executor`, load config, read data, or materialize anything
+  - incompatible combinations with terminal mode, `-c`, scripts, `--list-commands`, or interactive
+    mode fail clearly without changing existing success/error envelopes
   - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
 
   Out of Scope:
-  - command execution, plugin discovery, option/argument schemas, command examples in the catalog,
-    interactive JSON mode, dry-run/explain, repair diagnostics, operation lineage, estimation samples,
-    and new exit codes
-  - new commands, new backends, estimators, connectors, or plugins
+  - command execution, scripts, multiple-topic retrieval, option/argument schemas, catalog examples,
+    plugin discovery, interactive JSON mode, dry-run/explain, repair diagnostics, operation lineage,
+    estimation samples, and new exit codes
+  - new help topics, new commands, new backends, estimators, connectors, or plugins
 
 ## Future
 
@@ -672,8 +681,8 @@ and describe the active work with concise verification criteria.
     - transparency output is deterministic and does not trigger hidden materialization
   - out of scope: new estimator families, broad remote connectors, or public plugin APIs
 - **P1 — Agent and automation interface**
-  - specify JSON or JSON Lines output, schema/result metadata, stable exit codes, structured command
-    discovery, dry-run/explain behavior, and repair-oriented diagnostics
+  - specify JSON or JSON Lines output, schema/result metadata, stable exit codes, dry-run/explain
+    behavior, and repair-oriented diagnostics
   - verification:
     - representative EDA commands have versioned, snapshot-tested machine-readable envelopes
     - interactive, script, and `-c` execution produce equivalent state transitions
