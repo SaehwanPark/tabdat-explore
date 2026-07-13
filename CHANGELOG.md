@@ -30,6 +30,8 @@ All notable project changes are tracked here.
   deterministic mixed-domain failures are bounded before broader arithmetic expansion.
 - Started the Phase 24 arithmetic-result slice; missing propagation and computed non-finite
   normalization are bounded before exact storage-width and overflow policy.
+- The arithmetic-result slice rejects unsigned subtraction/unary-minus and covers Decimal operand
+  order so backend edge cases remain deterministic.
 
 ### Added
 

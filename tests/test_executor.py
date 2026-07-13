@@ -6695,18 +6695,37 @@ def test_arithmetic_predicates_treat_nonfinite_results_as_missing(
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  ("expression", "expected_labels"),
+  [
+    (
+      BinaryExpression(
+        IdentifierExpression("amount"),
+        "/",
+        IdentifierExpression("divisor"),
+      ),
+      ("valid",),
+    ),
+    (
+      BinaryExpression(
+        NumberExpression(1),
+        "/",
+        IdentifierExpression("amount"),
+      ),
+      ("valid", "zero"),
+    ),
+  ],
+)
 def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
   tmp_path: Path,
   engine: str,
+  expression: Expression,
+  expected_labels: tuple[str, ...],
 ) -> None:
   path = tmp_path / "decimal-arithmetic.parquet"
   _write_decimal_arithmetic_parquet(path)
   condition = BinaryExpression(
-    BinaryExpression(
-      IdentifierExpression("amount"),
-      "/",
-      IdentifierExpression("divisor"),
-    ),
+    expression,
     ">",
     NumberExpression(0),
   )
@@ -6726,7 +6745,7 @@ def test_decimal_arithmetic_predicates_use_numeric_missing_policy(
     executor.close()
 
   assert isinstance(preview, PreviewResult)
-  assert tuple(row[-1] for row in preview.rows) == ("valid",)
+  assert tuple(row[-1] for row in preview.rows) == expected_labels
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
@@ -6763,6 +6782,46 @@ def test_direct_nonfinite_source_values_are_not_rewritten(
   assert math.isinf(cast(float, preview.rows[0][1]))
   assert math.isnan(cast(float, preview.rows[1][1]))
   assert tuple(row[2] for row in preview.rows) == (None, None)
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize("arithmetic_case", ["unary", "subtraction"])
+def test_unsigned_subtraction_and_unary_like_arithmetic_are_rejected_consistently(
+  tmp_path: Path,
+  engine: str,
+  arithmetic_case: str,
+) -> None:
+  path = tmp_path / "unsigned-arithmetic.parquet"
+  _write_sql_parquet(
+    path,
+    "select cast(value as ubigint) as u from (values (0), (2)) as values_table(value)",
+  )
+  if arithmetic_case == "unary":
+    expression: Expression = UnaryExpression("-", IdentifierExpression("u"))
+  else:
+    expression = BinaryExpression(IdentifierExpression("u"), "-", NumberExpression(1))
+  condition = BinaryExpression(expression, ">", NumberExpression(0))
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(
+      TypeMismatchExecutionError,
+      match="unsigned numeric values do not support subtraction or unary minus",
+    ):
+      executor.execute(KeepCommand(condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[0] for row in preview.rows) == (0, 2)
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])

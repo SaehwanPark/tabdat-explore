@@ -574,6 +574,7 @@ and describe the active work with concise verification criteria.
   - division by zero and invalid sqrt/ln/log domains produce missing rather than backend-specific
     infinity, NaN, or execution failure
   - computed non-finite results are normalized while direct source values remain unchanged
+  - unsigned subtraction and unary minus are rejected consistently before backend execution
   - generated/replaced values and arithmetic predicates remain consistent across eager, DuckDB-lazy,
     and Polars-lazy paths
   - existing type validation remains atomic before Polars-lazy fallback

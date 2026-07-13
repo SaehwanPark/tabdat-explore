@@ -7,14 +7,16 @@ The arithmetic-result slice is implemented and fully validated locally.
 - Defined missing propagation for existing arithmetic and numeric functions.
 - Normalized zero-denominator results, invalid `sqrt`/`ln`/`log` domains, and computed NaN/infinity
   to missing values without rewriting direct source values.
+- Rejected unsigned subtraction and unary minus before backend execution, avoiding underflow and
+  signedness divergence.
 - Kept eager, DuckDB-lazy, and Polars-lazy predicate behavior aligned, including Decimal division.
 - Covered generated values, replacements, arithmetic predicates, CLI output, help, and docs.
 
 ## Validation
 
-- Arithmetic executor regressions: 18 passed in the final focused run.
+- Arithmetic executor regressions: 28 passed in the final focused run.
 - CLI regressions: 3 passed; help regressions: 2 passed.
-- Full suite: 1,044 passed, with 314 existing third-party warnings.
+- Full suite: 1,053 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully.
 

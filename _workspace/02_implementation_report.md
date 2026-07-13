@@ -11,16 +11,21 @@
 - `src/tabdat/backend.py`
   - Added a shared SQL numeric-result wrapper using DuckDB `try` plus finite checks so division by
     zero, invalid numeric-function domains, and computed NaN/infinity become `NULL` row values.
+  - Bound each SQL numeric result through a scalar projection so nested expressions do not duplicate
+    the same `try(...)` subexpression recursively.
   - Applied normalization to unary minus, `+`, `-`, `*`, `/`, and numeric functions while leaving
     direct identifiers and string functions unchanged.
-  - Added Polars numeric-result normalization with a Float64 finite probe while preserving the
-    original result expression and Decimal result type.
+  - Added Polars numeric-result normalization through a Float64 finite/result probe so Decimal
+    predicates avoid the unsupported Decimal `is_finite` operation.
   - Replaced zero Polars denominators with a safe evaluation denominator before masking affected
     rows, avoiding Decimal division-by-zero execution failures.
+  - Rejected subtraction involving unsigned columns and unary minus of unsigned expressions before
+    any backend executes the operation.
 - `tests/test_executor.py`
   - Added cross-engine fixtures for missing operands, zero and zero-over-zero denominators,
     negative square-root/log domains, direct source NaN/infinity, Decimal division, generated values,
-    replacements, and arithmetic predicates.
+    replacements, arithmetic predicates, operand-order Decimal division, and unsigned arithmetic
+    rejection.
 - `tests/test_cli.py`, `tests/test_help.py`, and help topics
   - Covered the user-visible no-`inf`/`nan` CLI path and documented the row-level result policy.
 - `docs/language-semantics.md`, `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
@@ -35,17 +40,17 @@ mutation and fallback boundaries remain unchanged; validation still occurs befor
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'arithmetic_results or arithmetic_predicates or direct_nonfinite or replace_normalizes_row' -q` — passed, 15 tests.
-- `uv run pytest tests/test_executor.py -k 'decimal_arithmetic or arithmetic_results or arithmetic_predicates or direct_nonfinite or replace_normalizes_row' -q` — passed, 18 tests.
+- `uv run pytest tests/test_executor.py -k 'arithmetic_results or arithmetic_predicates or direct_nonfinite or replace_normalizes_row' -q` — passed, 15 tests before review fixes.
+- `uv run pytest tests/test_executor.py -k 'arithmetic_results or arithmetic_predicates or decimal_arithmetic or direct_nonfinite or replace_normalizes_row or unsigned_subtraction or unsigned_numeric_negative' -q` — passed, 28 tests after review fixes.
 - `uv run pytest tests/test_cli.py -k 'normalizes_nonfinite or expression_type_mismatch' -q` — passed, 3 tests.
 - `uv run pytest tests/test_help.py -k 'missing or expression' -q` — passed, 2 tests.
-- `uv run pytest` — passed, 1,044 tests, with 314 existing third-party warnings.
+- `uv run pytest` — passed, 1,053 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py` — passed with exit code 0; canonical workflow
-  replay remained green.
+- `uv run python integrated_testing/run_e2e.py` — passed with exit code 0; all integrated scenarios,
+  including canonical replay, remained green.
 
 ## Known Limits And Follow-Up Work
 

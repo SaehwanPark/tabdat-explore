@@ -22,3 +22,6 @@ Arithmetic requires numeric operands. Numeric functions require numeric argument
 
 Missing operands produce missing results. Division by zero and invalid `sqrt`, `ln`, or `log`
 domains produce missing values for those rows; computed `inf` and `nan` are normalized to missing.
+
+Subtraction involving unsigned numeric variables and unary minus of unsigned numeric expressions
+are rejected rather than wrapped or implicitly widened.

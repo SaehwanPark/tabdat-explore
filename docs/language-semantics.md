@@ -84,6 +84,8 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `sqrt(x)` produces missing when `x < 0`; `ln(x)` and `log(x)` produce missing when `x <= 0`.
 - Any computed NaN or infinity from supported arithmetic or numeric functions is normalized to
   missing. A direct identifier does not rewrite a non-finite value already present in the source.
+- Subtraction involving an unsigned numeric column and unary minus of an unsigned numeric expression
+  are rejected before execution; wraparound and implicit signed widening are not inferred.
 - The policy is row-level: valid rows remain usable in `generate`, `replace`, and arithmetic
   predicates while affected rows become missing and follow the existing predicate rules.
 

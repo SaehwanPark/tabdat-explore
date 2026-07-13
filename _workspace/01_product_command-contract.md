@@ -37,6 +37,8 @@ No new operators, functions, options, or output columns are introduced by this s
 - Any computed NaN or infinity from supported arithmetic or numeric functions becomes missing.
 - A direct identifier expression does not rewrite an existing source NaN or infinity. Normalization
   applies to values produced by arithmetic or numeric-function nodes.
+- Subtraction involving an unsigned numeric column and unary minus of an unsigned numeric expression
+  are rejected before execution; this slice does not infer a signed widening or wraparound policy.
 - A valid finite result remains numeric. Exact backend-specific storage widening and overflow
   diagnostics are not promised by this slice.
 

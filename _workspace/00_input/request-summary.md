@@ -29,6 +29,8 @@ command and estimator expansion.
   affected rows rather than infinity, NaN, or a backend error.
 - Computed NaN and infinity from supported arithmetic or numeric functions are normalized to
   missing. Direct source values are not rewritten merely by being read.
+- Subtraction and unary minus on unsigned numeric columns are rejected before execution so
+  underflow and signedness behavior cannot diverge between backends.
 
 ## Non-Goals
 
