@@ -1,31 +1,31 @@
-# Request Summary: Phase 24 Identifier Overwrite and Atomic Error Semantics
+# Request Summary: Phase 24 Identifier Spelling and Quoted Identifiers
 
 ## Goal
 
-Define and verify the first stable cross-command write policy for `generate`, `rename`, `replace`,
-and `recode ... generate(...)`: explicit identifier target rules and no active-dataset mutation on
-validation failure.
+Define and verify exact variable spelling and backtick-quoted identifiers for command targets,
+variable lists, and expression references.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This follows the execution-transparency sequence and starts the
-roadmap's cross-command semantic contract without changing successful command behavior.
+Phase 24 P0 language semantics. This follows the write-target contract and makes identifier grammar
+usable for real column names without changing successful behavior for existing bare identifiers.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md` and `docs/user-guide.md`: durable write/atomicity policy
-- `tests/test_executor.py`: collision, target, and schema-preservation regressions
+- `docs/language-semantics.md`: durable identifier spelling and quoting policy
+- `src/tabdat/parser.py`: quoted identifier tokenization and keyword boundaries
+- `tests/test_parser.py` and `tests/test_executor.py`: parser/backend boundary regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
 
 ## Assumptions
 
-- Existing command errors are the public policy; this slice documents and hardens them rather than
-  redesigning error wording.
-- Validation failures are atomic at the active-dataset boundary: schema, rows, execution metadata,
-  and current active table remain unchanged.
-- Identifier case, quoting, missing-value coercion, and ordering semantics remain separate slices.
+- Existing command errors are the public policy; this slice does not redesign error wording.
+- Bare identifiers already resolve by exact spelling; this slice makes that behavior explicit and
+  adds backtick quoting without case folding.
+- Backtick quoting is limited to variable positions and expression references; SQL retains its own
+  parser and quoting semantics.
 
 ## Non-Goals
 
-- Adding commands, changing successful transformations, broad identifier grammar, missingness or
-  coercion policy, machine output, exit codes, lineage, or estimator behavior.
+- Adding commands, missingness or coercion policy, machine output, exit codes, lineage, or estimator
+  behavior.

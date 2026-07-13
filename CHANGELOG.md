@@ -20,6 +20,8 @@ All notable project changes are tracked here.
   distinguished from Polars fallback and source/table resets.
 - Started the Phase 24 identifier overwrite and atomic-error semantics slice; broader language
   policy remains queued behind this initial write-contract increment.
+- Started the Phase 24 identifier spelling and quoted-identifier semantics slice; missingness,
+  coercion, and broader language policy remain queued.
 
 ### Added
 

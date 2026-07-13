@@ -2176,6 +2176,52 @@ def test_cli_runs_phase_24_status_flow(sample_parquet: Path, capsys) -> None:
   assert captured.err == ""
 
 
+def test_cli_runs_phase_24_quoted_identifier_command(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "generate `Age Group` = age + 1",
+      "-c",
+      "select `Age Group`",
+      "-c",
+      "head 3",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Generated Age Group:" in captured.out
+  assert "Selected columns: 3 rows, 1 columns" in captured.out
+  assert "Age Group" in captured.out
+  assert "31" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_runs_phase_24_quoted_unicode_identifier_in_script(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "quoted-identifiers.td"
+  script_path.write_text(
+    f"use {sample_parquet}\ngenerate `Δείγμα` = age + 1\nselect `Δείγμα`\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Generated Δείγμα:" in captured.out
+  assert "Selected columns: 3 rows, 1 columns" in captured.out
+  assert "Δείγμα" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
   exit_code = main(["-c", "status"])
 

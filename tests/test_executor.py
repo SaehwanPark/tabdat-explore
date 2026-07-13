@@ -29,7 +29,7 @@ from tabdat.errors import (
   UnknownVariableError,
 )
 from tabdat.estimation import CoefficientEstimate
-from tabdat.executor import Executor, _xtabond_sample
+from tabdat.executor import Executor, _bayes_formula_identifier, _xtabond_sample
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -150,6 +150,7 @@ from tabdat.models import (
   ZipCommand,
   ZipRegressionResult,
 )
+from tabdat.parser import parse_command
 from tabdat.visualization import _posterior_draws_by_variable, save_bayes_diagnostic_plot
 
 
@@ -6275,6 +6276,41 @@ def test_describe_returns_active_dataset(sample_parquet: Path) -> None:
   assert isinstance(result, DescribeResult)
   assert result.dataset.row_count == 3
   assert result.dataset.columns[0].name == "age"
+
+
+def test_quoted_identifiers_execute_with_exact_spelling(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    generated = executor.execute(parse_command("generate `Age Group` = age + 1"))
+    replaced = executor.execute(
+      parse_command("replace `Age Group` = `Age Group` + 1 if `Age Group` >= 43")
+    )
+    selected = executor.execute(parse_command("select `Age Group` age"))
+    preview = executor.execute(HeadCommand(3))
+    with pytest.raises(UnknownVariableError, match="expression unknown variable: age group"):
+      executor.execute(parse_command("generate `lowercase target` = `age group`"))
+  finally:
+    executor.close()
+
+  assert isinstance(generated, TransformResult)
+  assert generated.dataset.columns[-1].name == "Age Group"
+  assert isinstance(replaced, TransformResult)
+  assert isinstance(selected, TransformResult)
+  assert isinstance(preview, PreviewResult)
+  assert preview.columns == ("Age Group", "age")
+  assert preview.rows == (
+    (31, 30),
+    (44, 42),
+    (56, 54),
+  )
+
+
+def test_bayes_formula_identifier_quotes_and_rejects_unrepresentable_names() -> None:
+  assert _bayes_formula_identifier("age") == "`age`"
+  assert _bayes_formula_identifier("age group+x") == "`age group+x`"
+  with pytest.raises(ExecutionError, match="bayes does not support backticks"):
+    _bayes_formula_identifier("age`group")
 
 
 def test_summarize_requested_numeric_columns(sample_parquet: Path) -> None:

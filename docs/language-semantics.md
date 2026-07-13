@@ -1,8 +1,29 @@
 # TabDat Language Semantics
 
-This document records stable cross-command behavior. It starts with write-target and failure
-semantics; identifier quoting, missing values, coercion, ordering, randomness, estimation samples,
-and exit behavior remain separate contracts.
+This document records stable cross-command behavior. It starts with identifier spelling, quoting,
+write-target, and failure semantics; missing values, coercion, ordering, randomness, estimation
+samples, and exit behavior remain separate contracts.
+
+## Identifier spelling and quoting
+
+- Bare identifiers preserve their exact spelling and are case-sensitive. `age` and `Age` refer to
+  different variables; command names remain case-insensitive.
+- A bare identifier starts with a Unicode letter or `_`, followed by Unicode letters, digits, or `_`.
+- Backtick-quoted identifiers can contain whitespace and punctuation. They are accepted for variable
+  targets, variable lists, and expression references, and their contents are preserved exactly.
+- Inside a backtick-quoted identifier, two consecutive backticks represent one literal backtick.
+  Empty quoted identifiers are invalid.
+- SQL text keeps SQL's own identifier rules; this command-language contract does not rewrite SQL.
+
+For example:
+
+```text
+generate `age group` = age + 1
+replace `weight kg` = `weight kg` * 2 if `status flag` == "active"
+```
+
+Quoted identifiers are not command names or option names. An exact spelling mismatch remains an
+unknown-variable error and follows the write-validation atomicity policy below.
 
 ## Write targets
 
@@ -31,5 +52,5 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Identifier case/quoting, missing values, coercion, arithmetic, categorical behavior, ordering,
-randomness, estimation samples, machine-readable output, and exit codes are not defined here yet.
+Missing values, coercion, arithmetic, categorical behavior, ordering, randomness, estimation samples,
+machine-readable output, and exit codes are not defined here yet.
