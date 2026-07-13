@@ -43,6 +43,8 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "Division by zero" in load_help_topic("generate")
   assert "computed `inf` and `nan`" in load_help_topic("replace")
   assert "unsigned numeric variables" in load_help_topic("generate")
+  assert "native ordering" in load_help_topic("tabulate")
+  assert "descending count" in load_help_topic("bar")
 
 
 def test_help_topics_document_expression_domains() -> None:

@@ -557,33 +557,35 @@ and describe the active work with concise verification criteria.
     functions with deterministic diagnostics
   - required boolean or missing predicates and same-domain/null replacement targets
   - validated Polars-lazy writes and tabulates before fallback materialization
+- Implemented Phase 24 P0 arithmetic result and non-finite-value policy:
+  - defined missing propagation, row-level zero-denominator and invalid numeric-function behavior,
+    and computed NaN/infinity normalization
+  - preserved direct source non-finite values while rejecting unsigned subtraction/unary minus
+  - aligned eager, DuckDB-lazy, and Polars-lazy arithmetic predicates, including Decimal operands
+  - bounded exact arithmetic widths, overflow diagnostics, row order, and broader ordering policy
 
 ## Present
 
-- Feature: Phase 24 P0 arithmetic result and non-finite-value policy
+- Feature: Phase 24 P0 grouped-result ordering semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-arithmetic-results
+  Branch: feat/phase24-grouped-ordering
 
   Summary:
-  Define and regression-test missing propagation, zero-denominator behavior, invalid numeric-function
-  domains, and computed non-finite normalization for existing arithmetic expressions.
+  Define and regression-test native ordering for grouped summaries, tabulate keys, and category-count
+  ties without adding sort syntax or changing active row-order behavior.
 
   Verification:
-  - missing operands propagate to missing arithmetic/function results across all execution paths
-  - division by zero and invalid sqrt/ln/log domains produce missing rather than backend-specific
-    infinity, NaN, or execution failure
-  - computed non-finite results are normalized while direct source values remain unchanged
-  - unsigned subtraction and unary minus are rejected consistently before backend execution
-  - generated/replaced values and arithmetic predicates remain consistent across eager, DuckDB-lazy,
-    and Polars-lazy paths
-  - existing type validation remains atomic before Polars-lazy fallback
+  - numeric tabulate keys are ordered numerically in long and wide output
+  - text keys remain lexicographic and missing grouped keys sort last
+  - bar ties use native category order and missing categories remain last
+  - eager, DuckDB-lazy, and Polars-lazy tabulate output agrees
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new expression syntax, categorical conversion, string concatenation, exact arithmetic storage
-    widths, overflow reporting, ordering/randomness, estimation samples, operation lineage, machine
-    output, and exit-code redesign
+  - new sort syntax, active row-order guarantees, `head`/`tail` ordering, arbitrary SQL ordering,
+    categorical ordering, exact arithmetic storage widths, overflow reporting, randomness, estimation
+    samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

@@ -15,6 +15,9 @@ column categories?
 
 `if` conditions must produce boolean or missing values; numeric and string truthiness is rejected.
 
+Grouped keys use native ordering: numeric values sort numerically, text values lexicographically,
+and missing values last. Wide table headers follow the same order.
+
 Examples:
 - `tabulate sex`
 - `tabulate sex outcome, row col`

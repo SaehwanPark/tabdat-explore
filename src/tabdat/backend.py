@@ -3,6 +3,7 @@
 import math
 import tempfile
 from collections.abc import Callable, Sequence
+from decimal import Decimal
 from pathlib import Path
 from typing import Literal, cast
 from urllib.error import URLError
@@ -1234,7 +1235,7 @@ class DuckDBBackend:
       from {ACTIVE_TABLE}
       {where_sql}
       group by {quoted}
-      order by count desc, value
+      order by count desc, {quoted} nulls last
       """,
       "bar",
     )
@@ -2181,8 +2182,19 @@ def _unique_tuple_values(rows: tuple[tuple[object, ...], ...]) -> tuple[tuple[ob
   return tuple(values)
 
 
-def _tabulate_sort_key(row: tuple[object, ...]) -> tuple[tuple[int, str], ...]:
-  return tuple((1, "") if value is None else (0, str(value)) for value in row)
+def _tabulate_sort_key(row: tuple[object, ...]) -> tuple[tuple[int, float | str], ...]:
+  keys: list[tuple[int, float | str]] = []
+  for value in row:
+    if value is None:
+      keys.append((2, ""))
+    elif isinstance(value, bool):
+      keys.append((0, float(value)))
+    elif isinstance(value, (int, float, Decimal)):
+      numeric_value = float(value)
+      keys.append((2, "") if math.isnan(numeric_value) else (0, numeric_value))
+    else:
+      keys.append((1, str(value)))
+  return tuple(keys)
 
 
 def _wide_value_headers(
