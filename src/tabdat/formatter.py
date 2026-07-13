@@ -28,6 +28,7 @@ from tabdat.models import (
   BayesRegressionResult,
   CfRegressionResult,
   CodebookResult,
+  CommandCatalogResult,
   CountResult,
   CvelasticnetRegressionResult,
   CvlassoRegressionResult,
@@ -78,6 +79,7 @@ from tabdat.models import (
 from tabdat.script import ScriptError
 
 RESULT_TYPE_LABELS: dict[type[object], str] = {
+  CommandCatalogResult: "CommandCatalogResult",
   LoadResult: "LoadResult",
   ActivateResult: "ActivateResult",
   DescribeResult: "DescribeResult",
@@ -144,6 +146,14 @@ ERROR_TYPE_LABELS: dict[type[object], str] = {
 
 
 def format_result(result: Result) -> str:
+  if isinstance(result, CommandCatalogResult):
+    return "\n".join(
+      _table(
+        ("Command", "Help"),
+        ((entry.name, entry.help_topic or ".") for entry in result.commands),
+      )
+    )
+
   if isinstance(result, LoadResult):
     dataset = result.dataset
     mode = (

@@ -39,6 +39,7 @@ def test_run_help_documents_batch_json_output() -> None:
   text = load_help_topic("run")
 
   assert "--json" in text
+  assert "--list-commands" in text
   assert "JSON" in text
   assert "interactive shell sessions remain terminal-only" in text
 
@@ -112,7 +113,7 @@ def test_predict_help_mentions_bayes_posterior_intervals() -> None:
 
 def test_help_topics_cover_all_current_commands() -> None:
   topics = set(available_help_topics())
-  optional = {"help", "by", "quit"}
+  optional = {"help", "by", "lincom", "quit", "test", "ttest"}
   command_names = set(COMMAND_NAMES)
   missing = sorted(name for name in command_names if name not in topics and name not in optional)
   assert missing == []

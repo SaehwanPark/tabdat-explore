@@ -16,6 +16,11 @@ are `base64:<payload>` strings. Script metadata and command echoes are suppresse
 existing stderr text and exit status; JSON mode also emits one `error` envelope with a stable type and
 message, plus script path/line when available. `--json` is not valid for interactive sessions.
 
+Use `tabdat --json --list-commands` for read-only command discovery. It emits one
+`CommandCatalogResult` envelope with lexicographically sorted command names and a `help_topic` value
+when the command has an in-app help topic, otherwise `null`. Discovery requires `--json`, cannot be
+combined with `-c`, `-f`, or a positional script, and does not create a session or read data.
+
 ## Load and inspect
 
 | Command | Purpose | Minimal invocation |
