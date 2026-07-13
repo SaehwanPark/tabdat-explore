@@ -38,6 +38,8 @@ All notable project changes are tracked here.
   bounded before relation-combination and SQL-order contracts.
 - Completed the Phase 24 active row-order slice with explicit DuckDB insertion-order preservation,
   cross-engine transformation coverage, and Polars-lazy recode fallback handling.
+- Started the Phase 24 SQL and named-table order slice; explicit `order by` results are being bounded
+  before unordered SQL and relation-combination contracts.
 
 ### Added
 

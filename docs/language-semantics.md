@@ -110,7 +110,17 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - Column projection and row-preserving value transformations preserve the current row sequence.
 - Grouped or relation-changing commands such as `collapse`, append, join, and reshape establish
   separate result-sequence contracts; this slice does not redefine their later preview order.
-- Named-table storage order, arbitrary SQL order, and categorical order remain separate contracts.
+- Categorical order remains a separate contract.
+
+## SQL and named-table row order
+
+- A direct SQL result follows the row sequence produced by its query. An explicit `order by` is the
+  deterministic way to define that sequence; SQL without `order by` has no guarantee here.
+- `sql ... into name` stores and activates the query result without reordering it. `use name` restores
+  that stored sequence, and `head`/`tail` consume it using the active row-order rules.
+- SQL remains an eager boundary for named-table creation; a Polars-lazy input uses the existing
+  fallback path before the query executes.
+- Append/join/reshape order and categorical order remain separate contracts.
 
 ## Write targets
 
@@ -140,5 +150,5 @@ side effects, such as an already-created artifact file from another command.
 ## Deliberate limits
 
 Categorical behavior, exact arithmetic storage widths, overflow diagnostics, append/join/reshape
-ordering, named-table storage order, arbitrary SQL ordering, randomness, estimation samples,
-machine-readable output, and exit codes are not defined here yet.
+ordering, SQL without explicit ordering, randomness, estimation samples, machine-readable output,
+and exit codes are not defined here yet.

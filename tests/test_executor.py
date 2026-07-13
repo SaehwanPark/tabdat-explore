@@ -7502,6 +7502,78 @@ def test_row_preserving_transformations_retain_active_sequence(
       assert status.last_materialization_reason is None
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_ordered_sql_results_survive_into_and_named_table_activation(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "sql_order.parquet"
+  _write_row_order_parquet(path)
+  query = "select value, label from active order by value desc nulls last"
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  direct_executor = Executor()
+  try:
+    direct_executor.execute(use_command())
+    direct = direct_executor.execute(SqlCommand(query))
+    direct_status = direct_executor.execute(StatusCommand())
+  finally:
+    direct_executor.close()
+
+  assert isinstance(direct, TableResult)
+  assert direct.headers == ("value", "label")
+  assert direct.rows == (
+    (4, "fourth"),
+    (3, "first"),
+    (2, "third"),
+    (1, "second"),
+    (None, "missing"),
+  )
+  assert isinstance(direct_status, StatusResult)
+  if engine == "polars":
+    assert direct_status.execution_mode == "eager"
+    assert direct_status.lazy_engine is None
+    assert direct_status.last_materialization_reason == "polars_fallback"
+  elif engine == "duckdb":
+    assert direct_status.execution_mode == "lazy"
+    assert direct_status.lazy_engine == "duckdb"
+    assert direct_status.last_materialization_reason is None
+  else:
+    assert direct_status.execution_mode == "eager"
+    assert direct_status.lazy_engine is None
+    assert direct_status.last_materialization_reason is None
+
+  executor = Executor()
+  try:
+    executor.execute(use_command())
+    created = executor.execute(SqlCommand(query, into="ordered"))
+    head = executor.execute(HeadCommand(2))
+    tail = executor.execute(TailCommand(2))
+    activated = executor.execute(UseCommand(Path("ordered")))
+    activated_head = executor.execute(HeadCommand(2))
+    activated_tail = executor.execute(TailCommand(2))
+  finally:
+    executor.close()
+
+  assert isinstance(created, SqlCreateResult)
+  assert created.dataset.execution_mode == "eager"
+  assert isinstance(head, PreviewResult)
+  assert isinstance(tail, PreviewResult)
+  assert isinstance(activated, ActivateResult)
+  assert isinstance(activated_head, PreviewResult)
+  assert isinstance(activated_tail, PreviewResult)
+  expected_head = ((4, "fourth"), (3, "first"))
+  expected_tail = ((1, "second"), (None, "missing"))
+  assert head.rows == expected_head
+  assert tail.rows == expected_tail
+  assert activated_head.rows == expected_head
+  assert activated_tail.rows == expected_tail
+
+
 def test_keep_and_drop_columns_update_active_dataset(sample_parquet: Path) -> None:
   executor = Executor()
   try:

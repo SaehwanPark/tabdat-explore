@@ -129,6 +129,42 @@ def test_cli_script_preserves_tail_and_filter_order(tmp_path: Path, capsys) -> N
   assert "missing" not in filter_output.out
 
 
+def test_cli_script_preserves_ordered_sql_through_named_table(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "sql_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select value, label
+    from (
+      values
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second'),
+        (4, 2, 'third')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
+    """,
+  )
+  script_path = tmp_path / "sql_order.td"
+  script_path.write_text(
+    f"use {path}\nsql select value, label from active order by value desc nulls last into ordered\n"
+    "head 2\nuse ordered\ntail 2\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Created ordered: 4 rows, 2 columns" in captured.out
+  assert "Activated: ordered (4 rows, 2 columns)" in captured.out
+  head_output = captured.out[captured.out.index(". head 2") : captured.out.index(". use ordered")]
+  tail_output = captured.out[captured.out.rindex(". tail 2") :]
+  assert head_output.index("first") < head_output.index("third")
+  assert tail_output.index("second") < tail_output.index("missing")
+  assert captured.err == ""
+
+
 def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   class InterruptThenEofSession:
     def __init__(self) -> None:
