@@ -37,10 +37,11 @@ their terminal output byte-for-byte.
 - Envelope keys are serialized deterministically. `schema_version` is the integer `1`; `result_type`
   is the stable public result label; `data` is the JSON-safe result payload.
 - Multiple `-c` commands, scripts, and nested scripts emit one envelope per line in execution order.
-  A command that returns no structured result emits no line.
+  A command that returns no structured result emits no line. `exit`/`quit` retain their control
+  behavior; terminal-only `help` is rejected with a clear error in JSON mode.
 - Missing values become JSON `null`; tuples become arrays; `Path` values become strings; exact
   `Decimal` values become lossless text rather than binary floating-point values; non-finite floats
-  become JSON `null`.
+  become JSON `null`; bytes become `base64:<payload>` strings.
 - Script metadata, command dot-echoes, macro/directive notices, human tables, and plot auto-opening
   do not add stdout content in JSON mode.
 - Parse and execution errors retain the existing stderr text and nonzero exit status. No structured

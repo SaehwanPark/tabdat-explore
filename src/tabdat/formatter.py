@@ -1,7 +1,12 @@
 """Terminal formatting for structured command results."""
 
+import base64
 import json
+import math
 from collections.abc import Iterable, Sequence
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from pathlib import Path
 
 from pydantic import TypeAdapter
@@ -59,6 +64,58 @@ from tabdat.models import (
   ZinbRegressionResult,
   ZipRegressionResult,
 )
+
+RESULT_TYPE_LABELS: dict[type[object], str] = {
+  LoadResult: "LoadResult",
+  ActivateResult: "ActivateResult",
+  DescribeResult: "DescribeResult",
+  StatusResult: "StatusResult",
+  SummarizeResult: "SummarizeResult",
+  CodebookResult: "CodebookResult",
+  CountResult: "CountResult",
+  PreviewResult: "PreviewResult",
+  TransformResult: "TransformResult",
+  RegressionResult: "RegressionResult",
+  LassoRegressionResult: "LassoRegressionResult",
+  PostlassoRegressionResult: "PostlassoRegressionResult",
+  RidgeRegressionResult: "RidgeRegressionResult",
+  ElasticnetRegressionResult: "ElasticnetRegressionResult",
+  CvlassoRegressionResult: "CvlassoRegressionResult",
+  CvridgeRegressionResult: "CvridgeRegressionResult",
+  CvelasticnetRegressionResult: "CvelasticnetRegressionResult",
+  BayesRegressionResult: "BayesRegressionResult",
+  SpatialRegressionResult: "SpatialRegressionResult",
+  QregRegressionResult: "QregRegressionResult",
+  LogitRegressionResult: "LogitRegressionResult",
+  ProbitRegressionResult: "ProbitRegressionResult",
+  TobitRegressionResult: "TobitRegressionResult",
+  HeckmanRegressionResult: "HeckmanRegressionResult",
+  NlRegressionResult: "NlRegressionResult",
+  PoissonRegressionResult: "PoissonRegressionResult",
+  NbregRegressionResult: "NbregRegressionResult",
+  ZipRegressionResult: "ZipRegressionResult",
+  ZinbRegressionResult: "ZinbRegressionResult",
+  StregRegressionResult: "StregRegressionResult",
+  IvRegressionResult: "IvRegressionResult",
+  XtRegressionResult: "XtRegressionResult",
+  XtLogitRegressionResult: "XtLogitRegressionResult",
+  XtAbondRegressionResult: "XtAbondRegressionResult",
+  DidRegressionResult: "DidRegressionResult",
+  DrDidRegressionResult: "DrDidRegressionResult",
+  DmlRegressionResult: "DmlRegressionResult",
+  CfRegressionResult: "CfRegressionResult",
+  PanelResult: "PanelResult",
+  SqlCreateResult: "SqlCreateResult",
+  TableResult: "TableResult",
+  PlotResult: "PlotResult",
+  SetResult: "SetResult",
+  SaveResult: "SaveResult",
+  ExportResult: "ExportResult",
+  BayesMcmcResult: "BayesMcmcResult",
+  TestResult: "TestResult",
+  LincomResult: "LincomResult",
+  TtestResult: "TtestResult",
+}
 
 
 def format_result(result: Result) -> str:
@@ -1122,10 +1179,11 @@ def format_result(result: Result) -> str:
 
 def format_result_json(result: Result) -> str:
   """Serialize one successful result as a deterministic machine-readable envelope."""
-  data = TypeAdapter(type(result)).dump_python(result, mode="json")
+  raw_data = TypeAdapter(type(result)).dump_python(result, mode="python")
+  data = _json_safe_value(raw_data)
   envelope = {
     "schema_version": 1,
-    "result_type": type(result).__name__,
+    "result_type": _result_type_label(result),
     "data": data,
   }
   return json.dumps(
@@ -1135,6 +1193,36 @@ def format_result_json(result: Result) -> str:
     sort_keys=True,
     separators=(",", ":"),
   )
+
+
+def _result_type_label(result: Result) -> str:
+  try:
+    return RESULT_TYPE_LABELS[type(result)]
+  except KeyError as exc:
+    raise TypeError(f"Unsupported result: {type(result).__name__}") from exc
+
+
+def _json_safe_value(value: object) -> object:
+  if value is None or isinstance(value, (str, int, bool)):
+    return value
+  if isinstance(value, float):
+    return value if math.isfinite(value) else None
+  if isinstance(value, Decimal):
+    return format(value, "f")
+  if isinstance(value, Path):
+    return str(value)
+  if isinstance(value, (bytes, bytearray, memoryview)):
+    encoded = base64.b64encode(bytes(value)).decode("ascii")
+    return f"base64:{encoded}"
+  if isinstance(value, (datetime, date, time)):
+    return value.isoformat()
+  if isinstance(value, Enum):
+    return _json_safe_value(value.value)
+  if isinstance(value, dict):
+    return {str(key): _json_safe_value(item) for key, item in value.items()}
+  if isinstance(value, (tuple, list)):
+    return [_json_safe_value(item) for item in value]
+  raise TypeError(f"Unsupported JSON value: {type(value).__name__}")
 
 
 def _row_count(row_count: int | None) -> str:

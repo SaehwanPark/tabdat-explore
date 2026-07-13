@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import get_args
 
 import duckdb
 import pytest
@@ -13,7 +14,8 @@ from tabdat.cli import (
   main,
 )
 from tabdat.executor import Executor
-from tabdat.models import PlotResult
+from tabdat.formatter import RESULT_TYPE_LABELS
+from tabdat.models import PlotResult, Result
 
 
 def _write_sql_parquet(path: Path, query: str) -> None:
@@ -96,6 +98,113 @@ def test_cli_json_emits_versioned_result_envelopes(sample_parquet: Path, capsys)
   assert envelopes[2]["data"]["overflow_count"] == 0
   assert "Loaded:" not in captured.out
   assert "Generated age2:" not in captured.out
+
+
+def test_cli_json_emits_status_and_table_results(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "--json",
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "status",
+      "-c",
+      "tabulate sex",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
+
+  assert exit_code == 0
+  assert captured.err == ""
+  assert tuple(envelope["result_type"] for envelope in envelopes) == (
+    "LoadResult",
+    "StatusResult",
+    "TableResult",
+  )
+  assert envelopes[1]["data"]["last_operation"] == "use"
+  assert "sex" in envelopes[2]["data"]["headers"]
+  assert envelopes[2]["data"]["rows"]
+
+
+def test_json_result_labels_cover_the_result_union() -> None:
+  result_types = set(get_args(Result))
+
+  assert set(RESULT_TYPE_LABELS) == result_types
+  assert len(set(RESULT_TYPE_LABELS.values())) == len(result_types)
+
+
+def test_cli_terminal_output_remains_unchanged_without_json(
+  sample_parquet: Path,
+  capsys,
+) -> None:
+  exit_code = main(["-c", f"use {sample_parquet}", "-c", "count"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out == (f"Loaded: {sample_parquet} (3 rows, 4 columns)\nRows: 3\n")
+  assert captured.err == ""
+
+
+def test_cli_json_serializes_binary_table_cells(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "--json",
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      r"sql select BLOB '\xFF' as blob from active limit 1",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
+
+  assert exit_code == 0
+  assert captured.err == ""
+  assert envelopes[-1]["result_type"] == "TableResult"
+  assert envelopes[-1]["data"]["rows"] == [["base64:/w=="]]
+
+
+def test_cli_json_normalizes_typed_nonfinite_results(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "json-ttest.parquet"
+  _write_sql_parquet(
+    path,
+    "select cast(1.0 as double) as value",
+  )
+
+  exit_code = main(
+    [
+      "--json",
+      "-c",
+      f"use {path}",
+      "-c",
+      "ttest value == 0",
+    ]
+  )
+
+  captured = capsys.readouterr()
+  envelopes = tuple(json.loads(line) for line in captured.out.splitlines())
+
+  assert exit_code == 0
+  assert captured.err == ""
+  assert envelopes[-1]["result_type"] == "TtestResult"
+  assert envelopes[-1]["data"]["t_statistic"] is None
+  assert envelopes[-1]["data"]["difference_stats"]["std_err"] is None
+  assert "nan" not in captured.out.lower()
+  assert "inf" not in captured.out.lower()
+
+
+def test_cli_json_rejects_terminal_help(capsys) -> None:
+  exit_code = main(["--json", "-c", "help run"])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert captured.out == ""
+  assert "help is not available with --json" in captured.err
 
 
 def test_cli_json_script_suppresses_metadata_and_echoes(

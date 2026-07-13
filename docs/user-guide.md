@@ -112,7 +112,9 @@ uv run tabdat --json -f analysis.td
 
 This writes one versioned JSON object per successful result, one per line, and suppresses script
 metadata and command echoes. Missing values are `null`; exact decimal values are lossless strings;
-errors keep the existing stderr text and nonzero exit status. Interactive sessions remain terminal-only.
+non-finite floats are `null`; bytes are `base64:<payload>` strings; and errors keep the existing stderr
+text and nonzero exit status. Interactive sessions remain terminal-only, and `help` is not available
+in JSON mode.
 
 ### Canonical Parquet-first workflow
 

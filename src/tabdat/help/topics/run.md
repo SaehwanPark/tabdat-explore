@@ -14,4 +14,4 @@ Examples:
 
 For batch or script execution, `tabdat --json -f analysis.td` emits one compact versioned JSON
 result envelope per successful command. JSON mode suppresses script metadata and command echoes;
-interactive shell sessions remain terminal-only.
+interactive shell sessions remain terminal-only, and terminal-only `help` is rejected in JSON mode.
