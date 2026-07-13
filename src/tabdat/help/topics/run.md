@@ -23,4 +23,5 @@ existing JSON error envelope. Use `tabdat --json --explain -c "summarize age"` f
 preview that reports the normalized command name with `execution: "not_run"`; exactly one `-c` is
 required and the command is not executed. Standard `--help` keeps argparse help precedence.
 Use `tabdat --json --list-command-effects` for the finite declared command-level effect catalog; it
-does not start a session, read data, or plan execution.
+does not start a session, read data, or plan execution. Categories are ordered `read`, `write`,
+`control`, `plot`, `unknown` and include possible delegated/output effects.

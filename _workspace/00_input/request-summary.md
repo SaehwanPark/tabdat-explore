@@ -24,8 +24,9 @@ discovery, and parser-only syntax preview, and is a bounded step toward full dry
 - `tabdat --json --list-command-effects` emits one deterministic catalog envelope whose entries map
   each advertised command to one or more declared effect categories; existing command execution and
   JSON success/error envelopes remain unchanged.
-- Categories are command-level declarations only. They do not inspect an active dataset, account for
-  options or predicates, estimate cost, or imply a full execution plan.
+- Categories are possible top-level command-family effects, including active-dataset reads, output
+  writes, artifact plots, and delegated `run`/`by` behavior. They do not inspect an active dataset,
+  account for options or predicates, estimate cost, or imply a full execution plan.
 - Every advertised command has an explicit category mapping; any future/unclassified command uses
   `unknown` rather than an inferred category.
 - Terminal and interactive behavior remain unchanged; the new machine-readable path is batch-only.

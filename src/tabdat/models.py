@@ -920,6 +920,8 @@ class CommandCatalogResult:
 
 
 EffectCategory = Literal["read", "write", "control", "plot", "unknown"]
+EFFECT_CATEGORY_ORDER: tuple[EffectCategory, ...] = ("read", "write", "control", "plot", "unknown")
+_EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(EFFECT_CATEGORY_ORDER)}
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -928,6 +930,19 @@ class CommandEffectEntry:
 
   name: str
   effects: tuple[EffectCategory, ...]
+
+  def __post_init__(self) -> None:
+    if not self.effects:
+      raise ValueError("command effects must not be empty")
+    if len(set(self.effects)) != len(self.effects):
+      raise ValueError("command effects must be unique")
+    if self.effects == ("unknown",) and len(self.effects) == 1:
+      return
+    if "unknown" in self.effects:
+      raise ValueError("unknown must be the only command effect")
+    expected = tuple(sorted(self.effects, key=_EFFECT_CATEGORY_RANK.__getitem__))
+    if self.effects != expected:
+      raise ValueError("command effects must use canonical order")
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

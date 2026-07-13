@@ -33,9 +33,11 @@ JSON error envelope. Standard `--help` retains argparse help precedence. Effect 
 estimates, and full dry-run planning remain out of scope.
 
 Use `tabdat --json --list-command-effects` to retrieve declared command-level effect categories. Each
-entry uses only `read`, `write`, `control`, `plot`, or `unknown`; categories are deterministic
-declarations and do not inspect data or plan execution. This mode is read-only and cannot be combined
-with command, script, discovery, help-topic, or explain execution.
+entry uses only `read`, `write`, `control`, `plot`, or `unknown`; emitted category tuples are ordered
+exactly `read`, `write`, `control`, `plot`, `unknown`. Categories describe possible top-level effects,
+including delegated `run`/`by` behavior and output/artifact writes; they do not inspect data or plan
+execution. This mode is read-only and cannot be combined with command, script, discovery, help-topic,
+or explain execution.
 
 ## Load and inspect
 

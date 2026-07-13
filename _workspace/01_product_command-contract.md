@@ -14,10 +14,11 @@ Phase 24 P1: Agent and automation interface.
 - `tabdat --json --list-command-effects` emits exactly one deterministic versioned
   `CommandEffectCatalogResult` envelope with `data.commands` entries containing `name` and `effects`.
 - Categories come from the finite vocabulary `read`, `write`, `control`, `plot`, and `unknown`.
-- A command may have multiple categories; category order is deterministic and documented. Every
-  advertised command has an explicit mapping, while future/unclassified commands use `unknown`.
-- Categories are command-level declarations only. They do not inspect active data, account for options
-  or predicates, estimate cost, plan resources, or imply execution.
+- The canonical category order is exactly `read`, `write`, `control`, `plot`, `unknown`; every emitted
+  tuple is non-empty, unique, and follows that order. `unknown` is emitted alone.
+- A command may have multiple possible top-level effects, including active-dataset reads, output
+  writes, artifact plots, and delegated `run`/`by` behavior. Categories do not inspect active data,
+  account for options or predicates, estimate cost, plan resources, or imply execution.
 - Existing command execution, terminal output, interactive behavior, and JSON success/error envelopes
   remain unchanged.
 - `--list-command-effects` without `--json`, combined with command/script execution,

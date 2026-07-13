@@ -18,6 +18,7 @@ from tabdat.executor import Executor
 from tabdat.formatter import format_error_json, format_result, format_result_json
 from tabdat.help import available_help_topics, load_help_topic, load_help_topic_text
 from tabdat.models import (
+  EFFECT_CATEGORY_ORDER,
   BarCommand,
   BayesPlotCommand,
   Command,
@@ -63,30 +64,29 @@ class _RunStatus(Enum):
 
 OutputFormat = Literal["terminal", "json"]
 
-_EFFECT_CATEGORY_ORDER: tuple[EffectCategory, ...] = ("read", "write", "control", "plot", "unknown")
-_EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(_EFFECT_CATEGORY_ORDER)}
+_EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(EFFECT_CATEGORY_ORDER)}
 _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "append": ("read", "write"),
   "bar": ("read", "plot"),
   "bayes": ("read",),
   "bayesplot": ("read", "plot"),
-  "by": ("control",),
+  "by": ("read", "write", "control", "plot"),
   "cfregress": ("read",),
   "codebook": ("read",),
   "collapse": ("read", "write"),
   "count": ("read",),
-  "cvelasticnet": ("read",),
-  "cvlasso": ("read",),
-  "cvridge": ("read",),
+  "cvelasticnet": ("read", "write"),
+  "cvlasso": ("read", "write"),
+  "cvridge": ("read", "write"),
   "describe": ("read",),
   "did": ("read",),
   "dml": ("read",),
   "drdid": ("read",),
   "drop": ("read", "write"),
   "elasticnet": ("read",),
-  "estat": ("read",),
+  "estat": ("read", "plot"),
   "exit": ("control",),
-  "export": ("write",),
+  "export": ("read", "write"),
   "generate": ("read", "write"),
   "head": ("read",),
   "heckman": ("read",),
@@ -114,8 +114,8 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "replace": ("read", "write"),
   "reshape": ("read", "write"),
   "ridge": ("read",),
-  "run": ("control",),
-  "save": ("write",),
+  "run": ("read", "write", "control", "plot"),
+  "save": ("read", "write"),
   "scatter": ("read", "plot"),
   "select": ("read", "write"),
   "set": ("control",),

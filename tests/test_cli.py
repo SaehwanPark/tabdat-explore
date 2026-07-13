@@ -7,6 +7,7 @@ import pytest
 
 from tabdat import __version__
 from tabdat.cli import (
+  _COMMAND_EFFECTS,
   _has_open_sql_triple_quote,
   _open_command_for_platform,
   _open_plot_if_needed,
@@ -27,7 +28,7 @@ from tabdat.errors import (
 from tabdat.executor import Executor
 from tabdat.formatter import ERROR_TYPE_LABELS, RESULT_TYPE_LABELS, format_error_json
 from tabdat.help import available_help_topics, load_help_topic_text
-from tabdat.models import PlotResult, Result
+from tabdat.models import EFFECT_CATEGORY_ORDER, CommandEffectEntry, PlotResult, Result
 from tabdat.script import ScriptError
 from tabdat.shell import COMMAND_NAMES
 
@@ -221,7 +222,28 @@ def test_cli_json_lists_declared_command_effects_without_session(monkeypatch, ca
   assert entry_by_name["summarize"]["effects"] == ["read"]
   assert entry_by_name["generate"]["effects"] == ["read", "write"]
   assert entry_by_name["histogram"]["effects"] == ["read", "plot"]
+  assert entry_by_name["estat"]["effects"] == ["read", "plot"]
+  assert entry_by_name["save"]["effects"] == ["read", "write"]
+  assert entry_by_name["run"]["effects"] == ["read", "write", "control", "plot"]
   assert entry_by_name["set"]["effects"] == ["control"]
+
+
+def test_command_effect_mapping_covers_current_registry() -> None:
+  assert set(_COMMAND_EFFECTS) == set(COMMAND_NAMES)
+  assert tuple(EFFECT_CATEGORY_ORDER) == ("read", "write", "control", "plot", "unknown")
+  assert all(
+    tuple(sorted(effects, key=EFFECT_CATEGORY_ORDER.index)) == effects
+    for effects in _COMMAND_EFFECTS.values()
+  )
+
+
+@pytest.mark.parametrize(
+  "effects",
+  ((), ("read", "read"), ("write", "read"), ("unknown", "read")),
+)
+def test_command_effect_entry_rejects_invalid_effect_tuples(effects) -> None:
+  with pytest.raises(ValueError):
+    CommandEffectEntry(name="example", effects=effects)
 
 
 def test_cli_json_command_effects_use_unknown_for_unclassified_commands(
