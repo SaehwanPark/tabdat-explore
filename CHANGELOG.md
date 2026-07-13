@@ -52,6 +52,10 @@ All notable project changes are tracked here.
   duplicate/unmatched regression coverage.
 - Started the Phase 24 reshape row-order slice; long expansion and wide group order are being bounded
   before categorical ordering.
+- Completed the Phase 24 reshape row-order slice with exact j discovery, first-group ordering,
+  collision-safe ordinals, and lazy validation coverage.
+- Started the Phase 24 categorical ordering slice; native label order and missing-category placement
+  are being bounded across tabulate and bar outputs.
 
 ### Added
 

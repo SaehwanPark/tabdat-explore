@@ -1,6 +1,6 @@
 # Delivery Summary: Phase 24 P0 Reshape Row Order
 
-The reshape row-order slice is implemented and locally validated; PR review remains pending.
+The reshape row-order slice is implemented and fully validated after review fixes.
 
 ## Delivered
 
@@ -20,7 +20,7 @@ The reshape row-order slice is implemented and locally validated; PR review rema
 - Full suite: 1,101 passed, with 314 existing third-party warnings.
 - `basedpyright`, Ruff, formatting, and diff checks passed.
 - Integrated workflow command exited successfully with all scenarios passing.
-- Exactly three independent PR review passes remain to be completed after the PR is opened.
+- Exactly three independent PR review passes completed; all actionable findings were fixed.
 
 ## Remaining Phase 24 Work
 

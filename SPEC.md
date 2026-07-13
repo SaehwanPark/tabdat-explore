@@ -589,27 +589,34 @@ and describe the active work with concise verification criteria.
   - explicitly preserved active-row order and named-table match order for inner and left joins
   - preserved duplicate right-side matches without global sorting or deduplication
   - kept append, reshape, and categorical ordering as separate contracts
+- Implemented Phase 24 P0 reshape row-order semantics:
+  - preserved source-row and exact j-value discovery order for long expansion
+  - preserved first-appearance identifier-group order for wide output
+  - prevalidated long/wide failures before Polars fallback and reserved public output names
+  - explicitly deferred categorical ordering
 
 ## Present
 
-- Feature: Phase 24 P0 reshape row-order semantics
+- Feature: Phase 24 P0 categorical ordering semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-reshape-order
+  Branch: feat/phase24-categorical-order
 
   Summary:
-  Define and regression-test deterministic result sequences for `reshape long` and `reshape wide`
-  across supported execution paths.
+  Define and regression-test categorical value ordering and missing-category placement across
+  tabulation and bar outputs without adding category-management syntax.
 
   Verification:
-  - reshape long emits each source row's j-values in established wide-column sequence
-  - reshape wide emits identifier groups in first-appearance order from the active sequence
-  - eager, DuckDB-lazy, and Polars-lazy inputs produce the same preview sequence
+  - categorical labels use native scalar order, not rendered text order or source arrival order
+  - missing categories are excluded by default and placed last when explicitly included
+  - bar ties use native category order after descending counts
+  - eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree
   - CLI, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new sort syntax, row-ID persistence, append/join ordering, unordered SQL guarantees,
-    categorical ordering, exact arithmetic storage widths, overflow reporting, randomness,
+  - new category metadata or level-management syntax, sort syntax, row-ID persistence,
+    append/join/reshape ordering, unordered SQL guarantees, exact arithmetic storage widths,
+    overflow reporting, randomness,
     estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 

@@ -1,6 +1,6 @@
 # QA Report: Phase 24 P0 Reshape Row Order
 
-Status: implementation validation complete; PR review pending
+Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
@@ -38,7 +38,17 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-Review passes have not started; exactly three independent passes are required after the PR is opened.
+Exactly three independent review passes completed before merge readiness:
+
+- **Pass 1:** found long-reshape aliases colliding with valid generated output names; fixed by
+  reserving identifiers, j names, and stubs before allocating ordinals, with collision tests.
+- **Pass 2:** found Polars-lazy validation mutation and public alias collisions; fixed with pure
+  long/wide prevalidation, Polars j-value discovery, and cross-engine failure-state tests.
+- **Pass 3:** found underspecified j-value discovery, weak null/duplicate coverage, and missing
+  command-reference guidance; fixed with an exact scan-order contract, edge fixtures, and reference
+  documentation.
+
+No Critical or unresolved High/Medium findings remain.
 
 ## Non-Blocking Follow-Ups
 
@@ -48,5 +58,5 @@ remain queued in `SPEC.md` Future.
 
 ## Recommended Next Action
 
-Commit the validated reshape slice, push it, open the PR, and complete exactly three independent review
-passes before any merge.
+The reshape slice is merged. Bind the categorical-order contract in the new feature branch and
+continue the SPEC loop.

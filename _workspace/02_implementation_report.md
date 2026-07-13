@@ -51,4 +51,4 @@ no row IDs, sort syntax, or duplicate-cell aggregation policy changes were intro
 
 Categorical ordering, unordered SQL, exact arithmetic storage widths, overflow diagnostics, randomness,
 estimation samples, errors and exits, machine output, and full operation lineage remain separate Phase
-24 slices. PR review is the remaining handoff step for this slice.
+24 slices.
