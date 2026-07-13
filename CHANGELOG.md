@@ -26,6 +26,8 @@ All notable project changes are tracked here.
   remain queued.
 - Started the Phase 24 explicit missing-predicate slice; null-aware equality is bounded separately
   from coercion and broader arithmetic policy.
+- Started the Phase 24 expression coercion contract slice; numeric-family compatibility and
+  deterministic mixed-domain failures are bounded before broader arithmetic expansion.
 
 ### Added
 

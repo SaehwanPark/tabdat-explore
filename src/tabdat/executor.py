@@ -5883,11 +5883,11 @@ class Executor:
     dataset = self._require_active_dataset("validate")
     column_names = {column.name for column in dataset.columns}
     if isinstance(command, TabulateCommand) and command.condition is not None:
-      self.backend.validate_expression(dataset, command.condition)
+      self.backend.validate_predicate(dataset, command.condition)
       return
     if isinstance(command, ByCommand) and isinstance(command.command, TabulateCommand):
       if command.command.condition is not None:
-        self.backend.validate_expression(dataset, command.command.condition)
+        self.backend.validate_predicate(dataset, command.command.condition)
       return
     if isinstance(command, GenerateCommand):
       if command.variable in column_names:
@@ -5903,9 +5903,12 @@ class Executor:
     if isinstance(command, ReplaceCommand):
       if command.variable not in column_names:
         raise UnknownVariableError(f"replace unknown variable: {command.variable}")
-      self.backend.validate_expression(dataset, command.expression)
-      if command.condition is not None:
-        self.backend.validate_expression(dataset, command.condition)
+      self.backend.validate_replace(
+        dataset,
+        command.variable,
+        command.expression,
+        command.condition,
+      )
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

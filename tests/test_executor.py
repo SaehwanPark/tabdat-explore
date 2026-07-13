@@ -6463,6 +6463,188 @@ def test_null_literal_rejects_unsupported_arithmetic_before_mutation(
   assert "invalid_null_arithmetic" not in preview.columns
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_numeric_expression_compatibility_is_consistent_across_engines(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  condition = BinaryExpression(
+    left=IdentifierExpression("age"),
+    operator=">=",
+    right=NumberExpression(30.5),
+  )
+  shift = BinaryExpression(
+    left=IdentifierExpression("cost"),
+    operator="+",
+    right=NumberExpression(1.5),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(KeepCommand(condition=condition))
+    executor.execute(GenerateCommand("cost_shift", shift))
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == (
+    (42, 25.0, "M", 150.0, 151.5),
+    (54, 27.5, "F", None, None),
+  )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_mixed_domain_comparison_preserves_state(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  condition = BinaryExpression(
+    left=IdentifierExpression("sex"),
+    operator="==",
+    right=NumberExpression(1),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(
+      TypeMismatchExecutionError,
+      match="expression type mismatch: cannot compare string and numeric values",
+    ):
+      executor.execute(KeepCommand(condition=condition))
+    status = executor.execute(StatusCommand())
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert len(preview.rows) == 3
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == ("eager" if engine == "eager" else "lazy")
+  assert status.lazy_engine == (None if engine == "eager" else engine)
+  assert status.last_operation == "use"
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  ("expression", "message"),
+  [
+    (
+      BinaryExpression(IdentifierExpression("sex"), "+", NumberExpression(1)),
+      "expression type mismatch: arithmetic requires numeric operands",
+    ),
+    (
+      FunctionCallExpression("sqrt", (IdentifierExpression("sex"),)),
+      "expression type mismatch: sqrt requires numeric argument",
+    ),
+  ],
+)
+def test_mixed_domain_expression_rejects_before_mutation(
+  sample_parquet: Path,
+  engine: str,
+  expression: Expression,
+  message: str,
+) -> None:
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(TypeMismatchExecutionError, match=message):
+      executor.execute(GenerateCommand("invalid_expression", expression))
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == ("eager" if engine == "eager" else "lazy")
+  assert status.lazy_engine == (None if engine == "eager" else engine)
+  assert status.last_operation == "use"
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_predicate_truthiness_and_cross_domain_replace_are_rejected_atomically(
+  sample_parquet: Path,
+  engine: str,
+) -> None:
+  executor = Executor()
+  try:
+    use_command = UseCommand(sample_parquet)
+    if engine != "eager":
+      use_command = UseCommand(
+        sample_parquet,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    with pytest.raises(TypeMismatchExecutionError, match="predicate requires boolean expression"):
+      executor.execute(
+        ReplaceCommand(
+          "cost",
+          NumberExpression(0),
+          condition=IdentifierExpression("age"),
+        )
+      )
+    with pytest.raises(
+      TypeMismatchExecutionError,
+      match="replace target cost is numeric but expression is string",
+    ):
+      executor.execute(ReplaceCommand("cost", StringExpression("invalid")))
+    status = executor.execute(StatusCommand())
+    preview = executor.execute(HeadCommand(3))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[3] for row in preview.rows) == (100.0, 150.0, None)
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == ("eager" if engine == "eager" else "lazy")
+  assert status.lazy_engine == (None if engine == "eager" else engine)
+  assert status.last_operation == "use"
+
+
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_tabulate_predicate_type_validation_preserves_polars_lazy_state(
+  sample_parquet: Path,
+  wrapped: bool,
+) -> None:
+  tabulate = TabulateCommand(("age",), condition=IdentifierExpression("age"))
+  command = ByCommand(("sex",), tabulate) if wrapped else tabulate
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(TypeMismatchExecutionError, match="predicate requires boolean expression"):
+      executor.execute(command)
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == "lazy"
+  assert status.lazy_engine == "polars"
+  assert status.last_operation == "use"
+  assert status.last_materialization_reason is None
+
+
 def test_describe_requires_active_dataset() -> None:
   executor = Executor()
   try:

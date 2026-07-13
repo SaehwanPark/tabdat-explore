@@ -57,10 +57,21 @@ NUMERIC_TYPES = (
   "USMALLINT",
   "UINTEGER",
   "UBIGINT",
+  "INT8",
+  "INT16",
+  "INT32",
+  "INT64",
+  "UINT8",
+  "UINT16",
+  "UINT32",
+  "UINT64",
+  "FLOAT32",
+  "FLOAT64",
   "FLOAT",
   "DOUBLE",
   "DECIMAL",
 )
+ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
 ACTIVE_TABLE = "__tabdat_active"
@@ -808,6 +819,7 @@ class DuckDBBackend:
     *,
     keep: bool,
   ) -> DatasetInfo:
+    self.validate_predicate(dataset, condition)
     if self._polars_lazy_frame is not None:
       condition_expr = self._compile_polars_expression(dataset, condition)
       boolean_condition = condition_expr.fill_null(False)
@@ -868,8 +880,7 @@ class DuckDBBackend:
     expression: Expression,
     condition: Expression | None,
   ) -> DatasetInfo:
-    column_types = {column.name: column.data_type for column in dataset.columns}
-    _require_columns("replace", column_types, (variable,))
+    self.validate_replace(dataset, variable, expression, condition)
     expression_sql = self._compile_expression(dataset, expression)
     replacement_sql = expression_sql
     if condition is not None:
@@ -1081,6 +1092,8 @@ class DuckDBBackend:
         raise TypeMismatchExecutionError(
           f"tabulate {statistic} requires numeric variable: {value_variable}"
         )
+    if condition is not None:
+      self.validate_predicate(dataset, condition)
     long_rows = self._tabulate_long(
       dataset,
       row_variables,
@@ -1509,6 +1522,7 @@ class DuckDBBackend:
     return self._fetch_table(sql, "tabulate")
 
   def _compile_expression(self, dataset: DatasetInfo, expression: Expression) -> str:
+    self._infer_expression_domain(dataset, expression)
     column_types = {column.name: column.data_type for column in dataset.columns}
     if isinstance(expression, IdentifierExpression):
       _require_columns("expression", column_types, (expression.name,))
@@ -1551,6 +1565,7 @@ class DuckDBBackend:
     raise ExecutionError("unsupported expression")
 
   def _compile_polars_expression(self, dataset: DatasetInfo, expression: Expression) -> pl.Expr:
+    self._infer_expression_domain(dataset, expression)
     column_types = {column.name: column.data_type for column in dataset.columns}
     if isinstance(expression, IdentifierExpression):
       _require_columns("expression", column_types, (expression.name,))
@@ -1615,7 +1630,102 @@ class DuckDBBackend:
 
   def validate_expression(self, dataset: DatasetInfo, expression: Expression) -> None:
     """Validate an expression without changing the active relation."""
+    self._infer_expression_domain(dataset, expression)
     self._compile_polars_expression(dataset, expression)
+
+  def validate_predicate(self, dataset: DatasetInfo, expression: Expression) -> None:
+    """Validate an expression used as a row-selection condition."""
+    domain = self._infer_expression_domain(dataset, expression)
+    if domain not in {"boolean", "null"}:
+      raise TypeMismatchExecutionError("predicate requires boolean expression")
+
+  def validate_replace(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+    expression: Expression,
+    condition: Expression | None,
+  ) -> None:
+    """Validate replacement expression and optional condition before mutation."""
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("replace", column_types, (variable,))
+    expression_domain = self._infer_expression_domain(dataset, expression)
+    target_domain = _expression_domain_for_data_type(column_types[variable])
+    if expression_domain not in {"null", target_domain}:
+      raise TypeMismatchExecutionError(
+        f"replace target {variable} is {target_domain} but expression is {expression_domain}"
+      )
+    if condition is not None:
+      self.validate_predicate(dataset, condition)
+
+  def _infer_expression_domain(
+    self,
+    dataset: DatasetInfo,
+    expression: Expression,
+  ) -> ExpressionDomain:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if isinstance(expression, IdentifierExpression):
+      _require_columns("expression", column_types, (expression.name,))
+      return _expression_domain_for_data_type(column_types[expression.name])
+    if isinstance(expression, NumberExpression):
+      return "numeric"
+    if isinstance(expression, StringExpression):
+      return "string"
+    if isinstance(expression, NullExpression):
+      return "null"
+    if isinstance(expression, UnaryExpression):
+      operand_domain = self._infer_expression_domain(dataset, expression.operand)
+      if operand_domain == "null":
+        raise ExecutionError(NULL_LITERAL_ERROR)
+      if operand_domain != "numeric":
+        raise TypeMismatchExecutionError(
+          "expression type mismatch: unary minus requires numeric operand"
+        )
+      return "numeric"
+    if isinstance(expression, BinaryExpression):
+      if _contains_null_literal(expression) and expression.operator not in {"==", "!="}:
+        raise ExecutionError(NULL_LITERAL_ERROR)
+      left_domain = self._infer_expression_domain(dataset, expression.left)
+      right_domain = self._infer_expression_domain(dataset, expression.right)
+      if expression.operator in {"==", "!=", "<", "<=", ">", ">="}:
+        if left_domain == "null" or right_domain == "null":
+          if expression.operator not in {"==", "!="}:
+            raise ExecutionError(NULL_LITERAL_ERROR)
+          return "boolean"
+        if left_domain != right_domain and not {
+          left_domain,
+          right_domain,
+        } == {"numeric"}:
+          raise TypeMismatchExecutionError(
+            f"expression type mismatch: cannot compare {left_domain} and {right_domain} values"
+          )
+        return "boolean"
+      if left_domain != "numeric" or right_domain != "numeric":
+        raise TypeMismatchExecutionError(
+          "expression type mismatch: arithmetic requires numeric operands"
+        )
+      return "numeric"
+    if isinstance(expression, FunctionCallExpression):
+      function_name = expression.name.lower()
+      if function_name not in SUPPORTED_FUNCTIONS:
+        raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      if len(expression.arguments) != 1:
+        raise ExecutionError(f"function {expression.name} expects one argument")
+      argument_domain = self._infer_expression_domain(dataset, expression.arguments[0])
+      if argument_domain == "null":
+        raise ExecutionError(NULL_LITERAL_ERROR)
+      if function_name in {"lower", "upper"}:
+        if argument_domain != "string":
+          raise TypeMismatchExecutionError(
+            f"expression type mismatch: {function_name} requires string argument"
+          )
+        return "string"
+      if argument_domain != "numeric":
+        raise TypeMismatchExecutionError(
+          f"expression type mismatch: {function_name} requires numeric argument"
+        )
+      return "numeric"
+    raise ExecutionError("unsupported expression")
 
   def materialize_polars_lazy(self, path: Path | str) -> DatasetInfo:
     frame = self._collect_polars_frame("materialize", path)
@@ -1803,6 +1913,17 @@ class DuckDBBackend:
 def _is_numeric_type(data_type: str) -> bool:
   normalized = data_type.upper()
   return normalized.startswith(NUMERIC_TYPES)
+
+
+def _expression_domain_for_data_type(data_type: str) -> ExpressionDomain:
+  normalized = data_type.upper()
+  if _is_numeric_type(normalized):
+    return "numeric"
+  if normalized.startswith(("VARCHAR", "CHAR", "TEXT", "STRING")):
+    return "string"
+  if normalized in {"BOOLEAN", "BOOL"}:
+    return "boolean"
+  return "other"
 
 
 def _select_alias_sql(variables: tuple[str, ...]) -> str:

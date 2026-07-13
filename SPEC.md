@@ -546,29 +546,34 @@ and describe the active work with concise verification criteria.
     and bar
   - aligned eager, DuckDB-lazy, and Polars-lazy keep/drop filtering for missing predicate results
   - documented and regression-tested aggregate missingness and stable missing bar rendering
+- Implemented Phase 24 P0 explicit missing predicates:
+  - added a case-insensitive unquoted `null` literal while preserving quoted `` `null` `` identifiers
+  - defined null-aware equality/inequality, direct all-missing assignment, and cross-engine filters
+  - rejected unsupported null arithmetic/functions and preserved Polars-lazy state on invalid tabulate
+    conditions
 
 ## Present
 
-- Feature: Phase 24 P0 explicit missing predicates
+- Feature: Phase 24 P0 expression coercion contract
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-explicit-missing-predicates
+  Branch: feat/phase24-expression-coercion-contract
 
   Summary:
-  Define and regression-test an explicit `null` literal with null-aware equality and inequality in
-  row predicates and direct assignments.
+  Define and regression-test scalar-domain compatibility for existing expression comparisons,
+  arithmetic, functions, predicates, and replacement targets.
 
   Verification:
-  - `null` parses as a case-insensitive literal while quoted `` `null` `` remains an identifier
-  - `== null` and `!= null` are null-aware in either operand order
-  - direct null assignment and existing keep/drop/replace behavior are consistent across supported
-    eager, DuckDB-lazy, and Polars-lazy paths
-  - unsupported null arithmetic/function use has a stable diagnostic
+  - numeric-family expressions are compatible across eager, DuckDB-lazy, and Polars-lazy paths
+  - mixed numeric/string comparisons and arithmetic fail with deterministic type diagnostics
+  - numeric and string functions enforce their argument domains
+  - predicates reject numeric/string truthiness and replacement rejects cross-domain assignments
+  - validation preserves Polars-lazy state before unsupported-command fallback
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - `is null`, `missing()`, `nonmissing()`, implicit coercion, broader arithmetic, categories,
-    ordering/randomness, estimation samples, operation lineage, machine output, and exit-code redesign
+  - new expression syntax, categorical conversion, string concatenation, ordering/randomness,
+    estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins
 
 ## Future

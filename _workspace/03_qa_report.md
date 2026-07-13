@@ -1,22 +1,21 @@
-# QA Report: Phase 24 P0 Explicit Missing Predicates
+# QA Report: Phase 24 P0 Expression Coercion
 
-Status: final; implementation validation and exactly three independent PR review passes complete
+Status: implementation validation pass; PR review loop pending
 
 ## Boundaries Checked
 
 - **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, help topics, and the
-  product contract agree on `null` literal spelling, null-aware equality/inequality, and deferred
-  coercion.
-- **Parser to AST:** unquoted `null` becomes a null literal while quoted `` `null` `` remains a
-  variable identifier.
-- **Backend behavior:** eager, DuckDB-lazy, and Polars-lazy paths agree for explicit missing
-  predicates and direct null assignment, including direct `null` row predicates.
-- **Failure behavior:** unsupported null arithmetic/function use fails before mutation with a stable
-  diagnostic; invalid tabulate conditions fail before Polars-lazy materialization.
-- **User-facing paths:** CLI `-c`, script execution, and command help document and exercise the
+  product contract agree on numeric, string, boolean, other, and null domains.
+- **AST/backend typing:** comparisons, arithmetic, functions, predicates, and replacement targets
+  enforce the declared domains before execution.
+- **Cross-engine behavior:** compatible numeric expressions agree across eager, DuckDB-lazy, and
+  Polars-lazy paths.
+- **Failure behavior:** mixed-domain expressions fail with deterministic type diagnostics before
+  active-dataset mutation or lazy fallback materialization.
+- **User-facing paths:** CLI `-c`, script execution, command help, and documentation cover the
   contract.
-- **Scope control:** no `is null`/function syntax, coercion policy, new command, or estimator was
-  added.
+- **Scope control:** no new syntax, categorical conversion, string concatenation, command, or
+  estimator was added.
 
 ## Blocking Issues
 
@@ -24,13 +23,10 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_parser.py -k 'null_literal' -q` — 1 passed.
-- `uv run pytest tests/test_executor.py -k 'explicit_null_predicates or null_literal_rejects' -q` —
-  9 passed.
-- `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — 2 passed.
-- `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — 1 passed.
-- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — 2 passed.
-- `uv run pytest` — 999 passed, 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'numeric_expression_compatibility or mixed_domain or predicate_truthiness or tabulate_predicate_type' -q` — 17 passed.
+- `uv run pytest tests/test_cli.py -k 'expression_type_mismatch' -q` — 2 passed.
+- `uv run pytest tests/test_help.py -k 'expression_domains' -q` — 1 passed.
+- `uv run pytest` — 1,019 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -40,23 +36,15 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## PR Review Loop
 
-Three independent review passes completed before merge readiness:
-
-- **Pass 1:** PASS; no actionable cross-boundary findings.
-- **Pass 2:** found a Medium atomicity issue where invalid tabulate null conditions materialized
-  Polars-lazy state before rejection. Fixed by validating direct and `by:` tabulate conditions before
-  fallback materialization, with two state-preservation regressions.
-- **Pass 3:** PASS; no actionable release-readiness findings.
-
-No Critical or High findings remain. The single Medium finding was fixed and revalidated.
+- Three independent code-review passes will run after the PR is opened.
+- Findings, fixes, and final disposition will be recorded here before merge.
 
 ## Non-Blocking Follow-Ups
 
-- Implicit coercion, broader arithmetic, categories, ordering/randomness, estimation samples,
-  machine output, exit semantics, lineage, differential assurance, and public-preview readiness
-  remain queued in `SPEC.md`.
+- Categorical conversion, string concatenation, ordering/randomness, estimation samples, machine
+  output, exit semantics, lineage, differential assurance, and public-preview readiness remain queued
+  in `SPEC.md`.
 
 ## Recommended Next Action
 
-Push the reviewed fix commit, mark the PR ready, merge it, then fast-forward `main` and clean up the
-feature branch.
+Commit the validated slice, open the PR, and run exactly three independent review passes.

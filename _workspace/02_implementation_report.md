@@ -1,41 +1,34 @@
-# Implementation Report: Phase 24 P0 Explicit Missing Predicates
+# Implementation Report: Phase 24 P0 Expression Coercion
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — `null` literal, null-aware equality/inequality, and
-  bounded invalid-null diagnostics.
+- `_workspace/01_product_command-contract.md` — expression domains, compatibility rules, predicate
+  typing, and replacement target-domain validation.
 
 ## Delivered Boundary
 
-- `src/tabdat/models.py`, `src/tabdat/parser.py`
-  - Added a typed `NullExpression` AST node.
-  - Parsed unquoted `null` case-insensitively while preserving quoted `` `null` `` identifiers.
 - `src/tabdat/backend.py`
-  - Compiled null-aware equality/inequality to SQL `is null`/`is not null` and equivalent Polars
-    expressions in either operand order.
-  - Supported direct all-missing generation/replacement.
-  - Rejected null arithmetic and function arguments before state-changing execution.
-  - Filled Polars predicate nulls before negation so direct `drop if null` remains cross-engine
-    consistent.
+  - Added pure AST/domain inference for numeric, string, boolean, other, and null values.
+  - Allowed numeric-family comparisons/arithmetic while rejecting mixed-domain comparisons,
+    arithmetic, and typed function arguments with deterministic `TypeMismatchExecutionError`
+    diagnostics.
+  - Required boolean or missing row predicates and same-domain/null replacement expressions.
+  - Validated direct and `by:` tabulate conditions before Polars-lazy fallback materialization.
 - `src/tabdat/executor.py`
-  - Validated direct and `by:` tabulate conditions before Polars-lazy fallback materialization,
-    preserving lazy state on invalid null expressions.
-- `tests/test_parser.py`, `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`
-  - Covered parser, eager/DuckDB-lazy/Polars-lazy behavior, direct assignment, invalid operations,
-    CLI/script execution, and discoverable help examples.
+  - Routed Polars-lazy generate/replace/tabulate validation through the domain and predicate checks
+    before fallback materialization.
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`
+  - Covered numeric compatibility, mixed-domain failures, predicate truthiness, target-domain
+    replacement, lazy-state preservation, CLI/script diagnostics, and help documentation.
 - `docs/language-semantics.md`, help topics, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Record the stable explicit-missing contract and deferred coercion boundary.
+  - Record the stable coercion contract and deferred categorical/arithmetic scope.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_parser.py -k 'null_literal' -q` — passed, 1 test.
-- `uv run pytest tests/test_executor.py -k 'explicit_null_predicates or null_literal_rejects' -q` —
-  passed, 9 tests.
-- `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — passed, 2 tests.
-- `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — passed, 1 test.
-- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — passed, 2
-  tests.
-- `uv run pytest` — passed, 999 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'numeric_expression_compatibility or mixed_domain or predicate_truthiness or tabulate_predicate_type' -q` — passed, 17 tests.
+- `uv run pytest tests/test_cli.py -k 'expression_type_mismatch' -q` — passed, 2 tests.
+- `uv run pytest tests/test_help.py -k 'expression_domains' -q` — passed, 1 test.
+- `uv run pytest` — passed, 1,019 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
@@ -45,6 +38,5 @@
 
 ## Known Limits And Follow-Up Work
 
-Implicit numeric/string coercion, broader arithmetic-result policy, categories, ordering, randomness,
-estimation samples, machine output, exit semantics, and full operation lineage remain separate Phase
-24 slices.
+Categorical conversion, string concatenation, ordering, randomness, estimation samples, machine
+output, exit semantics, and full operation lineage remain separate Phase 24 slices.

@@ -1,8 +1,8 @@
 # TabDat Language Semantics
 
 This document records stable cross-command behavior. It covers identifier spelling, quoting, explicit
-missing values, write-target, and failure semantics; coercion, ordering, randomness, estimation
-samples, and exit behavior remain separate contracts.
+missing values, expression domains, write-target, and failure semantics; ordering, randomness,
+estimation samples, and exit behavior remain separate contracts.
 
 ## Identifier spelling and quoting
 
@@ -52,7 +52,23 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 
-Implicit coercion and broader arithmetic-result policy remain separate contracts.
+## Expression domains and coercion
+
+- Numeric columns and numeric literals share one `numeric` domain. Numeric widening within that
+  domain is allowed; values are not parsed from or stringified into text implicitly.
+- Text values and string literals share the `string` domain. Boolean values and comparison results
+  use the `boolean` domain. Other backend scalar types are not coerced into either domain.
+- Equality/inequality and ordering require matching domains, except for numeric pairs and the
+  existing null-aware equality/inequality rules.
+- Arithmetic and unary minus require numeric operands. String concatenation is not defined here.
+- Numeric functions (`abs`, `ceil`, `floor`, `ln`, `log`, `round`, `sqrt`) require numeric arguments;
+  `lower` and `upper` require string arguments.
+- `keep`, `drop`, `replace if`, and `tabulate if` require boolean or missing conditions. Numeric or
+  string truthiness is rejected.
+- `replace` permits null or an expression in the target's domain; cross-domain assignment is
+  rejected before the active relation changes.
+- Mixed-domain failures use deterministic type-mismatch diagnostics, and Polars-lazy validation
+  occurs before fallback materialization.
 
 ## Write targets
 

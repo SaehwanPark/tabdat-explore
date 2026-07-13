@@ -2296,6 +2296,41 @@ def test_cli_reports_explicit_missing_predicate_behavior_in_script(
   assert captured.err == ""
 
 
+def test_cli_reports_expression_type_mismatch(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      "keep if sex == 1",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "expression type mismatch: cannot compare string and numeric values" in captured.err
+
+
+def test_cli_reports_expression_type_mismatch_in_script(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "expression-type-mismatch.td"
+  script_path.write_text(
+    f"use {sample_parquet}\nkeep if sex == 1\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 1
+  assert "expression type mismatch: cannot compare string and numeric values" in captured.err
+
+
 def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
   exit_code = main(["-c", "status"])
 
