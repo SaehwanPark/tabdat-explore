@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P1 — Structured JSON Syntax Preview
+# Product Contract: Phase 24 P1 — Structured JSON Declared Effect Categories
 
 ## Request Summary
 
-Expose a syntax-only machine-readable preview for exactly one batch command without executing it,
-creating a session, or reading data.
+Expose a finite, stable command-level effect vocabulary for machine clients without inspecting data,
+estimating cost, planning resources, or executing commands.
 
 ## Roadmap Phase
 
@@ -11,60 +11,42 @@ Phase 24 P1: Agent and automation interface.
 
 ## Invocation Rules
 
-- `tabdat --json --explain -c "summarize age"` emits exactly one compact deterministic success
-  envelope.
-- The envelope uses `schema_version: 1`, stable `result_type: "CommandExplainResult"`, and a `data`
-  payload containing `command_name: "summarize"` and `execution: "not_run"`.
-- `command_name` is the normalized leading command token; `?` maps to `help`, and prefix punctuation
-  such as `bayes:` is removed. This contract does not expose parser implementation classes or claim
-  command effect classification, option expansion, state planning, or execution equivalence.
-- Exactly one `-c/--command` is required. Parse failures emit one existing `ParseError` JSON
-  envelope, retain the existing human stderr message, and exit with status `1`.
-- Preview routing occurs before config or `Executor` construction, reads no dataset, changes no
-  session state, and materializes nothing. Existing command execution, terminal output, interactive
-  behavior, and JSON envelopes remain unchanged.
-- `--explain` without `--json`, with zero/multiple `-c`, combined with `-f`, a positional script,
-  `--list-commands`, or `--help-topic`, and use in an interactive session are rejected clearly with
-  existing CLI usage semantics.
-- Standard argparse `--help` retains conventional precedence and exits with CLI usage text; it does
-  not execute or preview a command.
+- `tabdat --json --list-command-effects` emits exactly one deterministic versioned
+  `CommandEffectCatalogResult` envelope with `data.commands` entries containing `name` and `effects`.
+- Categories come from the finite vocabulary `read`, `write`, `control`, `plot`, and `unknown`.
+- A command may have multiple categories; category order is deterministic and documented. Every
+  advertised command has an explicit mapping, while future/unclassified commands use `unknown`.
+- Categories are command-level declarations only. They do not inspect active data, account for options
+  or predicates, estimate cost, plan resources, or imply execution.
+- Existing command execution, terminal output, interactive behavior, and JSON success/error envelopes
+  remain unchanged.
+- `--list-command-effects` without `--json`, combined with command/script execution,
+  `--list-commands`, `--help-topic`, or `--explain`, and use in an interactive session are rejected
+  clearly.
 
 ## Examples
 
-Valid:
+Expected catalog entries for the effect mapping:
 
-```bash
-uv run tabdat --json --explain -c "summarize age"
+```text
+summarize -> [read]
+generate  -> [read, write]
+histogram -> [read, plot]
+set       -> [control]
+unknown   -> [unknown]
 ```
-
-Expected shape:
-
-```json
-{"data":{"command_name":"summarize","execution":"not_run"},"result_type":"CommandExplainResult","schema_version":1}
-```
-
-Syntax failure:
-
-```bash
-uv run tabdat --json --explain -c "not_a_tabdat_command"
-```
-
-Expected behavior: stderr retains the existing `Error: unknown command: not_a_tabdat_command`, stdout
-contains one `ParseError` envelope, and the process exits with status `1`.
 
 ## Acceptance Criteria
 
-- [x] One valid versioned success envelope reports the normalized command name and `not_run` execution.
-- [x] Preview parses exactly one `-c` command without config/Executor/data/session side effects.
-- [x] Syntax failures emit one stable JSON error envelope with exit status `1` and unchanged stderr.
-- [x] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
-  existing behavior.
-- [x] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
+- [ ] The result uses one finite documented vocabulary and deterministic category ordering.
+- [ ] Every advertised command has an explicit mapping; unclassified commands report `unknown`.
+- [ ] Mapping is pure and does not inspect data, estimate cost, plan resources, or execute commands.
+- [ ] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
   unchanged.
-- [x] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
+- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Command execution, effect classification, estimates, state/resource plans, scripts, multiple
-  commands, option/argument schemas, catalog examples, plugin discovery, interactive JSON mode, full
-  dry-run/explain behavior, repair diagnostics, new syntax, or new exit codes.
+- Data-dependent effects, resource/state plans, estimates, command execution, scripts, option/argument
+  schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain behavior,
+  repair diagnostics, operation lineage, new syntax, or new exit codes.

@@ -73,8 +73,10 @@ All notable project changes are tracked here.
   data commands.
 - Completed the Phase 24 structured JSON help-topic retrieval slice with case-insensitive raw-text
   envelopes, stable resource errors, and a fresh-wheel packaged-resource smoke check.
-- Started the Phase 24 structured JSON syntax-preview slice; one batch command will be parsed and
-  described without execution or session setup.
+- Completed the Phase 24 structured JSON syntax-preview slice with stable normalized command names,
+  conventional help precedence, and parser-only execution boundaries.
+- Started the Phase 24 structured JSON declared-effect slice; command-level effect categories will be
+  exposed without data-dependent planning or execution.
 
 ### Added
 
