@@ -527,7 +527,7 @@ class SessionState:
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
   last_operation: str | None = None
-  last_materialization_reason: Literal["polars_fallback"] | None = None
+  last_materialization_reason: Literal["polars_fallback", "eager_operation"] | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
@@ -580,7 +580,9 @@ class Executor:
     """
     self.backend = backend or DuckDBBackend()
     self.state = SessionState(config=config or TabDatConfig())
-    self._pending_materialization_reason: Literal["polars_fallback"] | None = None
+    self._pending_materialization_reason: Literal["polars_fallback", "eager_operation"] | None = (
+      None
+    )
     self._materialization_reason_reset_pending = False
 
   def _clear_all_regression_states(self) -> None:
@@ -617,6 +619,7 @@ class Executor:
 
   def execute(self, command: Command) -> Result | None:
     """Execute a command and commit materialization metadata only on success."""
+    previous_dataset = self.state.active_dataset
     self._pending_materialization_reason = None
     self._materialization_reason_reset_pending = False
     try:
@@ -630,6 +633,8 @@ class Executor:
       self.state.last_materialization_reason = None
     elif self._pending_materialization_reason is not None:
       self.state.last_materialization_reason = self._pending_materialization_reason
+    elif _lazy_to_eager_transition(previous_dataset, self.state.active_dataset):
+      self.state.last_materialization_reason = "eager_operation"
     if not isinstance(command, StatusCommand):
       self.state.last_operation = _canonical_command_name(command)
     self._pending_materialization_reason = None
@@ -9529,6 +9534,19 @@ def _canonical_command_name(command: Command) -> str:
   if command_name.endswith("Command"):
     command_name = command_name[: -len("Command")]
   return command_name.lower()
+
+
+def _lazy_to_eager_transition(
+  previous: DatasetInfo | None,
+  current: DatasetInfo | None,
+) -> bool:
+  return (
+    previous is not None
+    and previous.execution_mode == "lazy"
+    and previous.lazy_engine == "duckdb"
+    and current is not None
+    and current.execution_mode == "eager"
+  )
 
 
 def _use_table_name(command: UseCommand) -> str:

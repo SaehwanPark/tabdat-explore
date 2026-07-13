@@ -103,9 +103,10 @@ def format_result(result: Result) -> str:
       if result.execution_mode == "lazy"
       else "none"
     )
-    reason = (
-      "polars fallback" if result.last_materialization_reason == "polars_fallback" else "none"
-    )
+    reason = {
+      "polars_fallback": "polars fallback",
+      "eager_operation": "eager operation",
+    }.get(result.last_materialization_reason or "", "none")
     return "\n".join(
       (
         f"Backend: {result.backend}",

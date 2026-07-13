@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Last-Operation Transparency
+# Product Contract: Phase 24 P0 — Materialization-Reason Taxonomy
 
 ## Request Summary
 
-Extend the read-only `status` command with the canonical name of the last successfully executed
-executor command.
+Extend `status` with a deterministic `eager operation` reason for successful DuckDB-lazy to eager
+command transitions, while preserving the existing `polars fallback` reason.
 
 ## Roadmap Phase
 
@@ -20,74 +20,67 @@ syntax.
 
 ## Output Contract
 
-The terminal output keeps the current fields and inserts one session field after `Active table`:
+The status field remains in the existing position and expands its public taxonomy:
 
 ```text
-Backend: duckdb
-Source: <path-or-uri|none>
-Active table: <name|none>
-Last operation: <canonical-command-name|none>
-Execution mode: <eager|lazy|none>
-Lazy engine: <duckdb|polars|none>
-Materialization: <materialized|deferred|none>
-Last materialization reason: <polars fallback|none>
-Rows: <integer|unknown|none>
-Columns: <integer|none>
+Last materialization reason: <polars fallback|eager operation|none>
 ```
 
-Canonical names are lower-case command families (`use`, `count`, `generate`, `sql`, and so on);
-the Bayesian prefix is displayed as `bayes:`. The value is not a history and does not include
-arguments, paths, timings, or nested operation details.
+`polars fallback` means the existing Polars lazy frame was collected by the fallback hook.
+`eager operation` means a successful command began with an active DuckDB-lazy dataset and ended
+with an eager active dataset, outside the more-specific Polars fallback path. `none` means no
+tracked reason is attached to the current session state.
 
 ## State Semantics
 
-- A new executor reports `Last operation: none`.
-- A successfully completed command updates the field to its canonical command name.
-- `status` does not update the field; repeated status calls report the prior operation.
-- A failed command leaves the prior value unchanged, even if an earlier materialization boundary
-  has already changed the active execution mode.
-- Interactive, script, and `-c` execution use the same executor state transition.
-- Existing materialization-reason behavior is unchanged.
+- A new session, successful source load, and named-table/`sql ... into` activation report `none`.
+- DuckDB-lazy `status`, `count`, and other operations that preserve lazy state do not set a new
+  reason.
+- A successful DuckDB-lazy to eager command transition reports `eager operation`.
+- A successful Polars fallback continues to report `polars fallback`, taking precedence over the
+  generic eager transition.
+- Failed commands do not commit a new reason; the active backend state may still reflect any
+  physical transition that occurred before the failure.
+- Existing last-operation behavior is unchanged.
 
 ## Execution Semantics
 
-- `StatusResult` carries the optional last-operation value; the formatter renders only that result.
-- The public executor wrapper commits the operation only after the command returns successfully,
-  using the same success boundary that protects materialization-reason metadata.
-- The command remains dispatched before lazy materialization and never queries the backend.
+- `StatusResult` carries an optional typed reason value; the formatter maps it to exact public text.
+- The executor compares the active dataset execution mode before and after a successful command.
+- The existing success-only pending metadata boundary commits the specific reason after command
+  completion, with reset operations taking precedence.
+- `status` remains dispatched before lazy materialization and never queries the backend.
 
 ## Examples
 
 ```text
 tabdat> use data.parquet, lazy engine=duckdb
+tabdat> generate age2 = age + 1
 tabdat> status
-Active table: none
-Last operation: use
-Execution mode: lazy
-...
-tabdat> status
-Active table: none
-Last operation: use
+Execution mode: eager
+Materialization: materialized
+Last materialization reason: eager operation
 ```
 
 ```text
-tabdat> count
-Last operation: count
+tabdat> use data.parquet, lazy engine=polars
+tabdat> generate age2 = age + 1
+tabdat> status
+Last materialization reason: polars fallback
 ```
 
 ## Acceptance Criteria
 
-- [x] `StatusResult` has an optional typed last-operation field and the formatter renders the exact
-  label/order.
-- [x] Successful representative commands update the canonical name; `status` does not.
-- [x] Failed commands leave the prior operation unchanged.
-- [x] No-active, eager, lazy, named-table, and post-count status states retain the correct
-  last-operation value.
+- [x] The typed reason taxonomy includes `polars_fallback`, `eager_operation`, and `none`.
+- [x] A successful DuckDB-lazy to eager command reports `eager operation`.
+- [x] A successful Polars fallback still reports `polars fallback`.
+- [x] Source/table activation resets the reason and status/count preserve existing semantics.
+- [x] Failed commands do not commit a new reason.
 - [x] CLI, script, help, command-reference, user-guide, full tests, type/lint, and integrated
   workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Full operation lineage/history, active-operation progress, timings, broader materialization
-  taxonomy, retained estimation samples, machine-readable output, or explain/dry-run.
+- Full operation lineage/history, active-operation progress, backend-internal traces, timings,
+  retained estimation samples, machine-readable output, or explain/dry-run.
 - Changes to lazy/eager behavior, backends, estimators, connectors, plugins, or exit codes.

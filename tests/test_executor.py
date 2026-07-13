@@ -4,6 +4,7 @@ import math
 import socketserver
 import threading
 from collections.abc import Iterator
+from dataclasses import replace
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
@@ -789,6 +790,41 @@ def test_status_reports_polars_fallback_reason_and_resets_on_activation(
   assert after_activation.active_table == "summary"
   assert after_activation.last_operation == "use"
   assert after_activation.last_materialization_reason is None
+
+
+def test_status_reports_duckdb_eager_operation_reason(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    before = executor.execute(StatusCommand())
+    transform = executor.execute(GenerateCommand("age2", NumberExpression(2)))
+    after = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before, StatusResult)
+  assert before.execution_mode == "lazy"
+  assert before.last_materialization_reason is None
+  assert isinstance(transform, TransformResult)
+  assert transform.dataset.execution_mode == "eager"
+  assert isinstance(after, StatusResult)
+  assert after.execution_mode == "eager"
+  assert after.last_operation == "generate"
+  assert after.last_materialization_reason == "eager_operation"
+
+
+def test_lazy_to_eager_reason_requires_duckdb_lazy_engine(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    previous = executor.state.active_dataset
+    assert previous is not None
+    polars_eager = replace(previous, execution_mode="eager", lazy_engine=None)
+    duckdb_lazy = replace(previous, lazy_engine="duckdb")
+    assert executor_module._lazy_to_eager_transition(previous, polars_eager) is False
+    assert executor_module._lazy_to_eager_transition(duckdb_lazy, polars_eager) is True
+  finally:
+    executor.close()
 
 
 def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> None:

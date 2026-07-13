@@ -1,53 +1,53 @@
-# Implementation Report: Phase 24 P0 Last-Operation Transparency
+# Implementation Report: Phase 24 P0 Materialization-Reason Taxonomy
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — successful last-operation extension to `status`.
+- `_workspace/01_product_command-contract.md` — expanded `status` reason taxonomy.
 
 ## Delivered Boundary
 
 - `src/tabdat/executor.py` and `src/tabdat/models.py`
-  - Added optional typed `last_operation` session/result metadata.
-  - Commits the canonical command name only after the executor command succeeds.
-  - Leaves the prior operation unchanged for `status` and failed commands.
-  - Represents the Bayesian prefix as `bayes:` and normal command families in lowercase.
+  - Expanded the typed reason union with `eager_operation`.
+  - Detects a successful lazy-to-eager active-dataset transition after command execution.
+  - Restricts the generic transition category to a prior DuckDB-lazy dataset; Polars remains on
+    the specific fallback path.
+  - Keeps the specific staged `polars_fallback` reason ahead of the generic transition reason.
+  - Preserves success-only and reset precedence from the previous slice.
 - `src/tabdat/formatter.py`
-  - Added the stable `Last operation` field after `Active table`.
+  - Maps internal reason values to exact public phrases: `polars fallback`, `eager operation`, and
+    `none`.
 - `tests/`
-  - Covers no-active, `use`, repeated `status`, `count`, `sql` named-table activation, Polars
-    fallback/generate, failed commands, interactive shell, `-c`, script, and existing shell/help
-    surfaces.
+  - Covers DuckDB-lazy eager transitions, Polars fallback precedence, source/table resets, CLI and
+    script output, and the existing status/operation/failure paths.
 - `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, `docs/user-guide.md`,
   `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Documented canonical names, success-only semantics, examples, non-goals, and evidence.
+  - Documented the taxonomy, examples, limits, acceptance criteria, and validation evidence.
 
 ## Implementation Notes By Boundary
 
-- State: the field is one last-successful-operation value, not an operation history or lineage
-  graph.
-- Success boundary: the public executor wrapper updates it after `_execute_command` returns; an
-  exception leaves the previous value intact.
-- Read-only boundary: `status` returns the current value without updating it, materializing, or
-  querying the backend.
-- Naming boundary: command class names are normalized to lowercase command families, with the
-  `bayes:` prefix special-cased for user-facing clarity.
+- Transition boundary: the executor compares the active dataset mode before and after a successful
+  command; source/table reset operations take precedence.
+- Reason specificity: a staged Polars fallback is retained instead of being overwritten by the
+  generic lazy-to-eager transition category.
+- Failure boundary: failed commands do not commit a new reason, using the existing pending metadata
+  wrapper.
+- Scope: this is a user-visible taxonomy, not a backend-internal materialization trace.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 8 tests.
-- `uv run pytest tests/test_cli.py -k 'shell_preserves_last_operation or phase_24_status or fallback_reason' -q` — passed, 6 tests.
-- `uv run pytest tests/test_cli.py -q` — passed, 91 tests, with 128 existing third-party warnings.
-- `uv run pytest` — passed, 963 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 9 tests.
+- `uv run pytest tests/test_cli.py -k 'phase_24_status or fallback_reason or eager_operation' -q` — passed, 7 tests.
+- `uv run pytest` — passed, 967 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed, including
-  canonical replay with exact stdout/table equivalence and 4.712 seconds composite duration.
+  canonical replay with exact stdout/table equivalence and 4.324 seconds composite duration.
 
 ## Known Limits And Follow-Up Work
 
-- The field intentionally stores only the last successful command family; it does not retain
-  arguments, timing, nested commands, active progress, or a replayable operation graph.
-- Full operation lineage, broader materialization causes, retained estimation samples,
-  machine-readable output, and explain/dry-run remain future Phase 24 work.
+- The taxonomy intentionally does not identify backend-internal substeps, timings, or every
+  possible materialization cause.
+- Full operation lineage, retained estimation samples, machine-readable output, and explain/dry-run
+  remain future Phase 24 work.

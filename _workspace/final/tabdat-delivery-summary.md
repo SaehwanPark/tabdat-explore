@@ -1,19 +1,19 @@
-# Delivery Summary: Phase 24 P0 Last-Operation Transparency
+# Delivery Summary: Phase 24 P0 Materialization-Reason Taxonomy
 
-The last-operation transparency slice is implemented and locally validated.
+The materialization taxonomy slice is implemented and locally validated.
 
 ## Delivered
 
-- Extended `status` with `Last operation: <canonical-command-name|none>`.
-- Updated the value only after successful commands; `status` and failures preserve the previous
-  operation.
-- Covered representative eager/lazy, named-table, fallback, interactive shell, `-c`, and script
-  transitions.
-- Added typed metadata, deterministic formatting, documentation, tests, and handoff evidence.
+- Extended `status` with `Last materialization reason: polars fallback|eager operation|none`.
+- Distinguished successful DuckDB-lazy to eager command transitions from the existing Polars
+  fallback reason.
+- Preserved success-only metadata, source/table resets, and prior status/operation behavior.
+- Added typed metadata, deterministic formatting, CLI/script tests, documentation, and handoff
+  evidence.
 
 ## Validation
 
-- `uv run pytest` — 963 passed, 314 existing third-party warnings.
+- `uv run pytest` — 967 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` and `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
@@ -21,6 +21,6 @@ The last-operation transparency slice is implemented and locally validated.
 
 ## Remaining Phase 24 Work
 
-Full operation lineage/history, active-operation progress, broader materialization reasons, retained
-estimation samples, cross-command semantics, machine-readable automation output, differential
-assurance, dependency measurement, and preview readiness remain in `SPEC.md` Future.
+Full operation lineage/history, backend-internal materialization traces, retained estimation samples,
+cross-command semantics, machine-readable automation output, differential assurance, dependency
+measurement, and preview readiness remain in `SPEC.md` Future.

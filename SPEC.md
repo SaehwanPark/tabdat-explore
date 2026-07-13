@@ -524,28 +524,33 @@ and describe the active work with concise verification criteria.
   - reports the last tracked Polars lazy fallback in `status`
   - resets the reason when a new source or named table becomes active
   - rejects unsupported nested `by ...: status` before lazy materialization
+- Implemented Phase 24 P0 last-operation transparency:
+  - reports the last successfully executed command family in `status`
+  - keeps `status` read-only and preserves the prior operation across failures
+  - covers interactive shell, `-c`, and script state transitions
 
 ## Present
 
-- Feature: Phase 24 P0 last-operation transparency
+- Feature: Phase 24 P0 materialization-reason taxonomy
   Status: Active
   Started: 2026-07-12
-  Branch: feat/phase24-last-operation
+  Branch: feat/phase24-materialization-taxonomy
 
   Summary:
-  Extend `status` with the last successfully executed command, without turning it into full
-  operation lineage or progress reporting.
+  Extend the tracked materialization reason so successful DuckDB-lazy to eager command transitions
+  are distinguishable from Polars fallback and source/table resets.
 
   Verification:
-  - status reports `none` before any successful command and the canonical command name afterward
-  - status itself does not change the last operation
-  - failed commands leave the prior last operation unchanged
-  - interactive, `-c`, and script flows expose the same last-operation state
+  - a successful DuckDB-lazy command that becomes eager reports `eager operation`
+  - successful Polars fallback still reports `polars fallback`
+  - source/table activation and non-materializing status/count states report `none` or preserve
+    the prior reason according to the existing contract
+  - failed commands do not claim a new materialization reason
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
   - full operation lineage, active-operation progress, retained estimation samples, and JSON
-  - materialization-reason expansion beyond the prior tracked Polars fallback
+  - per-command timing or a complete backend-internal materialization trace
   - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
 
 ## Future
@@ -554,8 +559,8 @@ and describe the active work with concise verification criteria.
   - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
   - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
     categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
-  - extend execution transparency with full operation lineage, broader materialization reasons,
-    and retained estimation samples after the initial `status`, fallback, and last-operation slices
+  - extend execution transparency with full operation lineage, retained estimation samples, and
+    backend-internal materialization traces after this bounded reason taxonomy
   - verification:
     - the canonical workflow passes from a clean install in interactive and script modes
     - documented semantics have focused parser/executor/backend/CLI tests

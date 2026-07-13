@@ -25,4 +25,6 @@ Notes:
 - `Last operation` is the previous successful command family; calling `status` does not replace it,
   and a failed command leaves it unchanged.
 - `Last materialization reason: polars fallback` means an unsupported command collected a Polars
-  lazy frame into the eager DuckDB boundary. The field resets after a successful `use`.
+  lazy frame into the eager DuckDB boundary.
+- `Last materialization reason: eager operation` means a successful command changed an active
+  DuckDB-lazy dataset to eager. The field resets after a successful `use` or named-table activation.

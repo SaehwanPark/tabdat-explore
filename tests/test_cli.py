@@ -2223,6 +2223,29 @@ def test_cli_reports_phase_24_polars_fallback_reason(sample_parquet: Path, capsy
   assert captured.err == ""
 
 
+def test_cli_reports_phase_24_duckdb_eager_operation_reason(
+  sample_parquet: Path,
+  capsys,
+) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}, lazy engine=duckdb",
+      "-c",
+      "generate age2 = age + 1",
+      "-c",
+      "status",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Execution mode: eager" in captured.out
+  assert "Last materialization reason: eager operation" in captured.out
+  assert captured.err == ""
+
+
 def test_cli_reports_phase_24_eager_status(sample_parquet: Path, capsys) -> None:
   exit_code = main(["-c", f"use {sample_parquet}", "-c", "status"])
 
@@ -2277,6 +2300,26 @@ def test_cli_reports_phase_24_polars_fallback_reason_in_script(
   assert captured.out.count("Last materialization reason: polars fallback") == 1
   assert captured.out.count("Last operation: use") == 1
   assert captured.out.count("Last operation: generate") == 1
+  assert captured.err == ""
+
+
+def test_cli_reports_phase_24_duckdb_eager_operation_reason_in_script(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "eager-operation.td"
+  script_path.write_text(
+    f"use {sample_parquet}, lazy engine=duckdb\ngenerate age2 = age + 1\nstatus\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Last materialization reason: eager operation" in captured.out
   assert captured.err == ""
 
 
