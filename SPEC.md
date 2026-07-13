@@ -539,7 +539,8 @@ and describe the active work with concise verification criteria.
   Verification:
   - status reports `none` before any tracked fallback and `polars fallback` after an unsupported
     Polars-lazy command materializes the active relation
-  - a successful `use` or named-table activation resets the last reason to `none`
+  - a successful `use`, named-table activation, or `sql ... into <table>` resets the last reason to
+    `none`
   - status itself never materializes, counts, or changes the reason
   - unsupported `by ...: status` fails before the lazy materialization hook
   - CLI, script, help, docs, full tests, and type/lint checks pass

@@ -757,6 +757,7 @@ def test_status_reports_polars_fallback_reason_and_resets_on_activation(
     transform = executor.execute(GenerateCommand("age2", NumberExpression(2)))
     after_fallback = executor.execute(StatusCommand())
     executor.execute(SqlCommand("select * from active", into="summary"))
+    after_sql_activation = executor.execute(StatusCommand())
     executor.execute(UseCommand(Path("summary")))
     after_activation = executor.execute(StatusCommand())
   finally:
@@ -770,9 +771,27 @@ def test_status_reports_polars_fallback_reason_and_resets_on_activation(
   assert after_fallback.execution_mode == "eager"
   assert after_fallback.lazy_engine is None
   assert after_fallback.last_materialization_reason == "polars_fallback"
+  assert isinstance(after_sql_activation, StatusResult)
+  assert after_sql_activation.active_table == "summary"
+  assert after_sql_activation.last_materialization_reason is None
   assert isinstance(after_activation, StatusResult)
   assert after_activation.active_table == "summary"
   assert after_activation.last_materialization_reason is None
+
+
+def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(ExecutionError):
+      executor.execute(GenerateCommand("age2", IdentifierExpression("missing")))
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.execution_mode == "eager"
+  assert result.last_materialization_reason is None
 
 
 def test_resolve_remote_parquet_source() -> None:

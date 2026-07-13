@@ -44,7 +44,8 @@ successful tracked fallback, not a complete operation lineage.
 - `status`, `count`, and Polars-supported lazy operations do not set or change the reason.
 - After an unsupported Polars-lazy command materializes successfully, `status` reports eager mode,
   materialized state, and `Last materialization reason: polars fallback`.
-- A successful source load or named-table activation resets the reason to `none`.
+- A successful source load, named-table activation, or `sql ... into <table>` activation resets the
+  reason to `none`.
 - Failed commands do not claim a successful fallback.
 - Unsupported `by ...: status` is rejected during parsing; direct unsupported `ByCommand` values
   are rejected before the materialization hook.
@@ -52,8 +53,8 @@ successful tracked fallback, not a complete operation lineage.
 ## Execution Semantics
 
 - `StatusResult` carries the typed reason value; the formatter only renders that result.
-- `_materialize_polars_lazy_if_needed` records the reason only after the backend materialization
-  succeeds.
+- `_materialize_polars_lazy_if_needed` stages the reason after backend materialization succeeds;
+  the executor commits it only after the requested command succeeds.
 - `status` remains dispatched before the materialization hook and never queries the backend.
 - The command remains valid in interactive, script, and `-c` execution modes.
 
