@@ -91,6 +91,42 @@ def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   assert captured.err == ""
 
 
+def test_shell_preserves_last_operation_across_status(
+  monkeypatch, capsys, sample_parquet: Path
+) -> None:
+  class FixedPromptSession:
+    def __init__(self) -> None:
+      self.commands = iter(
+        (
+          f"use {sample_parquet}",
+          "status",
+          "count",
+          "status",
+        )
+      )
+
+    def prompt(self, prompt_text: str) -> str:
+      try:
+        return next(self.commands)
+      except StopIteration as exc:
+        raise EOFError from exc
+
+  session = FixedPromptSession()
+  executor = Executor()
+  try:
+    monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: session)
+    exit_code = _run_shell(executor)
+  finally:
+    executor.close()
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out.count("Last operation: use") == 1
+  assert captured.out.count("Last operation: count") == 1
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_3_inspection_commands(sample_parquet: Path, capsys) -> None:
   exit_code = main(
     [
@@ -2129,12 +2165,14 @@ def test_cli_runs_phase_24_status_flow(sample_parquet: Path, capsys) -> None:
 
   assert exit_code == 0
   assert "Backend: duckdb" in captured.out
+  assert "Last operation: use" in captured.out
   assert "Execution mode: lazy" in captured.out
   assert "Lazy engine: duckdb" in captured.out
   assert "Materialization: deferred" in captured.out
   assert "Last materialization reason: none" in captured.out
   assert "Rows: unknown" in captured.out
   assert "Rows: 3" in captured.out
+  assert "Last operation: count" in captured.out
   assert captured.err == ""
 
 
@@ -2148,6 +2186,7 @@ def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
     "Backend: duckdb\n"
     "Source: none\n"
     "Active table: none\n"
+    "Last operation: none\n"
     "Execution mode: none\n"
     "Lazy engine: none\n"
     "Materialization: none\n"
@@ -2177,6 +2216,8 @@ def test_cli_reports_phase_24_polars_fallback_reason(sample_parquet: Path, capsy
   assert exit_code == 0
   assert "Last materialization reason: none" in captured.out
   assert "Last materialization reason: polars fallback" in captured.out
+  assert "Last operation: use" in captured.out
+  assert "Last operation: generate" in captured.out
   assert "Execution mode: eager" in captured.out
   assert "Materialization: materialized" in captured.out
   assert captured.err == ""
@@ -2189,6 +2230,7 @@ def test_cli_reports_phase_24_eager_status(sample_parquet: Path, capsys) -> None
 
   assert exit_code == 0
   assert f"Source: {sample_parquet}" in captured.out
+  assert "Last operation: use" in captured.out
   assert "Execution mode: eager" in captured.out
   assert "Lazy engine: none" in captured.out
   assert "Materialization: materialized" in captured.out
@@ -2233,6 +2275,8 @@ def test_cli_reports_phase_24_polars_fallback_reason_in_script(
   assert exit_code == 0
   assert captured.out.count("Last materialization reason: none") == 1
   assert captured.out.count("Last materialization reason: polars fallback") == 1
+  assert captured.out.count("Last operation: use") == 1
+  assert captured.out.count("Last operation: generate") == 1
   assert captured.err == ""
 
 

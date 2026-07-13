@@ -111,6 +111,7 @@ def format_result(result: Result) -> str:
         f"Backend: {result.backend}",
         f"Source: {_display_path(source) if source is not None else 'none'}",
         f"Active table: {result.active_table or 'none'}",
+        f"Last operation: {result.last_operation or 'none'}",
         f"Execution mode: {result.execution_mode or 'none'}",
         f"Lazy engine: {result.lazy_engine or 'none'}",
         f"Materialization: {materialization}",
