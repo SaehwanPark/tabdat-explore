@@ -575,27 +575,36 @@ and describe the active work with concise verification criteria.
   - isolated cross-engine projection/value-transform coverage and routed Polars-lazy recode through
     validated fallback
   - explicitly deferred relation-changing order, unordered SQL, and categorical ordering
+- Implemented Phase 24 P0 SQL and named-table order semantics:
+  - defined explicit `order by` result sequences, tie-breaker requirements, and `sql ... into` storage
+  - preserved ordered sequences through isolated named-table reactivation and existing state resets
+  - added multiline parser, exact CLI, help, and eager/lazy SQL regressions
+  - explicitly deferred unordered SQL, append/join/reshape order, and categorical ordering
+- Implemented Phase 24 P0 append row-order semantics:
+  - explicitly snapshot each input sequence and order active rows before named-table rows
+  - preserved duplicate rows and made head/tail consume the combined sequence deterministically
+  - validated append table/schema failures before Polars fallback materialization
+  - explicitly deferred join/reshape and categorical ordering
 
 ## Present
 
-- Feature: Phase 24 P0 SQL and named-table order semantics
+- Feature: Phase 24 P0 append row-order semantics
   Status: Active
   Started: 2026-07-13
-  Branch: feat/phase24-sql-order
+  Branch: feat/phase24-append-order
 
   Summary:
-  Define and regression-test how explicit SQL ordering flows through direct results, `sql ... into`,
-  named-table activation, and later previews.
+  Define and regression-test left-then-right row sequence for `append table_name` across supported
+  execution paths.
 
   Verification:
-  - ordered direct SQL results agree across eager, DuckDB-lazy, and Polars-lazy inputs
-  - tied SQL keys require a deterministic secondary key for reproducible total order
-  - `sql ... into` followed by head/tail preserves query order
-  - named-table reactivation restores stored order
-  - CLI, script, parser, help, docs, full tests, and type/lint checks pass
+  - append emits active rows before named-table rows across eager, DuckDB-lazy, and Polars-lazy inputs
+  - head/tail preserve the combined left-then-right sequence
+  - append does not sort, deduplicate, or interleave inputs
+  - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - new sort syntax, row-ID persistence, append/join/reshape ordering, unordered SQL guarantees,
+  - new sort syntax, row-ID persistence, join/reshape ordering, unordered SQL guarantees,
     categorical ordering, exact arithmetic storage widths, overflow reporting, randomness,
     estimation samples, operation lineage, machine output, and exit-code redesign
   - new commands, new backends, estimators, connectors, or plugins

@@ -169,6 +169,61 @@ def test_cli_script_preserves_ordered_sql_through_named_table(tmp_path: Path, ca
   assert captured.err == ""
 
 
+def test_cli_script_preserves_append_sequence(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "append_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select value, label
+    from (
+      values
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second'),
+        (4, 2, 'third'),
+        (5, 4, 'fourth')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
+    """,
+  )
+  script_path = tmp_path / "append_order.td"
+  script_path.write_text(
+    f"use {path}\nsql select value, label from (values (1, 9, 'ninth'), (2, 4, 'fourth'), "
+    "(3, 8, 'eighth')) "
+    "as append_data(row_id, value, label) order by row_id into followup\n"
+    f"use {path}\nappend followup\nhead 5\ntail 4\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Appended followup: 8 rows, 2 columns" in captured.out
+  head_output = captured.out[captured.out.index(". head 5") : captured.out.index(". tail 4")]
+  tail_output = captured.out[captured.out.rindex(". tail 4") :]
+
+  def rows(block: str) -> tuple[str, ...]:
+    lines = block.splitlines()
+    header_index = next(index for index, line in enumerate(lines) if line.startswith("value"))
+    return tuple(line.strip() for line in lines[header_index + 1 :] if line.strip())
+
+  assert rows(head_output) == (
+    "3      first",
+    ".      missing",
+    "1      second",
+    "2      third",
+    "4      fourth",
+  )
+  assert rows(tail_output) == (
+    "4      fourth",
+    "9      ninth",
+    "4      fourth",
+    "8      eighth",
+  )
+  assert captured.err == ""
+
+
 def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   class InterruptThenEofSession:
     def __init__(self) -> None:

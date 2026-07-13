@@ -490,9 +490,45 @@ class DuckDBBackend:
     *,
     table_name: str,
   ) -> DatasetInfo:
+    self.validate_append(dataset, append_dataset, table_name=table_name)
+
+    internal_name = _named_table_identifier(table_name)
+    select_sql = _select_list(tuple(column.name for column in dataset.columns))
+    # Snapshot each input sequence before UNION ALL so the combine cannot interleave rows.
+    self._replace_active(
+      f"""
+      select * exclude (__tabdat_append_side, __tabdat_append_row)
+      from (
+        select
+          0 as __tabdat_append_side,
+          row_number() over () as __tabdat_append_row,
+          {select_sql}
+        from {ACTIVE_TABLE}
+        union all
+        select
+          1 as __tabdat_append_side,
+          row_number() over () as __tabdat_append_row,
+          {select_sql}
+        from {_quote_identifier(internal_name)}
+      ) as append_rows
+      order by __tabdat_append_side, __tabdat_append_row
+      """,
+      "append",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def validate_append(
+    self,
+    dataset: DatasetInfo,
+    append_dataset: DatasetInfo,
+    *,
+    table_name: str,
+  ) -> None:
     _validate_user_table_name(table_name)
-    left_types = {column.name: column.data_type for column in dataset.columns}
-    right_types = {column.name: column.data_type for column in append_dataset.columns}
+    left_types = {column.name: _canonical_data_type(column.data_type) for column in dataset.columns}
+    right_types = {
+      column.name: _canonical_data_type(column.data_type) for column in append_dataset.columns
+    }
     _require_columns("append", left_types, tuple(right_types))
     missing_right = tuple(
       column.name for column in dataset.columns if column.name not in right_types
@@ -502,20 +538,6 @@ class DuckDBBackend:
         f"append unknown variable in {table_name}: {', '.join(missing_right)}"
       )
     _require_matching_types("append", left_types, right_types, tuple(left_types))
-
-    internal_name = _named_table_identifier(table_name)
-    select_sql = _select_list(tuple(column.name for column in dataset.columns))
-    self._replace_active(
-      f"""
-      select {select_sql}
-      from {ACTIVE_TABLE}
-      union all
-      select {select_sql}
-      from {_quote_identifier(internal_name)}
-      """,
-      "append",
-    )
-    return self.active_dataset_info(dataset.path)
 
   def reshape_long(
     self,
@@ -779,21 +801,17 @@ class DuckDBBackend:
     if limit == 0:
       return ()
 
-    query = (
-      f"""
-        select * exclude (__tabdat_row_number)
-        from (
-          select
-            row_number() over () as __tabdat_row_number,
-            *
-          from {ACTIVE_TABLE}
-        )
-        order by __tabdat_row_number desc
-        limit ?
-      """
-      if tail
-      else f"select * from {ACTIVE_TABLE} limit ?"
-    )
+    query = f"""
+      select * exclude (__tabdat_row_number)
+      from (
+        select
+          row_number() over () as __tabdat_row_number,
+          *
+        from {ACTIVE_TABLE}
+      )
+      order by __tabdat_row_number {"desc" if tail else ""}
+      limit ?
+    """
     try:
       rows = tuple(self._connection.execute(query, [limit]).fetchall())
     except duckdb.Error as exc:
@@ -851,7 +869,15 @@ class DuckDBBackend:
     )
     command_name = "keep" if keep else "drop"
     self._replace_active(
-      f"select * from {ACTIVE_TABLE} where {sql_predicate}",
+      f"""
+      select * exclude (__tabdat_row_number)
+      from (
+        select row_number() over () as __tabdat_row_number, *
+        from {ACTIVE_TABLE}
+      )
+      where {sql_predicate}
+      order by __tabdat_row_number
+      """,
       command_name,
     )
     return self.active_dataset_info(dataset.path)
@@ -2379,6 +2405,24 @@ def _require_matching_types(
       raise TypeMismatchExecutionError(
         f"{command_name} type mismatch for {variable}: {left_type} vs {right_type}"
       )
+
+
+def _canonical_data_type(data_type: str) -> str:
+  aliases = {
+    "INT8": "TINYINT",
+    "INT16": "SMALLINT",
+    "INT32": "INTEGER",
+    "INT64": "BIGINT",
+    "UINT8": "UTINYINT",
+    "UINT16": "USMALLINT",
+    "UINT32": "UINTEGER",
+    "UINT64": "UBIGINT",
+    "FLOAT32": "FLOAT",
+    "FLOAT64": "DOUBLE",
+    "STRING": "VARCHAR",
+  }
+  normalized = data_type.upper().strip()
+  return aliases.get(normalized, normalized)
 
 
 def _select_list(variables: tuple[str, ...]) -> str:

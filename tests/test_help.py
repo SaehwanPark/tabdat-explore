@@ -49,6 +49,7 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "tie-breaker keys" in load_help_topic("sql")
   assert "no row-order guarantee" in load_help_topic("sql")
   assert "restores its stored row sequence" in load_help_topic("use")
+  assert "does not sort, deduplicate, or interleave" in load_help_topic("append")
 
 
 def test_help_topics_document_expression_domains() -> None:

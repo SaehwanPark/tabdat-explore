@@ -1,22 +1,19 @@
-# QA Report: Phase 24 P0 SQL and Named-Table Order
+# QA Report: Phase 24 P0 Append Row Order
 
 Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, language semantics, SQL/use help, user guide, and the
-  product contract agree on explicit SQL ordering, tie-breakers, named-table restoration, activation
-  reset semantics, and unordered SQL non-goals.
-- **Direct SQL:** ordered result rows agree across eager, DuckDB-lazy, and Polars-lazy inputs; tied
-  keys are deterministic only with an explicit secondary key.
-- **Active transition:** `sql ... into` preserves query sequence through head/tail, and reactivation
-  is tested after returning to the original source so a no-op activation cannot pass.
-- **Materialization:** the existing DuckDB eager boundary and Polars fallback/reset behavior are
-  asserted without adding hidden materialization behavior.
-- **User-facing paths:** multiline parser coverage, script-mode CLI output, exact preview rows, and
-  SQL/use help cover the contract.
-- **Scope control:** no SQL rewriting, new syntax, row IDs, sort command, append/join/reshape order,
-  categorical order, or estimator behavior was added.
+- **Roadmap/docs to contract:** `SPEC.md`, language semantics, append help, command reference, and
+  the product contract agree on active-left then named-table-right sequence and join/reshape limits.
+- **Combination semantics:** explicit per-input ordinals prevent interleaving; duplicate rows remain
+  present; eager, DuckDB-lazy, and Polars-lazy append paths agree.
+- **Preview semantics:** head/tail of the combined active dataset retain left-then-right order.
+- **Failure atomicity:** unknown table, missing-column, and type-mismatch append failures preserve
+  active execution state before Polars fallback materialization.
+- **User-facing paths:** exact script-mode CLI row blocks and append help cover the contract.
+- **Scope control:** no new syntax, row IDs, join/reshape rewrite, categorical order, or estimator
+  behavior was added.
 
 ## Blocking Issues
 
@@ -24,9 +21,9 @@ Status: final; implementation validation and exactly three independent PR review
 
 ## Validation Evidence
 
-- Ordered SQL executor regressions: 3 passed.
-- Ordered SQL parser regression: 1 passed; script-mode CLI regression: 1 passed; help suite: 8 passed.
-- `uv run pytest` — 1,074 passed, 314 existing third-party warnings.
+- Cross-engine append and failure regressions: 6 passed.
+- Script-mode CLI regression: 1 passed; help suite: 8 passed.
+- `uv run pytest` — 1,081 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -38,24 +35,25 @@ Status: final; implementation validation and exactly three independent PR review
 
 Exactly three independent review passes completed before merge readiness:
 
-- **Pass 1:** identified stale arbitrary-SQL wording, missing tie-breaker semantics, and missing use
-  help. Fixed the language/help wording and added tie-key/use-help coverage.
-- **Pass 2:** identified the existing Polars fallback-reason reset contradiction and repeated the tie
-  concern. Fixed the contract/docs to describe the activation reset and added a named-table status
-  assertion plus tied-key regression.
-- **Pass 3:** identified non-isolated reactivation coverage, missing multiline parser coverage, and
-  brittle CLI assertions. Fixed by reloading the source before reactivation, adding the parser case,
-  and asserting exact formatted rows in command-delimited output.
+- **Pass 1:** identified implicit append order, stale language caveats, command-reference syntax,
+  and missing duplicate coverage. Fixed with explicit side/ordinal ordering, docs cleanup, command
+  reference correction, and overlapping duplicate rows.
+- **Pass 2:** identified the same ordering risk and failed Polars-lazy append mutation on validation
+  errors. Fixed with pre-materialization append validation, type-alias normalization, and failure
+  state tests across all execution modes.
+- **Pass 3:** identified weak CLI/cardinality assertions, duplicate coverage, and stale deferred
+  append wording. Fixed with exact ordered row-block assertions, duplicate preservation checks, and
+  language-limit cleanup.
 
 No Critical or unresolved High/Medium findings remain.
 
 ## Non-Blocking Follow-Ups
 
-SQL without explicit ordering, append/join/reshape ordering, categorical ordering, exact arithmetic
-widths, overflow diagnostics, randomness, estimation samples, errors and exits, lineage, differential
-assurance, and public-preview readiness remain queued in `SPEC.md`.
+Join/reshape ordering, unordered SQL, categorical ordering, exact arithmetic widths, overflow
+diagnostics, randomness, estimation samples, errors and exits, lineage, differential assurance, and
+public-preview readiness remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 
-Push the review-fix commit, update PR #98, merge it, fast-forward `main`, and clean up the feature
+Push the review-fix commit, update PR #99, merge it, fast-forward `main`, and clean up the feature
 branch.
