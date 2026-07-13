@@ -27,8 +27,9 @@ No new operators, options, commands, result fields, or numeric literals are intr
 ## Exact Integer Rules
 
 - Integral `+`, `-`, `*`, and unary minus expressions use `DECIMAL(38,0)` as their exact result
-  domain. This includes signed and unsigned integer columns and integer literals when every operand
-  in the arithmetic subtree is integral.
+  domain. This includes signed and unsigned integer columns (including native `UHUGEINT` and
+  Arrow/Polars `UINT128` aliases) and integer literals when every operand in the arithmetic subtree
+  is integral.
 - Representable results preserve their exact integer value and result width across eager, DuckDB-lazy,
   and Polars-lazy write paths. A normal terminal preview renders integral values without a fractional
   suffix even though the stored result is decimal-backed.

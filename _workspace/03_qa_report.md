@@ -1,6 +1,6 @@
 # QA Report: Phase 24 P0 Exact Integer Arithmetic Result Widths
 
-Status: implementation validation complete; PR review pending
+Status: three-review pass complete; fixes validated; PR #103 ready for merge
 
 ## Boundaries Checked
 
@@ -12,6 +12,10 @@ Status: implementation validation complete; PR review pending
   aborting unrelated rows.
 - **Execution parity:** eager, DuckDB-lazy, and Polars-lazy generate/replace paths agree; exact
   arithmetic predicates use the validated Polars fallback and agree with DuckDB.
+- **Atomicity:** invalid exact predicates are rejected before Polars fallback, preserving lazy state,
+  materialization metadata, and the last successful operation.
+- **Type coverage:** native `UHUGEINT` and Arrow/Polars `UINT128` aliases are classified as unsigned
+  integral types for the exact-width policy.
 - **Scope control:** decimal-scale arithmetic, floating widths, arbitrary precision, stable overflow
   diagnostics, new syntax, estimator behavior, and lineage remain deferred.
 
@@ -21,10 +25,11 @@ Status: implementation validation complete; PR review pending
 
 ## Validation Evidence
 
-- Exact-width, replace, and predicate regressions: 9 passed across three engines.
+- Exact-width, replace, and predicate regressions: 15 passed, including UHUGEINT and failed-state
+  coverage.
 - CLI regression: 1 passed; focused help regression: 1 passed.
-- Existing arithmetic compatibility regressions: 39 passed.
-- `uv run pytest` — 1,116 passed, 314 existing third-party warnings.
+- Existing arithmetic compatibility regressions: 46 passed.
+- `uv run pytest` — 1,122 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -34,9 +39,14 @@ Status: implementation validation complete; PR review pending
 
 ## PR Review Loop
 
-Exactly three independent review passes are required after the PR is opened. Reviewers must check
-the arithmetic contract, backend width/overflow behavior, lazy fallback state, CLI/docs alignment,
-and regression coverage. No fourth review pass is permitted.
+Exactly three independent review passes completed on PR #103. Findings and fixes:
+
+- Pass 1: added `UHUGEINT`/`UINT128` type coverage and a replace-overflow regression.
+- Pass 2: validated complete `keep`/`drop` predicates before fallback and preserved failed lazy state.
+- Pass 3: added successful keep/drop fallback metadata coverage and corrected the related handoff
+  claims and stale PR state.
+
+No fourth review pass is planned.
 
 ## Non-Blocking Follow-Ups
 
@@ -46,5 +56,5 @@ lineage remain queued in `SPEC.md` Future.
 
 ## Recommended Next Action
 
-Commit the validated exact-integer slice, push it, open the PR, and complete exactly three independent
-review passes before any merge.
+Commit and push the validated review fixes, update PR #103, wait for its required checks, merge it to
+`main`, delete the local and remote feature branch, and return to the next `SPEC.md` item.

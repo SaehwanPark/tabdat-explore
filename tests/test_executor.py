@@ -7180,6 +7180,42 @@ def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
   )
 
 
+def test_uhugeint_arithmetic_uses_exact_integer_policy(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet))
+    executor.execute(
+      SqlCommand(
+        """
+        select * from (
+          values
+            (cast(1 as uhugeint), cast(1 as uhugeint), 'small'),
+            (cast(99999999999999999999999999999999999999 as uhugeint),
+             cast(1 as uhugeint), 'overflow')
+        ) as uhugeint_data(value, increment, label)
+        """,
+        into="uhugeint_source",
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "exact_value",
+        BinaryExpression(IdentifierExpression("value"), "+", IdentifierExpression("increment")),
+      )
+    )
+    preview = executor.execute(HeadCommand(10))
+    dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert dataset is not None
+  result_type = next(column.data_type for column in dataset.columns if column.name == "exact_value")
+  assert result_type.upper().startswith("DECIMAL(38,0)")
+  exact_index = preview.columns.index("exact_value")
+  assert tuple(row[exact_index] for row in preview.rows) == (Decimal("2"), None)
+
+
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
 def test_integral_replace_preserves_exact_width_and_row_level_missing(
   tmp_path: Path,
@@ -7188,9 +7224,9 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
   path = tmp_path / "exact-integer-replace.parquet"
   _write_exact_integer_arithmetic_parquet(path)
   expression = BinaryExpression(
-    IdentifierExpression("amount"),
-    "+",
-    IdentifierExpression("adjustment"),
+    IdentifierExpression("unsigned_left"),
+    "*",
+    IdentifierExpression("unsigned_right"),
   )
   executor = Executor()
   try:
@@ -7202,7 +7238,7 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(ReplaceCommand("amount", expression))
+    executor.execute(ReplaceCommand("unsigned_left", expression))
     preview = executor.execute(HeadCommand(10))
     dataset = executor.state.active_dataset
   finally:
@@ -7210,21 +7246,32 @@ def test_integral_replace_preserves_exact_width_and_row_level_missing(
 
   assert isinstance(preview, PreviewResult)
   assert dataset is not None
-  amount_type = next(column.data_type for column in dataset.columns if column.name == "amount")
-  assert amount_type.upper().startswith("DECIMAL(38,0)")
-  amount_index = preview.columns.index("amount")
-  assert tuple(row[amount_index] for row in preview.rows) == (
-    Decimal("9223372036854775808"),
-    Decimal("-9223372036854775809"),
-    Decimal("5"),
-    Decimal("2"),
+  result_type = next(
+    column.data_type for column in dataset.columns if column.name == "unsigned_left"
+  )
+  assert result_type.upper().startswith("DECIMAL(38,0)")
+  result_index = preview.columns.index("unsigned_left")
+  assert tuple(row[result_index] for row in preview.rows) == (
+    Decimal("18446744073709551615"),
+    Decimal("6"),
+    Decimal("6"),
+    None,
   )
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  ("command_type", "expected_labels"),
+  [
+    (KeepCommand, ("signed_max", "signed_min", "small")),
+    (DropCommand, ("overflow",)),
+  ],
+)
 def test_integral_arithmetic_predicate_uses_exact_missing_policy(
   tmp_path: Path,
   engine: str,
+  command_type: type[KeepCommand] | type[DropCommand],
+  expected_labels: tuple[str, ...],
 ) -> None:
   path = tmp_path / "exact-integer-predicate.parquet"
   _write_exact_integer_arithmetic_parquet(path)
@@ -7247,13 +7294,53 @@ def test_integral_arithmetic_predicate_uses_exact_missing_policy(
         lazy_engine=engine,  # type: ignore[arg-type]
       )
     executor.execute(use_command)
-    executor.execute(KeepCommand(condition=condition))
+    executor.execute(command_type(condition=condition))
+    status = executor.execute(StatusCommand())
     preview = executor.execute(HeadCommand(10))
   finally:
     executor.close()
 
   assert isinstance(preview, PreviewResult)
-  assert tuple(row[-1] for row in preview.rows) == ("signed_max", "signed_min", "small")
+  assert isinstance(status, StatusResult)
+  assert tuple(row[-1] for row in preview.rows) == expected_labels
+  if engine == "polars":
+    assert status.last_materialization_reason == "polars_fallback"
+  elif engine == "duckdb":
+    assert status.last_materialization_reason == "eager_operation"
+  else:
+    assert status.last_materialization_reason is None
+
+
+@pytest.mark.parametrize("command_type", [KeepCommand, DropCommand])
+def test_invalid_exact_integer_predicate_preserves_polars_lazy_state(
+  tmp_path: Path,
+  command_type: type[KeepCommand] | type[DropCommand],
+) -> None:
+  path = tmp_path / "exact-integer-invalid-predicate.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  condition = BinaryExpression(
+    BinaryExpression(
+      IdentifierExpression("amount"),
+      "+",
+      IdentifierExpression("missing_variable"),
+    ),
+    ">",
+    NumberExpression(0),
+  )
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(UnknownVariableError, match="unknown variable: missing_variable"):
+      executor.execute(command_type(condition=condition))
+    status = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(status, StatusResult)
+  assert status.execution_mode == "lazy"
+  assert status.lazy_engine == "polars"
+  assert status.last_operation == "use"
+  assert status.last_materialization_reason is None
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])

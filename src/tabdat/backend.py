@@ -54,6 +54,7 @@ NUMERIC_TYPES = (
   "INTEGER",
   "BIGINT",
   "HUGEINT",
+  "UHUGEINT",
   "UTINYINT",
   "USMALLINT",
   "UINTEGER",
@@ -66,6 +67,7 @@ NUMERIC_TYPES = (
   "UINT16",
   "UINT32",
   "UINT64",
+  "UINT128",
   "FLOAT32",
   "FLOAT64",
   "FLOAT",
@@ -81,6 +83,8 @@ UNSIGNED_NUMERIC_TYPES = (
   "UINT16",
   "UINT32",
   "UINT64",
+  "UINT128",
+  "UHUGEINT",
 )
 INTEGER_NUMERIC_TYPES = (
   "TINYINT",
@@ -88,6 +92,7 @@ INTEGER_NUMERIC_TYPES = (
   "INTEGER",
   "BIGINT",
   "HUGEINT",
+  "UHUGEINT",
   "UTINYINT",
   "USMALLINT",
   "UINTEGER",
@@ -100,6 +105,7 @@ INTEGER_NUMERIC_TYPES = (
   "UINT16",
   "UINT32",
   "UINT64",
+  "UINT128",
 )
 EXACT_INTEGER_RESULT_TYPE = "DECIMAL(38,0)"
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
@@ -2575,6 +2581,7 @@ def _canonical_data_type(data_type: str) -> str:
     "UINT16": "USMALLINT",
     "UINT32": "UINTEGER",
     "UINT64": "UBIGINT",
+    "UINT128": "UHUGEINT",
     "FLOAT32": "FLOAT",
     "FLOAT64": "DOUBLE",
     "STRING": "VARCHAR",
@@ -2915,6 +2922,7 @@ def _null_cast_type(data_type: str) -> str:
     "UINT16": "USMALLINT",
     "UINT32": "UINTEGER",
     "UINT64": "UBIGINT",
+    "UINT128": "UHUGEINT",
     "FLOAT32": "FLOAT",
     "FLOAT64": "DOUBLE",
     "STRING": "VARCHAR",

@@ -22,7 +22,8 @@ boundary before broader numeric policy.
 
 ## Assumptions
 
-- Integral `+`, `-`, `*`, and unary minus results use `DECIMAL(38,0)` as the bounded exact domain.
+- Integral `+`, `-`, `*`, and unary minus results use `DECIMAL(38,0)` as the bounded exact domain;
+  native `UHUGEINT` and Arrow/Polars `UINT128` aliases are included in the unsigned integer family.
 - Values within that domain remain exact; values outside it become missing for the affected row
   rather than wrapping or aborting the entire row-preserving transformation.
 - Real division, floating arithmetic, decimal-scale arithmetic, and existing invalid-function and
