@@ -34,6 +34,10 @@ All notable project changes are tracked here.
   order so backend edge cases remain deterministic.
 - Started the Phase 24 grouped-result ordering slice; native numeric/text/missing key order is being
   bounded before active row-order and categorical-order contracts.
+- Started the Phase 24 active row-order slice; head/tail and row-filter sequence semantics are being
+  bounded before relation-combination and SQL-order contracts.
+- Completed the Phase 24 active row-order slice with explicit DuckDB insertion-order preservation,
+  cross-engine transformation coverage, and Polars-lazy recode fallback handling.
 
 ### Added
 

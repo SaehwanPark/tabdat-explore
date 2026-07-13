@@ -166,6 +166,24 @@ def _write_sql_parquet(path: Path, query: str) -> None:
     connection.close()
 
 
+def _write_row_order_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select value, label
+    from (
+      values
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second'),
+        (4, 2, 'third'),
+        (5, 4, 'fourth')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
+    """,
+  )
+
+
 def _write_arithmetic_edge_parquet(path: Path) -> None:
   _write_sql_parquet(
     path,
@@ -7332,6 +7350,156 @@ def test_tail_returns_last_rows(sample_parquet: Path) -> None:
   assert isinstance(result, PreviewResult)
   assert result.columns == ("age", "bmi", "sex", "cost")
   assert result.rows == ((42, 25.0, "M", 150.0), (54, 27.5, "F", None))
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_active_row_order_is_consistent_for_previews_and_filters(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "row_order.parquet"
+  _write_row_order_parquet(path)
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  def preview(command: HeadCommand | TailCommand | KeepCommand | DropCommand) -> PreviewResult:
+    executor = Executor()
+    try:
+      executor.execute(use_command())
+      result = executor.execute(command)
+      if not isinstance(command, (HeadCommand, TailCommand)):
+        result = executor.execute(HeadCommand(5))
+    finally:
+      executor.close()
+    assert isinstance(result, PreviewResult)
+    return result
+
+  head = preview(HeadCommand(2))
+  tail = preview(TailCommand(2))
+  kept = preview(
+    KeepCommand(
+      condition=BinaryExpression(IdentifierExpression("value"), ">=", NumberExpression(1))
+    )
+  )
+  dropped = preview(
+    DropCommand(
+      condition=BinaryExpression(IdentifierExpression("value"), "==", NumberExpression(1))
+    )
+  )
+  empty_head = preview(HeadCommand(0))
+  empty_tail = preview(TailCommand(0))
+
+  assert head.rows == ((3, "first"), (None, "missing"))
+  assert tail.rows == ((2, "third"), (4, "fourth"))
+  assert kept.rows == ((3, "first"), (1, "second"), (2, "third"), (4, "fourth"))
+  assert dropped.rows == ((3, "first"), (None, "missing"), (2, "third"), (4, "fourth"))
+  assert empty_head.rows == ()
+  assert empty_tail.rows == ()
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_row_preserving_transformations_retain_active_sequence(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "row_order_transforms.parquet"
+  _write_row_order_parquet(path)
+  commands = (
+    (
+      SelectCommand(("value", "label")),
+      ("value", "label"),
+      ((3, "first"), (None, "missing"), (1, "second"), (2, "third"), (4, "fourth")),
+    ),
+    (
+      KeepCommand(variables=("label",)),
+      ("label",),
+      (("first",), ("missing",), ("second",), ("third",), ("fourth",)),
+    ),
+    (
+      DropCommand(variables=("value",)),
+      ("label",),
+      (("first",), ("missing",), ("second",), ("third",), ("fourth",)),
+    ),
+    (
+      RenameCommand("label", "name"),
+      ("value", "name"),
+      ((3, "first"), (None, "missing"), (1, "second"), (2, "third"), (4, "fourth")),
+    ),
+    (
+      GenerateCommand(
+        "double_value",
+        BinaryExpression(IdentifierExpression("value"), "*", NumberExpression(2)),
+      ),
+      ("value", "label", "double_value"),
+      (
+        (3, "first", 6),
+        (None, "missing", None),
+        (1, "second", 2),
+        (2, "third", 4),
+        (4, "fourth", 8),
+      ),
+    ),
+    (
+      ReplaceCommand(
+        "label",
+        StringExpression("updated"),
+        BinaryExpression(IdentifierExpression("value"), "==", NumberExpression(3)),
+      ),
+      ("value", "label"),
+      ((3, "updated"), (None, "missing"), (1, "second"), (2, "third"), (4, "fourth")),
+    ),
+    (
+      RecodeCommand(
+        variables=("value",),
+        rules=(RecodeRule(inputs=(3,), output=30),),
+        replace=True,
+      ),
+      ("value", "label"),
+      ((30, "first"), (None, "missing"), (1, "second"), (2, "third"), (4, "fourth")),
+    ),
+  )
+
+  for command, columns, expected_rows in commands:
+    executor = Executor()
+    try:
+      use_command = UseCommand(path)
+      if engine != "eager":
+        use_command = UseCommand(
+          path,
+          execution_mode="lazy",
+          lazy_engine=engine,  # type: ignore[arg-type]
+        )
+      executor.execute(use_command)
+      result = executor.execute(command)
+      preview = executor.execute(HeadCommand(5))
+      status = executor.execute(StatusCommand())
+    finally:
+      executor.close()
+
+    assert isinstance(result, TransformResult)
+    assert isinstance(preview, PreviewResult)
+    assert isinstance(status, StatusResult)
+    assert preview.columns == columns
+    assert preview.rows == expected_rows
+    if engine == "polars" and isinstance(command, (SelectCommand, KeepCommand, DropCommand)):
+      assert status.execution_mode == "lazy"
+      assert status.lazy_engine == "polars"
+      assert status.last_materialization_reason is None
+    elif engine == "polars":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.last_materialization_reason == "polars_fallback"
+    elif engine == "duckdb":
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.last_materialization_reason == "eager_operation"
+    else:
+      assert status.execution_mode == "eager"
+      assert status.lazy_engine is None
+      assert status.last_materialization_reason is None
 
 
 def test_keep_and_drop_columns_update_active_dataset(sample_parquet: Path) -> None:

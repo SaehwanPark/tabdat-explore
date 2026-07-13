@@ -705,9 +705,6 @@ class Executor:
       self._reset_materialization_reason()
       return result
 
-    if isinstance(command, RecodeCommand):
-      return self._execute_recode(command)
-
     if isinstance(command, StatusCommand):
       return self._execute_status()
 
@@ -719,6 +716,9 @@ class Executor:
 
     self._validate_write_before_materialization(command)
     self._materialize_polars_lazy_if_needed(command)
+
+    if isinstance(command, RecodeCommand):
+      return self._execute_recode(command)
 
     if isinstance(command, DescribeCommand):
       dataset = self._require_active_dataset("describe")
@@ -1093,22 +1093,7 @@ class Executor:
 
   def _execute_recode(self, command: RecodeCommand) -> TransformResult:
     dataset = self._require_active_dataset("recode")
-
-    col_names = {col.name for col in dataset.columns}
-    for var in command.variables:
-      if var not in col_names:
-        raise UnknownVariableError(f"variable not found: {var}")
-
-    if command.generate_variables is not None:
-      if len(command.generate_variables) != len(command.variables):
-        raise ExecutionError(
-          "number of generate variables must match number of variables to recode"
-        )
-      if len(set(command.generate_variables)) != len(command.generate_variables):
-        raise ExecutionError("recode generate variables must be unique")
-      for gen_var in command.generate_variables:
-        if gen_var in col_names:
-          raise ExecutionError(f"generate variable already exists: {gen_var}")
+    self._validate_recode_command(dataset, command)
 
     metadata = dataset.panel_metadata
     use_panel_validation = False
@@ -1139,6 +1124,23 @@ class Executor:
     next_dataset = _preserve_panel_metadata(dataset, next_dataset)
     msg = f"Recoded variables: {', '.join(command.variables)}"
     return self._record_transform(msg, next_dataset)
+
+  def _validate_recode_command(self, dataset: DatasetInfo, command: RecodeCommand) -> None:
+    col_names = {col.name for col in dataset.columns}
+    for var in command.variables:
+      if var not in col_names:
+        raise UnknownVariableError(f"variable not found: {var}")
+
+    if command.generate_variables is None:
+      return
+
+    if len(command.generate_variables) != len(command.variables):
+      raise ExecutionError("number of generate variables must match number of variables to recode")
+    if len(set(command.generate_variables)) != len(command.generate_variables):
+      raise ExecutionError("recode generate variables must be unique")
+    for gen_var in command.generate_variables:
+      if gen_var in col_names:
+        raise ExecutionError(f"generate variable already exists: {gen_var}")
 
   def _execute_generate(self, command: GenerateCommand) -> TransformResult:
     dataset = self._require_active_dataset("generate")
@@ -5928,6 +5930,9 @@ class Executor:
         command.expression,
         command.condition,
       )
+      return
+    if isinstance(command, RecodeCommand):
+      self._validate_recode_command(dataset, command)
 
   def _reset_materialization_reason(self) -> None:
     self.state.last_materialization_reason = None

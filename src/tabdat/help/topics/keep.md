@@ -18,3 +18,4 @@ Examples:
 to keep nonmissing values.
 
 Conditions must produce boolean or missing values; numeric and string truthiness is rejected.
+Rows that remain are kept in their prior relative order.

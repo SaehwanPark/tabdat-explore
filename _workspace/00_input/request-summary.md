@@ -1,37 +1,36 @@
-# Request Summary: Phase 24 Grouped-Result Ordering Contract
+# Request Summary: Phase 24 Active Row-Order Contract
 
 ## Goal
 
-Define and verify deterministic ordering for existing grouped outputs so numeric keys are ordered
-numerically, text keys lexicographically, and missing keys last across tabulate and category-count
-paths.
+Define and verify the active dataset's row sequence for `head`, `tail`, `keep if`, and `drop if`
+across eager, DuckDB-lazy, and Polars-lazy execution.
 
 ## Phase Fit
 
-Phase 24 P0 language semantics. This is the smallest ordering slice after identifier, missing-value,
-coercion, arithmetic-result, and overwrite contracts, and it adds no new command syntax.
+Phase 24 P0 language semantics. This follows grouped-result ordering and bounds the next observable
+ordering boundary without adding sort syntax or relation metadata.
 
 ## Touched Surfaces
 
-- `docs/language-semantics.md`: durable grouped-output ordering policy
-- `src/tabdat/backend.py`: tabulate-wide and bar category ordering
-- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: numeric, text, missing, and
-  user-visible ordering regressions
+- `docs/language-semantics.md`: durable active row-order policy
+- `src/tabdat/help/topics/head.md`, `tail.md`, `keep.md`, `drop.md`: user guidance
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_help.py`: cross-engine and CLI regressions
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- Existing grouped commands retain their current syntax and output shapes.
-- `by summarize`, `by count`, `collapse`, and long-form `tabulate` order grouping dimensions in
-  native scalar order with missing values last.
-- Wide-form `tabulate` uses the same native order for row keys and column headers; numeric labels
-  are not sorted by their display strings.
-- `bar` sorts nonmissing categories by descending count, then native category order for ties; the
-  missing category is always last.
-- Row-preserving active-dataset order, `head`/`tail` guarantees, arbitrary SQL `order by`, and
-  categorical ordering remain separate contracts.
+- The active dataset has a stable current row sequence established by its source or prior supported
+  transformation.
+- `head n` returns the first `n` rows and `tail n` returns the last `n` rows in that sequence; `0`
+  returns no rows.
+- Row filters preserve the relative order of retained rows. Missing filter results follow the
+  existing keep/drop truth policy and do not reorder surviving rows.
+- Row-preserving column and value transformations retain row order; grouped commands use their
+  separate grouped-result ordering contract.
+- Append/join/reshape ordering, arbitrary SQL ordering, named-table storage order, and a new sort
+  command remain separate contracts.
 
 ## Non-Goals
 
-- Adding a `sort` command or ordering syntax, changing parser grammar, defining row-order metadata,
-  rewriting user SQL order, category-level ordering, exact arithmetic widths, or estimator behavior.
+- Adding row IDs, sort syntax, a `sort` command, arbitrary SQL rewriting, append/join/reshape order,
+  categorical order, or estimator behavior.
