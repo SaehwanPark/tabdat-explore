@@ -5882,6 +5882,13 @@ class Executor:
       return
     dataset = self._require_active_dataset("validate")
     column_names = {column.name for column in dataset.columns}
+    if isinstance(command, TabulateCommand) and command.condition is not None:
+      self.backend.validate_expression(dataset, command.condition)
+      return
+    if isinstance(command, ByCommand) and isinstance(command.command, TabulateCommand):
+      if command.command.condition is not None:
+        self.backend.validate_expression(dataset, command.command.condition)
+      return
     if isinstance(command, GenerateCommand):
       if command.variable in column_names:
         raise ExecutionError(f"generate target already exists: {command.variable}")

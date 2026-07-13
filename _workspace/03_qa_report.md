@@ -1,6 +1,6 @@
 # QA Report: Phase 24 P0 Explicit Missing Predicates
 
-Status: implementation validation pass; PR review loop pending
+Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
@@ -12,7 +12,7 @@ Status: implementation validation pass; PR review loop pending
 - **Backend behavior:** eager, DuckDB-lazy, and Polars-lazy paths agree for explicit missing
   predicates and direct null assignment, including direct `null` row predicates.
 - **Failure behavior:** unsupported null arithmetic/function use fails before mutation with a stable
-  diagnostic.
+  diagnostic; invalid tabulate conditions fail before Polars-lazy materialization.
 - **User-facing paths:** CLI `-c`, script execution, and command help document and exercise the
   contract.
 - **Scope control:** no `is null`/function syntax, coercion policy, new command, or estimator was
@@ -29,7 +29,8 @@ Status: implementation validation pass; PR review loop pending
   9 passed.
 - `uv run pytest tests/test_cli.py -k 'explicit_missing_predicate' -q` — 2 passed.
 - `uv run pytest tests/test_help.py -k 'explicit_missing' -q` — 1 passed.
-- `uv run pytest` — 997 passed, 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'failed_polars_tabulate_null_validation' -q` — 2 passed.
+- `uv run pytest` — 999 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -39,8 +40,15 @@ Status: implementation validation pass; PR review loop pending
 
 ## PR Review Loop
 
-- Three independent code-review passes will run after the PR is opened.
-- Findings, fixes, and final disposition will be recorded here before merge.
+Three independent review passes completed before merge readiness:
+
+- **Pass 1:** PASS; no actionable cross-boundary findings.
+- **Pass 2:** found a Medium atomicity issue where invalid tabulate null conditions materialized
+  Polars-lazy state before rejection. Fixed by validating direct and `by:` tabulate conditions before
+  fallback materialization, with two state-preservation regressions.
+- **Pass 3:** PASS; no actionable release-readiness findings.
+
+No Critical or High findings remain. The single Medium finding was fixed and revalidated.
 
 ## Non-Blocking Follow-Ups
 
@@ -50,4 +58,5 @@ Status: implementation validation pass; PR review loop pending
 
 ## Recommended Next Action
 
-Commit the validated slice, open the PR, and run exactly three independent review passes.
+Push the reviewed fix commit, mark the PR ready, merge it, then fast-forward `main` and clean up the
+feature branch.

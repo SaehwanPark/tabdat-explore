@@ -847,6 +847,37 @@ def test_failed_polars_write_validation_preserves_lazy_state(sample_parquet: Pat
   assert result.last_materialization_reason is None
 
 
+@pytest.mark.parametrize("wrapped", [False, True])
+def test_failed_polars_tabulate_null_validation_preserves_lazy_state(
+  sample_parquet: Path,
+  wrapped: bool,
+) -> None:
+  condition = BinaryExpression(
+    left=IdentifierExpression("cost"),
+    operator="<",
+    right=NullExpression(),
+  )
+  tabulate = TabulateCommand(("sex",), condition=condition)
+  command = ByCommand(("sex",), tabulate) if wrapped else tabulate
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(
+      ExecutionError,
+      match="null literal only supports equality and inequality comparisons",
+    ):
+      executor.execute(command)
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.execution_mode == "lazy"
+  assert result.lazy_engine == "polars"
+  assert result.last_operation == "use"
+  assert result.last_materialization_reason is None
+
+
 def test_resolve_remote_parquet_source() -> None:
   source = resolve_load_source("https://example.com/data.parquet")
 
