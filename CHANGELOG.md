@@ -12,6 +12,8 @@ All notable project changes are tracked here.
   precede new estimator-family expansion.
 - Started the Phase 24 read-only `status` transparency slice on a dedicated feature branch; richer
   execution explanation and machine-readable output remain deferred.
+- Started the Phase 24 materialization-reason transparency slice; it exposes the tracked Polars
+  lazy-to-eager fallback cause while broader operation lineage remains deferred.
 
 ### Added
 

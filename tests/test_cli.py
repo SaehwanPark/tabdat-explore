@@ -2132,6 +2132,7 @@ def test_cli_runs_phase_24_status_flow(sample_parquet: Path, capsys) -> None:
   assert "Execution mode: lazy" in captured.out
   assert "Lazy engine: duckdb" in captured.out
   assert "Materialization: deferred" in captured.out
+  assert "Last materialization reason: none" in captured.out
   assert "Rows: unknown" in captured.out
   assert "Rows: 3" in captured.out
   assert captured.err == ""
@@ -2150,9 +2151,34 @@ def test_cli_reports_phase_24_status_without_active_dataset(capsys) -> None:
     "Execution mode: none\n"
     "Lazy engine: none\n"
     "Materialization: none\n"
+    "Last materialization reason: none\n"
     "Rows: none\n"
     "Columns: none\n"
   )
+  assert captured.err == ""
+
+
+def test_cli_reports_phase_24_polars_fallback_reason(sample_parquet: Path, capsys) -> None:
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}, lazy engine=polars",
+      "-c",
+      "status",
+      "-c",
+      "generate age2 = age + 1",
+      "-c",
+      "status",
+    ],
+  )
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert "Last materialization reason: none" in captured.out
+  assert "Last materialization reason: polars fallback" in captured.out
+  assert "Execution mode: eager" in captured.out
+  assert "Materialization: materialized" in captured.out
   assert captured.err == ""
 
 
@@ -2186,6 +2212,27 @@ def test_cli_runs_phase_24_status_in_script(sample_parquet: Path, tmp_path: Path
   assert captured.out.count("Execution mode: lazy") == 2
   assert "Rows: unknown" in captured.out
   assert "Rows: 3" in captured.out
+  assert captured.err == ""
+
+
+def test_cli_reports_phase_24_polars_fallback_reason_in_script(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  script_path = tmp_path / "materialization-reason.td"
+  script_path.write_text(
+    f"use {sample_parquet}, lazy engine=polars\nstatus\ngenerate age2 = age + 1\nstatus\n",
+    encoding="utf-8",
+  )
+
+  exit_code = main(["-f", str(script_path)])
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out.count("Last materialization reason: none") == 1
+  assert captured.out.count("Last materialization reason: polars fallback") == 1
   assert captured.err == ""
 
 

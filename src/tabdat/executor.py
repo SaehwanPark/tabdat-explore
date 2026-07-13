@@ -526,6 +526,7 @@ class SessionState:
 
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
+  last_materialization_reason: Literal["polars_fallback"] | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
@@ -671,7 +672,9 @@ class Executor:
       self.state.spatial_regression = None
 
     if isinstance(command, UseCommand):
-      return self._execute_use(command)
+      result = self._execute_use(command)
+      self.state.last_materialization_reason = None
+      return result
 
     if isinstance(command, RecodeCommand):
       return self._execute_recode(command)
@@ -987,6 +990,7 @@ class Executor:
         active_table=None,
         execution_mode=None,
         lazy_engine=None,
+        last_materialization_reason=None,
         row_count=None,
         column_count=None,
       )
@@ -996,6 +1000,7 @@ class Executor:
       active_table=self.state.active_table_name,
       execution_mode=dataset.execution_mode,
       lazy_engine=dataset.lazy_engine,
+      last_materialization_reason=self.state.last_materialization_reason,
       row_count=dataset.row_count,
       column_count=dataset.column_count,
     )
@@ -5942,6 +5947,7 @@ class Executor:
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
     self.state.active_dataset = materialized
+    self.state.last_materialization_reason = "polars_fallback"
 
   def _execute_test(self, command: TestCommand) -> TestResult:
     params_series, cov_df, df_resid = self._get_active_estimation_results()

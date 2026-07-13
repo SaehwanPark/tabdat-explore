@@ -1,34 +1,35 @@
-# Request Summary: Phase 24 Read-Only Status Transparency
+# Request Summary: Phase 24 Materialization Reason Transparency
 
 ## Goal
 
-Implement the next Phase 24 stabilization slice: add a read-only `status` command that makes the
-current backend and active-dataset execution state visible without hidden materialization.
+Extend the merged read-only `status` command with one bounded execution-transparency signal: the
+last tracked reason a Polars lazy relation crossed into the eager DuckDB boundary.
 
 ## Phase Fit
 
-Phase 24 P0 product-center stabilization. This follows the merged canonical Parquet workflow slice
-and is the first execution-transparency increment.
+Phase 24 P0 product-center stabilization. This follows the merged canonical workflow and initial
+status slice, and makes the existing lazy fallback boundary explainable without adding lineage or
+machine output.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: `StatusCommand` and typed `StatusResult`
-- `src/tabdat/parser.py` and `src/tabdat/executor.py`: parsing and state-only dispatch
-- `src/tabdat/formatter.py`, `src/tabdat/shell.py`, and help topic: terminal UX
-- `tests/test_parser.py`, `tests/test_executor.py`, `tests/test_cli.py`, and `tests/test_shell.py`
-- `docs/command-reference.md`, `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
+- `src/tabdat/executor.py` and `src/tabdat/models.py`: typed session/result metadata
+- `src/tabdat/formatter.py`: one deterministic status field
+- `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, and `docs/user-guide.md`
+- `tests/test_executor.py`, `tests/test_cli.py`, `tests/test_parser.py`, and `tests/test_shell.py`
+- `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
 
 ## Assumptions
 
-- `DatasetInfo` and `SessionState` already contain the authoritative current source, mode, engine,
-  schema, and cached row-count metadata.
-- The current runtime backend is DuckDB; the status result names that backend explicitly.
-- A lazy dataset's row count is `unknown` until an existing command such as `count` records it in
-  session metadata.
+- The existing `_materialize_polars_lazy_if_needed` hook is the authoritative tracked Polars
+  fallback boundary.
+- A reason is session metadata describing the last successful tracked fallback, not full operation
+  lineage.
+- The current backend remains DuckDB and the fallback reason is the literal `polars fallback`.
 
 ## Non-Goals
 
-- Adding `explain`, operation lineage, materialization reasons, retained estimation samples, or
-  machine-readable output.
-- Changing backend selection, lazy execution semantics, or estimator behavior.
-- Adding estimator families, broader connectors, or dependency-layer changes.
+- Adding operation lineage, current-operation progress, retained estimation samples, JSON/JSONL,
+  explain/dry-run, or stable exit-code redesign.
+- Modeling every eager materialization path or changing lazy/eager semantics.
+- Adding estimator families, connectors, plugins, or dependency-layer changes.

@@ -52,13 +52,16 @@ Active table: none
 Execution mode: lazy
 Lazy engine: duckdb
 Materialization: deferred
+Last materialization reason: none
 Rows: unknown
 Columns: 4
 ```
 
 The command is read-only. After `count`, the known row count is reflected in a later `status`
-result; operation lineage, materialization reasons, and retained estimation samples are planned for
-later transparency work.
+result. If an unsupported Polars-lazy command falls back to eager execution, status reports
+`Last materialization reason: polars fallback`; a successful `use` resets it to `none`. Full
+operation lineage, broader materialization reasons, and retained estimation samples remain planned
+for later transparency work.
 
 ### Named tables
 

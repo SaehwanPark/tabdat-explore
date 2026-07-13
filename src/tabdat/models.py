@@ -923,6 +923,7 @@ class StatusResult:
   active_table: str | None
   execution_mode: Literal["eager", "lazy"] | None
   lazy_engine: Literal["duckdb", "polars"] | None
+  last_materialization_reason: Literal["polars_fallback"] | None
   row_count: int | None
   column_count: int | None
 
