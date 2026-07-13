@@ -2551,6 +2551,7 @@ def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> 
 
   assert exit_code == 0
   assert captured.out.index("2 Count") < captured.out.index("10 Count")
+  assert "missing Count" in captured.out
   assert captured.err == ""
 
 

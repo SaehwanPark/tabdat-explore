@@ -1,9 +1,9 @@
-# Product Contract: Phase 24 P0 — Reshape Row Order
+# Product Contract: Phase 24 P0 — Categorical Ordering
 
 ## Request Summary
 
-Make existing `reshape long` and `reshape wide` result ordering sequence-preserving and predictable
-without adding new syntax.
+Make existing `tabulate` and `bar` category ordering and missing-label behavior predictable without
+adding category-management syntax.
 
 ## Roadmap Phase
 
@@ -11,50 +11,49 @@ Phase 24 P0: stable language semantics before broader command and estimator expa
 
 ## Roadmap Fit
 
-This is a bounded follow-up to the completed active, SQL/named-table, append, and join order
-contracts. It defines the result sequence for wide/long layout changes while leaving categorical order
-separate.
+This closes the basic label-order contract after grouped-result, active-row, SQL, append, join, and
+reshape ordering. It does not introduce a categorical data model or user-defined levels.
 
 ## Existing Syntax
 
 Valid forms retain the current grammar:
 
 - `use source.parquet`
-- `reshape long income cost, i(id) j(year)`
-- `reshape wide income cost, i(id) j(year)`
-- `head 5`
+- `tabulate code, missing`
+- `tabulate, rows(group_id) columns(code) missing`
+- `bar code, missing noopen`
 
-No new options, commands, or output fields are introduced.
+No new options, commands, result fields, or category metadata are introduced.
 
-## Reshape-Order Rules
+## Categorical-Order Rules
 
-- `reshape long` preserves the active source-row sequence. For each source row, generated rows are
-  emitted in the established wide-column j-value sequence: scan requested stubs in command varlist
-  order, scan each stub's matching source columns in schema order, and keep each suffix's first
-  appearance once.
-- `reshape wide` emits one row per identifier group in the order of the first active row belonging to
-  that group. Existing generated-column order and duplicate-cell aggregation remain unchanged.
-- `head`/`tail` consume each reshape result using the active row-order contract.
-- Eager, DuckDB-lazy, and Polars-lazy inputs produce the same reshape result sequence. Reshape crosses
-  the existing eager boundary where required and preserves current state reporting.
+- Category labels use native scalar order: numeric values sort numerically, text values
+  lexicographically, and booleans false before true. Numeric labels are not compared by rendered text.
+- `tabulate` excludes missing categories by default. With `missing`, missing categories appear after
+  all nonmissing categories in row keys and column headers.
+- `bar` orders nonmissing categories by descending count, then native category order for ties. With
+  `missing`, the missing category remains last and displays as `<missing>`.
+- Source arrival order and user-defined category levels are not ordering contracts in this slice.
+- Eager, DuckDB-lazy, and Polars-lazy tabulate/bar outputs agree; output formatting does not alter
+  ordering.
 
 ## Data And Execution Assumptions
 
-- Existing identifier, stub, j-value, output-column, and duplicate-cell validation remains unchanged.
-- The source sequence is the current active sequence, not a newly sorted identifier or j-value order.
-- Append/join order, unordered SQL, categorical order, and a new sort command remain outside this
-  slice.
+- Existing native type, missing-value, aggregate, percentage, and plotting behavior remains unchanged.
+- Category labels are represented by existing scalar columns; no categorical metadata is persisted.
+- Identifier spelling, expression coercion, active/reshape/relation order, and unordered SQL remain
+  separate contracts.
 
 ## Acceptance Criteria
 
-- [ ] Long output follows source-row order and established j-value sequence.
-- [ ] Wide output follows first-appearance order of identifier groups.
-- [ ] Existing wide/long column layout and duplicate-cell behavior remain unchanged.
-- [ ] Eager, DuckDB-lazy, and Polars-lazy result previews agree.
+- [ ] Numeric, text, boolean, and missing category order follows the native policy.
+- [ ] Tabulate missing omission/inclusion and missing-last placement are covered.
+- [ ] Bar count/tie order and missing-last display are covered.
+- [ ] Eager, DuckDB-lazy, and Polars-lazy outputs agree.
 - [ ] CLI/help/docs, focused tests, full tests, type/lint/format checks, and integrated workflow
   checks pass.
 
 ## Non-Goals For This Slice
 
-- New sort syntax or commands, row-ID persistence, append/join ordering, unordered SQL guarantees,
-  categorical ordering, duplicate-cell aggregation changes, or estimators.
+- New category metadata or level-management syntax, recoding changes, sort syntax, append/join/reshape
+  ordering, unordered SQL guarantees, or estimators.

@@ -8492,6 +8492,50 @@ def test_grouped_results_use_native_numeric_text_and_missing_order(
   assert grouped_count.rows == ((1, 3), (2, 2))
 
 
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_categorical_order_is_native_and_missing_last(tmp_path: Path, engine: str) -> None:
+  path = tmp_path / "categorical-ordering.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (2, 'z', true),
+        (10, 'a', false),
+        (null::integer, null::varchar, null::boolean),
+        (10, 'a', false),
+        (2, 'z', true)
+    ) as categories(code, label, flag)
+    """,
+  )
+
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+    executor.execute(use_command)
+    without_missing = executor.execute(TabulateCommand(("code",)))
+    with_missing = executor.execute(TabulateCommand(("code",), include_missing=True))
+    text_categories = executor.execute(TabulateCommand(("label",), include_missing=True))
+    boolean_categories = executor.execute(TabulateCommand(("flag",), include_missing=True))
+    dataset = executor.state.active_dataset
+    assert dataset is not None
+    bar_rows = executor.backend.bar_counts(dataset, "code", include_missing=True)
+  finally:
+    executor.close()
+
+  assert isinstance(without_missing, TableResult)
+  assert tuple(row[0] for row in without_missing.rows) == (2, 10)
+  assert isinstance(with_missing, TableResult)
+  assert tuple(row[0] for row in with_missing.rows) == (2, 10, None)
+  assert isinstance(text_categories, TableResult)
+  assert tuple(row[0] for row in text_categories.rows) == ("a", "z", None)
+  assert isinstance(boolean_categories, TableResult)
+  assert tuple(row[0] for row in boolean_categories.rows) == (False, True, None)
+  assert bar_rows == (("2", 2), ("10", 2), (None, 1))
+
+
 def test_wide_tabulate_preserves_exact_decimal_key_order(tmp_path: Path) -> None:
   path = tmp_path / "exact-ordering.parquet"
   _write_exact_ordering_parquet(path)
