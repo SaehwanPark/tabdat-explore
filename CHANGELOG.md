@@ -16,6 +16,8 @@ All notable project changes are tracked here.
   lazy-to-eager fallback cause while broader operation lineage remains deferred.
 - Started the Phase 24 last-operation transparency slice; `status` will expose the last successful
   command while full operation lineage remains deferred.
+- Started the Phase 24 materialization-reason taxonomy slice; successful eager transitions will be
+  distinguished from Polars fallback and source/table resets.
 
 ### Added
 

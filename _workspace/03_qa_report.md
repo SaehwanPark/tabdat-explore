@@ -1,19 +1,19 @@
-# QA Report: Phase 24 P0 Last-Operation Transparency
+# QA Report: Phase 24 P0 Materialization-Reason Taxonomy
 
 Status: implementation validation pass; PR review loop pending
 
 ## Boundaries Checked
 
-- **Roadmap/docs to contract:** `SPEC.md`, the command reference, user guide, and status help topic
-  agree on the new field, canonical-name rule, success-only semantics, and scope limits.
-- **Contract to typed state:** `SessionState` and `StatusResult` carry the optional operation name;
-  the formatter renders it in the exact labeled position.
-- **Success/failure boundary:** successful `use`, `count`, `generate`, and `sql` flows update the
-  value; repeated `status` and failed commands preserve it.
-- **Existing transparency boundary:** materialization-reason state remains unchanged and status
-  remains before the lazy materialization hook.
-- **Public surfaces:** no-active, eager/lazy, named-table, interactive shell, `-c`, script, help,
-  and command-reference paths are covered.
+- **Roadmap/docs to contract:** `SPEC.md`, command reference, user guide, and status help agree on
+  the three public reason phrases and their scope.
+- **Typed taxonomy:** `SessionState` and `StatusResult` accept only the two tracked reasons or
+  `none`; formatter mapping is explicit and type-checked.
+- **Transition detection:** successful DuckDB-lazy to eager commands report `eager operation`,
+  while successful Polars fallback reports the more-specific `polars fallback`.
+- **Reset/failure boundary:** source/table activation resets the reason; failed commands do not
+  commit a new reason; status/count preserve existing behavior.
+- **Public surfaces:** `-c`, script, no-active, eager/lazy, named-table, help, and documentation
+  flows are covered.
 
 ## Blocking Issues
 
@@ -21,29 +21,23 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 963 passed, 314 existing third-party warnings.
+- `uv run pytest` — 966 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
-  exact stdout/table equivalence with 4.712 seconds composite duration.
+  exact stdout/table equivalence with 4.324 seconds composite duration.
 
 ## PR Review Loop
 
-- **Pass 1:** found no actionable issues across executor success boundaries and state transitions.
-- **Pass 2:** found no actionable issues across typed output, canonical naming, and contract/docs
-  coherence.
-- **Pass 3:** identified a Low coverage gap for the interactive shell path. Fixed by adding a
-  mocked-prompt regression for `use → status → count → status`, then rerunning the full suite and
-  integrated harness.
-- No Critical, High, or unresolved Medium findings remain.
+- Three independent code-review passes will run after the PR is opened.
+- Findings, fixes, and final disposition will be recorded here before merge.
 
 ## Non-Blocking Follow-Ups
 
-- Full operation lineage/history, active-operation progress, broader materialization reasons,
-  retained estimation samples, and machine-readable output remain intentionally queued in
-  `SPEC.md`.
+- Backend-internal traces, operation lineage/history, retained estimation samples, and machine
+  output remain intentionally queued in `SPEC.md`.
 
 ## Recommended Next Action
 

@@ -791,6 +791,27 @@ def test_status_reports_polars_fallback_reason_and_resets_on_activation(
   assert after_activation.last_materialization_reason is None
 
 
+def test_status_reports_duckdb_eager_operation_reason(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="duckdb"))
+    before = executor.execute(StatusCommand())
+    transform = executor.execute(GenerateCommand("age2", NumberExpression(2)))
+    after = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before, StatusResult)
+  assert before.execution_mode == "lazy"
+  assert before.last_materialization_reason is None
+  assert isinstance(transform, TransformResult)
+  assert transform.dataset.execution_mode == "eager"
+  assert isinstance(after, StatusResult)
+  assert after.execution_mode == "eager"
+  assert after.last_operation == "generate"
+  assert after.last_materialization_reason == "eager_operation"
+
+
 def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> None:
   executor = Executor()
   try:

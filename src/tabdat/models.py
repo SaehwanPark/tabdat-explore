@@ -924,7 +924,7 @@ class StatusResult:
   last_operation: str | None
   execution_mode: Literal["eager", "lazy"] | None
   lazy_engine: Literal["duckdb", "polars"] | None
-  last_materialization_reason: Literal["polars_fallback"] | None
+  last_materialization_reason: Literal["polars_fallback", "eager_operation"] | None
   row_count: int | None
   column_count: int | None
 
