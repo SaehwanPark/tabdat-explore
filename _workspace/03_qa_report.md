@@ -12,8 +12,8 @@ Status: implementation validation pass; PR review loop pending
   value; repeated `status` and failed commands preserve it.
 - **Existing transparency boundary:** materialization-reason state remains unchanged and status
   remains before the lazy materialization hook.
-- **Public surfaces:** no-active, eager/lazy, named-table, `-c`, script, help, and command-reference
-  paths are covered.
+- **Public surfaces:** no-active, eager/lazy, named-table, interactive shell, `-c`, script, help,
+  and command-reference paths are covered.
 
 ## Blocking Issues
 
@@ -21,18 +21,23 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest` — 962 passed, 314 existing third-party warnings.
+- `uv run pytest` — 963 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — all six scenarios passed; canonical replay kept
-  exact stdout/table equivalence with 4.306 seconds composite duration.
+  exact stdout/table equivalence with 4.712 seconds composite duration.
 
 ## PR Review Loop
 
-- Three independent code-review passes will run after the PR is opened.
-- Findings, fixes, and final disposition will be recorded here before merge.
+- **Pass 1:** found no actionable issues across executor success boundaries and state transitions.
+- **Pass 2:** found no actionable issues across typed output, canonical naming, and contract/docs
+  coherence.
+- **Pass 3:** identified a Low coverage gap for the interactive shell path. Fixed by adding a
+  mocked-prompt regression for `use → status → count → status`, then rerunning the full suite and
+  integrated harness.
+- No Critical, High, or unresolved Medium findings remain.
 
 ## Non-Blocking Follow-Ups
 

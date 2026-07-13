@@ -91,6 +91,42 @@ def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:
   assert captured.err == ""
 
 
+def test_shell_preserves_last_operation_across_status(
+  monkeypatch, capsys, sample_parquet: Path
+) -> None:
+  class FixedPromptSession:
+    def __init__(self) -> None:
+      self.commands = iter(
+        (
+          f"use {sample_parquet}",
+          "status",
+          "count",
+          "status",
+        )
+      )
+
+    def prompt(self, prompt_text: str) -> str:
+      try:
+        return next(self.commands)
+      except StopIteration as exc:
+        raise EOFError from exc
+
+  session = FixedPromptSession()
+  executor = Executor()
+  try:
+    monkeypatch.setattr("tabdat.cli.create_prompt_session", lambda executor: session)
+    exit_code = _run_shell(executor)
+  finally:
+    executor.close()
+
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert captured.out.count("Last operation: use") == 1
+  assert captured.out.count("Last operation: count") == 1
+  assert captured.err == ""
+
+
 def test_cli_runs_phase_3_inspection_commands(sample_parquet: Path, capsys) -> None:
   exit_code = main(
     [

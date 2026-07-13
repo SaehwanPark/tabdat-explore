@@ -15,7 +15,8 @@
   - Added the stable `Last operation` field after `Active table`.
 - `tests/`
   - Covers no-active, `use`, repeated `status`, `count`, `sql` named-table activation, Polars
-    fallback/generate, failed commands, `-c`, script, and existing shell/help surfaces.
+    fallback/generate, failed commands, interactive shell, `-c`, script, and existing shell/help
+    surfaces.
 - `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, `docs/user-guide.md`,
   `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
   - Documented canonical names, success-only semantics, examples, non-goals, and evidence.
@@ -34,14 +35,15 @@
 ## Validation Commands And Outcomes
 
 - `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 8 tests.
-- `uv run pytest tests/test_cli.py -k 'phase_24_status or fallback_reason' -q` — passed, 5 tests.
-- `uv run pytest` — passed, 962 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_cli.py -k 'shell_preserves_last_operation or phase_24_status or fallback_reason' -q` — passed, 6 tests.
+- `uv run pytest tests/test_cli.py -q` — passed, 91 tests, with 128 existing third-party warnings.
+- `uv run pytest` — passed, 963 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
 - `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed, including
-  canonical replay with exact stdout/table equivalence and 4.306 seconds composite duration.
+  canonical replay with exact stdout/table equivalence and 4.712 seconds composite duration.
 
 ## Known Limits And Follow-Up Work
 
