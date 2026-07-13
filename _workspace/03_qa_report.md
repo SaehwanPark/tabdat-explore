@@ -1,19 +1,18 @@
-# QA Report: Phase 24 P0 Identifier Spelling and Quoted Identifiers
+# QA Report: Phase 24 P0 Missing Predicate Semantics
 
-Status: implementation validation pass; PR review loop pending
+Status: final; implementation validation and exactly three independent PR review passes complete
 
 ## Boundaries Checked
 
 - **Roadmap/docs to contract:** `SPEC.md`, `docs/language-semantics.md`, and the product contract
-  agree on exact case-sensitive spelling and backtick quoting.
-- **Parser to command AST:** quoted whitespace, punctuation, escaped backticks, and quoted `if` are
-  preserved as identifier content across targets, lists, expressions, `by`, and Bayes prefixes.
-- **Executor/backend behavior:** generated and replaced columns with spaces and capital letters are
-  materialized with exact names; a lowercase mismatch remains an unknown-variable failure; Bayes
-  formula identifiers are quoted before formula evaluation.
-- **User-facing paths:** `-c`, script execution, and Unicode quoted identifiers are covered.
-- **Scope control:** SQL quoting, missingness, coercion, successful bare-identifier behavior, and
-  estimator semantics remain unchanged.
+  agree on true/false/missing predicate behavior and aggregate missingness.
+- **Backend behavior:** eager/DuckDB and Polars paths agree that drop predicates retain missing
+  results while keep predicates exclude them.
+- **Existing aggregate behavior:** summarize counts nonmissing numeric values, codebook reports
+  missing counts, tabulate's `missing` option includes null categories, and missing bar categories
+  render with the stable `<missing>` label.
+- **Scope control:** no new missing syntax, null literal, coercion policy, estimator behavior, or
+  backend was added.
 
 ## Blocking Issues
 
@@ -21,10 +20,9 @@ Status: implementation validation pass; PR review loop pending
 
 ## Validation Evidence
 
-- `uv run pytest tests/test_parser.py -q` — 488 passed.
-- `uv run pytest tests/test_executor.py -k 'quoted_identifiers_execute or bayes_formula_identifier' -q` — 2 passed.
-- `uv run pytest tests/test_cli.py -k 'quoted_identifier or quoted_unicode_identifier' -q` — 2 passed.
-- `uv run pytest` — 976 passed, 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k 'missing_predicates_are_consistent or tabulate_missing_option_controls or all_missing_numeric or phase_24_bar_missing' -q` — 6 passed.
+- `uv run pytest tests/test_cli.py -k 'missing_drop_predicate' -q` — 2 passed.
+- `uv run pytest` — 984 passed, 314 existing third-party warnings.
 - `uv run basedpyright` — 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
@@ -34,22 +32,22 @@ Status: implementation validation pass; PR review loop pending
 
 ## PR Review Loop
 
-Three independent review passes completed. All findings were addressed before merge readiness:
+Three independent review passes completed before merge readiness:
 
-- **Pass 1:** fixed quote-aware `by`/Bayes-prefix framing, preserved quoted control-word metadata,
-  quoted Bayes formula identifiers, and added an explicit backtick limitation for that backend.
-- **Pass 2:** independently confirmed wrapper framing, then fixed bare punctuation boundaries and
-  added CLI/script/Unicode acceptance coverage.
-- **Pass 3:** fixed the remaining recode structural delimiter check and retained the wrapper/control
-  metadata fixes.
+- **Pass 1:** fixed the documented-but-unrendered missing bar category by normalizing it to
+  `<missing>` and added an SVG artifact regression. Clarified Polars replace coverage by asserting
+  the supported fallback materializes to eager state.
+- **Pass 2:** independently confirmed the same fallback evidence gap, then verified the script CLI
+  path and added all-missing aggregate and bar-output regressions.
+- **Pass 3:** no actionable findings.
 
-No Critical or High findings remain. The two legacy unquoted-punctuation parser fixtures were updated
-to the documented backtick syntax, and the final full suite passed.
+No Critical or High findings remain. All Medium and Low findings were addressed and revalidated.
 
 ## Non-Blocking Follow-Ups
 
-- Missing values/coercion, arithmetic/categories, ordering/randomness, estimation samples, machine
-  output, exit semantics, lineage, and public-preview assurance remain queued in `SPEC.md`.
+- Explicit missing predicates/null literals, coercion, arithmetic/categories, ordering/randomness,
+  estimation samples, machine output, exit semantics, lineage, differential assurance, and
+  public-preview readiness remain queued in `SPEC.md`.
 
 ## Recommended Next Action
 

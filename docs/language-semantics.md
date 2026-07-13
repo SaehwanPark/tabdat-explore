@@ -1,8 +1,8 @@
 # TabDat Language Semantics
 
-This document records stable cross-command behavior. It starts with identifier spelling, quoting,
-write-target, and failure semantics; missing values, coercion, ordering, randomness, estimation
-samples, and exit behavior remain separate contracts.
+This document records stable cross-command behavior. It covers identifier spelling, quoting, missing
+values, write-target, and failure semantics; coercion, ordering, randomness, estimation samples, and
+exit behavior remain separate contracts.
 
 ## Identifier spelling and quoting
 
@@ -24,6 +24,24 @@ replace `weight kg` = `weight kg` * 2 if `status flag` == "active"
 
 Quoted identifiers are not command names or option names. An exact spelling mismatch remains an
 unknown-variable error and follows the write-validation atomicity policy below.
+
+## Missing values and predicates
+
+- Missing values are represented as null values (`None` at the Python boundary); this slice does not
+  introduce a special numeric missing sentinel.
+- `keep if expression` retains only rows where the expression is true. False and missing predicate
+  results are not kept.
+- `drop if expression` removes only rows where the expression is true. False and missing predicate
+  results remain in the active dataset.
+- `replace name = expression if condition` updates only true-condition rows. False and missing
+  conditions preserve the existing value.
+- `summarize` counts nonmissing numeric values; its means, minima, and maxima ignore missing values.
+  `codebook` reports nonmissing and missing counts explicitly.
+- `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
+  categories where the command supports it; bar charts display that category as `<missing>`.
+
+Explicit missing-value predicates, null literals, coercion, and arithmetic-result policy remain
+separate contracts.
 
 ## Write targets
 
@@ -52,5 +70,5 @@ side effects, such as an already-created artifact file from another command.
 
 ## Deliberate limits
 
-Missing values, coercion, arithmetic, categorical behavior, ordering, randomness, estimation samples,
-machine-readable output, and exit codes are not defined here yet.
+Coercion, arithmetic, categorical behavior, ordering, randomness, estimation samples, machine-readable
+output, and exit codes are not defined here yet.

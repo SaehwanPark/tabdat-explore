@@ -1,46 +1,42 @@
-# Product Contract: Phase 24 P0 — Identifier Spelling and Quoted Identifiers
+# Product Contract: Phase 24 P0 — Missing Predicate Semantics
 
 ## Request Summary
 
-Document and regression-test exact variable spelling plus backtick-quoted identifiers in the command
-language.
+Document and regression-test how existing commands treat missing values in predicates and aggregates.
 
 ## Roadmap Phase
 
 Phase 24 P0, workstream 2: stable language semantics before broader command and estimator expansion.
 
-## Stable Identifier Policy
+## Stable Missingness Policy
 
-- Bare identifiers preserve exact spelling and are case-sensitive; command names remain
-  case-insensitive.
-- Bare identifiers use Unicode letters/underscore for the first character and Unicode letters, digits,
-  or underscore thereafter.
-- Backtick-quoted identifiers may contain whitespace and punctuation and use doubled backticks to
-  represent one literal backtick.
-- Quoted identifiers are accepted in variable targets, variable lists, and expression references;
-  command names and option names remain unquoted keywords.
-- Empty quoted identifiers are invalid, and exact spelling mismatches remain unknown-variable errors.
+- Missing values are null values (`None` at the Python boundary), not a special numeric sentinel.
+- `keep if` retains only true predicates; false and missing predicate results are excluded.
+- `drop if` removes only true predicates; false and missing predicate results are retained.
+- `replace if` updates only true predicates; false and missing conditions preserve the original value.
+- `summarize` aggregates nonmissing numeric values; `codebook` reports nonmissing and missing counts.
+- `tabulate` and `bar` omit missing categories by default and include them with `missing` where
+  supported.
 
 ## Error Contract
 
-Existing command-specific errors remain the public diagnostics. Exact spelling mismatches use the
-existing unknown-variable diagnostics; wording remains covered by focused tests and may be refined
-only through a future language-error policy slice.
+Existing command-specific errors remain the public diagnostics; wording remains covered by focused
+tests and may be refined only through a future language-error policy slice.
 
 ## Execution Semantics
 
-- Existing eager/lazy materialization and write-target atomicity behavior remain unchanged.
-- Quoted identifiers resolve through the same backend identifier-quoting boundary as bare identifiers.
+- Predicate semantics apply consistently in eager and supported lazy paths.
+- No new missing predicate syntax or null literal is introduced.
 
 ## Acceptance Criteria
 
-- [x] Durable language-semantics documentation covers exact spelling and backtick quoting.
-- [x] Parser accepts quoted identifiers in targets, lists, and expressions.
-- [x] Quoted keywords remain identifiers rather than control keywords.
-- [x] Backend execution preserves quoted names and exact case.
+- [x] Durable language-semantics documentation covers predicate and aggregate missingness.
+- [x] Keep/drop predicate behavior is tested across eager, DuckDB-lazy, and Polars-lazy paths.
+- [x] Replace-if behavior for false and missing conditions is covered.
+- [x] Summarize/codebook missing-count behavior is covered.
 - [x] Full tests, type/lint/format checks, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Missing values, coercion, arithmetic, categories, ordering, randomness, estimation samples,
-  machine output, exit codes, SQL identifier syntax, or new commands.
+- Explicit missing predicates/null literals, coercion, arithmetic, categories, ordering, randomness,
+  estimation samples, machine output, exit codes, or new commands.
