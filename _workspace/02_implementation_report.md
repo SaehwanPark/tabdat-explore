@@ -1,41 +1,36 @@
-# Implementation Report: Phase 24 P0 Append Row Order
+# Implementation Report: Phase 24 P0 Join Row Order
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — active-left then named-table-right sequence, no
-  sorting/deduplication/interleaving, preview behavior, failure atomicity, and join/reshape non-goals.
+- `_workspace/01_product_command-contract.md` — active-row grouping, named-table match order,
+  duplicate preservation, inner/left unmatched behavior, and reshape/categorical non-goals.
 
 ## Delivered Boundary
 
 - `src/tabdat/backend.py`
-  - Added explicit per-input ordinals and side ordering to append output, preventing `UNION ALL`
-    planning from interleaving active and named-table rows.
-  - Made head, tail, and DuckDB row filters explicitly order their current sequence snapshots.
-  - Normalized Polars/DuckDB scalar type aliases for pre-materialization append validation.
-- `src/tabdat/executor.py`
-  - Validates named-table existence and append schema compatibility before Polars lazy fallback, so
-    failed append commands preserve the active state.
+  - Added a right-input ordinal to the existing active-input ordinal and ordered join output by
+    active sequence first, then named-table sequence.
 - `tests/test_executor.py`
-  - Verified eager, DuckDB-lazy, and Polars-lazy append order, duplicate-row preservation, head/tail,
-    and failure atomicity for unknown tables, missing columns, and type mismatches.
+  - Verified eager, DuckDB-lazy, and Polars-lazy inner/left joins with duplicate right matches and
+    unmatched active rows.
 - `tests/test_cli.py` and `tests/test_help.py`
-  - Covered exact script-mode append row blocks and documented left-then-right behavior.
-- `src/tabdat/help/topics/append.md`, `docs/language-semantics.md`, `docs/command-reference.md`,
+  - Covered exact CLI join row blocks and documented active-row/match ordering.
+- `src/tabdat/help/topics/join.md`, `docs/language-semantics.md`, `docs/command-reference.md`,
   `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Record append sequence semantics while keeping join, reshape, and categorical ordering separate.
+  - Record join sequence semantics while keeping append, reshape, and categorical ordering separate.
 
 ## Functional-First Notes
 
-Append now snapshots each input's current sequence into an internal side/ordinal ordering boundary,
-then materializes the combined rows. Validation remains pure and precedes Polars fallback; no row IDs,
-deduplication, or public sorting abstraction is introduced.
+Join now snapshots both inputs into internal ordinal ordering boundaries before materialization. The
+ordinals are implementation-only; no row IDs, deduplication, global sort, or public sorting abstraction
+is introduced.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_executor.py -k 'append_preserves_left_then_right_sequence or failed_append_validation_preserves_active_state' -q` — passed, 6 tests.
-- `uv run pytest tests/test_cli.py -k 'script_preserves_append_sequence' -q` — passed, 1 test.
-- `uv run pytest tests/test_help.py -q` — passed, 8 tests.
-- `uv run pytest` — passed, 1,081 tests, with 314 existing third-party warnings.
+- `uv run pytest tests/test_executor.py -k join_preserves_active_and_match_sequence -q` — passed, 6 tests.
+- `uv run pytest tests/test_cli.py -k phase_11_join_named_table_flow -q` — passed, 1 test.
+- `uv run pytest tests/test_help.py -k help_topics_document_explicit_missing_values -q` — passed, 1 test.
+- `uv run pytest` — passed, 1,087 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
@@ -45,6 +40,6 @@ deduplication, or public sorting abstraction is introduced.
 
 ## Known Limits And Follow-Up Work
 
-Join/reshape ordering, unordered SQL, categorical ordering, exact arithmetic storage widths, overflow
-diagnostics, randomness, estimation samples, machine output, exit semantics, and full operation
-lineage remain separate Phase 24 slices.
+Reshape ordering, unordered SQL, categorical ordering, exact arithmetic storage widths, overflow
+diagnostics, randomness, estimation samples, errors and exits, machine output, and full operation
+lineage remain separate Phase 24 slices. PR review is the remaining handoff step for this slice.

@@ -9,7 +9,7 @@ from decimal import Decimal
 from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Literal, cast
 from unittest.mock import Mock
 
 import duckdb
@@ -5948,6 +5948,90 @@ def test_phase_11_join_reports_table_and_key_errors(sample_parquet: Path) -> Non
       executor.execute(JoinCommand(table_name="lookup", keys=("age",)))
   finally:
     executor.close()
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+@pytest.mark.parametrize(
+  "how, expected_rows",
+  [
+    (
+      "inner",
+      (
+        ("A", "left-a1", "a-first"),
+        ("A", "left-a1", "a-second"),
+        ("B", "left-b", "b-only"),
+        ("A", "left-a2", "a-first"),
+        ("A", "left-a2", "a-second"),
+      ),
+    ),
+    (
+      "left",
+      (
+        ("A", "left-a1", "a-first"),
+        ("A", "left-a1", "a-second"),
+        ("B", "left-b", "b-only"),
+        ("A", "left-a2", "a-first"),
+        ("A", "left-a2", "a-second"),
+        ("C", "left-c", None),
+      ),
+    ),
+  ],
+)
+def test_join_preserves_active_and_match_sequence(
+  tmp_path: Path,
+  engine: str,
+  how: Literal["inner", "left"],
+  expected_rows: tuple[tuple[object, ...], ...],
+) -> None:
+  path = tmp_path / "join_order.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select join_key, left_label
+    from (
+      values
+        (1, 'A', 'left-a1'),
+        (2, 'B', 'left-b'),
+        (3, 'A', 'left-a2'),
+        (4, 'C', 'left-c')
+    ) as active_rows(row_id, join_key, left_label)
+    order by row_id
+    """,
+  )
+
+  def use_command() -> UseCommand:
+    if engine == "eager":
+      return UseCommand(path)
+    return UseCommand(path, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
+
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(path))
+    executor.execute(
+      SqlCommand(
+        """
+        select join_key, right_label
+        from (
+          values
+            (1, 'A', 'a-first'),
+            (2, 'A', 'a-second'),
+            (3, 'B', 'b-only')
+        ) as lookup_rows(row_id, join_key, right_label)
+        order by row_id
+        """,
+        into="lookup",
+      )
+    )
+    executor.execute(use_command())
+    result = executor.execute(JoinCommand(table_name="lookup", keys=("join_key",), how=how))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(result, TransformResult)
+  assert result.dataset.row_count == len(expected_rows)
+  assert isinstance(preview, PreviewResult)
+  assert preview.rows == expected_rows
 
 
 def test_phase_11_append_named_table_aligns_columns_by_active_order(

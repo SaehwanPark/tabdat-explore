@@ -475,9 +475,12 @@ class DuckDBBackend:
         select row_number() over () as __tabdat_join_order, *
         from {ACTIVE_TABLE}
       ) as left_table
-      {how} join {_quote_identifier(internal_name)} as right_table
+      {how} join (
+        select row_number() over () as __tabdat_join_order, *
+        from {_quote_identifier(internal_name)}
+      ) as right_table
         on {predicates}
-      order by left_table.__tabdat_join_order
+      order by left_table.__tabdat_join_order, right_table.__tabdat_join_order
       """,
       "join",
     )

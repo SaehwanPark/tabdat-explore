@@ -46,6 +46,8 @@ All notable project changes are tracked here.
   are being bounded before join and reshape ordering.
 - Completed the Phase 24 append row-order slice with explicit per-input ordinals, duplicate-row
   coverage, and pre-materialization validation for failed lazy appends.
+- Started the Phase 24 join row-order slice; active-row and named-table match ordering are being
+  bounded before reshape and categorical ordering.
 
 ### Added
 
