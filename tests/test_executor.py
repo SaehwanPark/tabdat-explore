@@ -213,6 +213,25 @@ def _write_nonfinite_parquet(path: Path) -> None:
   )
 
 
+def _write_exact_integer_arithmetic_parquet(path: Path) -> None:
+  _write_sql_parquet(
+    path,
+    """
+    select * from (
+      values
+        (cast(9223372036854775807 as bigint), cast(1 as bigint), cast(3037000500 as bigint),
+         cast(18446744073709551615 as ubigint), cast(1 as ubigint), 'signed_max'),
+        (cast(-9223372036854775808 as bigint), cast(-1 as bigint), cast(2 as bigint),
+         cast(2 as ubigint), cast(3 as ubigint), 'signed_min'),
+        (cast(2 as bigint), cast(3 as bigint), cast(3037000500 as bigint),
+         cast(2 as ubigint), cast(3 as ubigint), 'small'),
+        (cast(1 as bigint), cast(1 as bigint), cast(2 as bigint),
+         cast(18446744073709551615 as ubigint), cast(18446744073709551615 as ubigint), 'overflow')
+    ) as exact_integer_data(amount, adjustment, factor, unsigned_left, unsigned_right, label)
+    """,
+  )
+
+
 def _write_decimal_arithmetic_parquet(path: Path) -> None:
   _write_sql_parquet(
     path,
@@ -7035,6 +7054,206 @@ def test_numeric_expression_compatibility_is_consistent_across_engines(
     (42, 25.0, "M", 150.0, 151.5),
     (54, 27.5, "F", None, None),
   )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_integral_arithmetic_preserves_exact_decimal_width_and_overflow_policy(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "exact-integer-arithmetic.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(
+      GenerateCommand(
+        "exact_sum",
+        BinaryExpression(IdentifierExpression("amount"), "+", IdentifierExpression("adjustment")),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "exact_product",
+        BinaryExpression(IdentifierExpression("factor"), "*", IdentifierExpression("factor")),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "exact_difference",
+        BinaryExpression(IdentifierExpression("amount"), "-", IdentifierExpression("adjustment")),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "exact_negated",
+        UnaryExpression("-", IdentifierExpression("amount")),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "unsigned_sum",
+        BinaryExpression(
+          IdentifierExpression("unsigned_left"),
+          "+",
+          IdentifierExpression("unsigned_right"),
+        ),
+      )
+    )
+    executor.execute(
+      GenerateCommand(
+        "unsigned_product",
+        BinaryExpression(
+          IdentifierExpression("unsigned_left"),
+          "*",
+          IdentifierExpression("unsigned_right"),
+        ),
+      )
+    )
+    preview = executor.execute(HeadCommand(10))
+    dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert dataset is not None
+  for variable in (
+    "exact_sum",
+    "exact_product",
+    "exact_difference",
+    "exact_negated",
+    "unsigned_sum",
+    "unsigned_product",
+  ):
+    data_type = next(column.data_type for column in dataset.columns if column.name == variable)
+    assert data_type.upper().startswith("DECIMAL(38,0)")
+
+  columns = preview.columns
+  exact_sum_index = columns.index("exact_sum")
+  exact_product_index = columns.index("exact_product")
+  exact_negated_index = columns.index("exact_negated")
+  unsigned_sum_index = columns.index("unsigned_sum")
+  unsigned_product_index = columns.index("unsigned_product")
+  assert tuple(row[exact_sum_index] for row in preview.rows) == (
+    Decimal("9223372036854775808"),
+    Decimal("-9223372036854775809"),
+    Decimal("5"),
+    Decimal("2"),
+  )
+  assert tuple(row[exact_product_index] for row in preview.rows) == (
+    Decimal("9223372037000250000"),
+    Decimal("4"),
+    Decimal("9223372037000250000"),
+    Decimal("4"),
+  )
+  exact_difference_index = columns.index("exact_difference")
+  assert tuple(row[exact_difference_index] for row in preview.rows) == (
+    Decimal("9223372036854775806"),
+    Decimal("-9223372036854775807"),
+    Decimal("-1"),
+    Decimal("0"),
+  )
+  assert tuple(row[exact_negated_index] for row in preview.rows) == (
+    Decimal("-9223372036854775807"),
+    Decimal("9223372036854775808"),
+    Decimal("-2"),
+    Decimal("-1"),
+  )
+  assert tuple(row[unsigned_sum_index] for row in preview.rows) == (
+    Decimal("18446744073709551616"),
+    Decimal("5"),
+    Decimal("5"),
+    Decimal("36893488147419103230"),
+  )
+  assert tuple(row[unsigned_product_index] for row in preview.rows) == (
+    Decimal("18446744073709551615"),
+    Decimal("6"),
+    Decimal("6"),
+    None,
+  )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_integral_replace_preserves_exact_width_and_row_level_missing(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "exact-integer-replace.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  expression = BinaryExpression(
+    IdentifierExpression("amount"),
+    "+",
+    IdentifierExpression("adjustment"),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(ReplaceCommand("amount", expression))
+    preview = executor.execute(HeadCommand(10))
+    dataset = executor.state.active_dataset
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert dataset is not None
+  amount_type = next(column.data_type for column in dataset.columns if column.name == "amount")
+  assert amount_type.upper().startswith("DECIMAL(38,0)")
+  amount_index = preview.columns.index("amount")
+  assert tuple(row[amount_index] for row in preview.rows) == (
+    Decimal("9223372036854775808"),
+    Decimal("-9223372036854775809"),
+    Decimal("5"),
+    Decimal("2"),
+  )
+
+
+@pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
+def test_integral_arithmetic_predicate_uses_exact_missing_policy(
+  tmp_path: Path,
+  engine: str,
+) -> None:
+  path = tmp_path / "exact-integer-predicate.parquet"
+  _write_exact_integer_arithmetic_parquet(path)
+  condition = BinaryExpression(
+    BinaryExpression(
+      IdentifierExpression("unsigned_left"),
+      "*",
+      IdentifierExpression("unsigned_right"),
+    ),
+    ">",
+    NumberExpression(0),
+  )
+  executor = Executor()
+  try:
+    use_command = UseCommand(path)
+    if engine != "eager":
+      use_command = UseCommand(
+        path,
+        execution_mode="lazy",
+        lazy_engine=engine,  # type: ignore[arg-type]
+      )
+    executor.execute(use_command)
+    executor.execute(KeepCommand(condition=condition))
+    preview = executor.execute(HeadCommand(10))
+  finally:
+    executor.close()
+
+  assert isinstance(preview, PreviewResult)
+  assert tuple(row[-1] for row in preview.rows) == ("signed_max", "signed_min", "small")
 
 
 @pytest.mark.parametrize("engine", ["eager", "duckdb", "polars"])
