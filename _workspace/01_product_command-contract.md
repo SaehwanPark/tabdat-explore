@@ -36,17 +36,19 @@ No new options, commands, or output fields are introduced.
   rows.
 - `select`, `keep`/`drop` column projection, `rename`, `generate`, `replace`, and `recode` preserve
   the current row sequence when they succeed.
+- Grouped or relation-changing commands such as `collapse`, append, join, and reshape establish
+  their own result sequence; this slice does not redefine their later preview order.
 - Eager, DuckDB-lazy, and Polars-lazy paths produce the same row sequence for this supported surface.
 
 ## Data And Execution Assumptions
 
 - The active dataset must exist and referenced variables must exist, following current errors.
-- DuckDB preview/filter queries consume the active relation sequence; Polars lazy frames use their
-  native sequence-preserving `head`, `tail`, and `filter` operations.
+- DuckDB explicitly enables insertion-order preservation for preview/filter queries; Polars lazy
+  frames use their native sequence-preserving `head`, `tail`, and `filter` operations.
 - Missing conditions use the already defined keep/drop behavior; no additional missing syntax is
   introduced.
-- Append/join/reshape order, named-table storage order, arbitrary SQL `order by`, categorical order,
-  and a new sort command remain outside this slice.
+- Collapse, append/join/reshape order, named-table storage order, arbitrary SQL `order by`,
+  categorical order, and a new sort command remain outside this slice.
 
 ## Acceptance Criteria
 

@@ -115,6 +115,9 @@ class DuckDBBackend:
   def __init__(self) -> None:
     """Initialize the backend connection and internal state variables."""
     self._connection = duckdb.connect(database=":memory:")
+    # Head/tail, filters, and row-preserving rewrites expose the active sequence. Keep DuckDB's
+    # insertion-order behavior explicit instead of relying on its connection default.
+    self._connection.execute("set preserve_insertion_order = true")
     self._active_storage: Literal["table", "view"] = "table"
     self._lazy_engine: Literal["duckdb", "polars"] | None = None
     self._polars_lazy_frame: pl.LazyFrame | None = None

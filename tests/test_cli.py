@@ -70,12 +70,14 @@ def test_cli_script_preserves_active_row_order(tmp_path: Path, capsys) -> None:
   _write_sql_parquet(
     path,
     """
-    select * from (
+    select value, label
+    from (
       values
-        (3, 'first'),
-        (null::integer, 'missing'),
-        (1, 'second')
-    ) as row_order_data(value, label)
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
     """,
   )
   script_path = tmp_path / "row_order.td"
@@ -90,6 +92,41 @@ def test_cli_script_preserves_active_row_order(tmp_path: Path, capsys) -> None:
   assert captured.out.index("first") < captured.out.index("missing")
   assert "second" not in captured.out
   assert captured.err == ""
+
+
+def test_cli_script_preserves_tail_and_filter_order(tmp_path: Path, capsys) -> None:
+  path = tmp_path / "row_order_tail_filter.parquet"
+  _write_sql_parquet(
+    path,
+    """
+    select value, label
+    from (
+      values
+        (1, 3, 'first'),
+        (2, null::integer, 'missing'),
+        (3, 1, 'second'),
+        (4, 2, 'third')
+    ) as row_order_data(row_id, value, label)
+    order by row_id
+    """,
+  )
+
+  tail_script = tmp_path / "row_order_tail.td"
+  tail_script.write_text(f"use {path}\ntail 2\n", encoding="utf-8")
+  assert main(["-f", str(tail_script)]) == 0
+  tail_output = capsys.readouterr()
+
+  filter_script = tmp_path / "row_order_filter.td"
+  filter_script.write_text(f"use {path}\nkeep if value >= 1\nhead 5\n", encoding="utf-8")
+  assert main(["-f", str(filter_script)]) == 0
+  filter_output = capsys.readouterr()
+
+  assert tail_output.err == ""
+  assert tail_output.out.index("second") < tail_output.out.index("third")
+  assert filter_output.err == ""
+  assert filter_output.out.index("first") < filter_output.out.index("second")
+  assert filter_output.out.index("second") < filter_output.out.index("third")
+  assert "missing" not in filter_output.out
 
 
 def test_shell_continues_after_keyboard_interrupt(monkeypatch, capsys) -> None:

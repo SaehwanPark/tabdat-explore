@@ -108,8 +108,9 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
   results follow the existing keep/drop policy and never reorder survivors.
 - Column projection and row-preserving value transformations preserve the current row sequence.
-- Append/join/reshape order, named-table storage order, arbitrary SQL order, and categorical order
-  remain separate contracts.
+- Grouped or relation-changing commands such as `collapse`, append, join, and reshape establish
+  separate result-sequence contracts; this slice does not redefine their later preview order.
+- Named-table storage order, arbitrary SQL order, and categorical order remain separate contracts.
 
 ## Write targets
 
