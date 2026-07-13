@@ -50,15 +50,15 @@ structured error envelope, and the process exits with status `1`.
 
 ## Acceptance Criteria
 
-- [ ] One valid versioned success envelope contains the canonical topic and exact packaged help text.
-- [ ] Topic lookup is registry-derived, case-insensitive, and has no Executor/config/data/session side
+- [x] One valid versioned success envelope contains the canonical topic and exact packaged help text.
+- [x] Topic lookup is registry-derived, case-insensitive, and has no Executor/config/data/session side
   effects.
-- [ ] Unknown topics emit one stable structured JSON error envelope with exit status `1`.
-- [ ] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
+- [x] Unknown topics emit one stable structured JSON error envelope with exit status `1`.
+- [x] Incompatible invocation combinations fail clearly without contaminating JSON output or changing
   existing success/error behavior.
-- [ ] Terminal help, command execution, interactive behavior, and existing JSON schemas remain
+- [x] Terminal help, command execution, interactive behavior, and existing JSON schemas remain
   unchanged.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
+- [x] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 

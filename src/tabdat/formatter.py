@@ -40,6 +40,7 @@ from tabdat.models import (
   ElasticnetRegressionResult,
   ExportResult,
   HeckmanRegressionResult,
+  HelpTopicResult,
   IvRegressionResult,
   LassoRegressionResult,
   LincomResult,
@@ -80,6 +81,7 @@ from tabdat.script import ScriptError
 
 RESULT_TYPE_LABELS: dict[type[object], str] = {
   CommandCatalogResult: "CommandCatalogResult",
+  HelpTopicResult: "HelpTopicResult",
   LoadResult: "LoadResult",
   ActivateResult: "ActivateResult",
   DescribeResult: "DescribeResult",
@@ -146,6 +148,9 @@ ERROR_TYPE_LABELS: dict[type[object], str] = {
 
 
 def format_result(result: Result) -> str:
+  if isinstance(result, HelpTopicResult):
+    return result.text
+
   if isinstance(result, CommandCatalogResult):
     return "\n".join(
       _table(

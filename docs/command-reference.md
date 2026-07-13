@@ -21,6 +21,11 @@ Use `tabdat --json --list-commands` for read-only command discovery. It emits on
 when the command has an in-app help topic, otherwise `null`. Discovery requires `--json`, cannot be
 combined with `-c`, `-f`, or a positional script, and does not create a session or read data.
 
+Use `tabdat --json --help-topic summarize` to retrieve one existing help topic as a
+`HelpTopicResult` envelope containing its canonical topic name and exact packaged text. Topic names
+are case-insensitive; unknown topics emit the existing JSON error envelope. Help-topic retrieval
+requires `--json` and cannot be combined with command or script execution or `--list-commands`.
+
 ## Load and inspect
 
 | Command | Purpose | Minimal invocation |
