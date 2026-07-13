@@ -675,6 +675,7 @@ def test_status_reports_no_active_dataset() -> None:
   assert result.backend == "duckdb"
   assert result.source is None
   assert result.active_table is None
+  assert result.last_operation is None
   assert result.execution_mode is None
   assert result.lazy_engine is None
   assert result.last_materialization_reason is None
@@ -690,6 +691,7 @@ def test_status_preserves_lazy_state_until_count(sample_parquet: Path, engine: s
       UseCommand(sample_parquet, execution_mode="lazy", lazy_engine=engine)  # type: ignore[arg-type]
     )
     before_count = executor.execute(StatusCommand())
+    repeated_status = executor.execute(StatusCommand())
     count_result = executor.execute(CountCommand())
     after_count = executor.execute(StatusCommand())
   finally:
@@ -698,11 +700,15 @@ def test_status_preserves_lazy_state_until_count(sample_parquet: Path, engine: s
   assert isinstance(before_count, StatusResult)
   assert before_count.execution_mode == "lazy"
   assert before_count.lazy_engine == engine
+  assert before_count.last_operation == "use"
   assert before_count.last_materialization_reason is None
   assert before_count.row_count is None
   assert isinstance(count_result, CountResult)
   assert count_result.row_count == 3
+  assert isinstance(repeated_status, StatusResult)
+  assert repeated_status.last_operation == "use"
   assert isinstance(after_count, StatusResult)
+  assert after_count.last_operation == "count"
   assert after_count.execution_mode == "lazy"
   assert after_count.lazy_engine == engine
   assert after_count.last_materialization_reason is None
@@ -724,6 +730,7 @@ def test_status_reports_active_named_table(sample_parquet: Path) -> None:
   assert isinstance(result, StatusResult)
   assert result.source == Path("summary")
   assert result.active_table == "summary"
+  assert result.last_operation == "sql"
   assert result.execution_mode == "eager"
   assert result.lazy_engine is None
   assert result.last_materialization_reason is None
@@ -744,6 +751,7 @@ def test_unsupported_by_command_does_not_materialize_polars_lazy(sample_parquet:
   assert isinstance(result, StatusResult)
   assert result.execution_mode == "lazy"
   assert result.lazy_engine == "polars"
+  assert result.last_operation == "use"
   assert result.row_count is None
 
 
@@ -765,17 +773,21 @@ def test_status_reports_polars_fallback_reason_and_resets_on_activation(
 
   assert isinstance(before, StatusResult)
   assert before.last_materialization_reason is None
+  assert before.last_operation == "use"
   assert isinstance(transform, TransformResult)
   assert transform.dataset.execution_mode == "eager"
   assert isinstance(after_fallback, StatusResult)
   assert after_fallback.execution_mode == "eager"
   assert after_fallback.lazy_engine is None
+  assert after_fallback.last_operation == "generate"
   assert after_fallback.last_materialization_reason == "polars_fallback"
   assert isinstance(after_sql_activation, StatusResult)
   assert after_sql_activation.active_table == "summary"
+  assert after_sql_activation.last_operation == "sql"
   assert after_sql_activation.last_materialization_reason is None
   assert isinstance(after_activation, StatusResult)
   assert after_activation.active_table == "summary"
+  assert after_activation.last_operation == "use"
   assert after_activation.last_materialization_reason is None
 
 
@@ -791,6 +803,7 @@ def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> 
 
   assert isinstance(result, StatusResult)
   assert result.execution_mode == "eager"
+  assert result.last_operation == "use"
   assert result.last_materialization_reason is None
 
 

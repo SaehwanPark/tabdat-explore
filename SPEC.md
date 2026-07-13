@@ -527,27 +527,25 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- Feature: Phase 24 P0 materialization reason transparency
+- Feature: Phase 24 P0 last-operation transparency
   Status: Active
   Started: 2026-07-12
-  Branch: feat/phase24-materialization-reasons
+  Branch: feat/phase24-last-operation
 
   Summary:
-  Extend `status` with a deterministic last-materialization reason for the Polars-lazy fallback
-  boundary, so users can tell why an unsupported command changed the execution mode.
+  Extend `status` with the last successfully executed command, without turning it into full
+  operation lineage or progress reporting.
 
   Verification:
-  - status reports `none` before any tracked fallback and `polars fallback` after an unsupported
-    Polars-lazy command materializes the active relation
-  - a successful `use`, named-table activation, or `sql ... into <table>` resets the last reason to
-    `none`
-  - status itself never materializes, counts, or changes the reason
-  - unsupported `by ...: status` fails before the lazy materialization hook
+  - status reports `none` before any successful command and the canonical command name afterward
+  - status itself does not change the last operation
+  - failed commands leave the prior last operation unchanged
+  - interactive, `-c`, and script flows expose the same last-operation state
   - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - operation lineage, active-operation reporting, retained estimation samples, and JSON
-  - reasons for every DuckDB/eager materialization path beyond the tracked Polars fallback
+  - full operation lineage, active-operation progress, retained estimation samples, and JSON
+  - materialization-reason expansion beyond the prior tracked Polars fallback
   - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
 
 ## Future
@@ -556,8 +554,8 @@ and describe the active work with concise verification criteria.
   - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
   - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
     categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
-  - extend execution transparency with active operations, broader materialization reasons, and
-    retained estimation samples after the initial `status` and Polars-fallback slices
+  - extend execution transparency with full operation lineage, broader materialization reasons,
+    and retained estimation samples after the initial `status`, fallback, and last-operation slices
   - verification:
     - the canonical workflow passes from a clean install in interactive and script modes
     - documented semantics have focused parser/executor/backend/CLI tests

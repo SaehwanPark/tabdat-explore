@@ -1,15 +1,14 @@
-# Delivery Summary: Phase 24 P0 Materialization Reason Transparency
+# Delivery Summary: Phase 24 P0 Last-Operation Transparency
 
-The materialization-reason slice is implemented and locally validated.
+The last-operation transparency slice is implemented and locally validated.
 
 ## Delivered
 
-- Extended `status` with `Last materialization reason: polars fallback|none`.
-- Recorded the reason only after the complete unsupported Polars-lazy command succeeds.
-- Reset the reason after successful source, named-table, or `sql ... into` activation.
-- Preserved lazy state for `status` and unsupported nested `by ...: status` failures.
-- Added typed state/result models, deterministic formatting, CLI/script/parser/shell/help coverage,
-  documentation, and handoff evidence.
+- Extended `status` with `Last operation: <canonical-command-name|none>`.
+- Updated the value only after successful commands; `status` and failures preserve the previous
+  operation.
+- Covered representative eager/lazy, named-table, fallback, `-c`, and script transitions.
+- Added typed metadata, deterministic formatting, documentation, tests, and handoff evidence.
 
 ## Validation
 
@@ -21,6 +20,6 @@ The materialization-reason slice is implemented and locally validated.
 
 ## Remaining Phase 24 Work
 
-Full operation lineage, active-operation reporting, broader materialization reasons, retained
+Full operation lineage/history, active-operation progress, broader materialization reasons, retained
 estimation samples, cross-command semantics, machine-readable automation output, differential
 assurance, dependency measurement, and preview readiness remain in `SPEC.md` Future.

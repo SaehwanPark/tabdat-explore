@@ -14,6 +14,8 @@ All notable project changes are tracked here.
   execution explanation and machine-readable output remain deferred.
 - Started the Phase 24 materialization-reason transparency slice; it exposes the tracked Polars
   lazy-to-eager fallback cause while broader operation lineage remains deferred.
+- Started the Phase 24 last-operation transparency slice; `status` will expose the last successful
+  command while full operation lineage remains deferred.
 
 ### Added
 

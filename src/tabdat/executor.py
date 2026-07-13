@@ -526,6 +526,7 @@ class SessionState:
 
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
+  last_operation: str | None = None
   last_materialization_reason: Literal["polars_fallback"] | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
@@ -629,6 +630,8 @@ class Executor:
       self.state.last_materialization_reason = None
     elif self._pending_materialization_reason is not None:
       self.state.last_materialization_reason = self._pending_materialization_reason
+    if not isinstance(command, StatusCommand):
+      self.state.last_operation = _canonical_command_name(command)
     self._pending_materialization_reason = None
     self._materialization_reason_reset_pending = False
     return result
@@ -1009,6 +1012,7 @@ class Executor:
         backend="duckdb",
         source=None,
         active_table=None,
+        last_operation=self.state.last_operation,
         execution_mode=None,
         lazy_engine=None,
         last_materialization_reason=None,
@@ -1019,6 +1023,7 @@ class Executor:
       backend="duckdb",
       source=dataset.path,
       active_table=self.state.active_table_name,
+      last_operation=self.state.last_operation,
       execution_mode=dataset.execution_mode,
       lazy_engine=dataset.lazy_engine,
       last_materialization_reason=self.state.last_materialization_reason,
@@ -9515,6 +9520,15 @@ def _setting_display_value(name: str, config: TabDatConfig) -> str:
   if name == "graph_open":
     return "on" if config.graph_open else "off"
   raise ExecutionError(f"unknown setting: {name}")
+
+
+def _canonical_command_name(command: Command) -> str:
+  if isinstance(command, BayesPrefixCommand):
+    return "bayes:"
+  command_name = type(command).__name__
+  if command_name.endswith("Command"):
+    command_name = command_name[: -len("Command")]
+  return command_name.lower()
 
 
 def _use_table_name(command: UseCommand) -> str:

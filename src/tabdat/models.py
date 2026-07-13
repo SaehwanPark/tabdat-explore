@@ -921,6 +921,7 @@ class StatusResult:
   backend: Literal["duckdb"]
   source: Path | str | None
   active_table: str | None
+  last_operation: str | None
   execution_mode: Literal["eager", "lazy"] | None
   lazy_engine: Literal["duckdb", "polars"] | None
   last_materialization_reason: Literal["polars_fallback"] | None
