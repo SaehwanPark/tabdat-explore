@@ -1,43 +1,41 @@
-# Request Summary: Phase 24 P1 Structured JSON Help-Topic Retrieval
+# Request Summary: Phase 24 P1 Structured JSON Syntax Preview
 
 ## Goal
 
-Expose one existing in-app help topic through the JSON interface without creating a session,
-executing a command, reading data, or changing terminal behavior.
+Expose a syntax-only machine-readable preview for exactly one batch command without executing it,
+creating a session, reading data, or changing terminal behavior.
 
 ## Phase Fit
 
-Phase 24 P1 Agent and automation interface. This follows the completed JSON success/error envelopes
-and command discovery slice, giving machine clients access to the documented behavior behind a
-discovered help topic before option schemas or dry-run/explain work.
+Phase 24 P1 Agent and automation interface. This follows JSON success/error envelopes, command
+discovery, and machine-readable help retrieval, and provides a deliberately narrow first step toward
+dry-run/explain behavior before effect analysis or option schemas.
 
 ## Touched Surfaces
 
-- `src/tabdat/models.py`: typed help-topic result model
+- `src/tabdat/models.py`: typed syntax-preview result model
 - `src/tabdat/formatter.py`: terminal/JSON serialization and stable result-label coverage
-- `src/tabdat/cli.py`: `--help-topic` validation, lookup, and read-only JSON emission
+- `src/tabdat/cli.py`: `--explain` validation, parser-only routing, and JSON error handling
 - `docs/command-reference.md`, `docs/user-guide.md`, `src/tabdat/help/topics/run.md`: usage docs
-- `tests/test_cli.py`, `tests/test_help.py`: success, unknown-topic, compatibility, and state-free
+- `tests/test_cli.py`, `tests/test_help.py`: success, parse error, state-free, and compatibility
   behavior
 - `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
 
 ## Assumptions
 
-- `tabdat --json --help-topic <topic>` is the only invocation for this slice; it emits one success
-  envelope with `schema_version: 1`, stable `result_type`, and `data.help_topic`/`data.text`.
-- Topic matching is case-insensitive and normalized to the existing lowercase help-topic name.
-- Blank or whitespace-only topics fail with the stable message `help topic cannot be empty`; packaged
-  resource failures fail with `unable to load help topic: <topic>` rather than a traceback.
-- Only topics returned by the existing `available_help_topics()` registry are valid. Unknown topics
-  emit one existing structured JSON error envelope and exit status `1`.
-- Retrieval happens before config or `Executor` construction and has no dataset or session side
-  effects. Existing command execution, terminal help, and JSON success/error envelopes remain
-  unchanged.
-- Combining `--help-topic` with `-c`, `-f`, a positional script, `--list-commands`, or without
-  `--json` fails clearly; interactive mode remains terminal-only.
+- `tabdat --json --explain -c <command>` is the only valid invocation for this slice; it emits one
+  success envelope with `schema_version: 1`, stable `result_type`, `data.command_type`, and
+  `data.execution: "not_run"`.
+- The existing `parse_command()` result class name is the stable parsed command type. No command
+  execution, effect inference, normalization beyond parsing, or data inspection is promised.
+- Exactly one `-c/--command` is required. Syntax failures emit one existing structured JSON error
+  envelope and exit status `1`; terminal stderr retains the existing parse message.
+- Routing occurs before config or `Executor` construction and has no dataset or session side effects.
+- Combining `--explain` with terminal mode, zero/multiple `-c`, `-f`, a positional script,
+  `--list-commands`, `--help-topic`, or interactive mode fails clearly.
 
 ## Non-Goals
 
-- Command execution, script retrieval, multiple-topic output, option/argument schemas, examples,
-  plugin discovery, interactive JSON mode, dry-run/explain, repair diagnostics, operation lineage,
-  or new exit codes.
+- Command execution, effect classification, estimates, state/resource plans, scripts, multiple
+  commands, option/argument schemas, catalog examples, plugin discovery, interactive JSON mode, full
+  dry-run/explain behavior, repair diagnostics, operation lineage, or new exit codes.
