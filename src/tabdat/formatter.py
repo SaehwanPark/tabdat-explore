@@ -103,6 +103,9 @@ def format_result(result: Result) -> str:
       if result.execution_mode == "lazy"
       else "none"
     )
+    reason = (
+      "polars fallback" if result.last_materialization_reason == "polars_fallback" else "none"
+    )
     return "\n".join(
       (
         f"Backend: {result.backend}",
@@ -111,6 +114,7 @@ def format_result(result: Result) -> str:
         f"Execution mode: {result.execution_mode or 'none'}",
         f"Lazy engine: {result.lazy_engine or 'none'}",
         f"Materialization: {materialization}",
+        f"Last materialization reason: {reason}",
         f"Rows: {_row_count(result.row_count) if source is not None else 'none'}",
         f"Columns: {result.column_count if result.column_count is not None else 'none'}",
       )

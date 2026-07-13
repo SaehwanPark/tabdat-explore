@@ -515,26 +515,39 @@ and describe the active work with concise verification criteria.
   - added observational wall-clock benchmark metrics to the integrated E2E reports
   - hardened HTML regression-report downsampling coverage against Altair dataset ordering and
     verified both sampled observations and the one-row reference line
+- Implemented Phase 24 P0 read-only status transparency:
+  - added `status` output for backend, source, active table, eager/lazy mode, materialization state,
+    lazy engine, row-count knowledge, and column count
+  - preserved lazy state for status inspection and recorded explicit `count` metadata
+  - covered parser, executor, CLI/script, shell completion, help, and documentation contracts
+- Implemented Phase 24 P0 materialization reason transparency:
+  - reports the last tracked Polars lazy fallback in `status`
+  - resets the reason when a new source or named table becomes active
+  - rejects unsupported nested `by ...: status` before lazy materialization
 
 ## Present
 
-- Feature: Phase 24 P0 read-only status transparency
+- Feature: Phase 24 P0 materialization reason transparency
   Status: Active
   Started: 2026-07-12
-  Branch: feat/phase24-status-transparency
+  Branch: feat/phase24-materialization-reasons
 
   Summary:
-  Add `status` as a deterministic, read-only view of current backend, source, active table,
-  eager/lazy mode, materialization state, row-count knowledge, and column count.
+  Extend `status` with a deterministic last-materialization reason for the Polars-lazy fallback
+  boundary, so users can tell why an unsupported command changed the execution mode.
 
   Verification:
-  - parser rejects unsupported `status` arguments with a command-level error
-  - status reports no-active, eager, lazy, named-table, and post-count states
-  - status does not materialize lazy datasets or execute a backend count
-  - CLI, script, shell, help, docs, full tests, and type/lint checks pass
+  - status reports `none` before any tracked fallback and `polars fallback` after an unsupported
+    Polars-lazy command materializes the active relation
+  - a successful `use`, named-table activation, or `sql ... into <table>` resets the last reason to
+    `none`
+  - status itself never materializes, counts, or changes the reason
+  - unsupported `by ...: status` fails before the lazy materialization hook
+  - CLI, script, help, docs, full tests, and type/lint checks pass
 
   Out of Scope:
-  - `explain`, operation lineage, materialization reasons, retained estimation samples, and JSON
+  - operation lineage, active-operation reporting, retained estimation samples, and JSON
+  - reasons for every DuckDB/eager materialization path beyond the tracked Polars fallback
   - lazy/eager semantic changes, new backends, estimators, connectors, or plugins
 
 ## Future
@@ -543,8 +556,8 @@ and describe the active work with concise verification criteria.
   - pause net-new estimator families until the Phase 24 exit gate in `docs/dev_phase.md` is met
   - define stable cross-command semantics for identifiers, missing values, coercion, arithmetic,
     categories, ordering, overwrite behavior, estimation samples, randomness, errors, and exits
-  - extend execution transparency with active operations, materialization reasons, and retained
-    estimation samples after the initial read-only `status` slice
+  - extend execution transparency with active operations, broader materialization reasons, and
+    retained estimation samples after the initial `status` and Polars-fallback slices
   - verification:
     - the canonical workflow passes from a clean install in interactive and script modes
     - documented semantics have focused parser/executor/backend/CLI tests

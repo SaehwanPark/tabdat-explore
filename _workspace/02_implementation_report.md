@@ -1,61 +1,58 @@
-# Implementation Report: Phase 24 P0 Read-Only Status Transparency
+# Implementation Report: Phase 24 P0 Materialization Reason Transparency
 
 ## Contract Consumed
 
-- `_workspace/01_product_command-contract.md` — deterministic, read-only `status` command.
+- `_workspace/01_product_command-contract.md` — `status` materialization-reason extension.
 
 ## Delivered Boundary
 
-- `src/tabdat/models.py`
-  - Added typed `StatusCommand` and `StatusResult` models.
-  - Added the command/result variants to the shared unions.
-- `src/tabdat/parser.py`
-  - Added exact `status` parsing.
-  - Rejects arguments, options, conditions, and assignment syntax with one command-level error.
 - `src/tabdat/executor.py`
-  - Dispatches `status` before the existing lazy materialization hook.
-  - Builds status only from `SessionState` metadata and the fixed DuckDB backend identity.
-  - Records the live count in `DatasetInfo` when `count` runs so later status output can distinguish
-    unknown from known lazy row counts without changing `count` output.
-- `src/tabdat/formatter.py`, `src/tabdat/shell.py`, and `src/tabdat/help/topics/status.md`
-  - Added the stable labeled terminal output, command completion, and help documentation.
+  - Added typed session metadata for the last successful tracked Polars fallback.
+  - Uses a small public-execution commit boundary so `polars_fallback` is recorded only after the
+    requested command succeeds, even though the fallback hook runs before command dispatch.
+  - Resets the reason after a successful source load or named-table activation.
+  - Resets the reason after successful `sql ... into <table>` activation.
+  - Keeps unsupported `ByCommand` validation before the lazy materialization hook.
+- `src/tabdat/models.py` and `src/tabdat/formatter.py`
+  - Added the optional typed reason to `StatusResult`.
+  - Render `Last materialization reason: polars fallback|none` in the contracted position.
 - `tests/`
-  - Added parser, executor, CLI, script, shell-completion, and help coverage for no-active, eager,
-    lazy DuckDB, lazy Polars, named-table, and post-count state.
-- `docs/command-reference.md`, `docs/user-guide.md`, `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
-  - Documented the command contract, scope, implementation assumptions, and validation evidence.
+  - Covers initial/eager/DuckDB-lazy/Polars-lazy `none` states, successful fallback, failed
+    unsupported `by` preservation, source/table reset, exact no-active output, `-c` and script
+    flows, parser, shell completion, and help.
+- `src/tabdat/help/topics/status.md`, `docs/command-reference.md`, `docs/user-guide.md`,
+  `SPEC.md`, `CHANGELOG.md`, and `_workspace/`
+  - Documented the narrow fallback taxonomy, examples, non-goals, and verification evidence.
 
 ## Implementation Notes By Boundary
 
-- Parser/CLI: `status` is available in interactive, script, and `-c` modes and accepts no suffix
-  syntax.
-- Executor/backend: the command does not call a backend count or materialize a lazy relation;
-  materialization remains owned by the existing command-dispatch path.
-- State: eager datasets report materialized, lazy datasets report deferred, and lazy row counts stay
-  unknown until an existing `count` command records the value.
-- Output: the formatter renders only the typed result, with stable labels and `none`/`unknown`
-  sentinels from the contract.
+- State: the reason is session metadata for the last successful tracked Polars fallback, not full
+  operation lineage.
+- Lazy boundary: status remains dispatched before the materialization hook; the hook stages the
+  reason after collecting the lazy frame, and the executor commits it only after command success.
+- Reset boundary: successful `use`, named-table activation, and `sql ... into <table>` clear the
+  reason; failed operations do not claim a fallback.
+- Output: the internal typed value `polars_fallback` is normalized to the public phrase
+  `polars fallback`; no backend inspection is added to formatting.
+- Scope: reasons for other DuckDB/eager materialization paths remain intentionally unmodeled.
 
 ## Validation Commands And Outcomes
 
-- `uv run pytest tests/test_parser.py -k status -q` — passed, 2 tests.
-- `uv run pytest tests/test_executor.py -k status -q` — passed, 4 tests.
-- `uv run pytest tests/test_cli.py -k phase_24_status -q` — passed, 3 tests.
-- `uv run pytest tests/test_shell.py -k command_names -q` — passed, 1 test.
+- `uv run pytest tests/test_executor.py -k 'status or fallback' -q` — passed, 8 tests.
+- `uv run pytest tests/test_cli.py -k 'phase_24_status or fallback_reason' -q` — passed, 5 tests.
+- `uv run pytest tests/test_parser.py -k 'status or by' -q` — passed, 8 tests.
+- `uv run pytest tests/test_shell.py -k 'command_names or by' -q` — passed, 3 tests.
 - `uv run pytest tests/test_help.py -k help_topics -q` — passed, 2 tests.
-- `uv run pytest` — passed, 958 tests, with 314 existing third-party warnings.
+- `uv run pytest` — passed, 962 tests, with 314 existing third-party warnings.
 - `uv run basedpyright` — passed, 0 errors, warnings, or notes.
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed, 34 files already formatted.
 - `git diff --check` — passed.
-- `uv run tabdat -c status` — passed; rendered the no-active-dataset contract exactly.
-- `uv run python integrated_testing/run_e2e.py` — passed; all six existing scenarios passed,
-  including canonical replay with exact stdout/table equivalence and 4.327 seconds composite
-  duration.
+- `uv run python integrated_testing/run_e2e.py` — passed; all six scenarios passed, including
+  canonical replay with exact stdout/table equivalence and 4.362 seconds composite duration.
 
 ## Known Limits And Follow-Up Work
 
-- This slice intentionally reports current state only; operation lineage, materialization reasons,
-  retained estimation samples, machine-readable output, and stable exit-code redesign remain
-  future Phase 24 work.
-- The backend identity is currently fixed to DuckDB because backend selection is outside this slice.
+- The reason taxonomy currently covers only the existing Polars lazy-to-eager fallback hook.
+- Full operation lineage, active-operation reporting, broader materialization causes, retained
+  estimation samples, machine-readable output, and explain/dry-run remain future Phase 24 work.

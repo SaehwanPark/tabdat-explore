@@ -677,6 +677,7 @@ def test_status_reports_no_active_dataset() -> None:
   assert result.active_table is None
   assert result.execution_mode is None
   assert result.lazy_engine is None
+  assert result.last_materialization_reason is None
   assert result.row_count is None
   assert result.column_count is None
 
@@ -697,12 +698,14 @@ def test_status_preserves_lazy_state_until_count(sample_parquet: Path, engine: s
   assert isinstance(before_count, StatusResult)
   assert before_count.execution_mode == "lazy"
   assert before_count.lazy_engine == engine
+  assert before_count.last_materialization_reason is None
   assert before_count.row_count is None
   assert isinstance(count_result, CountResult)
   assert count_result.row_count == 3
   assert isinstance(after_count, StatusResult)
   assert after_count.execution_mode == "lazy"
   assert after_count.lazy_engine == engine
+  assert after_count.last_materialization_reason is None
   assert after_count.row_count == 3
   assert after_count.column_count == 4
 
@@ -723,6 +726,7 @@ def test_status_reports_active_named_table(sample_parquet: Path) -> None:
   assert result.active_table == "summary"
   assert result.execution_mode == "eager"
   assert result.lazy_engine is None
+  assert result.last_materialization_reason is None
   assert result.row_count == 2
   assert result.column_count == 2
 
@@ -741,6 +745,53 @@ def test_unsupported_by_command_does_not_materialize_polars_lazy(sample_parquet:
   assert result.execution_mode == "lazy"
   assert result.lazy_engine == "polars"
   assert result.row_count is None
+
+
+def test_status_reports_polars_fallback_reason_and_resets_on_activation(
+  sample_parquet: Path,
+) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    before = executor.execute(StatusCommand())
+    transform = executor.execute(GenerateCommand("age2", NumberExpression(2)))
+    after_fallback = executor.execute(StatusCommand())
+    executor.execute(SqlCommand("select * from active", into="summary"))
+    after_sql_activation = executor.execute(StatusCommand())
+    executor.execute(UseCommand(Path("summary")))
+    after_activation = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(before, StatusResult)
+  assert before.last_materialization_reason is None
+  assert isinstance(transform, TransformResult)
+  assert transform.dataset.execution_mode == "eager"
+  assert isinstance(after_fallback, StatusResult)
+  assert after_fallback.execution_mode == "eager"
+  assert after_fallback.lazy_engine is None
+  assert after_fallback.last_materialization_reason == "polars_fallback"
+  assert isinstance(after_sql_activation, StatusResult)
+  assert after_sql_activation.active_table == "summary"
+  assert after_sql_activation.last_materialization_reason is None
+  assert isinstance(after_activation, StatusResult)
+  assert after_activation.active_table == "summary"
+  assert after_activation.last_materialization_reason is None
+
+
+def test_failed_polars_fallback_does_not_record_reason(sample_parquet: Path) -> None:
+  executor = Executor()
+  try:
+    executor.execute(UseCommand(sample_parquet, execution_mode="lazy", lazy_engine="polars"))
+    with pytest.raises(ExecutionError):
+      executor.execute(GenerateCommand("age2", IdentifierExpression("missing")))
+    result = executor.execute(StatusCommand())
+  finally:
+    executor.close()
+
+  assert isinstance(result, StatusResult)
+  assert result.execution_mode == "eager"
+  assert result.last_materialization_reason is None
 
 
 def test_resolve_remote_parquet_source() -> None:

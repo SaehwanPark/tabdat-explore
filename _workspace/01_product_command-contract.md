@@ -1,13 +1,13 @@
-# Product Contract: Phase 24 P0 — Read-Only Status Transparency
+# Product Contract: Phase 24 P0 — Materialization Reason Transparency
 
 ## Request Summary
 
-Expose the current execution boundary through a deterministic, read-only `status` command that
-does not trigger a backend scan or lazy materialization.
+Extend the existing read-only `status` command with a deterministic explanation for the tracked
+Polars lazy-to-eager fallback boundary.
 
 ## Roadmap Phase
 
-Phase 24 P0, workstream 3: execution transparency before command-catalog expansion.
+Phase 24 P0, workstream 3: execution transparency before broader semantic and automation work.
 
 ## Command Syntax
 
@@ -15,11 +15,12 @@ Phase 24 P0, workstream 3: execution transparency before command-catalog expansi
 status
 ```
 
-`status` accepts no arguments, options, conditions, or assignment syntax.
+The command syntax is unchanged. `status` accepts no arguments, options, conditions, or assignment
+syntax.
 
 ## Output Contract
 
-The terminal output is a stable labeled summary with these fields, in this order:
+The terminal output keeps the existing fields and inserts one field after `Materialization`:
 
 ```text
 Backend: duckdb
@@ -28,74 +29,73 @@ Active table: <name|none>
 Execution mode: <eager|lazy|none>
 Lazy engine: <duckdb|polars|none>
 Materialization: <materialized|deferred|none>
+Last materialization reason: <polars fallback|none>
 Rows: <integer|unknown|none>
 Columns: <integer|none>
 ```
 
-For an eager active dataset, materialization is `materialized`; for a lazy active dataset it is
-`deferred`. `Rows: unknown` reports an active lazy dataset whose row count has not been recorded.
-After `count`, the executor records the live count in session metadata and `status` reports that
-integer without changing the existing `count` output.
+`polars fallback` means an unsupported command caused the existing Polars lazy frame to be
+collected and replaced by the eager DuckDB relation. The field is session metadata for the last
+successful tracked fallback, not a complete operation lineage.
 
-With no active dataset, backend remains `duckdb` and the remaining dataset fields are `none`.
+## State Semantics
 
-## Product Outcome
-
-TabDat demonstrates that it is the fastest, clearest, and most reproducible terminal workflow for
-first-pass exploration of modern tabular data. Conventional statistics remain available, while
-specialized integrations no longer determine the installation or product narrative of the core;
-users can see the current execution boundary before choosing a potentially materializing command.
+- A new executor, eager `use`, lazy DuckDB `use`, and lazy Polars `use` report `none`.
+- `status`, `count`, and Polars-supported lazy operations do not set or change the reason.
+- After an unsupported Polars-lazy command materializes successfully, `status` reports eager mode,
+  materialized state, and `Last materialization reason: polars fallback`.
+- A successful source load, named-table activation, or `sql ... into <table>` activation resets the
+  reason to `none`.
+- Failed commands do not claim a successful fallback.
+- Unsupported `by ...: status` is rejected during parsing; direct unsupported `ByCommand` values
+  are rejected before the materialization hook.
 
 ## Execution Semantics
 
-- The parser creates a `StatusCommand` with no backend access.
-- The executor builds `StatusResult` from `SessionState.active_dataset`,
-  `SessionState.active_table_name`, and the fixed DuckDB backend identity.
-- `status` is dispatched before the existing Polars lazy materialization hook.
-- The formatter renders only the structured result; it does not inspect or count the backend.
-- The command is valid in interactive, script, and `-c` execution modes.
+- `StatusResult` carries the typed reason value; the formatter only renders that result.
+- `_materialize_polars_lazy_if_needed` stages the reason after backend materialization succeeds;
+  the executor commits it only after the requested command succeeds.
+- `status` remains dispatched before the materialization hook and never queries the backend.
+- The command remains valid in interactive, script, and `-c` execution modes.
 
 ## Examples
 
-```text
-tabdat> status
-Backend: duckdb
-Source: none
-Active table: none
-Execution mode: none
-Lazy engine: none
-Materialization: none
-Rows: none
-Columns: none
-```
+Before a fallback:
 
 ```text
-tabdat> use data.parquet, lazy engine=duckdb
+tabdat> use data.parquet, lazy engine=polars
 tabdat> status
-Backend: duckdb
-Source: data.parquet
-Active table: none
 Execution mode: lazy
-Lazy engine: duckdb
+Lazy engine: polars
 Materialization: deferred
-Rows: unknown
-Columns: 4
+Last materialization reason: none
+```
+
+After an unsupported Polars-lazy command:
+
+```text
+tabdat> generate age2 = age + 1
+tabdat> status
+Execution mode: eager
+Lazy engine: none
+Materialization: materialized
+Last materialization reason: polars fallback
 ```
 
 ## Acceptance Criteria
 
-- [x] `parse_command("status")` returns `StatusCommand()` and invalid extra input has a command-
-  level parse error.
-- [x] No-active, eager, lazy DuckDB, lazy Polars, named-table, and post-`count` states render the
-  contracted fields.
-- [x] `status` after lazy load leaves the dataset lazy and the row count unknown; it does not invoke
-  a materialization or row-count backend operation.
-- [x] CLI, script, shell completion, help, and command-reference coverage exist.
-- [x] Full tests, type checks, lint/format checks, and a CLI smoke flow pass.
+- [x] `StatusResult` has a typed optional fallback-reason field and the formatter renders the exact
+  label/order.
+- [x] New/eager/DuckDB-lazy/Polars-lazy states report `none`.
+- [x] A successful unsupported Polars-lazy command reports `polars fallback` after materializing.
+- [x] Successful `use` and named-table activation reset the reason; failed fallback does not set it.
+- [x] `status` remains non-materializing and unsupported nested `by ...: status` remains
+  state-preserving.
+- [x] CLI, script, parser, shell/help, command-reference, user-guide, full tests, type/lint, and
+  integrated workflow checks pass.
 
 ## Non-Goals For This Slice
 
-- Implementing `explain`, operation lineage, materialization reasons, retained estimation samples,
-  machine-readable output, or stable exit-code redesign.
-- Changing lazy/eager execution or adding backend implementations.
-- Adding estimators, connectors, plugins, or dependency-layer changes.
+- Full operation lineage, active-operation progress, broader materialization-cause taxonomy,
+  retained estimation samples, machine-readable output, or explain/dry-run.
+- Changes to lazy/eager behavior, backends, estimators, connectors, plugins, or exit codes.

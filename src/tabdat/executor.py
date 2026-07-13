@@ -526,6 +526,7 @@ class SessionState:
 
   active_dataset: DatasetInfo | None = None
   active_table_name: str | None = None
+  last_materialization_reason: Literal["polars_fallback"] | None = None
   tables: dict[str, DatasetInfo] = field(default_factory=dict)
   config: TabDatConfig = TabDatConfig()
   regression: _RegressionState | None = None
@@ -578,6 +579,8 @@ class Executor:
     """
     self.backend = backend or DuckDBBackend()
     self.state = SessionState(config=config or TabDatConfig())
+    self._pending_materialization_reason: Literal["polars_fallback"] | None = None
+    self._materialization_reason_reset_pending = False
 
   def _clear_all_regression_states(self) -> None:
     self.state.regression = None
@@ -612,6 +615,25 @@ class Executor:
     self.backend.close()
 
   def execute(self, command: Command) -> Result | None:
+    """Execute a command and commit materialization metadata only on success."""
+    self._pending_materialization_reason = None
+    self._materialization_reason_reset_pending = False
+    try:
+      result = self._execute_command(command)
+    except Exception:
+      self._pending_materialization_reason = None
+      self._materialization_reason_reset_pending = False
+      raise
+
+    if self._materialization_reason_reset_pending:
+      self.state.last_materialization_reason = None
+    elif self._pending_materialization_reason is not None:
+      self.state.last_materialization_reason = self._pending_materialization_reason
+    self._pending_materialization_reason = None
+    self._materialization_reason_reset_pending = False
+    return result
+
+  def _execute_command(self, command: Command) -> Result | None:
     """Execute a parsed command AST node and return its structured Result.
 
     Coordinates regression cache invalidation prior to running new estimation
@@ -671,7 +693,9 @@ class Executor:
       self.state.spatial_regression = None
 
     if isinstance(command, UseCommand):
-      return self._execute_use(command)
+      result = self._execute_use(command)
+      self._reset_materialization_reason()
+      return result
 
     if isinstance(command, RecodeCommand):
       return self._execute_recode(command)
@@ -987,6 +1011,7 @@ class Executor:
         active_table=None,
         execution_mode=None,
         lazy_engine=None,
+        last_materialization_reason=None,
         row_count=None,
         column_count=None,
       )
@@ -996,6 +1021,7 @@ class Executor:
       active_table=self.state.active_table_name,
       execution_mode=dataset.execution_mode,
       lazy_engine=dataset.lazy_engine,
+      last_materialization_reason=self.state.last_materialization_reason,
       row_count=dataset.row_count,
       column_count=dataset.column_count,
     )
@@ -1147,6 +1173,7 @@ class Executor:
         command.into,
       )
       self._set_active_dataset(next_dataset, active_table_name=command.into)
+      self._reset_materialization_reason()
       return SqlCreateResult(command.into, next_dataset)
     sql_headers, sql_rows = self.backend.run_sql(command.query)
     return TableResult(headers=sql_headers, rows=sql_rows)
@@ -5837,6 +5864,10 @@ class Executor:
       raise NoActiveDatasetError(f"{command_name} requires an active dataset; run use <path> first")
     return self.state.active_dataset
 
+  def _reset_materialization_reason(self) -> None:
+    self.state.last_materialization_reason = None
+    self._materialization_reason_reset_pending = True
+
   def _set_active_dataset(
     self,
     dataset: DatasetInfo,
@@ -5942,6 +5973,7 @@ class Executor:
     materialized = self.backend.materialize_polars_lazy(dataset.path)
     materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
     self.state.active_dataset = materialized
+    self._pending_materialization_reason = "polars_fallback"
 
   def _execute_test(self, command: TestCommand) -> TestResult:
     params_series, cov_df, df_resid = self._get_active_estimation_results()
