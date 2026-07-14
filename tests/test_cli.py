@@ -833,7 +833,10 @@ def test_cli_json_rejects_interactive_mode(capsys) -> None:
 
   captured = capsys.readouterr()
 
-  assert "--json requires -c/--command or a script path" in captured.err
+  assert (
+    "--json requires a command execution, script path, explain, or discovery/describe flag"
+    in captured.err
+  )
 
 
 def test_cli_script_preserves_active_row_order(tmp_path: Path, capsys) -> None:
