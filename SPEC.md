@@ -665,32 +665,14 @@ and describe the active work with concise verification criteria.
     as PR #110
   - explicitly deferred data-dependent planning, option/argument schemas, estimates, and full
     dry-run/explain behavior
+- Implemented Phase 24 P1 structured JSON command schema discovery:
+  - added read-only `--json --describe-command <name>` emitting one deterministic schema envelope with canonical command name, syntax/help-topic metadata, and bounded argument/option descriptors
+  - derived metadata from registry without launching Executor, loading config, inspecting data, or starting a session
+  - handled unknown commands using the existing structured JSON error envelope
+  - completed exactly three independent reviews, fixed all findings, and merged the validated slice as PR #111
+  - explicitly deferred command execution, data-dependent planning, scripts, multiple-command output, plugin schemas, interactive JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation lineage, estimation samples, new syntax, and new exit codes
 
 ## Present
-
-- Feature: Phase 24 P1 structured JSON command schema discovery
-  Status: Active
-  Started: 2026-07-13
-  Branch: feat/phase24-json-schema
-
-  Summary:
-  Add read-only machine-readable syntax and argument metadata for one discovered command without
-  executing it, creating a session, or reading data.
-
-  Verification:
-  - `--json --describe-command <name>` emits one deterministic schema envelope with canonical command
-    name, syntax/help-topic metadata, and bounded argument/option descriptors
-  - metadata is registry-derived, read-only, and does not launch `Executor`, load config, inspect data,
-    or claim full parser/execution equivalence
-  - unknown commands use the existing structured JSON error envelope; terminal and existing JSON paths
-    remain unchanged
-  - CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass
-
-  Out of Scope:
-  - command execution, data-dependent planning, scripts, multiple-command output, plugins, interactive
-    JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation lineage,
-    estimation samples, new syntax, and new exit codes
-  - new commands, new backends, estimators, connectors, or plugins
 
 ## Future
 
