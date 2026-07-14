@@ -31,11 +31,12 @@ Run these checks before opening a pull request:
 ```bash
 uv run mypy
 uv run pytest
+uv run python scripts/check_docs_alignment.py
 uv run ruff check .
 uv run ruff format --check .
 ```
 
-Fix formatting with `uv run ruff format .` when needed.
+Documentation links and command registries are validated automatically by `pytest` and can be run independently using the script above. Fix formatting with `uv run ruff format .` when needed.
 
 ## Development expectations
 

@@ -20,6 +20,7 @@ Keep this file short and repo-wide. Detailed reusable workflows live under `.age
 - Until a test suite exists, every implementation task should add or update focused tests and record the exact validation command in the final response.
 - Use a tab size of 2 spaces across project files.
 - Run configured linting and formatting proactively before commits.
+- Run documentation and command alignment verification: `uv run python scripts/check_docs_alignment.py` (also runs automatically under `pytest`).
 - For reusable agent workflows, use `.agents/skills/tabdat-orchestrator/SKILL.md` and `docs/harness/tabdat/team-spec.md`.
 - Note this project should follow: FP-style (use `fp-developer` skill whenever writing or editing codebase), SDD (spec-driven), TDD (test-driven)
 - Focus on type safety via `basedpyright` and `pydantic`: Use `basedpyright` to prevent bugs by analyzing code for errors before execution, use `pydantic` to ensure data integrity by ensuring data structures conform to defined types.
