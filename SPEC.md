@@ -666,11 +666,17 @@ and describe the active work with concise verification criteria.
   - explicitly deferred data-dependent planning, option/argument schemas, estimates, and full
     dry-run/explain behavior
 - Implemented Phase 24 P1 structured JSON command schema discovery:
-  - added read-only `--json --describe-command <name>` emitting one deterministic schema envelope with canonical command name, syntax/help-topic metadata, and bounded argument/option descriptors
-  - derived metadata from registry without launching Executor, loading config, inspecting data, or starting a session
+  - added read-only `--json --describe-command <name>` emitting one deterministic schema envelope
+    with canonical command name, syntax/help-topic metadata, and bounded argument/option descriptors
+  - derived metadata from registry without launching executor, loading config, inspecting data, or
+    starting a session
   - handled unknown commands using the existing structured JSON error envelope
-  - completed exactly three independent reviews, fixed all findings, and merged the validated slice as PR #111
-  - explicitly deferred command execution, data-dependent planning, scripts, multiple-command output, plugin schemas, interactive JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation lineage, estimation samples, new syntax, and new exit codes
+  - completed exactly three independent reviews, fixed all findings, and merged the validated slice
+    as PR #111
+  - explicitly deferred command execution, data-dependent planning, scripts,
+    multiple-command output, plugin schemas, interactive JSON mode, effect estimates,
+    full dry-run/explain, repair diagnostics, operation lineage, estimation samples,
+    new syntax, and new exit codes
 
 ## Present
 

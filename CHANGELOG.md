@@ -77,7 +77,10 @@ All notable project changes are tracked here.
   conventional help precedence, and parser-only execution boundaries.
 - Completed the Phase 24 structured JSON declared-effect slice with explicit registry coverage,
   delegated/output-effect semantics, canonical category invariants, and unknown fallback.
-- Completed the Phase 24 structured JSON command-schema discovery slice with a read-only machine-readable syntax and argument metadata catalog for one command, and registered command schemas without session initialization or data loading.
+- Completed the Phase 24 structured JSON command-schema discovery slice with a read-only
+  machine-readable syntax and argument metadata catalog for one command, and registered command
+  schemas without session initialization or data loading.
+
 
 ### Added
 
