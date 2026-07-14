@@ -13,7 +13,7 @@ from typing import Any, Literal, Protocol
 
 from tabdat import __version__
 from tabdat.config import TabDatConfig, load_config, load_default_config
-from tabdat.errors import TabDatError
+from tabdat.errors import ParseError, TabDatError
 from tabdat.executor import Executor
 from tabdat.formatter import format_error_json, format_result, format_result_json
 from tabdat.help import available_help_topics, load_help_topic, load_help_topic_text
@@ -1041,7 +1041,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     config = load_config(args.config) if args.config is not None else load_default_config()
   except TabDatError as exc:
     print(f"Error: {exc}", file=sys.stderr)
-    return 1
+    return 3 if isinstance(exc.__cause__, FileNotFoundError) or "not found" in str(exc) else 1
 
   executor = Executor(config=config)
   try:
@@ -1189,28 +1189,38 @@ def _run_commands(
     executor: The active Executor instance.
 
   Returns:
-    Exit code 0 if all commands succeeded, or 1 if any command failed.
+    Exit code 0 if all commands succeeded, 2 if any has parse error,
+    or 1 if any has execution error.
   """
-  for command_text in commands:
-    status = _run_one(
-      command_text,
-      executor,
-      open_plots=False,
-      output_format=output_format,
-      help_chooser=None,
-      run_script=lambda path: _run_script_status(
-        path,
+  try:
+    for command_text in commands:
+      status = _run_one(
+        command_text,
         executor,
-        base_dir=None,
-        active_stack=(),
-        context=ScriptContext.empty(),
+        open_plots=False,
         output_format=output_format,
-      ),
-    )
-    if status is _RunStatus.ERROR:
-      return 1
-    if status is _RunStatus.STOP:
-      break
+        help_chooser=None,
+        run_script=lambda path: _run_script_status(
+          path,
+          executor,
+          base_dir=None,
+          active_stack=(),
+          context=ScriptContext.empty(),
+          output_format=output_format,
+        ),
+      )
+      if status is _RunStatus.STOP:
+        break
+  except ParseError as exc:
+    print(f"Error: {exc}", file=sys.stderr)
+    if output_format == "json":
+      print(format_error_json(exc))
+    return 2
+  except TabDatError as exc:
+    print(f"Error: {exc}", file=sys.stderr)
+    if output_format == "json":
+      print(format_error_json(exc))
+    return 1
   return 0
 
 
@@ -1238,22 +1248,29 @@ def _run_shell(executor: Executor) -> int:
       print()
       return 0
 
-    status = _run_one(
-      command_text,
-      executor,
-      open_plots=executor.state.config.graph_open,
-      command_rewriter=_prepare_interactive_command,
-      help_chooser=lambda topics: _prompt_for_help_topic(session, topics),
-      run_script=lambda path: _run_script_status(
-        path,
+    try:
+      status = _run_one(
+        command_text,
         executor,
-        base_dir=None,
-        active_stack=(),
-        context=ScriptContext.empty(),
-      ),
-    )
+        open_plots=executor.state.config.graph_open,
+        command_rewriter=_prepare_interactive_command,
+        help_chooser=lambda topics: _prompt_for_help_topic(session, topics),
+        run_script=lambda path: _run_script_status(
+          path,
+          executor,
+          base_dir=None,
+          active_stack=(),
+          context=ScriptContext.empty(),
+          output_format="terminal",
+        ),
+      )
+    except TabDatError as exc:
+      print(f"Error: {exc}", file=sys.stderr)
+      continue
+
     if status is _RunStatus.STOP:
-      return 0
+      break
+  return 0
 
 
 def _run_one(
@@ -1281,20 +1298,14 @@ def _run_one(
   Returns:
     The running status outcome (CONTINUE, STOP, or ERROR).
   """
-  try:
-    status, result = _execute_one(
-      command_text,
-      executor,
-      output_format=output_format,
-      command_rewriter=command_rewriter,
-      help_chooser=help_chooser,
-      run_script=run_script,
-    )
-  except TabDatError as exc:
-    print(f"Error: {exc}", file=sys.stderr)
-    if output_format == "json":
-      print(format_error_json(exc))
-    return _RunStatus.ERROR
+  status, result = _execute_one(
+    command_text,
+    executor,
+    output_format=output_format,
+    command_rewriter=command_rewriter,
+    help_chooser=help_chooser,
+    run_script=run_script,
+  )
 
   if status is not _RunStatus.CONTINUE:
     return status
@@ -1443,6 +1454,15 @@ def _run_script(
     print(f"Error: {exc}", file=sys.stderr)
     if output_format == "json":
       print(format_error_json(exc))
+
+    if isinstance(exc.__cause__, ParseError):
+      return 2
+    if (
+      isinstance(exc.__cause__, FileNotFoundError)
+      or "not found" in exc.message
+      or "could not read script" in exc.message
+    ):
+      return 3
     return 1
   return 1 if status is _RunStatus.ERROR else 0
 

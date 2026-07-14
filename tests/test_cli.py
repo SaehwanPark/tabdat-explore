@@ -722,7 +722,7 @@ def test_cli_json_parse_error_emits_one_error_envelope(capsys) -> None:
   captured = capsys.readouterr()
   envelope = json.loads(captured.out)
 
-  assert exit_code == 1
+  assert exit_code == 2
   assert envelope["schema_version"] == 1
   assert envelope["error"]["type"] == "ParseError"
   assert "unknown command" in envelope["error"]["message"]
@@ -4100,7 +4100,7 @@ def test_cli_prints_phase_2_parse_errors(capsys) -> None:
 
   captured = capsys.readouterr()
 
-  assert exit_code == 1
+  assert exit_code == 2
   assert captured.out == ""
   assert "Error: missing expression after if" in captured.err
 

@@ -1,66 +1,79 @@
-# Product Contract: Phase 24 P1 — Structured JSON Command Schema Discovery
+# Product Contract: Phase 24 P0 — Estimation Sample, Randomness, and Exit Semantics
 
 ## Request Summary
-
-Expose bounded machine-readable syntax and argument metadata for one discovered command without
-executing it, creating a session, or reading data.
+Implement stable cross-command semantics for:
+1. `e(sample)` tracking and evaluation in expressions.
+2. Seed propagation for reproducible randomness.
+3. Clean CLI exit codes (0: success, 1: execution error, 2: syntax error, 3: file/system error).
 
 ## Roadmap Phase
+Phase 24 P0: Product-Center Stabilization and Public Preview Gate.
 
-Phase 24 P1: Agent and automation interface.
+## Invocation & Semantics Rules
 
-## Invocation Rules
+### 1. Estimation Sample `e(sample)`
+- **Syntax**: `e(sample)` (case-insensitive function name and argument).
+- **Semantics**: Evaluates to `True` for observations used in the last estimation, and `False` otherwise.
+- **Hidden Column**: Tracking is backed by a hidden boolean column `__esample` in the active dataset. Hidden columns starting with `__` are excluded from all user-visible schema details (such as `describe` and `codebook`).
+- **Compilation**:
+  - DuckDB: Compiles to `__esample` (avoiding window function limitations).
+  - Polars: Compiles to `pl.col("__esample")`.
+- **Validation**:
+  - `e(sample)` requires exactly one argument, which must be the identifier `sample`. Any other arguments (e.g. `e(age)` or `e(sample, 2)`) raise a `TypeMismatchExecutionError` or `ExecutionError`.
+  - If no estimation model has been successfully fit in the session, or if the active dataset has changed since the fit, evaluating `e(sample)` raises an `ExecutionError` ("no active estimation sample available").
 
-- `tabdat --json --describe-command summarize` emits exactly one compact deterministic
-  `CommandSchemaResult` envelope.
-- The data contains canonical `name`, `syntax`, `help_topic`, `arguments`, and `options` fields.
-  Argument/option descriptors have stable names and bounded kind/required metadata; descriptor order
-  is deterministic.
-- Metadata is declarative registry data. It does not execute commands, invoke the full parser,
-  inspect active data, resolve backend capabilities, estimate cost, or promise complete grammar
-  validation.
-- Unknown command names emit one existing structured JSON error envelope with type `TabDatError` and
-  exit status `1`.
-- Existing command execution, terminal output, interactive behavior, and JSON success/error envelopes
-  remain unchanged. `--describe-command` is read-only and occurs before config/`Executor` setup.
-- `--describe-command` without `--json`, combined with `-c`, scripts, other discovery flags,
-  `--help-topic`, or `--explain`, and use in an interactive session are rejected clearly.
+### 2. Randomness & Seeds
+- Option `seed(value)` or script directive `seed value` configures the random number generator seed.
+- Seed value must be a non-negative integer.
+- Global seed is propagated to all estimators and functions using random number generation (e.g., bootstrap in `drdid`, folds in `dml`, MCMC in `bayes`, downsampling in `estat report`).
+
+### 3. Exits & Errors
+- CLI and script runners return:
+  - `0` on successful completion.
+  - `1` for execution-related errors (`ExecutionError` and its subclasses, database failures).
+  - `2` for syntax and parser errors (`ParseError`).
+  - `3` for system, environment, or file errors (missing script files, missing config files).
 
 ## Examples
 
-Valid:
+Evaluating `e(sample)`:
+```stata
+regress wage educ exper
+generate in_sample = e(sample)
+keep if e(sample)
+```
 
+Invalid arguments:
+```stata
+generate bad = e(age)
+# Error: e() requires exactly one argument 'sample'
+```
+
+No active estimation:
+```stata
+use data.parquet
+keep if e(sample)
+# Error: no active estimation sample available
+```
+
+Exit Codes:
 ```bash
-uv run tabdat --json --describe-command summarize
+# Syntax error
+tabdat -c "generate bad ="
+# Exit code: 2
+
+# Missing file
+tabdat missing_file.td
+# Exit code: 3
+
+# Execution error
+tabdat -c "use missing.parquet"
+# Exit code: 1
 ```
-
-Expected shape:
-
-```json
-{"data":{"arguments":[{"name":"variables","required":false}],"help_topic":"summarize","name":"summarize","options":[],"syntax":"summarize [varlist]"},"result_type":"CommandSchemaResult","schema_version":1}
-```
-
-Unknown command:
-
-```bash
-uv run tabdat --json --describe-command does-not-exist
-```
-
-Expected behavior: stdout contains one existing structured error envelope, stderr retains the human
-diagnostic, and the process exits with status `1`.
 
 ## Acceptance Criteria
-
-- [ ] One known command emits one deterministic schema envelope with all five metadata fields.
-- [ ] Argument/option descriptor names, required flags, and ordering are stable and bounded.
-- [ ] Metadata lookup is pure and has no config/Executor/data/session side effects.
-- [ ] Unknown commands emit one stable structured JSON error envelope with exit status `1`.
-- [ ] Existing command execution, terminal output, interactive behavior, and JSON schemas remain
-  unchanged.
-- [ ] CLI/help/docs, focused tests, full tests, type/lint/format, and integrated workflow checks pass.
-
-## Non-Goals For This Slice
-
-- Command execution, data-dependent planning, scripts, multiple-command output, plugin schemas,
-  interactive JSON mode, effect estimates, full dry-run/explain behavior, repair diagnostics, new
-  syntax, or new exit codes.
+- [ ] `e(sample)` compiles and evaluates correctly as a boolean column `__esample`.
+- [ ] Internal columns starting with `__` are invisible in `describe` and `codebook`.
+- [ ] Evaluated `e(sample)` raises correct errors when no estimation has run or arguments are invalid.
+- [ ] Exit status codes return `0`, `1`, `2`, or `3` according to the failure type.
+- [ ] Test suite and E2E integration scenarios pass completely.

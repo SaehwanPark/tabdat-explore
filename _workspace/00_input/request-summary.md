@@ -1,37 +1,28 @@
-# Request Summary: Phase 24 P1 Structured JSON Command Schema Discovery
+# Request Summary: Phase 24 P0 Estimation Sample, Randomness, and Exit Semantics
 
 ## Goal
-
-Expose bounded machine-readable syntax and argument metadata for one discovered command without
-executing it, creating a session, reading data, or changing terminal behavior.
+Implement stable cross-command semantics for:
+1. `e(sample)` tracking and evaluation in expressions.
+2. Seed propagation for reproducible randomness.
+3. Clean CLI exit codes (0: success, 1: execution error, 2: syntax error, 3: file/system error).
 
 ## Phase Fit
-
-Phase 24 P1 Agent and automation interface. This follows JSON success/error envelopes, command/help
-discovery, syntax preview, and declared effects, and provides a narrow option-schema surface before
-full parser/execution planning.
+Phase 24 P0: Product-Center Stabilization and Public Preview Gate.
 
 ## Touched Surfaces
-
-- `src/tabdat/models.py`: typed command-schema metadata models
-- `src/tabdat/formatter.py`: JSON serialization and stable result-label coverage
-- `src/tabdat/cli.py`: `--describe-command` validation and read-only routing
-- `src/tabdat/help/topics/`, `docs/command-reference.md`, `docs/user-guide.md`: metadata docs
-- `tests/test_cli.py`, `tests/test_help.py`: known/unknown command, ordering, and side-effect coverage
-- `SPEC.md`, `CHANGELOG.md`, and `_workspace/`: roadmap and handoff state
+- `src/tabdat/backend.py`: SUPPORTED_FUNCTIONS, active_dataset_info, _compile_expression_raw, _compile_polars_expression, add_boolean_column_from_values.
+- `src/tabdat/executor.py`: regress, logit, other estimators, evaluating/saving estimation sample masks.
+- `src/tabdat/cli.py`: _run_commands, _run_script, error catching, exit code mapping.
+- `docs/language-semantics.md`: specifications update.
+- `tests/test_executor.py`, `tests/test_cli.py`: test coverage.
 
 ## Assumptions
-
-- `tabdat --json --describe-command <name>` emits one versioned result for one known command with a
-  canonical name, syntax string, help-topic availability, and bounded argument/option descriptors.
-- Metadata is declarative and registry-derived. It does not execute a parser branch, inspect data,
-  resolve backend capabilities, estimate cost, or promise complete grammar validation.
-- Unknown command names emit one existing structured JSON error envelope and exit status `1`.
-- The path is batch-only and cannot be combined with command/script execution, other discovery flags,
-  explain/help-topic flags, or interactive mode.
+- `e(sample)` evaluates as an expression to a boolean (True/False).
+- It is only valid with exactly one argument: the identifier `sample` (case-insensitive).
+- System-internal columns starting with `__` are excluded from user-facing column metadata.
+- Exits return 2 for syntax errors, 3 for missing files/configs, 1 for execution errors, 0 for success.
 
 ## Non-Goals
-
-- Command execution, data-dependent planning, scripts, multiple-command output, plugin schemas,
-  interactive JSON mode, effect estimates, full dry-run/explain, repair diagnostics, operation
-  lineage, new syntax, or new exit codes.
+- Adding new econometric models/estimators.
+- Exposing other estimation results like coefficients/covariance via expression evaluation (retained for future phases).
+- Supporting `e(sample)` across sessions.
