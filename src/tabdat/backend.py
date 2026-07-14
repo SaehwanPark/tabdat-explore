@@ -110,7 +110,7 @@ INTEGER_NUMERIC_TYPES = (
 EXACT_INTEGER_RESULT_TYPE = "DECIMAL(38,0)"
 ExpressionDomain = Literal["numeric", "string", "boolean", "other", "null"]
 TabulateCellKey = tuple[tuple[tuple[str, object], ...], tuple[tuple[str, object], ...]]
-SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper"}
+SUPPORTED_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "lower", "round", "sqrt", "upper", "e"}
 NUMERIC_FUNCTIONS = {"abs", "ceil", "floor", "ln", "log", "round", "sqrt"}
 NULL_LITERAL_ERROR = "null literal only supports equality and inequality comparisons"
 UNSIGNED_ARITHMETIC_ERROR = (
@@ -389,7 +389,9 @@ class DuckDBBackend:
       except PolarsError as exc:
         raise ExecutionError("active dataset is not available") from exc
       columns = tuple(
-        ColumnInfo(name=name, data_type=_polars_dtype_name(dtype)) for name, dtype in schema.items()
+        ColumnInfo(name=name, data_type=_polars_dtype_name(dtype))
+        for name, dtype in schema.items()
+        if name != "__esample"
       )
       return DatasetInfo(
         path=path,
@@ -402,7 +404,9 @@ class DuckDBBackend:
       description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
     except duckdb.Error as exc:
       raise ExecutionError("active dataset is not available") from exc
-    columns = tuple(ColumnInfo(name=row[0], data_type=row[1]) for row in description)
+    columns = tuple(
+      ColumnInfo(name=row[0], data_type=row[1]) for row in description if row[0] != "__esample"
+    )
     row_count = None if self._active_storage == "view" else self.active_row_count()
     return DatasetInfo(
       path=path,
@@ -894,8 +898,16 @@ class DuckDBBackend:
     if limit == 0:
       return ()
 
+    try:
+      description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
+      public_columns = [row[0] for row in description if row[0] != "__esample"]
+      select_sql = ", ".join(_quote_identifier(name) for name in public_columns)
+    except duckdb.Error as exc:
+      command_name = "tail" if tail else "head"
+      raise ExecutionError(f"{command_name} failed") from exc
+
     query = f"""
-      select * exclude (__tabdat_row_number)
+      select {select_sql}
       from (
         select
           row_number() over () as __tabdat_row_number,
@@ -919,10 +931,16 @@ class DuckDBBackend:
     column_types = {column.name: column.data_type for column in dataset.columns}
     _require_columns("keep", column_types, variables)
     if self._polars_lazy_frame is not None:
-      self._polars_lazy_frame = self._polars_lazy_frame.select(list(variables))
+      select_cols = list(variables)
+      if self._has_internal_column("__esample"):
+        select_cols.append("__esample")
+      self._polars_lazy_frame = self._polars_lazy_frame.select(select_cols)
       return self.active_dataset_info(dataset.path)
+    select_sql = _select_list(variables)
+    if self._has_internal_column("__esample"):
+      select_sql += ", __esample"
     self._replace_active(
-      f"select {_select_list(variables)} from {ACTIVE_TABLE}",
+      f"select {select_sql} from {ACTIVE_TABLE}",
       "keep",
     )
     return self.active_dataset_info(dataset.path)
@@ -934,10 +952,16 @@ class DuckDBBackend:
     if not remaining:
       raise ExecutionError("drop would remove every column")
     if self._polars_lazy_frame is not None:
-      self._polars_lazy_frame = self._polars_lazy_frame.select(list(remaining))
+      remaining_cols = list(remaining)
+      if self._has_internal_column("__esample"):
+        remaining_cols.append("__esample")
+      self._polars_lazy_frame = self._polars_lazy_frame.select(remaining_cols)
       return self.active_dataset_info(dataset.path)
+    select_sql = _select_list(remaining)
+    if self._has_internal_column("__esample"):
+      select_sql += ", __esample"
     self._replace_active(
-      f"select {_select_list(remaining)} from {ACTIVE_TABLE}",
+      f"select {select_sql} from {ACTIVE_TABLE}",
       "drop",
     )
     return self.active_dataset_info(dataset.path)
@@ -989,6 +1013,8 @@ class DuckDBBackend:
       else _quote_identifier(column.name)
       for column in dataset.columns
     )
+    if self._has_internal_column("__esample"):
+      select_sql += ", __esample"
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "rename")
     next_dataset = self.active_dataset_info(dataset.path)
     if tuple(column.name for column in next_dataset.columns) != renamed:
@@ -1088,6 +1114,8 @@ class DuckDBBackend:
       else _quote_identifier(column.name)
       for column in dataset.columns
     )
+    if self._has_internal_column("__esample"):
+      select_sql += ", __esample"
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "replace")
     return self.active_dataset_info(dataset.path)
 
@@ -1193,6 +1221,8 @@ class DuckDBBackend:
         select_items.append(f"{recode_map[gen_var]} as {_quote_identifier(gen_var)}")
 
     select_sql = ", ".join(select_items)
+    if self._has_internal_column("__esample"):
+      select_sql += ", __esample"
     self._replace_active(f"select {select_sql} from {ACTIVE_TABLE}", "recode")
     return self.active_dataset_info(dataset.path)
 
@@ -1585,6 +1615,62 @@ class DuckDBBackend:
       raise ExecutionError(f"{command_name} failed") from exc
     return self.active_dataset_info(dataset.path)
 
+  def add_boolean_column_from_values(
+    self,
+    dataset: DatasetInfo,
+    *,
+    target_variable: str,
+    values: Sequence[bool],
+    command_name: str,
+  ) -> DatasetInfo:
+    if self._polars_lazy_frame is not None:
+      import polars as pl
+
+      df = self._polars_lazy_frame.collect()
+      df = df.with_columns(pl.Series(target_variable, values, dtype=pl.Boolean))
+      self._polars_lazy_frame = df.lazy()
+      return self.active_dataset_info(dataset.path)
+
+    row_table = "__tabdat_bool_rows"
+    value_table = "__tabdat_bool_values"
+    expected_count = len(values)
+    try:
+      self._connection.execute(
+        f"""
+        create or replace temp table {row_table} as
+        select row_number() over () as __row_id, * from {ACTIVE_TABLE}
+        """
+      )
+      exclude_cols = ["__row_id"]
+      if self._has_internal_column(target_variable):
+        exclude_cols.append(target_variable)
+      exclude_sql = ", ".join(_quote_identifier(col) for col in exclude_cols)
+
+      self._connection.execute(
+        f"create or replace temp table {value_table} (__row_id bigint, value boolean)"
+      )
+      self._connection.executemany(
+        f"insert into {value_table} values (?, ?)",
+        tuple((index + 1, bool(values[index])) for index in range(expected_count)),
+      )
+      self._replace_active(
+        f"""
+        select
+          row_data.* exclude ({exclude_sql}),
+          values_data.value as {_quote_identifier(target_variable)}
+        from {row_table} as row_data
+        inner join {value_table} as values_data
+        on row_data.__row_id = values_data.__row_id
+        order by row_data.__row_id
+        """,
+        command_name,
+      )
+      self._connection.execute(f"drop table if exists {row_table}")
+      self._connection.execute(f"drop table if exists {value_table}")
+    except duckdb.Error as exc:
+      raise BackendExecutionError(f"{command_name} failed") from exc
+    return self.active_dataset_info(dataset.path)
+
   def _summarize_variable(self, variable: str) -> SummaryRow:
     quoted_variable = _quote_identifier(variable)
     sql = f"""
@@ -1822,6 +1908,8 @@ class DuckDBBackend:
       function_name = expression.name.lower()
       if function_name not in SUPPORTED_FUNCTIONS:
         raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      if function_name == "e":
+        return "__esample"
       arguments = ", ".join(
         self._compile_expression_raw(dataset, argument) for argument in expression.arguments
       )
@@ -1896,6 +1984,8 @@ class DuckDBBackend:
       function_name = expression.name.lower()
       if function_name not in SUPPORTED_FUNCTIONS:
         raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      if function_name == "e":
+        return pl.col("__esample")
       arguments = tuple(
         self._compile_polars_expression(dataset, argument) for argument in expression.arguments
       )
@@ -1904,6 +1994,15 @@ class DuckDBBackend:
         return _normalize_polars_numeric_result(compiled)
       return compiled
     raise ExecutionError("unsupported expression")
+
+  def _has_internal_column(self, column_name: str) -> bool:
+    if self._polars_lazy_frame is not None:
+      return column_name in self._polars_lazy_frame.collect_schema()
+    try:
+      description = self._connection.execute(f"describe {ACTIVE_TABLE}").fetchall()
+      return any(row[0] == column_name for row in description)
+    except duckdb.Error:
+      return False
 
   def is_polars_lazy_active(self) -> bool:
     return self._polars_lazy_frame is not None
@@ -2023,6 +2122,16 @@ class DuckDBBackend:
       function_name = expression.name.lower()
       if function_name not in SUPPORTED_FUNCTIONS:
         raise ExecutionError(f"unsupported function in expression: {expression.name}")
+      if function_name == "e":
+        if (
+          len(expression.arguments) != 1
+          or not isinstance(expression.arguments[0], IdentifierExpression)
+          or expression.arguments[0].name.lower() != "sample"
+        ):
+          raise ExecutionError("e() requires exactly one argument 'sample'")
+        if not self._has_internal_column("__esample"):
+          raise ExecutionError("no active estimation sample available")
+        return "boolean"
       if len(expression.arguments) != 1:
         raise ExecutionError(f"function {expression.name} expects one argument")
       argument_domain = self._infer_expression_domain(dataset, expression.arguments[0])
@@ -2119,6 +2228,8 @@ class DuckDBBackend:
     if limit == 0:
       return ()
     lazy_frame = self._require_polars_lazy_frame("preview")
+    public_columns = [col for col in lazy_frame.collect_schema() if col != "__esample"]
+    lazy_frame = lazy_frame.select(public_columns)
     try:
       frame = lazy_frame.tail(limit).collect() if tail else lazy_frame.head(limit).collect()
     except PolarsError as exc:
@@ -2927,6 +3038,8 @@ def _expression_identifier_names(expression: Expression) -> tuple[str, ...]:
       _expression_identifier_names(expression.right),
     )
   if isinstance(expression, FunctionCallExpression):
+    if expression.name.lower() == "e":
+      return ()
     names: tuple[str, ...] = ()
     for argument in expression.arguments:
       names = _merge_identifier_names(names, _expression_identifier_names(argument))

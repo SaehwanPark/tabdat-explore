@@ -613,6 +613,119 @@ class Executor:
     self.state.xtabond_regression = None
     self.state.heckman_regression = None
 
+  def _update_esample(self, command: Command) -> None:
+    try:
+      dataset = self.state.active_dataset
+      if dataset is None:
+        return
+
+      column_names = {c.name for c in dataset.columns}
+      variables: list[str] = []
+
+      has_weight = False
+      weight_var: str | None = None
+      if hasattr(command, "weight_variable"):
+        try:
+          weight_var = getattr(command, "weight_variable")
+          if isinstance(weight_var, str) and weight_var in column_names:
+            has_weight = True
+        except Exception:
+          pass
+
+      blacklist = {
+        "estimator",
+        "method",
+        "covariance",
+        "prior",
+        "kind",
+        "saving",
+        "format",
+        "graph_format",
+        "options",
+        "bootstrap",
+        "seed",
+        "rseed",
+        "draws",
+        "burnin",
+        "chains",
+        "thin",
+        "robust",
+        "include_intercept",
+        "noconstant",
+        "alpha",
+        "folds",
+        "cv",
+      }
+
+      fields = []
+      if hasattr(command, "model_fields"):
+        model_fields = getattr(command, "model_fields")
+        fields = list(model_fields.keys())
+      elif hasattr(command, "__dataclass_fields__"):
+        dataclass_fields = getattr(command, "__dataclass_fields__")
+        fields = list(dataclass_fields.keys())
+      else:
+        fields = [attr for attr in dir(command) if not attr.startswith("_")]
+
+      for attr in fields:
+        if attr in blacklist:
+          continue
+        try:
+          val = getattr(command, attr)
+        except Exception:
+          continue
+        if isinstance(val, str) and val in column_names:
+          if val not in variables:
+            variables.append(val)
+        elif isinstance(val, (list, tuple)):
+          for item in val:
+            if isinstance(item, str) and item in column_names:
+              if item not in variables:
+                variables.append(item)
+
+      if weight_var and weight_var in column_names and weight_var not in variables:
+        variables.append(weight_var)
+
+      if not variables:
+        return
+
+      rows = self.backend.regression_rows(dataset, tuple(variables))
+
+      mask: list[bool] = []
+      for row in rows:
+        valid = True
+        for idx, name in enumerate(variables):
+          val = row[idx]
+          if val is None:
+            valid = False
+            break
+
+          if has_weight and name == weight_var:
+            coerced = _coerce_float(val)
+            if coerced is None or coerced <= 0.0:
+              valid = False
+              break
+
+          if isinstance(val, (int, float)):
+            if not math.isfinite(val):
+              valid = False
+              break
+        mask.append(valid)
+
+      next_dataset = self.backend.add_boolean_column_from_values(
+        dataset,
+        target_variable="__esample",
+        values=mask,
+        command_name="regress",
+      )
+      self.state.active_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    except Exception as exc:
+      import sys
+      import traceback
+
+      print(f"Warning: failed to update estimation sample: {exc}", file=sys.stderr)
+      traceback.print_exc(file=sys.stderr)
+
   def close(self) -> None:
     """Close the active backend adapter to release resources."""
     self.backend.close()
@@ -626,6 +739,41 @@ class Executor:
     self._materialization_reason_reset_pending = False
     try:
       result = self._execute_command(command)
+      if isinstance(
+        command,
+        (
+          RegressCommand,
+          LassoCommand,
+          PostlassoCommand,
+          RidgeCommand,
+          ElasticnetCommand,
+          CvlassoCommand,
+          CvridgeCommand,
+          CvelasticnetCommand,
+          BayesCommand,
+          QregCommand,
+          LogitCommand,
+          ProbitCommand,
+          TobitCommand,
+          HeckmanCommand,
+          NlCommand,
+          PoissonCommand,
+          NbregCommand,
+          ZipCommand,
+          ZinbCommand,
+          StregCommand,
+          IvRegressCommand,
+          CfRegressCommand,
+          XtRegCommand,
+          DidCommand,
+          DrDidCommand,
+          DmlCommand,
+          XtAbondCommand,
+          XtLogitCommand,
+          SpregressCommand,
+        ),
+      ):
+        self._update_esample(command)
     except Exception:
       if self.backend.rollback_polars_materialization():
         self.state.active_dataset = previous_dataset
