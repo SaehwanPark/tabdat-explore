@@ -1,17 +1,16 @@
-# Request Summary: Homebrew Formula & Distribution Architecture Decision Record
+# Request Summary: Fix GitHub CI Issues
 
 ## Goal
-Implement Phase 28 (Homebrew Distribution) and Phase 29 (Standalone Packaging Evaluation & ADR) of `docs/tabdat_forward_roadmap.md`:
-1. Create standard Homebrew formula `Formula/tabdat.rb` enabling `brew install SaehwanPark/tabdat/tabdat` or custom tap installation.
-2. Author ADR `docs/adr/0001-distribution-and-packaging-strategy.md` defining distribution tiering, startup and payload trade-offs, and capability scoping.
-3. Add automated formula validation test in `tests/test_homebrew_formula.py`.
-4. Update docs and roadmap status.
+Fix failures in GitHub Actions CI workflows:
+1. `rpy2-rinterface` compilation failure on Ubuntu Linux runners by setting `RPY2_CFFI_MODE=ABI`.
+2. `test_wheel_package_contains_topics_and_entrypoints` failure on fresh checkouts by building wheel on-demand into a temporary fixture directory if not pre-built in `dist/`.
+3. `wheel-smoke` tool PATH discovery in GitHub Actions runners.
 
 ## Phase Fit
-Phases 28, 29, 30, 31 (`docs/tabdat_forward_roadmap.md` Sections 11, 12, 13, 14).
+Phase 26 (CI & Release Automation).
 
 ## Touched Surfaces
-- `Formula/tabdat.rb`: Homebrew Ruby formula definition.
-- `docs/adr/0001-distribution-and-packaging-strategy.md`: Architecture Decision Record.
-- `tests/test_homebrew_formula.py`: Formula structure and syntax validation test.
-- `README.md`, `CONTRIBUTING.md`, `docs/tabdat_forward_roadmap.md`.
+- `.github/workflows/ci.yml`: Workflow environment and PATH.
+- `.github/workflows/release.yml`: Workflow environment.
+- `tests/test_packaging_and_installer.py`: Hermetic wheel test fixture.
+- `scripts/install.sh`: Export ABI mode environment variable.

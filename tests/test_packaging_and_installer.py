@@ -37,10 +37,18 @@ def test_github_actions_workflows_exist() -> None:
   assert "SHA256SUMS.txt" in release_text
 
 
-def test_wheel_package_contains_topics_and_entrypoints() -> None:
+def test_wheel_package_contains_topics_and_entrypoints(tmp_path: Path) -> None:
   dist_dir = Path("dist")
-  wheels = list(dist_dir.glob("*.whl"))
-  assert len(wheels) >= 1, "No built wheel found in dist/"
+  wheels = list(dist_dir.glob("*.whl")) if dist_dir.exists() else []
+  if not wheels:
+    subprocess.run(
+      ["uv", "build", "--wheel", "--out-dir", str(tmp_path)],
+      check=True,
+      capture_output=True,
+    )
+    wheels = list(tmp_path.glob("*.whl"))
+
+  assert len(wheels) >= 1, "No built wheel found"
 
   wheel_path = wheels[0]
   with zipfile.ZipFile(wheel_path, "r") as zf:

@@ -1,24 +1,24 @@
-# Delivery Summary: Homebrew Distribution Formula & Packaging ADR
+# Delivery Summary: Fix GitHub CI Workflows and Hermetic Packaging Tests
 
-## Delivered Capabilities
-1. **Homebrew Formula Packaging**:
-   - `Formula/tabdat.rb` supporting installation via custom tap (`brew tap SaehwanPark/tabdat https://github.com/SaehwanPark/tabdat-explore.git` && `brew install tabdat`).
-2. **Distribution Architecture Decision Record**:
-   - `docs/adr/0001-distribution-and-packaging-strategy.md` benchmarking and establishing distribution tiers (`curl | sh` / `uv tool` as primary; Homebrew tap; standalone frozen binary evaluation).
-3. **Automated Formula Verification Suite**:
-   - `tests/test_homebrew_formula.py` validating formula class structure, dependencies, test assertions, and ADR contents.
-4. **Roadmap & Documentation Alignment**:
-   - Updated `README.md`, `CONTRIBUTING.md`, and marked completed items in `docs/tabdat_forward_roadmap.md` (Phases 28 & 29).
+## Delivered Fixes
+1. **Rpy2 ABI Mode Configuration**:
+   - Added `env: RPY2_CFFI_MODE: "ABI"` to `.github/workflows/ci.yml` and `.github/workflows/release.yml`, allowing CFFI wheel compilation on Linux runners without requiring external R C-headers.
+2. **Hermetic Test Isolation for Built Wheels**:
+   - Updated `tests/test_packaging_and_installer.py` to build the wheel fixture into a temporary directory if `dist/` is empty or missing, preventing failures on clean test runners.
+3. **Tool Path Setup in CI Smoke Tests**:
+   - Added `$HOME/.local/bin` to `$GITHUB_PATH` in `wheel-smoke`.
+4. **Installer Environment Protection**:
+   - Added `export RPY2_CFFI_MODE=ABI` in `scripts/install.sh`.
 
 ## Changed Files
-- `Formula/tabdat.rb`: Homebrew formula.
-- `docs/adr/0001-distribution-and-packaging-strategy.md`: Architecture decision record.
-- `tests/test_homebrew_formula.py`: Formula tests.
-- `README.md`, `CONTRIBUTING.md`, `docs/tabdat_forward_roadmap.md`, `_workspace/*`.
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `scripts/install.sh`
+- `tests/test_packaging_and_installer.py`
+- `_workspace/*`
 
 ## Validation Commands
-- `uv run pytest` -> 1,249 passed
-- `uv run python integrated_testing/run_e2e.py` -> 6/6 scenarios passed
+- `rm -rf dist && uv run pytest tests/test_packaging_and_installer.py` -> 3 passed
 - `uv run basedpyright` -> 0 errors, 0 warnings
 - `uv run ruff check . && uv run ruff format --check .` -> Clean
 - `uv run python scripts/check_docs_alignment.py` -> Clean

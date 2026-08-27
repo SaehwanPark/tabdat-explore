@@ -48,6 +48,7 @@ printf "Using uv: ${GREEN}%s${NC}\n" "$(command -v uv)"
 
 # 3. Install TabDat CLI globally using uv tool
 printf "\nInstalling TabDat CLI globally...\n"
+export RPY2_CFFI_MODE=ABI
 if [ -n "$TABDAT_INSTALL_FROM" ]; then
   uv tool install --force "$TABDAT_INSTALL_FROM"
 else
