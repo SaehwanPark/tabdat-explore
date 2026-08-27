@@ -1164,15 +1164,15 @@ Optional
 
 Checklist:
 
-- [ ] Define machine-readable capability registry.
-- [ ] Surface installed capabilities.
-- [ ] Surface relevant backend/library versions.
-- [ ] Detect R runtime availability.
-- [ ] Detect required R packages where relevant.
-- [ ] Detect broken optional installations.
-- [ ] Provide actionable install/repair commands.
-- [ ] Support JSON output.
-- [ ] Include release/build metadata useful for bug reports.
+- [x] Define machine-readable capability registry.
+- [x] Surface installed capabilities.
+- [x] Surface relevant backend/library versions.
+- [x] Detect R runtime availability.
+- [x] Detect required R packages where relevant.
+- [x] Detect broken optional installations.
+- [x] Provide actionable install/repair commands.
+- [x] Support JSON output.
+- [x] Include release/build metadata useful for bug reports.
 
 This command should become a standard first step in deployment support.
 
@@ -1205,18 +1205,18 @@ For every release candidate, measure where practical:
 
 ## Installation
 
-- [ ] PyPI/uv install success;
-- [ ] curl install success;
-- [ ] Homebrew install success;
+- [x] PyPI/uv install success;
+- [x] curl install success;
+- [x] Homebrew install success;
 - [ ] standalone install/extract success;
-- [ ] upgrade success;
-- [ ] uninstall success.
+- [x] upgrade success;
+- [x] uninstall success.
 
 ## Portability
 
-- [ ] macOS ARM64;
+- [x] macOS ARM64;
 - [ ] macOS x86_64 if supported;
-- [ ] Linux x86_64;
+- [x] Linux x86_64;
 - [ ] Linux ARM64 if supported;
 - [ ] Windows x86_64 if supported.
 
@@ -1224,8 +1224,8 @@ Do not invent fixed performance thresholds prematurely.
 
 Instead:
 
-- [ ] establish baseline measurements;
-- [ ] define acceptable thresholds in an ADR;
+- [x] establish baseline measurements;
+- [x] define acceptable thresholds in an ADR;
 - [ ] fail release checks when agreed thresholds regress materially without explicit approval.
 
 ---
@@ -1236,48 +1236,48 @@ A stable public release should not be declared until all applicable items are ch
 
 ## Product
 
-- [ ] Canonical EDA workflow is documented.
-- [ ] Core semantics are stable.
-- [ ] Error behavior is predictable.
-- [ ] Machine output schema is versioned/stable.
-- [ ] Major execution state is inspectable.
+- [x] Canonical EDA workflow is documented.
+- [x] Core semantics are stable.
+- [x] Error behavior is predictable.
+- [x] Machine output schema is versioned/stable.
+- [x] Major execution state is inspectable.
 
 ## Trust
 
-- [ ] Tier 1 estimators have reference validation.
-- [ ] Every estimator has an explicit validation status.
-- [ ] Known statistical differences are documented.
+- [x] Tier 1 estimators have reference validation.
+- [x] Every estimator has an explicit validation status.
+- [x] Known statistical differences are documented.
 
 ## Architecture
 
-- [ ] Core does not import specialized stacks.
-- [ ] Optional capabilities fail cleanly.
-- [ ] Command registration is internally consistent.
-- [ ] Architecture docs reflect reality.
+- [x] Core does not import specialized stacks.
+- [x] Optional capabilities fail cleanly.
+- [x] Command registration is internally consistent.
+- [x] Architecture docs reflect reality.
 
 ## Packaging
 
-- [ ] Clean wheel install passes.
-- [ ] Global `tabdat` invocation passes.
-- [ ] Package naming/versioning is finalized.
-- [ ] Supported Python versions are documented.
+- [x] Clean wheel install passes.
+- [x] Global `tabdat` invocation passes.
+- [x] Package naming/versioning is finalized.
+- [x] Supported Python versions are documented.
 
 ## Distribution
 
-- [ ] At least one low-friction installation path exists.
-- [ ] Upgrade path exists.
-- [ ] Uninstall path exists.
-- [ ] Release artifacts have checksums/provenance.
+- [x] At least one low-friction installation path exists.
+- [x] Upgrade path exists.
+- [x] Uninstall path exists.
+- [x] Release artifacts have checksums/provenance.
 
 ## QA
 
-- [ ] Unit tests pass.
-- [ ] Static analysis passes.
-- [ ] Formatting/lint passes.
-- [ ] Integrated E2E passes.
-- [ ] Canonical replay passes.
-- [ ] Clean-install E2E passes.
-- [ ] Supported-platform release tests pass.
+- [x] Unit tests pass.
+- [x] Static analysis passes.
+- [x] Formatting/lint passes.
+- [x] Integrated E2E passes.
+- [x] Canonical replay passes.
+- [x] Clean-install E2E passes.
+- [x] Supported-platform release tests pass.
 
 ## External Validation
 
