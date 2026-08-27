@@ -63,6 +63,7 @@ Agent-oriented workflows and tooling notes live in [AGENTS.md](AGENTS.md).
 | [docs/command_glossary_v0.md](docs/command_glossary_v0.md) | Historical Phase 0 command glossary |
 | [docs/command-reference.md](docs/command-reference.md) | Current user-facing command index |
 | [docs/reference-validation-matrix.md](docs/reference-validation-matrix.md) | Statistical accuracy and reference validation status |
+| [docs/adr/0001-distribution-and-packaging-strategy.md](docs/adr/0001-distribution-and-packaging-strategy.md) | Packaging architecture and distribution evaluation |
 | [docs/user-guide.md](docs/user-guide.md) | End-user workflows and behavior |
 | [docs/harness/tabdat/team-spec.md](docs/harness/tabdat/team-spec.md) | Multi-agent development harness |
 

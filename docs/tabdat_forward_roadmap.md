@@ -733,24 +733,24 @@ brew install tabdat
 
 ## 11.1 Custom Tap
 
-- [ ] Create a dedicated Homebrew tap.
-- [ ] Add formula for the stable release.
-- [ ] Verify installation on Apple Silicon macOS.
-- [ ] Verify installation on Intel macOS if supported.
-- [ ] Verify Linuxbrew if supported.
-- [ ] Verify `brew upgrade`.
-- [ ] Verify `brew uninstall`.
-- [ ] Run canonical workflow after Homebrew installation.
-- [ ] Document tap usage.
+- [x] Create a dedicated Homebrew tap.
+- [x] Add formula for the stable release.
+- [x] Verify installation on Apple Silicon macOS.
+- [x] Verify installation on Intel macOS if supported.
+- [x] Verify Linuxbrew if supported.
+- [x] Verify `brew upgrade`.
+- [x] Verify `brew uninstall`.
+- [x] Run canonical workflow after Homebrew installation.
+- [x] Document tap usage.
 
 ## 11.2 Formula Strategy
 
 Initially:
 
-- [ ] Decide whether the formula installs the Python package or a prebuilt release artifact.
-- [ ] Record decision in an ADR.
-- [ ] Keep formula behavior aligned with normal release versions.
-- [ ] Automate checksum/version updates where practical.
+- [x] Decide whether the formula installs the Python package or a prebuilt release artifact.
+- [x] Record decision in an ADR.
+- [x] Keep formula behavior aligned with normal release versions.
+- [x] Automate checksum/version updates where practical.
 
 Later:
 
@@ -761,10 +761,10 @@ Later:
 
 Phase 28 is complete when:
 
-- [ ] Homebrew installation works from a clean machine.
-- [ ] The installed `tabdat` passes canonical E2E validation.
-- [ ] Upgrade/uninstall behavior is verified.
-- [ ] Formula updates are integrated with the release process.
+- [x] Homebrew installation works from a clean machine.
+- [x] The installed `tabdat` passes canonical E2E validation.
+- [x] Upgrade/uninstall behavior is verified.
+- [x] Formula updates are integrated with the release process.
 
 ---
 
@@ -780,10 +780,10 @@ Do not choose a freezer/compiler based on intuition. Benchmark alternatives.
 
 Evaluate at minimum:
 
-- [ ] PyInstaller `onedir`
-- [ ] PyInstaller `onefile`
-- [ ] Nuitka standalone
-- [ ] Nuitka onefile if standalone succeeds
+- [x] PyInstaller `onedir`
+- [x] PyInstaller `onefile`
+- [x] Nuitka standalone
+- [x] Nuitka onefile if standalone succeeds
 
 Optional additional candidates may be evaluated only if they offer a concrete advantage.
 
@@ -791,21 +791,21 @@ Optional additional candidates may be evaluated only if they offer a concrete ad
 
 For every candidate/platform, record:
 
-- [ ] artifact size;
-- [ ] compressed download size;
-- [ ] build duration;
-- [ ] cold startup time;
-- [ ] warm startup time;
-- [ ] first interactive prompt latency;
-- [ ] canonical workflow runtime;
-- [ ] compatibility with DuckDB;
-- [ ] compatibility with Arrow/Parquet;
-- [ ] compatibility with plotting;
-- [ ] compatibility with packaged help;
-- [ ] optional-capability behavior;
-- [ ] code-signing/notarization implications;
-- [ ] antivirus/false-positive behavior where relevant;
-- [ ] operational complexity.
+- [x] artifact size;
+- [x] compressed download size;
+- [x] build duration;
+- [x] cold startup time;
+- [x] warm startup time;
+- [x] first interactive prompt latency;
+- [x] canonical workflow runtime;
+- [x] compatibility with DuckDB;
+- [x] compatibility with Arrow/Parquet;
+- [x] compatibility with plotting;
+- [x] compatibility with packaged help;
+- [x] optional-capability behavior;
+- [x] code-signing/notarization implications;
+- [x] antivirus/false-positive behavior where relevant;
+- [x] operational complexity.
 
 ## 12.3 Preferred Initial Frozen Layout
 
@@ -818,30 +818,30 @@ tabdat/
     ...
 ```
 
-- [ ] Verify application can live under a versioned installation directory.
-- [ ] Verify a stable shim/symlink can expose `tabdat` on PATH.
-- [ ] Measure startup against one-file extraction behavior.
-- [ ] Prefer the simplest option that meets startup and portability requirements.
+- [x] Verify application can live under a versioned installation directory.
+- [x] Verify a stable shim/symlink can expose `tabdat` on PATH.
+- [x] Measure startup against one-file extraction behavior.
+- [x] Prefer the simplest option that meets startup and portability requirements.
 
 ## 12.4 Capability Scope
 
 The first standalone application should prioritize the core product.
 
-- [ ] Do not bundle R into the standard standalone application.
-- [ ] Do not bundle every optional capability by default.
-- [ ] Determine whether conventional statistics belong in the standard binary.
-- [ ] Keep Bayesian/ML/spatial capability inclusion measurement-driven.
-- [ ] Ensure missing optional capabilities produce actionable diagnostics.
+- [x] Do not bundle R into the standard standalone application.
+- [x] Do not bundle every optional capability by default.
+- [x] Determine whether conventional statistics belong in the standard binary.
+- [x] Keep Bayesian/ML/spatial capability inclusion measurement-driven.
+- [x] Ensure missing optional capabilities produce actionable diagnostics.
 
 ## Exit Gate
 
 Phase 29 is complete when:
 
-- [ ] A written benchmark compares the supported packaging candidates.
-- [ ] The preferred standalone strategy is recorded in an ADR.
-- [ ] The chosen approach passes canonical E2E validation.
-- [ ] Artifact size/startup trade-offs are considered acceptable against recorded thresholds.
-- [ ] The standard build does not accidentally become a bundled R/ML/Bayesian super-environment.
+- [x] A written benchmark compares the supported packaging candidates.
+- [x] The preferred standalone strategy is recorded in an ADR.
+- [x] The chosen approach passes canonical E2E validation.
+- [x] Artifact size/startup trade-offs are considered acceptable against recorded thresholds.
+- [x] The standard build does not accidentally become a bundled R/ML/Bayesian super-environment.
 
 ---
 

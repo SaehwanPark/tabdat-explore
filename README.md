@@ -36,6 +36,13 @@ Install TabDat globally with one command (macOS and Linux):
 curl -LsSf https://raw.githubusercontent.com/SaehwanPark/tabdat-explore/main/scripts/install.sh | sh
 ```
 
+Or via Homebrew:
+
+```bash
+brew tap SaehwanPark/tabdat https://github.com/SaehwanPark/tabdat-explore.git
+brew install tabdat
+```
+
 Or using `uv tool`:
 
 ```bash
@@ -150,6 +157,7 @@ Panel metadata, plot defaults, and other session details are covered in the
 - [User guide](docs/user-guide.md) — sessions, lazy loading, scripts, config, plots, estimation
 - [Command reference](docs/command-reference.md) — categorized command index
 - [Statistical validation matrix](docs/reference-validation-matrix.md) — verified numerical tolerances against reference backends
+- [Distribution and packaging ADR](docs/adr/0001-distribution-and-packaging-strategy.md) — packaging architecture and distribution evaluation
 - [Active forward roadmap](docs/tabdat_forward_roadmap.md) — stabilization priorities, trust, and deployment
 - [Project proposal](docs/project_proposal.md) — product vision (optional deep read)
 
