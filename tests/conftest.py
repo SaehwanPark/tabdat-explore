@@ -5,6 +5,12 @@ import pandas as pd
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def prevent_opening_browser(monkeypatch: pytest.MonkeyPatch) -> None:
+  """Ensure test suites never launch external viewer or browser processes."""
+  monkeypatch.setattr("tabdat.cli._open_path", lambda path: None)
+
+
 @pytest.fixture
 def sample_parquet(tmp_path: Path) -> Path:
   path = tmp_path / "patients.parquet"

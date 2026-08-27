@@ -335,8 +335,8 @@ def s3_taxi_lazy_scale() -> ScenarioResult:
       "payment_type",
       "mean_total",
       "mean_tip_share",
-      "Saved plot: artifacts/e2e/s3/total_amount_hist.svg",
-      "Saved plot: artifacts/e2e/s3/payment_type_bar.svg",
+      f"Saved plot: {Path('artifacts/e2e/s3/total_amount_hist.svg').resolve().as_uri()}",
+      f"Saved plot: {Path('artifacts/e2e/s3/payment_type_bar.svg').resolve().as_uri()}",
       "Saved: artifacts/e2e/s3/filtered_trips.parquet",
       "Created payment_summary:",
     ),
@@ -433,7 +433,10 @@ def s4_penguins_script_repro() -> ScenarioResult:
       "Script: artifacts/e2e/s4/prep.td",
       ". summarize bill_length_mm flipper_length_mm body_mass_g",
       "Generated body_mass_kg:",
-      "Saved plot: artifacts/e2e/s4/artifacts/plots/penguins_scatter.png",
+      (
+        "Saved plot: "
+        f"{Path('artifacts/e2e/s4/artifacts/plots/penguins_scatter.png').resolve().as_uri()}"
+      ),
       "species",
       "Row %",
       "Col %",

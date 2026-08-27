@@ -3064,7 +3064,7 @@ def test_cli_runs_phase_6_plot_flow(sample_parquet: Path, tmp_path: Path, capsys
   captured = capsys.readouterr()
 
   assert exit_code == 0
-  assert f"Saved plot: {plot_path}" in captured.out
+  assert f"Saved plot: {plot_path.resolve().as_uri()}" in captured.out
   assert plot_path.read_text().lstrip().startswith("<svg")
   assert captured.err == ""
 
@@ -3370,7 +3370,7 @@ def test_cli_preserves_native_numeric_tabulate_order(tmp_path: Path, capsys) -> 
   assert captured.out.index("2 Count") < captured.out.index("10 Count")
   assert "missing Count" in captured.out
   assert captured.out.index("False") < captured.out.index("True")
-  assert f"Saved plot: {bar_path}" in captured.out
+  assert f"Saved plot: {bar_path.resolve().as_uri()}" in captured.out
   assert bar_path.exists()
   assert captured.err == ""
 
@@ -3547,11 +3547,11 @@ def test_cli_runs_phase_8_script_file(sample_parquet: Path, tmp_path: Path, caps
   assert f"TabDat: {__version__}" in captured.out
   assert "Python:" in captured.out
   assert "Seed: none" in captured.out
-  assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=on" in captured.out
+  assert "Config: graph_format=svg, artifact_dir=artifacts, graph_open=off" in captured.out
   assert f". use {sample_parquet}" in captured.out
   assert "Kept matching rows: 2 rows, 4 columns" in captured.out
   assert "sex  n" in captured.out
-  assert f"Saved plot: {plot_path}" in captured.out
+  assert f"Saved plot: {plot_path.resolve().as_uri()}" in captured.out
   assert plot_path.read_text().lstrip().startswith("<svg")
   assert captured.err == ""
 
@@ -3848,7 +3848,7 @@ def test_cli_phase_9_loads_explicit_config(
   plot_path = artifact_dir / "plots" / "histogram-age.png"
 
   assert exit_code == 0
-  assert f"Saved plot: {plot_path}" in captured.out
+  assert f"Saved plot: {plot_path.resolve().as_uri()}" in captured.out
   assert plot_path.exists()
   assert captured.err == ""
 
@@ -3885,7 +3885,7 @@ def test_cli_phase_9_uses_xdg_default_config_when_project_config_is_missing(
   plot_path = artifact_dir / "plots" / "histogram-age.png"
 
   assert exit_code == 0
-  assert f"Saved plot: {plot_path}" in captured.out
+  assert f"Saved plot: {plot_path.resolve().as_uri()}" in captured.out
   assert plot_path.exists()
   assert captured.err == ""
 
@@ -3924,7 +3924,7 @@ def test_cli_phase_9_prefers_project_config_over_xdg_default(
   plot_path = project_artifact_dir / "plots" / "histogram-age.png"
 
   assert exit_code == 0
-  assert f"Saved plot: {plot_path}" in captured.out
+  assert f"Saved plot: {plot_path.resolve().as_uri()}" in captured.out
   assert plot_path.exists()
   assert captured.err == ""
 
@@ -3984,7 +3984,8 @@ def test_cli_phase_9_runtime_set_and_save(
   assert exit_code == 0
   assert "Set graph_format: png" in captured.out
   assert f"Set artifact_dir: {artifact_dir}" in captured.out
-  assert f"Saved plot: {artifact_dir / 'plots' / 'histogram-age.png'}" in captured.out
+  expected_plot = (artifact_dir / "plots" / "histogram-age.png").resolve().as_uri()
+  assert f"Saved plot: {expected_plot}" in captured.out
   assert f"Saved: {output_path} (2 rows, 4 columns)" in captured.out
   assert f"Exported: {export_path} (2 rows, 4 columns)" in captured.out
   assert output_path.exists()
@@ -4064,8 +4065,8 @@ def test_shell_default_plot_paths_avoid_overwriting_existing_artifacts(
   second_plot = project_dir / "artifacts" / "plots" / "histogram-age-2.svg"
 
   assert exit_code == 0
-  assert "Saved plot: artifacts/plots/histogram-age.svg" in captured.out
-  assert "Saved plot: artifacts/plots/histogram-age-2.svg" in captured.out
+  assert f"Saved plot: {first_plot.resolve().as_uri()}" in captured.out
+  assert f"Saved plot: {second_plot.resolve().as_uri()}" in captured.out
   assert first_plot.exists()
   assert second_plot.exists()
   assert captured.err == ""

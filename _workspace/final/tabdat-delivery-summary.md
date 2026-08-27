@@ -1,29 +1,29 @@
-# Delivery Summary: Phase 24 P1 Structured JSON Declared Effect Categories
+# Delivery Summary: Silent Plot Drawing & Clickable File Links
 
-The declared command-effect catalog slice is implemented and fully validated; exactly three
-independent PR reviews are complete and all findings are fixed.
+## Delivered Capabilities
+1. **Silent Plot Drawing by Default**:
+   - `TabDatConfig.graph_open` now defaults to `False` (`off`).
+   - Plot generation commands (`histogram`, `scatter`, `bar`, `bayesplot`, `estat report`) save files silently in the background without automatically popping open external applications or browsers.
+   - Users can still optionally enable auto-open per session via `set graph_open on` or in config via `graph_open = true`.
 
-## Delivered
+2. **Clickable `file://<path>` URIs**:
+   - `format_result(PlotResult(...))` formats plot output with full RFC 8089 `file://` URIs (e.g. `Saved plot: file:///Users/.../artifacts/plots/histogram-age.svg`), enabling instant terminal click-to-open.
 
-- Added strict typed effect-category models with canonical tuple invariants.
-- Added read-only `--json --list-command-effects` with explicit mapping for every current command.
-- Used deterministic finite categories (`read`, `write`, `control`, `plot`, `unknown`) and documented
-  possible delegated/output effects without data inspection or execution planning.
-- Rejected incompatible execution/discovery/preview modes without changing existing behavior.
-- Documented and tested the new contract.
+3. **Guaranteed Test Suite Isolation**:
+   - `tests/conftest.py` adds an `autouse=True` fixture `prevent_opening_browser` mocking `tabdat.cli._open_path` so no test ever launches a browser or external viewer process.
 
-## Validation
+## Changed Files
+- `src/tabdat/config.py`: `graph_open = False` default in `TabDatConfig`.
+- `src/tabdat/formatter.py`: `_plot_uri` helper and `file://` formatting for `PlotResult`.
+- `tests/conftest.py`: Autouse fixture preventing browser/viewer process launches.
+- `tests/test_config.py`: Default config assertions.
+- `tests/test_cli.py`: Updated CLI plot assertions and config banners.
+- `integrated_testing/run_e2e.py`: Updated E2E scenarios for plot URI outputs.
+- `docs/user-guide.md` & `ARCHITECTURE.md`: Updated documentation.
 
-- Focused JSON/catalog/effect/help-topic/explain CLI checks: 58 passed; focused help/docs checks: 2.
-- Full suite: 1,205 passed, with 314 existing third-party warnings.
-- basedpyright, Ruff, formatting, and diff checks passed.
-- All six integrated workflows passed; canonical replay stdout matched exactly.
-- Exactly three independent PR review passes completed; all findings were fixed and no fourth review
-  was run.
-
-## Remaining Phase 24 Work
-
-Data-dependent effects, resource/state plans, estimates, command execution, scripts, option/argument
-schemas, catalog examples, plugin discovery, interactive JSON mode, full dry-run/explain, repair
-diagnostics, SQL-result metadata, operation lineage, retained estimation samples, differential
-assurance, dependency layering, and preview readiness remain in `SPEC.md` Future.
+## Validation Commands
+- `uv run pytest` -> 1,223 passed
+- `uv run python integrated_testing/run_e2e.py` -> All 6 scenarios passed
+- `uv run basedpyright` -> 0 errors, 0 warnings, 0 notes
+- `uv run python scripts/check_docs_alignment.py` -> PASSED
+- `uv run ruff check . && uv run ruff format --check .` -> PASSED
