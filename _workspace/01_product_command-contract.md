@@ -1,28 +1,21 @@
-# Product Contract: Homebrew Formula & Packaging Architecture Decision Record
+# Product Contract: Fix GitHub CI Issues
 
 ## Request Summary
-Provide standard Homebrew formula packaging and record architectural decisions governing distribution channels, binary freezing trade-offs, and capability scoping.
+Resolve CI workflow failures across Linux and macOS matrix environments.
 
-## Roadmap Phase
-Phases 28 & 29 (Homebrew Distribution & Standalone Packaging Evaluation).
+## Invariants & Fixes
 
-## Specification & Validation Rules
+### 1. Rpy2 ABI Mode Configuration
+- When R is not pre-installed on standard Linux runners (such as GitHub Actions `ubuntu-latest`), `rpy2-rinterface` must be built in ABI mode.
+- Export `RPY2_CFFI_MODE: "ABI"` at workflow level in `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
 
-### 1. Homebrew Formula (`Formula/tabdat.rb`)
-- Implements standard Homebrew `Formula` subclass `Tabdat`.
-- Requires Python 3.13 or `uv`.
-- Configures virtualenv/isolated tool installation into Homebrew `libexec` and symlinks `bin/tabdat` into standard Homebrew `bin`.
-- Includes `test` block executing `tabdat doctor` and `tabdat -c "describe"`.
+### 2. Hermetic Wheel Test Fixture
+- `tests/test_packaging_and_installer.py::test_wheel_package_contains_topics_and_entrypoints` must not assume `dist/` was populated by an external job.
+- If `dist/` contains no `.whl` files, it builds a wheel into `tmp_path` on demand.
 
-### 2. Architecture Decision Record (`docs/adr/0001-distribution-and-packaging-strategy.md`)
-- Conforms to standard MADR / ADR format: Title, Status, Context, Decision, Consequences, Evaluation Matrix.
-- Evaluates:
-  - `uv tool` / shell curl installer vs. Homebrew formula vs. PyInstaller `onedir`/`onefile` vs. Nuitka standalone.
-  - Startup latency (cold/warm), package footprint, dependency graph weight, cross-platform portability.
-  - Decision: Standardize on `uv tool` as primary engine under the shell curl installer and Homebrew formula; gate optional statistical ecosystems behind `doctor` diagnostics rather than giant bundled monoliths.
+### 3. Tool Path in CI
+- In `wheel-smoke`, `$HOME/.local/bin` is exported to `$GITHUB_PATH` and invoked directly.
 
 ## Acceptance Criteria
-- [ ] `Formula/tabdat.rb` exists, is syntactically valid Ruby, and defines valid installation and test methods.
-- [ ] `docs/adr/0001-distribution-and-packaging-strategy.md` exists and satisfies all Phase 29 ADR evaluation criteria.
-- [ ] `tests/test_homebrew_formula.py` passes.
-- [ ] `scripts/check_docs_alignment.py` and `pytest` pass.
+- [ ] `pytest tests/test_packaging_and_installer.py` passes cleanly on a fresh checkout without prior `uv build`.
+- [ ] GitHub Actions CI workflow passes 100% on `ubuntu-latest`, `macos-latest`, and `wheel-smoke`.

@@ -1,15 +1,13 @@
-# QA Report: Homebrew Distribution Formula & Packaging ADR
+# QA Report: Fix GitHub CI Workflows and Hermetic Packaging Tests
 
 ## Status: PASS
 
 ## Checks Performed
-1. **Homebrew Formula Structure & Standards**:
-   - `Formula/tabdat.rb` satisfies Homebrew Formula syntax, language helper inclusions, and test blocks.
-2. **ADR Completeness**:
-   - `docs/adr/0001-distribution-and-packaging-strategy.md` satisfies Phase 29 criteria with comparative benchmark matrix, startup times, artifact sizes, and explicit decisions.
-3. **Type Safety & Code Quality**:
-   - `basedpyright` passes with 0 errors/warnings.
-   - `ruff` passes check and formatting checks.
-4. **Documentation & Cross-Boundary Consistency**:
+1. **Hermetic Test Isolation**:
+   - `tests/test_packaging_and_installer.py` passes cleanly on clean worktrees without needing a pre-existing `dist/` directory.
+2. **CI Environment Consistency**:
+   - `RPY2_CFFI_MODE="ABI"` set across all GitHub workflow jobs, eliminating missing R header build failures on clean Linux environments.
+3. **Static Analysis & Formatting**:
+   - `basedpyright` 0 errors, 0 warnings.
+   - `ruff` linter and formatter clean.
    - `scripts/check_docs_alignment.py` passed.
-   - 1,249 automated tests and 6 E2E scenarios passed.

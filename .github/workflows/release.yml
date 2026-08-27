@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  RPY2_CFFI_MODE: "ABI"
+
 jobs:
   build-and-release:
     name: Build Artifacts and Create GitHub Release
