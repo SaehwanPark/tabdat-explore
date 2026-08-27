@@ -45,6 +45,7 @@ if TYPE_CHECKING:
 
 from tabdat.backend import DuckDBBackend
 from tabdat.config import TabDatConfig, set_config_value
+from tabdat.doctor import inspect_environment
 from tabdat.errors import (
   ExecutionError,
   NoActiveDatasetError,
@@ -87,6 +88,8 @@ from tabdat.models import (
   DidRegressionResult,
   DmlCommand,
   DmlRegressionResult,
+  DoctorCommand,
+  DoctorResult,
   DrDidCommand,
   DrDidRegressionResult,
   DropCommand,
@@ -790,7 +793,7 @@ class Executor:
       self.state.last_materialization_reason = self._pending_materialization_reason
     elif _lazy_to_eager_transition(previous_dataset, self.state.active_dataset):
       self.state.last_materialization_reason = "eager_operation"
-    if not isinstance(command, StatusCommand):
+    if not isinstance(command, (StatusCommand, DoctorCommand)):
       self.state.last_operation = _canonical_command_name(command)
     self._pending_materialization_reason = None
     self._materialization_reason_reset_pending = False
@@ -862,6 +865,9 @@ class Executor:
 
     if isinstance(command, StatusCommand):
       return self._execute_status()
+
+    if isinstance(command, DoctorCommand):
+      return self._execute_doctor()
 
     if isinstance(command, ByCommand) and not isinstance(
       command.command,
@@ -1191,6 +1197,9 @@ class Executor:
       row_count=dataset.row_count,
       column_count=dataset.column_count,
     )
+
+  def _execute_doctor(self) -> DoctorResult:
+    return inspect_environment()
 
   def _execute_use(self, command: UseCommand) -> LoadResult | ActivateResult:
     if self._should_activate_named_table(command):

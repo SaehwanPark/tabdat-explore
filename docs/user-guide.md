@@ -67,6 +67,39 @@ unsupported Polars-lazy command falls back to eager execution, status reports
 Full operation lineage, active-operation progress, and retained estimation samples remain planned
 for later transparency work.
 
+### Environment and capability diagnostics
+
+Use `doctor` (or CLI `tabdat doctor`) to inspect installed backends, capability health, and runtime metadata:
+
+```text
+tabdat> doctor
+TabDat 0.23.0 Environment Diagnostics
+
+Core Capabilities:
+  DuckDB        ✓ duckdb 1.5.2
+  PyArrow       ✓ pyarrow 24.0.0
+  Polars        ✓ polars 1.40.1
+  Plotting      ✓ altair 6.1.0, matplotlib 3.10.9
+
+Statistics:
+  statsmodels   ✓ statsmodels 0.14.6
+  linearmodels  ✓ linearmodels 7.0
+  scipy         ✓ scipy 1.17.1
+
+Optional Capabilities:
+  ML            ✓ sklearn 1.8.0
+  Bayesian      ✓ bambi 0.18.0
+  Spatial       ✓ spreg 1.9.0, libpysal 4.14.1
+  R             ✓ rpy2 3.6.7, R binary at /opt/homebrew/bin/R
+
+System:
+  Python        ✓ 3.13.13
+  Platform      ✓ Darwin (arm64)
+  Executable    ✓ /path/to/python
+```
+
+For automation, `tabdat --json doctor` emits machine-readable diagnostics in the standard JSON envelope.
+
 ### Named tables
 
 ```text

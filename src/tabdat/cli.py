@@ -82,6 +82,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "cvlasso": ("read", "write"),
   "cvridge": ("read", "write"),
   "describe": ("read",),
+  "doctor": ("read",),
   "did": ("read",),
   "dml": ("read",),
   "drdid": ("read",),
@@ -182,6 +183,13 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
   "status": CommandSchemaResult(
     name="status",
     syntax="status",
+    help_topic=None,
+    arguments=(),
+    options=(),
+  ),
+  "doctor": CommandSchemaResult(
+    name="doctor",
+    syntax="doctor",
     help_topic=None,
     arguments=(),
     options=(),
@@ -1052,6 +1060,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_format="json" if args.json else "terminal",
       )
     if script_path is not None:
+      if str(script_path) == "doctor" and not script_path.exists():
+        return _run_commands(
+          ["doctor"],
+          executor,
+          output_format="json" if args.json else "terminal",
+        )
       return _run_script(
         script_path,
         executor,

@@ -148,6 +148,13 @@ class StatusCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class DoctorCommand:
+  """Command to inspect environment, core backends, and capability health."""
+
+  pass
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SummarizeCommand:
   """Command to display basic summary statistics (count, mean, std, min, max).
 
@@ -758,6 +765,7 @@ Command = (
   | RecodeCommand
   | DescribeCommand
   | StatusCommand
+  | DoctorCommand
   | SummarizeCommand
   | CodebookCommand
   | CountCommand
@@ -1020,6 +1028,27 @@ class StatusResult:
   last_materialization_reason: Literal["polars_fallback", "eager_operation"] | None
   row_count: int | None
   column_count: int | None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DoctorCapabilityItem:
+  """Structured status item for a single backend or library capability."""
+
+  name: str
+  available: bool
+  version: str | None = None
+  details: str | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DoctorResult:
+  """Structured diagnostics and capability status of the TabDat environment."""
+
+  version: str
+  core: tuple[DoctorCapabilityItem, ...]
+  statistics: tuple[DoctorCapabilityItem, ...]
+  optional: tuple[DoctorCapabilityItem, ...]
+  system: tuple[DoctorCapabilityItem, ...]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1562,6 +1591,7 @@ Result = (
   | ActivateResult
   | DescribeResult
   | StatusResult
+  | DoctorResult
   | SummarizeResult
   | CodebookResult
   | CountResult

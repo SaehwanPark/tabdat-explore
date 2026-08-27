@@ -39,6 +39,8 @@ from tabdat.models import (
   DescribeResult,
   DidRegressionResult,
   DmlRegressionResult,
+  DoctorCapabilityItem,
+  DoctorResult,
   DrDidRegressionResult,
   ElasticnetRegressionResult,
   ExportResult,
@@ -92,6 +94,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   ActivateResult: "ActivateResult",
   DescribeResult: "DescribeResult",
   StatusResult: "StatusResult",
+  DoctorResult: "DoctorResult",
   SummarizeResult: "SummarizeResult",
   CodebookResult: "CodebookResult",
   CountResult: "CountResult",
@@ -253,6 +256,23 @@ def format_result(result: Result) -> str:
         f"Columns: {result.column_count if result.column_count is not None else 'none'}",
       )
     )
+
+  if isinstance(result, DoctorResult):
+    sections: list[str] = [f"TabDat {result.version} Environment Diagnostics\n"]
+
+    sections.append("Core Capabilities:")
+    sections.extend(_format_capability_items(result.core))
+
+    sections.append("\nStatistics:")
+    sections.extend(_format_capability_items(result.statistics))
+
+    sections.append("\nOptional Capabilities:")
+    sections.extend(_format_capability_items(result.optional))
+
+    sections.append("\nSystem:")
+    sections.extend(_format_capability_items(result.system))
+
+    return "\n".join(sections)
 
   if isinstance(result, SummarizeResult):
     summary_rows = (
@@ -1402,3 +1422,15 @@ def _format_diff_row(stats: TtestGroupStats) -> tuple[str, str, str, str, str, s
     _format_number(stats.ci_lower),
     _format_number(stats.ci_upper),
   )
+
+
+def _format_capability_items(items: tuple[DoctorCapabilityItem, ...]) -> list[str]:
+  lines: list[str] = []
+  max_name_len = max(len(item.name) for item in items) if items else 12
+  for item in items:
+    status_icon = "✓" if item.available else "-"
+    desc = item.details or (
+      item.version if item.version else ("available" if item.available else "missing")
+    )
+    lines.append(f"  {item.name.ljust(max_name_len)}  {status_icon} {desc}")
+  return lines
