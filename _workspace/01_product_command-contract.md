@@ -1,21 +1,28 @@
-# Product Contract: Fix GitHub CI Issues
+# Product Contract: Fast Startup Optimization & v0.24.0 Release
 
 ## Request Summary
-Resolve CI workflow failures across Linux and macOS matrix environments.
+Drastically reduce CLI startup latency through lazy deferred imports and fast CLI routing while preserving 100% semantic and test compatibility.
 
-## Invariants & Fixes
+## Invariants & Optimization Specifications
 
-### 1. Rpy2 ABI Mode Configuration
-- When R is not pre-installed on standard Linux runners (such as GitHub Actions `ubuntu-latest`), `rpy2-rinterface` must be built in ABI mode.
-- Export `RPY2_CFFI_MODE: "ABI"` at workflow level in `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
+### 1. Lazy Statistical Imports (`src/tabdat/executor.py`)
+- Core modules (`tabdat.models`, `tabdat.parser`, `tabdat.backend`, `tabdat.formatter`, `tabdat.shell`) must not import `statsmodels`, `libpysal`, `spreg`, `linearmodels`, `scikit-learn`, or `scipy.optimize` at module load time.
+- Heavy statistical libraries are imported inside their respective command execution methods (e.g. `_execute_regress`, `_execute_spregress`, `_execute_ivregress`, `_execute_lasso`, etc.).
+- When an optional library is missing or fails to import, the existing actionable error behavior is preserved.
 
-### 2. Hermetic Wheel Test Fixture
-- `tests/test_packaging_and_installer.py::test_wheel_package_contains_topics_and_entrypoints` must not assume `dist/` was populated by an external job.
-- If `dist/` contains no `.whl` files, it builds a wheel into `tmp_path` on demand.
+### 2. Lazy Visualization Imports (`src/tabdat/visualization.py`)
+- `altair`, `matplotlib`, and `vl_convert` are imported on demand when executing `scatter`, `histogram`, or `bar`.
 
-### 3. Tool Path in CI
-- In `wheel-smoke`, `$HOME/.local/bin` is exported to `$GITHUB_PATH` and invoked directly.
+### 3. Fast CLI Dispatch (`src/tabdat/cli.py`)
+- When invoked with `--version`, `--help`, or `doctor`, the CLI routes immediately without allocating database sessions or compiling execution graph primitives unnecessarily.
+
+### 4. Release & Version Bump
+- Package version bumped to `0.24.0` in `pyproject.toml` and Homebrew formula.
+- Release workflow on tag `v0.24.0` builds and publishes distribution assets.
 
 ## Acceptance Criteria
-- [ ] `pytest tests/test_packaging_and_installer.py` passes cleanly on a fresh checkout without prior `uv build`.
-- [ ] GitHub Actions CI workflow passes 100% on `ubuntu-latest`, `macos-latest`, and `wheel-smoke`.
+- [ ] Startup latency measured via `python -X importtime -c "import tabdat.cli"` decreases by $\ge 80\%$ (from ~1,820ms to $\le 300$ms).
+- [ ] All 1,249 existing tests pass without regressions.
+- [ ] `basedpyright`, `ruff`, and `scripts/check_docs_alignment.py` pass cleanly.
+- [ ] PR created and merged into `main`.
+- [ ] Release tag `v0.24.0` created on GitHub.
