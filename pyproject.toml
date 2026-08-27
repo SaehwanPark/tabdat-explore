@@ -1,9 +1,23 @@
 [project]
-name = "tabdat-explore-dev"
+name = "tabdat-explore"
 version = "0.23.0"
 description = "Terminal-native exploratory data analysis tool for modern tabular data, Stata-inspired"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
+authors = [{ name = "Sae-Hwan Park" }]
+keywords = ["eda", "tabular", "data-analysis", "duckdb", "parquet", "stata", "econometrics", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
 requires-python = ">=3.13"
+
 dependencies = [
     "altair>=6.1.0",
     "duckdb>=1.4.3",
@@ -22,6 +36,12 @@ dependencies = [
     "matplotlib>=3.10.9",
     "pyarrow>=24.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/SaehwanPark/tabdat-explore"
+Repository = "https://github.com/SaehwanPark/tabdat-explore"
+Documentation = "https://github.com/SaehwanPark/tabdat-explore/blob/main/README.md"
+Issues = "https://github.com/SaehwanPark/tabdat-explore/issues"
 
 [project.scripts]
 tabdat = "tabdat.cli:main"
@@ -82,6 +102,20 @@ module = [
     "rpy2.*",
 ]
 ignore_missing_imports = true
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src/tabdat",
+    "/docs",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+exclude = [
+    "/.antigravitycli",
+    "/.forge",
+    "/_workspace",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/tabdat"]

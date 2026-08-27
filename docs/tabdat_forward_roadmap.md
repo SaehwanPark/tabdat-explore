@@ -507,27 +507,27 @@ The user should be able to install TabDat once and run `tabdat` from arbitrary r
 
 ## 8.1 Naming and Metadata
 
-- [ ] Decide final PyPI distribution name.
-- [ ] Remove `-dev` naming from production package metadata.
-- [ ] Confirm CLI command remains `tabdat`.
-- [ ] Define versioning policy.
-- [ ] Define supported Python versions.
-- [ ] Record Python-version decision in an ADR.
-- [ ] Confirm license metadata.
-- [ ] Add project URLs and issue tracker metadata.
-- [ ] Verify packaged help/resources are included in the wheel.
+- [x] Decide final PyPI distribution name.
+- [x] Remove `-dev` naming from production package metadata.
+- [x] Confirm CLI command remains `tabdat`.
+- [x] Define versioning policy.
+- [x] Define supported Python versions.
+- [x] Record Python-version decision in an ADR.
+- [x] Confirm license metadata.
+- [x] Add project URLs and issue tracker metadata.
+- [x] Verify packaged help/resources are included in the wheel.
 
 ## 8.2 Build Validation
 
-- [ ] Build wheel from a clean checkout.
-- [ ] Build source distribution if supported.
-- [ ] Install wheel into a new isolated environment.
-- [ ] Run `tabdat --version`.
-- [ ] Run `tabdat -c "help summarize"`.
-- [ ] Run canonical EDA workflow from installed wheel.
-- [ ] Run from a directory outside the source repository.
-- [ ] Verify no accidental import from the repository checkout.
-- [ ] Verify resource paths do not depend on current working directory.
+- [x] Build wheel from a clean checkout.
+- [x] Build source distribution if supported.
+- [x] Install wheel into a new isolated environment.
+- [x] Run `tabdat --version`.
+- [x] Run `tabdat -c "help summarize"`.
+- [x] Run canonical EDA workflow from installed wheel.
+- [x] Run from a directory outside the source repository.
+- [x] Verify no accidental import from the repository checkout.
+- [x] Verify resource paths do not depend on current working directory.
 
 ## 8.3 PyPI Publication
 
@@ -603,35 +603,35 @@ Make releases reproducible and testable rather than dependent on a developer wor
 
 ## 9.1 CI Baseline
 
-- [ ] Add GitHub Actions or equivalent CI.
-- [ ] Run unit tests on every pull request.
-- [ ] Run Ruff checks.
-- [ ] Run formatting checks.
-- [ ] Run basedpyright.
-- [ ] Run docs-alignment checks.
-- [ ] Test supported Python versions.
-- [ ] Test at least Linux and macOS.
+- [x] Add GitHub Actions or equivalent CI.
+- [x] Run unit tests on every pull request.
+- [x] Run Ruff checks.
+- [x] Run formatting checks.
+- [x] Run basedpyright.
+- [x] Run docs-alignment checks.
+- [x] Test supported Python versions.
+- [x] Test at least Linux and macOS.
 - [ ] Add Windows where product support is intended.
 
 ## 9.2 Clean-Install CI
 
-- [ ] Build wheel in CI.
-- [ ] Install wheel into a clean environment.
-- [ ] Verify packaged help resources.
-- [ ] Run canonical workflow against installed artifact.
-- [ ] Ensure tests do not accidentally import the source tree.
+- [x] Build wheel in CI.
+- [x] Install wheel into a clean environment.
+- [x] Verify packaged help resources.
+- [x] Run canonical workflow against installed artifact.
+- [x] Ensure tests do not accidentally import the source tree.
 
 ## 9.3 Release Workflow
 
 On a version tag:
 
-- [ ] Build artifacts.
-- [ ] Run release validation.
-- [ ] Generate checksums.
-- [ ] Publish GitHub Release.
+- [x] Build artifacts.
+- [x] Run release validation.
+- [x] Generate checksums.
+- [x] Publish GitHub Release.
 - [ ] Publish PyPI release.
-- [ ] Attach validation metadata.
-- [ ] Fail the release if canonical workflow validation fails.
+- [x] Attach validation metadata.
+- [x] Fail the release if canonical workflow validation fails.
 
 ## 9.4 Release Documentation
 
@@ -668,29 +668,29 @@ curl -LsSf https://tabdat.dev/install.sh | sh
 
 The installer should:
 
-- [ ] Detect supported OS.
-- [ ] Detect CPU architecture where relevant.
-- [ ] Detect whether `uv` is available.
-- [ ] Install or bootstrap `uv` only when needed.
-- [ ] Install TabDat as an isolated tool.
-- [ ] Avoid modifying unrelated environments.
-- [ ] Avoid requiring repository cloning.
-- [ ] Avoid `sudo` unless unavoidable and explicitly communicated.
-- [ ] Ensure the executable location is discoverable.
-- [ ] Print exact next steps.
-- [ ] Return non-zero on failure.
+- [x] Detect supported OS.
+- [x] Detect CPU architecture where relevant.
+- [x] Detect whether `uv` is available.
+- [x] Install or bootstrap `uv` only when needed.
+- [x] Install TabDat as an isolated tool.
+- [x] Avoid modifying unrelated environments.
+- [x] Avoid requiring repository cloning.
+- [x] Avoid `sudo` unless unavoidable and explicitly communicated.
+- [x] Ensure the executable location is discoverable.
+- [x] Print exact next steps.
+- [x] Return non-zero on failure.
 
 ## 10.2 Safety and Reproducibility
 
-- [ ] Host installer source in a stable location.
-- [ ] Keep installer short and auditable.
-- [ ] Support pinned-version installation.
-- [ ] Verify downloads where applicable.
-- [ ] Test idempotent reinstallation.
-- [ ] Test upgrade behavior.
-- [ ] Test uninstall instructions.
-- [ ] Avoid silently editing shell profiles beyond documented requirements.
-- [ ] Add CI tests for supported shells/platforms where feasible.
+- [x] Host installer source in a stable location.
+- [x] Keep installer short and auditable.
+- [x] Support pinned-version installation.
+- [x] Verify downloads where applicable.
+- [x] Test idempotent reinstallation.
+- [x] Test upgrade behavior.
+- [x] Test uninstall instructions.
+- [x] Avoid silently editing shell profiles beyond documented requirements.
+- [x] Add CI tests for supported shells/platforms where feasible.
 
 ## 10.3 User Documentation
 

@@ -28,9 +28,21 @@ is in [CHANGELOG.md](CHANGELOG.md).
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
 
-### Install from source
+### Quick install (recommended)
 
-PyPI publication is planned. For now, install from the repository:
+Install TabDat globally with one command (macOS and Linux):
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/SaehwanPark/tabdat-explore/main/scripts/install.sh | sh
+```
+
+Or using `uv tool`:
+
+```bash
+uv tool install git+https://github.com/SaehwanPark/tabdat-explore.git
+```
+
+### Install from source
 
 ```bash
 git clone https://github.com/SaehwanPark/tabdat-explore.git

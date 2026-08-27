@@ -1,16 +1,18 @@
-# QA Report: Statistical Reference Validation Matrix & Tier 1 Assurance
+# QA Report: CI/CD Workflows, Packaging Baseline & Frictionless Shell Installer
 
 ## Status: PASS
 
 ## Checks Performed
-1. **Numerical Differential Consistency**:
-   - TabDat Tier 1 estimators (`regress` standard/robust/cluster, `logit`, `probit`, `poisson`, `qreg`) match authoritative `statsmodels` fits within relative tolerances ($10^{-5}$ to $10^{-6}$).
-   - Parameter estimates, standard errors, and fit metrics match expected theoretical DGPs.
-2. **Schema & Machine Format Integrity**:
-   - `docs/reference_validation_matrix.json` parses as valid JSON with all required fields (`schema_version`, `tiers`, `coef_rtol`, `validation_status`).
-3. **Type Safety & Code Quality**:
-   - `basedpyright` passes with 0 errors across codebase and tests.
-   - `ruff` passes check and format checks.
-4. **Documentation Alignment**:
-   - `scripts/check_docs_alignment.py` passes.
-   - 1,244 automated unit, executor, and differential tests passed.
+1. **Wheel Build & Distribution Artifact Validation**:
+   - `uv build` created clean `.tar.gz` and `.whl` distributions.
+   - Built wheel inspected and confirmed to bundle `tabdat.cli:main` entrypoint, Python modules, and all 60+ help markdown topic files.
+2. **Installer Shell Script Syntax & Safety**:
+   - `scripts/install.sh` passed POSIX shell validation (`sh -n`).
+   - OS detection, `uv` presence detection, and tool directory PATH handling confirmed.
+3. **CI/CD Configuration Validity**:
+   - `.github/workflows/ci.yml` and `.github/workflows/release.yml` verified for syntax and step integrity.
+4. **Code Quality, Type Safety & Docs Alignment**:
+   - `basedpyright` 0 errors, 0 warnings.
+   - `ruff` lint and format clean.
+   - `scripts/check_docs_alignment.py` passed.
+   - 1,247 automated unit/integration tests and 6 E2E scenarios passed.

@@ -16,3 +16,9 @@ wheels/
 # Integrated test artifacts
 artifacts/
 integrated_testing/reports/
+
+# IDE, agent and tool cache directories
+.antigravitycli/
+.forge/
+.ruff_cache/
+.mypy_cache/
