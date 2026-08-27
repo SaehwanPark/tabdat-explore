@@ -1,33 +1,24 @@
-# Delivery Summary: `doctor` Command & Environment Diagnostics
+# Delivery Summary: Statistical Reference Validation Matrix & Tier 1 Assurance
 
 ## Delivered Capabilities
-1. **`doctor` Command & CLI Diagnostics**:
-   - Added interactive `doctor` command and top-level CLI `tabdat doctor` / `tabdat --json doctor`.
-   - Safely discovers and formats capability health across Core (DuckDB, PyArrow, Polars, Plotting), Statistics (statsmodels, linearmodels, scipy), Optional (ML, Bayesian, Spatial, R), and System layers.
-2. **Deterministic Output Formats**:
-   - Clean aligned terminal matrix with status checkmarks and version annotations.
-   - Versioned JSON envelope (`result_type="DoctorResult"`, `schema_version=1`) for machine consumption and automated tooling.
-3. **Documentation & Help Integration**:
-   - In-app help topic `doctor.md`.
-   - Documented in `README.md`, `docs/user-guide.md`, `docs/command-reference.md`, `CONTRIBUTING.md`, and `docs/tabdat_forward_roadmap.md`.
-4. **Comprehensive Test Coverage**:
-   - 13 new test cases covering discovery structure, parser rejection rules, executor neutrality, terminal/JSON formatting, and CLI flags in `tests/test_doctor.py`.
+1. **Machine-Readable Reference Validation Tracking Matrix**:
+   - `docs/reference_validation_matrix.json` tracking estimator algorithms, reference backends, numerical tolerances, and verification status.
+2. **Human-Readable Trust Documentation**:
+   - `docs/reference-validation-matrix.md` detailing the validation status across Tier 1 (foundational models), Tier 2 (panel & IV), and Tier 3 (advanced & specialized methods).
+3. **Automated Tier 1 Differential Testing Suite**:
+   - `tests/test_reference_validation.py` running automated differential comparisons against `statsmodels` OLS, robust HC1, clustered standard errors, binary Logit MLE, Probit MLE, Poisson log-linear MLE, and median/quantile regression (`qreg`).
+4. **Roadmap & Documentation Alignment**:
+   - Updated `docs/tabdat_forward_roadmap.md`, `README.md`, and `CONTRIBUTING.md`.
 
 ## Changed Files
-- `src/tabdat/models.py`: Added `DoctorCommand`, `DoctorCapabilityItem`, and `DoctorResult`.
-- `src/tabdat/doctor.py`: Added environment and capability inspection logic.
-- `src/tabdat/parser.py`: Added `doctor` syntax parsing and validation.
-- `src/tabdat/executor.py`: Integrated `DoctorCommand` execution handler.
-- `src/tabdat/formatter.py`: Formatter for `DoctorResult` in terminal and JSON modes.
-- `src/tabdat/shell.py`: Added `doctor` to shell command list.
-- `src/tabdat/cli.py`: Added positional `tabdat doctor` execution and schema metadata.
-- `src/tabdat/help/topics/doctor.md`: Added packaged help topic.
-- `tests/test_doctor.py`: Unit, executor, formatter, and CLI test suite.
-- `README.md`, `CONTRIBUTING.md`, `docs/command-reference.md`, `docs/user-guide.md`, `docs/tabdat_forward_roadmap.md`.
+- `docs/reference_validation_matrix.json`: Machine-readable tracking catalog.
+- `docs/reference-validation-matrix.md`: Published validation documentation.
+- `tests/test_reference_validation.py`: Focused differential test suite.
+- `docs/tabdat_forward_roadmap.md`: Updated Phase 24C validation checklist.
+- `README.md`, `CONTRIBUTING.md`, `_workspace/*`.
 
 ## Validation Commands
-- `uv run pytest` -> 1,236 passed
-- `uv run python integrated_testing/run_e2e.py` -> 6/6 passed
+- `uv run pytest` -> 1,244 passed
 - `uv run basedpyright` -> 0 errors, 0 warnings, 0 notes
 - `uv run ruff check . && uv run ruff format --check .` -> Clean
 - `uv run python scripts/check_docs_alignment.py` -> Clean

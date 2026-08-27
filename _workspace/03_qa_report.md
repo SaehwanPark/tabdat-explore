@@ -1,17 +1,16 @@
-# QA Report: `doctor` Command & Environment Diagnostics
+# QA Report: Statistical Reference Validation Matrix & Tier 1 Assurance
 
 ## Status: PASS
 
 ## Checks Performed
-1. **Contract Consistency**:
-   - `doctor` parser rejects arguments, if-conditions, options, and assignment syntax.
-   - `by: doctor` is explicitly rejected with helpful message.
-   - Introspection is strictly read-only and does not alter active dataset or materialization tracking.
-2. **Type Safety & Code Quality**:
-   - `basedpyright` passes with 0 errors/warnings across `src/tabdat` and `tests`.
-   - `ruff` linting and formatting conform to strict 2-space rules.
-3. **Documentation Alignment**:
-   - `scripts/check_docs_alignment.py` passes with valid links, full command reference coverage, and registered help topics.
-4. **Test Suite Verification**:
-   - 1,236 automated unit/parser/executor tests passed.
-   - All 6 full-session end-to-end integration scenarios passed with deterministic reproducibility.
+1. **Numerical Differential Consistency**:
+   - TabDat Tier 1 estimators (`regress` standard/robust/cluster, `logit`, `probit`, `poisson`, `qreg`) match authoritative `statsmodels` fits within relative tolerances ($10^{-5}$ to $10^{-6}$).
+   - Parameter estimates, standard errors, and fit metrics match expected theoretical DGPs.
+2. **Schema & Machine Format Integrity**:
+   - `docs/reference_validation_matrix.json` parses as valid JSON with all required fields (`schema_version`, `tiers`, `coef_rtol`, `validation_status`).
+3. **Type Safety & Code Quality**:
+   - `basedpyright` passes with 0 errors across codebase and tests.
+   - `ruff` passes check and format checks.
+4. **Documentation Alignment**:
+   - `scripts/check_docs_alignment.py` passes.
+   - 1,244 automated unit, executor, and differential tests passed.

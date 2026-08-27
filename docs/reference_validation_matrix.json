@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "last_updated": "2026-08-27",
+  "tiers": {
+    "tier_1_foundational": [
+      {
+        "command": "regress",
+        "estimator_mode": "ols_classical",
+        "reference_implementation": "statsmodels.regression.linear_model.OLS (standard cov)",
+        "coef_rtol": 1e-6,
+        "se_rtol": 1e-5,
+        "validation_status": "reference_validated",
+        "notes": "Validated against statsmodels OLS point estimates, standard errors, t-stats, p-values, R2, and F-statistic."
+      },
+      {
+        "command": "regress",
+        "estimator_mode": "ols_robust_hc1",
+        "reference_implementation": "statsmodels.regression.linear_model.OLS (cov_type='HC1')",
+        "coef_rtol": 1e-6,
+        "se_rtol": 1e-5,
+        "validation_status": "reference_validated",
+        "notes": "Validated against statsmodels OLS with HC1 robust heteroskedasticity-consistent covariance."
+      },
+      {
+        "command": "regress",
+        "estimator_mode": "ols_clustered",
+        "reference_implementation": "statsmodels.regression.linear_model.OLS (cov_type='cluster')",
+        "coef_rtol": 1e-6,
+        "se_rtol": 1e-5,
+        "validation_status": "reference_validated",
+        "notes": "Validated against statsmodels cluster-robust covariance with finite-sample group adjustment."
+      },
+      {
+        "command": "predict",
+        "estimator_mode": "linear_prediction_and_residuals",
+        "reference_implementation": "statsmodels.regression.linear_model.RegressionResults.predict / resid",
+        "coef_rtol": 1e-6,
+        "se_rtol": 1e-5,
+        "validation_status": "reference_validated",
+        "notes": "Validated fitted values (xb) and residual calculation against statsmodels."
+      },
+      {
+        "command": "estat",
+        "estimator_mode": "vif_and_ic",
+        "reference_implementation": "statsmodels.stats.outliers_influence.variance_inflation_factor",
+        "coef_rtol": 1e-5,
+        "se_rtol": 1e-5,
+        "validation_status": "reference_validated",
+        "notes": "Validated Variance Inflation Factors and information criteria (AIC/BIC)."
+      },
+      {
+        "command": "logit",
+        "estimator_mode": "logit_mle",
+        "reference_implementation": "statsmodels.discrete.discrete_model.Logit",
+        "coef_rtol": 1e-5,
+        "se_rtol": 1e-4,
+        "validation_status": "reference_validated",
+        "notes": "Validated Logit maximum-likelihood coefficients, Hessian-based SEs, log-likelihood, and pseudo-R2."
+      },
+      {
+        "command": "probit",
+        "estimator_mode": "probit_mle",
+        "reference_implementation": "statsmodels.discrete.discrete_model.Probit",
+        "coef_rtol": 1e-5,
+        "se_rtol": 1e-4,
+        "validation_status": "reference_validated",
+        "notes": "Validated Probit maximum-likelihood coefficients, SEs, log-likelihood, and pseudo-R2."
+      },
+      {
+        "command": "poisson",
+        "estimator_mode": "poisson_mle",
+        "reference_implementation": "statsmodels.discrete.discrete_model.Poisson",
+        "coef_rtol": 1e-5,
+        "se_rtol": 1e-4,
+        "validation_status": "reference_validated",
+        "notes": "Validated Poisson log-linear MLE coefficients, SEs, log-likelihood, and deviance."
+      },
+      {
+        "command": "qreg",
+        "estimator_mode": "quantile_regression",
+        "reference_implementation": "statsmodels.regression.quantile_regression.QuantReg",
+        "coef_rtol": 1e-5,
+        "se_rtol": 1e-4,
+        "validation_status": "reference_validated",
+        "notes": "Validated median (q=0.5) and custom quantile estimates against statsmodels QuantReg."
+      }
+    ],
+    "tier_2_econometric": [
+      {
+        "command": "ivregress",
+        "estimator_mode": "2sls_and_gmm",
+        "reference_implementation": "linearmodels.iv.model.IV2SLS / IVGMM",
+        "validation_status": "implemented",
+        "notes": "Unit tested with endogeneity and weak-instrument diagnostic workflows."
+      },
+      {
+        "command": "xtreg",
+        "estimator_mode": "panel_fe_re",
+        "reference_implementation": "linearmodels.panel.model.PanelOLS / RandomEffects",
+        "validation_status": "implemented",
+        "notes": "Unit tested with entity/time fixed effects and random effects models."
+      },
+      {
+        "command": "cfregress",
+        "estimator_mode": "control_function",
+        "reference_implementation": "statsmodels 2-step OLS control function",
+        "validation_status": "implemented",
+        "notes": "Unit tested with first-stage residual projection and bootstrap/2-step standard errors."
+      },
+      {
+        "command": "did",
+        "estimator_mode": "difference_in_differences",
+        "reference_implementation": "statsmodels TWFE difference-in-differences",
+        "validation_status": "implemented",
+        "notes": "Unit tested with 2x2 and multi-period treatment setups."
+      },
+      {
+        "command": "xtabond",
+        "estimator_mode": "arellano_bond_gmm",
+        "reference_implementation": "linearmodels dynamic panel GMM",
+        "validation_status": "implemented",
+        "notes": "Unit tested with lagged instrument moment conditions."
+      },
+      {
+        "command": "xtlogit",
+        "estimator_mode": "panel_logit_fe_re",
+        "reference_implementation": "statsmodels conditional logit",
+        "validation_status": "implemented",
+        "notes": "Unit tested with panel binary choice workflows."
+      }
+    ],
+    "tier_3_advanced": [
+      {
+        "command": "tobit",
+        "estimator_mode": "censored_regression",
+        "reference_implementation": "statsmodels / scipy.optimize MLE",
+        "validation_status": "implemented",
+        "notes": "Unit tested with left/right censoring boundaries."
+      },
+      {
+        "command": "heckman",
+        "estimator_mode": "sample_selection",
+        "reference_implementation": "2-step Heckman selection model",
+        "validation_status": "implemented",
+        "notes": "Unit tested with inverse Mills ratio projection."
+      },
+      {
+        "command": "zip / zinb",
+        "estimator_mode": "zero_inflated_counts",
+        "reference_implementation": "statsmodels ZeroInflatedPoisson / ZeroInflatedNegativeBinomialP",
+        "validation_status": "implemented",
+        "notes": "Unit tested with count and inflation submodel specs."
+      },
+      {
+        "command": "streg",
+        "estimator_mode": "survival_analysis",
+        "reference_implementation": "statsmodels PHReg / lifelines",
+        "validation_status": "implemented",
+        "notes": "Unit tested with Weibull/Exponential/Cox proportional hazards."
+      },
+      {
+        "command": "dml / drdid",
+        "estimator_mode": "double_machine_learning_causal",
+        "reference_implementation": "cross-fitting orthogonalized score estimators",
+        "validation_status": "implemented",
+        "notes": "Unit tested with K-fold cross-fitting and AIPW/doubly robust scores."
+      },
+      {
+        "command": "lasso / ridge / elasticnet",
+        "estimator_mode": "regularized_linear_models",
+        "reference_implementation": "scikit-learn linear_model / statsmodels OLS.fit_regularized",
+        "validation_status": "implemented",
+        "notes": "Unit tested with cross-validation tuning loops (cvlasso, cvridge, cvelasticnet)."
+      },
+      {
+        "command": "bayes",
+        "estimator_mode": "mcmc_bayesian_regression",
+        "reference_implementation": "bambi / pymc / arviz",
+        "validation_status": "implemented",
+        "notes": "Unit tested with multi-chain NUTS sampling, Gelman-Rubin diagnostics, and posterior intervals."
+      },
+      {
+        "command": "spregress",
+        "estimator_mode": "spatial_econometrics",
+        "reference_implementation": "spreg / libpysal spatial lag and spatial error models",
+        "validation_status": "implemented",
+        "notes": "Unit tested with Queen/Rook/KNN/GAL/GWT weights matrices."
+      }
+    ]
+  }
+}

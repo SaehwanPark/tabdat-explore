@@ -416,12 +416,12 @@ validation status
 last validated date
 ```
 
-- [ ] Define the matrix format.
-- [ ] Store it in a machine-readable form.
-- [ ] Render a human-readable version for documentation.
-- [ ] Include backend/library versions.
-- [ ] Include known intentional semantic differences.
-- [ ] Distinguish "implemented" from "reference validated".
+- [x] Define the matrix format.
+- [x] Store it in a machine-readable form.
+- [x] Render a human-readable version for documentation.
+- [x] Include backend/library versions.
+- [x] Include known intentional semantic differences.
+- [x] Distinguish "implemented" from "reference validated".
 
 ## 7.2 Priority Validation Order
 
@@ -429,16 +429,16 @@ Validate the most common and foundational commands first.
 
 ### Tier 1
 
-- [ ] `regress`
-- [ ] robust covariance
-- [ ] clustered covariance
-- [ ] WLS/GLS where supported
-- [ ] `predict`
-- [ ] core `estat` diagnostics
-- [ ] `logit`
-- [ ] `probit`
-- [ ] `poisson`
-- [ ] `qreg`
+- [x] `regress`
+- [x] robust covariance
+- [x] clustered covariance
+- [x] WLS/GLS where supported
+- [x] `predict`
+- [x] core `estat` diagnostics
+- [x] `logit`
+- [x] `probit`
+- [x] `poisson`
+- [x] `qreg`
 
 ### Tier 2
 

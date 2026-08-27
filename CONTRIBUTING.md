@@ -62,6 +62,7 @@ Agent-oriented workflows and tooling notes live in [AGENTS.md](AGENTS.md).
 | [docs/phase0_product_guardrails.md](docs/phase0_product_guardrails.md) | Scope guardrails and non-goals |
 | [docs/command_glossary_v0.md](docs/command_glossary_v0.md) | Historical Phase 0 command glossary |
 | [docs/command-reference.md](docs/command-reference.md) | Current user-facing command index |
+| [docs/reference-validation-matrix.md](docs/reference-validation-matrix.md) | Statistical accuracy and reference validation status |
 | [docs/user-guide.md](docs/user-guide.md) | End-user workflows and behavior |
 | [docs/harness/tabdat/team-spec.md](docs/harness/tabdat/team-spec.md) | Multi-agent development harness |
 
