@@ -2,7 +2,7 @@
 title: "Development Roadmap"
 author: "Sae-Hwan Park"
 date: 2026-05-02
-description: "a high-level phased plan that balances architecture discipline + rapid usability validation."
+description: "a high-level phased plan that balances architecture discipline + rapid usability validation.; new roadmap is generated on 2026-08-27. Any developments on or later than Aug 27 should prioritize `tabdat_forward_roadmap.md`"
 ---
 
 # Development Roadmap
