@@ -1,30 +1,23 @@
-# Delivery Summary: CI/CD Workflows, Packaging Baseline & Frictionless Shell Installer
+# Delivery Summary: Homebrew Distribution Formula & Packaging ADR
 
 ## Delivered Capabilities
-1. **Production Packaging Specification**:
-   - `pyproject.toml` updated to `name = "tabdat-explore"` with full URLs, classifiers, AGPL-3.0 license, and `hatchling` sdist/wheel packaging rules bundling in-app help markdown topics.
-2. **GitHub Actions CI Pipeline**:
-   - `.github/workflows/ci.yml` running linting, formatting, type checking, doc alignment, pytest, and E2E scenarios across Ubuntu and macOS, plus an isolated clean-wheel build and installation smoke test.
-3. **Automated Release Pipeline**:
-   - `.github/workflows/release.yml` building release wheels and source tarballs, generating SHA256 checksums, and creating GitHub Releases on `v*` tags.
-4. **Frictionless Shell Installer**:
-   - `scripts/install.sh` enabling one-line global installation via `curl -LsSf https://raw.githubusercontent.com/SaehwanPark/tabdat-explore/main/scripts/install.sh | sh`.
-5. **Testing Suite & Documentation**:
-   - Added `tests/test_packaging_and_installer.py`.
-   - Updated `README.md` and `docs/tabdat_forward_roadmap.md`.
+1. **Homebrew Formula Packaging**:
+   - `Formula/tabdat.rb` supporting installation via custom tap (`brew tap SaehwanPark/tabdat https://github.com/SaehwanPark/tabdat-explore.git` && `brew install tabdat`).
+2. **Distribution Architecture Decision Record**:
+   - `docs/adr/0001-distribution-and-packaging-strategy.md` benchmarking and establishing distribution tiers (`curl | sh` / `uv tool` as primary; Homebrew tap; standalone frozen binary evaluation).
+3. **Automated Formula Verification Suite**:
+   - `tests/test_homebrew_formula.py` validating formula class structure, dependencies, test assertions, and ADR contents.
+4. **Roadmap & Documentation Alignment**:
+   - Updated `README.md`, `CONTRIBUTING.md`, and marked completed items in `docs/tabdat_forward_roadmap.md` (Phases 28 & 29).
 
 ## Changed Files
-- `pyproject.toml`: Package metadata, project URLs, build targets.
-- `.gitignore`: Cache exclusions.
-- `.github/workflows/ci.yml`: GitHub Actions CI pipeline.
-- `.github/workflows/release.yml`: Release and packaging workflow.
-- `scripts/install.sh`: POSIX shell installer.
-- `tests/test_packaging_and_installer.py`: Packaging test suite.
-- `README.md`, `docs/tabdat_forward_roadmap.md`, `_workspace/*`.
+- `Formula/tabdat.rb`: Homebrew formula.
+- `docs/adr/0001-distribution-and-packaging-strategy.md`: Architecture decision record.
+- `tests/test_homebrew_formula.py`: Formula tests.
+- `README.md`, `CONTRIBUTING.md`, `docs/tabdat_forward_roadmap.md`, `_workspace/*`.
 
 ## Validation Commands
-- `uv build` -> Built clean sdist and wheel
-- `uv run pytest` -> 1,247 passed
+- `uv run pytest` -> 1,249 passed
 - `uv run python integrated_testing/run_e2e.py` -> 6/6 scenarios passed
 - `uv run basedpyright` -> 0 errors, 0 warnings
 - `uv run ruff check . && uv run ruff format --check .` -> Clean

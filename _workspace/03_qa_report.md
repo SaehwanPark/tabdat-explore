@@ -1,18 +1,15 @@
-# QA Report: CI/CD Workflows, Packaging Baseline & Frictionless Shell Installer
+# QA Report: Homebrew Distribution Formula & Packaging ADR
 
 ## Status: PASS
 
 ## Checks Performed
-1. **Wheel Build & Distribution Artifact Validation**:
-   - `uv build` created clean `.tar.gz` and `.whl` distributions.
-   - Built wheel inspected and confirmed to bundle `tabdat.cli:main` entrypoint, Python modules, and all 60+ help markdown topic files.
-2. **Installer Shell Script Syntax & Safety**:
-   - `scripts/install.sh` passed POSIX shell validation (`sh -n`).
-   - OS detection, `uv` presence detection, and tool directory PATH handling confirmed.
-3. **CI/CD Configuration Validity**:
-   - `.github/workflows/ci.yml` and `.github/workflows/release.yml` verified for syntax and step integrity.
-4. **Code Quality, Type Safety & Docs Alignment**:
-   - `basedpyright` 0 errors, 0 warnings.
-   - `ruff` lint and format clean.
+1. **Homebrew Formula Structure & Standards**:
+   - `Formula/tabdat.rb` satisfies Homebrew Formula syntax, language helper inclusions, and test blocks.
+2. **ADR Completeness**:
+   - `docs/adr/0001-distribution-and-packaging-strategy.md` satisfies Phase 29 criteria with comparative benchmark matrix, startup times, artifact sizes, and explicit decisions.
+3. **Type Safety & Code Quality**:
+   - `basedpyright` passes with 0 errors/warnings.
+   - `ruff` passes check and formatting checks.
+4. **Documentation & Cross-Boundary Consistency**:
    - `scripts/check_docs_alignment.py` passed.
-   - 1,247 automated unit/integration tests and 6 E2E scenarios passed.
+   - 1,249 automated tests and 6 E2E scenarios passed.
