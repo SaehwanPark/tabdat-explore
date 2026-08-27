@@ -137,6 +137,7 @@ Panel metadata, plot defaults, and other session details are covered in the
 
 - [User guide](docs/user-guide.md) — sessions, lazy loading, scripts, config, plots, estimation
 - [Command reference](docs/command-reference.md) — categorized command index
+- [Statistical validation matrix](docs/reference-validation-matrix.md) — verified numerical tolerances against reference backends
 - [Active forward roadmap](docs/tabdat_forward_roadmap.md) — stabilization priorities, trust, and deployment
 - [Project proposal](docs/project_proposal.md) — product vision (optional deep read)
 

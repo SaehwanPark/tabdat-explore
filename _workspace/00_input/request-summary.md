@@ -1,33 +1,23 @@
-# Request Summary: `doctor` Command & Environment Diagnostics
+# Request Summary: Statistical Reference Validation Matrix & Tier 1 Assurance
 
 ## Goal
-Implement `tabdat doctor` and the interactive `doctor` command to inspect, verify, and report the operational health and capability status of the TabDat environment:
-1. Core capabilities: DuckDB, PyArrow, Polars, Plotting engines (Altair/Matplotlib).
-2. Conventional statistics capabilities: statsmodels, linearmodels, scipy.
-3. Optional/specialized capabilities: ML (scikit-learn), Bayesian (bambi/PyMC), Spatial (spreg/libpysal), R integration (rpy2 / R runtime).
-4. System metadata: Python version, OS platform, architecture.
-5. Provide clean terminal diagnostics table, actionable missing-capability guidance, and structured JSON output.
-6. Support top-level `tabdat doctor` and `tabdat --json doctor` CLI invocation, as well as interactive `doctor` command in session/scripts.
+Establish Phase 24C statistical trust and reference validation:
+1. Create machine-readable validation matrix `docs/reference_validation_matrix.json` and human-readable documentation `docs/reference-validation-matrix.md`.
+2. Add differential verification test suite `tests/test_reference_validation.py` validating Tier 1 foundational estimators (`regress` OLS, robust HC1, clustered covariance, `logit`, `probit`, `poisson`, `qreg`) against authoritative `statsmodels`/`scipy` implementations with explicit numerical tolerances ($10^{-5}$ for point estimates and SEs).
+3. Ensure reproducible synthetic fixtures cover edge cases, missing data filtering, and prediction consistency across eager/lazy boundaries.
 
 ## Phase Fit
-Phase 17 & Phase 24B (`docs/tabdat_forward_roadmap.md` Sections 6, 17, 21).
+Phase 24C (Statistical Trust and Reference Validation, `docs/tabdat_forward_roadmap.md` Section 7).
 
 ## Touched Surfaces
-- `src/tabdat/models.py`: `DoctorCommand`, `DoctorCapabilityItem`, `DoctorResult`.
-- `src/tabdat/parser.py`: `doctor` grammar, catalog entries, command effect registration.
-- `src/tabdat/doctor.py`: Diagnostics inspection logic, safe dependency inspection without unhandled exceptions.
-- `src/tabdat/executor.py`: Handler for `DoctorCommand`.
-- `src/tabdat/formatter.py`: Text formatting for `DoctorResult` and JSON envelope support.
-- `src/tabdat/cli.py`: Top-level `tabdat doctor` CLI handling, catalog schemas.
-- `src/tabdat/help/topics/doctor.md` & `src/tabdat/help/__init__.py`: In-app help topic.
-- `docs/command-reference.md`, `docs/user-guide.md`, `README.md`: Documentation updates.
-- Tests: `tests/test_doctor.py`, `tests/test_cli.py`, `tests/test_parser.py`.
+- `docs/reference_validation_matrix.json`: Machine-readable tracking schema.
+- `docs/reference-validation-matrix.md`: Human-readable reference validation documentation.
+- `tests/test_reference_validation.py`: Focused differential test suite.
+- `CONTRIBUTING.md`, `README.md`, `docs/tabdat_forward_roadmap.md`: Documentation links and checked items.
 
 ## Assumptions
-- `doctor` is a read-only introspection command (effect: `metadata`).
-- Safe introspection must gracefully detect missing optional packages without throwing uncaught import errors.
-- Both human-readable terminal output and structured `--json` output derive from the same `DoctorResult` model.
+- Validation uses well-defined tolerances ($10^{-5}$ to $10^{-6}$) rather than arbitrary exact binary matches to account for floating-point platform nuances.
+- Synthetic datasets are generated deterministically with fixed random seeds.
 
 ## Non-Goals
-- Attempting automatic installation of missing system binaries (e.g. system R compiler).
-- Materializing or modifying the active dataset.
+- Adding new estimator families.

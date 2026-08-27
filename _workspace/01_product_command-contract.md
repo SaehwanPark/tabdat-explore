@@ -1,85 +1,34 @@
-# Product Contract: `doctor` Command & Environment Diagnostics
+# Product Contract: Statistical Reference Validation Matrix & Tier 1 Assurance
 
 ## Request Summary
-Add `tabdat doctor` CLI subcommand and interactive `doctor` command to inspect capability health across core, statistics, optional, and system layers.
+Track, publish, and differentially verify statistical estimator accuracy against trusted numerical reference implementations with explicit tolerances.
 
 ## Roadmap Phase
-Phase 17 (`tabdat doctor`) & Phase 24B (Capability Boundaries).
+Phase 24C (Statistical Trust and Reference Validation).
 
-## Syntax
-```stata
-doctor
-```
+## Specification & Validation Rules
 
-CLI:
-```bash
-tabdat doctor
-tabdat --json doctor
-```
+### 1. Tracked Reference Validation Matrix Schema
+Each estimator entry in `docs/reference_validation_matrix.json` records:
+- `command`: Command name (e.g. `regress`, `logit`, `probit`, `poisson`, `qreg`).
+- `estimator_mode`: Specific inference/estimation mode (e.g., `ols_classical`, `ols_hc1_robust`, `ols_cluster`, `logit_mle`, `probit_mle`, `poisson_mle`, `quantile_median`).
+- `backend`: Execution backend (`duckdb` data relation + stats engine).
+- `reference_implementation`: External reference package (e.g. `statsmodels.regression.linear_model.OLS`, `statsmodels.discrete.discrete_model.Logit`).
+- `tolerances`:
+  - `coef_rtol`: Maximum relative tolerance on point estimates ($10^{-5}$).
+  - `se_rtol`: Maximum relative tolerance on standard errors ($10^{-4}$).
+  - `pvalue_rtol`: Maximum relative tolerance on p-values ($10^{-4}$).
+  - `log_likelihood_rtol`: Maximum relative tolerance on log-likelihood ($10^{-5}$).
+- `validation_status`: `"reference_validated"` for fully verified Tier 1 estimators; `"implemented"` for remaining estimators.
 
-## Invocation & Semantics Rules
-
-### 1. Interactive & Script Semantics
-- Command: `doctor`
-- Arguments/Options: `doctor` takes no arguments, if-clauses, or options. Passing arguments or options raises `ParseError`.
-- State Effects: Pure introspection / metadata. Does not mutate dataset, active table, or estimation state.
-- Output: Returns `DoctorResult` containing structured capability groups: `core`, `statistics`, `optional`, and `system`.
-
-### 2. Capabilities Inspected
-- **Core Layer**:
-  - `DuckDB`: DuckDB SQL engine status & version.
-  - `PyArrow`: Apache Arrow table / Parquet IO status & version.
-  - `Polars`: Polars lazy engine status & version.
-  - `Plotting`: Altair / Matplotlib chart rendering status & versions.
-- **Statistics Layer**:
-  - `statsmodels`: Econometric & linear model engine & version.
-  - `linearmodels`: Panel / IV estimation engine & version.
-  - `scipy`: Numerical optimization & statistical distribution substrate & version.
-- **Optional Layer**:
-  - `ML`: `scikit-learn` regularized & ML models status & version.
-  - `Bayesian`: `bambi` / `pymc` MCMC backend status & version.
-  - `Spatial`: `spreg` & `libpysal` spatial econometrics backend status & versions.
-  - `R`: `rpy2` bridge and underlying R runtime/packages status.
-- **System Layer**:
-  - Python version, Platform/OS, Machine architecture, Executable path.
-
-### 3. CLI Subcommand
-- Invoking `tabdat doctor` directly prints the diagnostic report and exits with 0 (or 1 if critical core engine is broken).
-- Invoking `tabdat --json doctor` emits standard JSON success envelope containing `DoctorResult` payload.
-
-## Examples
-Terminal output:
-```text
-TabDat 0.23.0 Environment Diagnostics
-
-Core Capabilities:
-  DuckDB        ✓ 1.4.3
-  PyArrow       ✓ 24.0.0
-  Polars        ✓ 1.36.1
-  Plotting      ✓ altair 6.1.0, matplotlib 3.10.9
-
-Statistics:
-  statsmodels   ✓ 0.14.6
-  linearmodels  ✓ 7.0
-  scipy         ✓ 1.15.0
-
-Optional Capabilities:
-  ML            ✓ scikit-learn 1.7.0
-  Bayesian      ✓ bambi 0.18.0
-  Spatial       ✓ spreg 1.4.0, libpysal 4.12.1
-  R             ✓ rpy2 3.6.4
-
-System:
-  Python        3.13.1
-  Platform      Darwin (arm64)
-```
+### 2. Tier 1 Differential Testing
+- `tests/test_reference_validation.py` synthesizes deterministic fixtures with noise, controls, and cluster groups.
+- Directly invokes TabDat commands (`regress`, `logit`, `probit`, `poisson`, `qreg`) through the Executor pipeline and compares structured Result coefficients, standard errors, test statistics, and predictions against direct `statsmodels` fits over identical data.
+- Asserts deterministic numerical convergence within the specified tolerances.
 
 ## Acceptance Criteria
-- [ ] `DoctorCommand` AST node and `DoctorResult` model defined in `src/tabdat/models.py`.
-- [ ] `doctor` command parser in `src/tabdat/parser.py` validates 0 args/options and rejects `by: doctor`.
-- [ ] Modular diagnostics inspection engine in `src/tabdat/doctor.py` safely inspects libraries without unhandled crashes.
-- [ ] `DoctorResult` text formatter in `src/tabdat/formatter.py` produces clean aligned tabular diagnostics.
-- [ ] `tabdat doctor` and `tabdat --json doctor` supported from CLI.
-- [ ] `doctor.md` in-app help topic added and registered in `src/tabdat/help/topics/`.
-- [ ] Docs and `check_docs_alignment.py` pass.
-- [ ] Comprehensive unit, executor, and CLI tests added.
+- [ ] `docs/reference_validation_matrix.json` exists, is valid JSON, and catalogs all TabDat estimators.
+- [ ] `docs/reference-validation-matrix.md` is rendered, linked, and documented in the doc tree.
+- [ ] `tests/test_reference_validation.py` contains thorough differential tests for Tier 1 estimators (`regress` standard/robust/cluster, `logit`, `probit`, `poisson`, `qreg`).
+- [ ] All tests pass without flakiness.
+- [ ] `scripts/check_docs_alignment.py` and `pytest` pass.
