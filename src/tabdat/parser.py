@@ -26,6 +26,7 @@ from tabdat.models import (
   DescribeCommand,
   DidCommand,
   DmlCommand,
+  DoctorCommand,
   DrDidCommand,
   DropCommand,
   ElasticnetCommand,
@@ -98,6 +99,7 @@ _EXECUTABLE_COMMANDS = {
   "recode",
   "describe",
   "status",
+  "doctor",
   "summarize",
   "codebook",
   "count",
@@ -387,6 +389,8 @@ def _parse_by_result(text: str) -> Generator[Result[Any, str], Any, Command]:
     return cast(Command, (yield Err("help is not supported inside by commands")))
   if isinstance(command, StatusCommand):
     return cast(Command, (yield Err("status is not supported inside by commands")))
+  if isinstance(command, DoctorCommand):
+    return cast(Command, (yield Err("doctor is not supported inside by commands")))
   return ByCommand(groups=groups, command=command)
 
 
@@ -499,6 +503,18 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
         "status does not accept arguments, if clauses, options, or assignment syntax"
       )
     return StatusCommand()
+
+  if parts.name == "doctor":
+    if (
+      parts.arguments
+      or parts.condition is not None
+      or parts.options
+      or parts.expression is not None
+    ):
+      raise ParseError(
+        "doctor does not accept arguments, if clauses, options, or assignment syntax"
+      )
+    return DoctorCommand()
 
   if parts.name == "summarize":
     if parts.expression is not None:

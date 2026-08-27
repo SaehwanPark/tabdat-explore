@@ -1,29 +1,33 @@
-# Delivery Summary: Silent Plot Drawing & Clickable File Links
+# Delivery Summary: `doctor` Command & Environment Diagnostics
 
 ## Delivered Capabilities
-1. **Silent Plot Drawing by Default**:
-   - `TabDatConfig.graph_open` now defaults to `False` (`off`).
-   - Plot generation commands (`histogram`, `scatter`, `bar`, `bayesplot`, `estat report`) save files silently in the background without automatically popping open external applications or browsers.
-   - Users can still optionally enable auto-open per session via `set graph_open on` or in config via `graph_open = true`.
-
-2. **Clickable `file://<path>` URIs**:
-   - `format_result(PlotResult(...))` formats plot output with full RFC 8089 `file://` URIs (e.g. `Saved plot: file:///Users/.../artifacts/plots/histogram-age.svg`), enabling instant terminal click-to-open.
-
-3. **Guaranteed Test Suite Isolation**:
-   - `tests/conftest.py` adds an `autouse=True` fixture `prevent_opening_browser` mocking `tabdat.cli._open_path` so no test ever launches a browser or external viewer process.
+1. **`doctor` Command & CLI Diagnostics**:
+   - Added interactive `doctor` command and top-level CLI `tabdat doctor` / `tabdat --json doctor`.
+   - Safely discovers and formats capability health across Core (DuckDB, PyArrow, Polars, Plotting), Statistics (statsmodels, linearmodels, scipy), Optional (ML, Bayesian, Spatial, R), and System layers.
+2. **Deterministic Output Formats**:
+   - Clean aligned terminal matrix with status checkmarks and version annotations.
+   - Versioned JSON envelope (`result_type="DoctorResult"`, `schema_version=1`) for machine consumption and automated tooling.
+3. **Documentation & Help Integration**:
+   - In-app help topic `doctor.md`.
+   - Documented in `README.md`, `docs/user-guide.md`, `docs/command-reference.md`, `CONTRIBUTING.md`, and `docs/tabdat_forward_roadmap.md`.
+4. **Comprehensive Test Coverage**:
+   - 13 new test cases covering discovery structure, parser rejection rules, executor neutrality, terminal/JSON formatting, and CLI flags in `tests/test_doctor.py`.
 
 ## Changed Files
-- `src/tabdat/config.py`: `graph_open = False` default in `TabDatConfig`.
-- `src/tabdat/formatter.py`: `_plot_uri` helper and `file://` formatting for `PlotResult`.
-- `tests/conftest.py`: Autouse fixture preventing browser/viewer process launches.
-- `tests/test_config.py`: Default config assertions.
-- `tests/test_cli.py`: Updated CLI plot assertions and config banners.
-- `integrated_testing/run_e2e.py`: Updated E2E scenarios for plot URI outputs.
-- `docs/user-guide.md` & `ARCHITECTURE.md`: Updated documentation.
+- `src/tabdat/models.py`: Added `DoctorCommand`, `DoctorCapabilityItem`, and `DoctorResult`.
+- `src/tabdat/doctor.py`: Added environment and capability inspection logic.
+- `src/tabdat/parser.py`: Added `doctor` syntax parsing and validation.
+- `src/tabdat/executor.py`: Integrated `DoctorCommand` execution handler.
+- `src/tabdat/formatter.py`: Formatter for `DoctorResult` in terminal and JSON modes.
+- `src/tabdat/shell.py`: Added `doctor` to shell command list.
+- `src/tabdat/cli.py`: Added positional `tabdat doctor` execution and schema metadata.
+- `src/tabdat/help/topics/doctor.md`: Added packaged help topic.
+- `tests/test_doctor.py`: Unit, executor, formatter, and CLI test suite.
+- `README.md`, `CONTRIBUTING.md`, `docs/command-reference.md`, `docs/user-guide.md`, `docs/tabdat_forward_roadmap.md`.
 
 ## Validation Commands
-- `uv run pytest` -> 1,223 passed
-- `uv run python integrated_testing/run_e2e.py` -> All 6 scenarios passed
+- `uv run pytest` -> 1,236 passed
+- `uv run python integrated_testing/run_e2e.py` -> 6/6 passed
 - `uv run basedpyright` -> 0 errors, 0 warnings, 0 notes
-- `uv run python scripts/check_docs_alignment.py` -> PASSED
-- `uv run ruff check . && uv run ruff format --check .` -> PASSED
+- `uv run ruff check . && uv run ruff format --check .` -> Clean
+- `uv run python scripts/check_docs_alignment.py` -> Clean

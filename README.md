@@ -123,7 +123,7 @@ Panel metadata, plot defaults, and other session details are covered in the
 
 | Area | Commands | What they help with |
 |------|----------|---------------------|
-| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `head`, `count` | Open data and understand structure |
+| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `head`, `count`, `status`, `doctor` | Open data, check state, and diagnose environment |
 | Transform | `keep`, `drop`, `select`, `generate`, `rename`, `recode` | Filter, reshape, and derive columns |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |
@@ -137,6 +137,7 @@ Panel metadata, plot defaults, and other session details are covered in the
 
 - [User guide](docs/user-guide.md) — sessions, lazy loading, scripts, config, plots, estimation
 - [Command reference](docs/command-reference.md) — categorized command index
+- [Active forward roadmap](docs/tabdat_forward_roadmap.md) — stabilization priorities, trust, and deployment
 - [Project proposal](docs/project_proposal.md) — product vision (optional deep read)
 
 ## Contributing

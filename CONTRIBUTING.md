@@ -56,7 +56,8 @@ Agent-oriented workflows and tooling notes live in [AGENTS.md](AGENTS.md).
 | [AGENTS.md](AGENTS.md) | Repository-wide agent and contributor conventions |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Runtime flow, component boundaries, implementation detail |
 | [SPEC.md](SPEC.md) | Feature state and verification criteria |
-| [docs/dev_phase.md](docs/dev_phase.md) | Development roadmap and phase plan |
+| [docs/tabdat_forward_roadmap.md](docs/tabdat_forward_roadmap.md) | Active forward roadmap and stabilization priorities |
+| [docs/dev_phase.md](docs/dev_phase.md) | Historical development roadmap and phase plan |
 | [docs/project_proposal.md](docs/project_proposal.md) | Product intent and target users |
 | [docs/phase0_product_guardrails.md](docs/phase0_product_guardrails.md) | Scope guardrails and non-goals |
 | [docs/command_glossary_v0.md](docs/command_glossary_v0.md) | Historical Phase 0 command glossary |

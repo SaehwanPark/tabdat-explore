@@ -4,6 +4,11 @@ All notable project changes are tracked here.
 
 ## Unreleased
 
+### Added
+
+- Added `doctor` command and CLI subcommand `tabdat doctor` / `tabdat --json doctor` to inspect
+  and diagnose environment health across Core, Statistics, Optional, and System layers.
+
 ### Changed
 
 - Reprioritized the SDD roadmap around a Phase 24 product-center stabilization and public-preview
