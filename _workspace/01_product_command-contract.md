@@ -1,34 +1,49 @@
-# Product Contract: Statistical Reference Validation Matrix & Tier 1 Assurance
+# Product Contract: CI/CD Workflows, Packaging Baseline & Frictionless Shell Installer
 
 ## Request Summary
-Track, publish, and differentially verify statistical estimator accuracy against trusted numerical reference implementations with explicit tolerances.
+Establish continuous delivery automation, production packaging configuration, and one-command shell installation.
 
 ## Roadmap Phase
-Phase 24C (Statistical Trust and Reference Validation).
+Phase 25 (Package & Installability Baseline), Phase 26 (Release Automation & CI), and Phase 27 (Frictionless Shell Installation).
 
-## Specification & Validation Rules
+## Specification & Behavioral Invariants
 
-### 1. Tracked Reference Validation Matrix Schema
-Each estimator entry in `docs/reference_validation_matrix.json` records:
-- `command`: Command name (e.g. `regress`, `logit`, `probit`, `poisson`, `qreg`).
-- `estimator_mode`: Specific inference/estimation mode (e.g., `ols_classical`, `ols_hc1_robust`, `ols_cluster`, `logit_mle`, `probit_mle`, `poisson_mle`, `quantile_median`).
-- `backend`: Execution backend (`duckdb` data relation + stats engine).
-- `reference_implementation`: External reference package (e.g. `statsmodels.regression.linear_model.OLS`, `statsmodels.discrete.discrete_model.Logit`).
-- `tolerances`:
-  - `coef_rtol`: Maximum relative tolerance on point estimates ($10^{-5}$).
-  - `se_rtol`: Maximum relative tolerance on standard errors ($10^{-4}$).
-  - `pvalue_rtol`: Maximum relative tolerance on p-values ($10^{-4}$).
-  - `log_likelihood_rtol`: Maximum relative tolerance on log-likelihood ($10^{-5}$).
-- `validation_status`: `"reference_validated"` for fully verified Tier 1 estimators; `"implemented"` for remaining estimators.
+### 1. Packaging Metadata (`pyproject.toml`)
+- Production package name: `tabdat-explore`
+- CLI executable script: `tabdat = "tabdat.cli:main"`
+- Python version requirement: `>=3.13`
+- Included resources: `src/tabdat/help/topics/*.md` packaged in wheel and sdist distributions.
+- Metadata: project URLs (Homepage, Repository, Issues, Documentation), authors, keywords, classifiers.
 
-### 2. Tier 1 Differential Testing
-- `tests/test_reference_validation.py` synthesizes deterministic fixtures with noise, controls, and cluster groups.
-- Directly invokes TabDat commands (`regress`, `logit`, `probit`, `poisson`, `qreg`) through the Executor pipeline and compares structured Result coefficients, standard errors, test statistics, and predictions against direct `statsmodels` fits over identical data.
-- Asserts deterministic numerical convergence within the specified tolerances.
+### 2. CI Workflow (`.github/workflows/ci.yml`)
+- Triggered on: push to `main` and pull requests.
+- Matrix: `ubuntu-latest`, `macos-latest` on Python `3.13`.
+- Steps:
+  1. Checkout code.
+  2. Setup Python & `uv`.
+  3. Run static checks (`ruff check`, `ruff format --check`, `basedpyright`).
+  4. Run docs alignment (`scripts/check_docs_alignment.py`).
+  5. Run pytest suite (`pytest`).
+  6. Run integrated E2E suite (`integrated_testing/run_e2e.py`).
+  7. Build wheel (`uv build`) and test clean installation in an isolated venv.
+
+### 3. Release Workflow (`.github/workflows/release.yml`)
+- Triggered on: push of tags matching `v*`.
+- Builds wheel and source distributions.
+- Runs verification against built wheel.
+- Creates GitHub Release with release notes and attaches built distribution artifacts with SHA256 checksums.
+
+### 4. Shell Installer (`scripts/install.sh`)
+- Executable POSIX shell script:
+  - Verifies operating system (Linux / macOS) and CPU architecture.
+  - Checks if `uv` is available on PATH; if not, installs `uv` using official installer or provides direct instructions.
+  - Installs TabDat globally via `uv tool install tabdat-explore` (or `--from git+https://github.com/SaehwanPark/tabdat-explore.git`).
+  - Verifies installation with `tabdat doctor` and `tabdat --version`.
+  - Prints friendly quickstart onboarding banner.
 
 ## Acceptance Criteria
-- [ ] `docs/reference_validation_matrix.json` exists, is valid JSON, and catalogs all TabDat estimators.
-- [ ] `docs/reference-validation-matrix.md` is rendered, linked, and documented in the doc tree.
-- [ ] `tests/test_reference_validation.py` contains thorough differential tests for Tier 1 estimators (`regress` standard/robust/cluster, `logit`, `probit`, `poisson`, `qreg`).
-- [ ] All tests pass without flakiness.
-- [ ] `scripts/check_docs_alignment.py` and `pytest` pass.
+- [ ] `pyproject.toml` contains complete package metadata and wheel build config.
+- [ ] `.github/workflows/ci.yml` and `.github/workflows/release.yml` created with valid GitHub Actions syntax.
+- [ ] `scripts/install.sh` created, executable, and passing syntax validation (`sh -n scripts/install.sh`).
+- [ ] `tests/test_packaging_and_installer.py` validates wheel build and installer script syntax/behavior.
+- [ ] All tests, type checks, and docs alignment checks pass.

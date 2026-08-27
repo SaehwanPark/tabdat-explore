@@ -1,23 +1,28 @@
-# Request Summary: Statistical Reference Validation Matrix & Tier 1 Assurance
+# Request Summary: CI/CD Workflows, Packaging Baseline & Frictionless Shell Installer
 
 ## Goal
-Establish Phase 24C statistical trust and reference validation:
-1. Create machine-readable validation matrix `docs/reference_validation_matrix.json` and human-readable documentation `docs/reference-validation-matrix.md`.
-2. Add differential verification test suite `tests/test_reference_validation.py` validating Tier 1 foundational estimators (`regress` OLS, robust HC1, clustered covariance, `logit`, `probit`, `poisson`, `qreg`) against authoritative `statsmodels`/`scipy` implementations with explicit numerical tolerances ($10^{-5}$ for point estimates and SEs).
-3. Ensure reproducible synthetic fixtures cover edge cases, missing data filtering, and prediction consistency across eager/lazy boundaries.
+Implement the release, installation, and CI/CD foundations specified in Phases 25, 26, and 27 of `docs/tabdat_forward_roadmap.md`:
+1. Production packaging metadata in `pyproject.toml` (package URLs, classifiers, wheel resource packaging).
+2. Continuous Integration workflow `.github/workflows/ci.yml` verifying linting, formatting, type checking, docs alignment, test suite, and clean-wheel installation across Linux and macOS.
+3. Tagged release automation workflow `.github/workflows/release.yml`.
+4. Frictionless shell installer `scripts/install.sh` for one-command installation (`curl -LsSf ... | sh`) via `uv tool`.
+5. Packaging and installer verification tests.
 
 ## Phase Fit
-Phase 24C (Statistical Trust and Reference Validation, `docs/tabdat_forward_roadmap.md` Section 7).
+Phases 25, 26, and 27 (`docs/tabdat_forward_roadmap.md` Sections 8, 9, 10).
 
 ## Touched Surfaces
-- `docs/reference_validation_matrix.json`: Machine-readable tracking schema.
-- `docs/reference-validation-matrix.md`: Human-readable reference validation documentation.
-- `tests/test_reference_validation.py`: Focused differential test suite.
-- `CONTRIBUTING.md`, `README.md`, `docs/tabdat_forward_roadmap.md`: Documentation links and checked items.
+- `pyproject.toml`: Production package metadata and build settings.
+- `.github/workflows/ci.yml`: GitHub Actions PR and branch validation workflow.
+- `.github/workflows/release.yml`: Tagged GitHub Release and packaging workflow.
+- `scripts/install.sh`: Shell installer script.
+- `tests/test_packaging_and_installer.py`: Build and installer validation tests.
+- Documentation: `README.md`, `CONTRIBUTING.md`, `docs/tabdat_forward_roadmap.md`.
 
 ## Assumptions
-- Validation uses well-defined tolerances ($10^{-5}$ to $10^{-6}$) rather than arbitrary exact binary matches to account for floating-point platform nuances.
-- Synthetic datasets are generated deterministically with fixed random seeds.
+- Uses standard POSIX-compliant `/bin/sh` for `scripts/install.sh`.
+- Wheel builds via standard `hatchling` backend / `uv build`.
+- CI uses standard GitHub Actions runners (`ubuntu-latest`, `macos-latest`) with Astral `uv` setup action.
 
 ## Non-Goals
-- Adding new estimator families.
+- Native C/Rust compiler toolchains.
