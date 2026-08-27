@@ -245,8 +245,8 @@ Owns Altair chart construction and SVG/PNG artifact writes. Default plot artifac
 under `<artifact_dir>/plots/` using `graph_format`, and explicit `saving(...)` paths create parent
 directories as needed. Interactive shell default plot saves avoid overwriting existing artifacts by
 adding `-2`, `-3`, and later suffixes, while batch and script defaults keep the stable unsuffixed
-path for reproducibility. Interactive shell auto-open is a CLI-edge behavior controlled by
-`graph_open`; batch `-c` and script execution only print the artifact path.
+path for reproducibility. Plot generation is silent by default, formatting clickable `file://` URI
+links; interactive shell auto-open is a CLI-edge behavior optionally enabled via `graph_open`.
 
 ### Formatter
 

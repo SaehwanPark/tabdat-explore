@@ -206,8 +206,8 @@ uv run tabdat --config project.tabdat.toml -f analysis.td
 Plot commands (`histogram`, `scatter`, `bar`, `bayesplot`) save files rather than rendering inline
 in the terminal.
 
-- **Interactive shell**: generated plot files open by default (unless `graph_open` is false).
-- **Batch `-c` and script runs**: only the saved path is printed.
+- **Silent by default**: plot files are saved silently without popping open an external viewer window (`graph_open` defaults to `false`), providing clickable `file://<path>` links in the terminal output.
+- **Auto-open (optional)**: enable `set graph_open on` (or `graph_open = true` in config) to automatically open plots in interactive shell sessions.
 
 Default paths follow `<artifact_dir>/plots/<command>-<vars>.<graph_format>`. Interactive reruns
 avoid collisions with `-2`, `-3`, and later suffixes. Batch and script runs keep the stable

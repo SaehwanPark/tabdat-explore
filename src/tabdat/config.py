@@ -30,12 +30,12 @@ class TabDatConfig:
     graph_format: The file format for exported visualizations ('svg' or 'png').
     artifact_dir: Directory path where visualizations and exported files are saved.
     graph_open: If True, automatically launches the system default application or
-      browser to view newly generated visual plots.
+      browser to view newly generated visual plots. Defaults to False (silent plotting).
   """
 
   graph_format: Literal["svg", "png"] = "svg"
   artifact_dir: Path = Path("artifacts")
-  graph_open: bool = True
+  graph_open: bool = False
 
 
 def load_config(path: Path) -> TabDatConfig:

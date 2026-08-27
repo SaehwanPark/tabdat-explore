@@ -1227,7 +1227,7 @@ def format_result(result: Result) -> str:
     return "\n".join(_table(result.headers, table_rows))
 
   if isinstance(result, PlotResult):
-    return f"Saved plot: {_display_path(result.path)}"
+    return f"Saved plot: {_plot_uri(result.path)}"
 
   if isinstance(result, SetResult):
     return f"Set {result.name}: {result.value}"
@@ -1373,6 +1373,11 @@ def _display_path(path: Path | str) -> str:
     return str(path.relative_to(Path.cwd()))
   except ValueError:
     return str(path)
+
+
+def _plot_uri(path: Path | str) -> str:
+  normalized = Path(path).resolve() if isinstance(path, str) else path.resolve()
+  return normalized.as_uri()
 
 
 def _format_group_stats(stats: TtestGroupStats) -> tuple[str, str, str, str, str, str, str]:

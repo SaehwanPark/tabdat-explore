@@ -1,56 +1,36 @@
-# Implementation Report: Phase 24 P1 Structured JSON Declared Effect Categories
+# Implementation Report: Silent Plot Drawing & Clickable File Links
 
 ## Contract Consumed
-
-- `_workspace/01_product_command-contract.md` — a deterministic read-only command-effect catalog
-  using the finite `read`/`write`/`control`/`plot`/`unknown` vocabulary and canonical ordering.
+- `_workspace/01_product_command-contract.md` — silent plot generation by default (`graph_open = False`), clickable `file://<path>` RFC 8089 URI output formatting for `PlotResult`, and test harness isolation preventing any browser or external process spawning during test suite runs.
 
 ## Delivered Boundary
-
-- `src/tabdat/models.py`
-  - Added strict `EffectCategory`, canonical order, `CommandEffectEntry`, and
-    `CommandEffectCatalogResult` models.
-  - Enforced non-empty, unique, canonical tuples and `unknown`-alone invariants at the model boundary.
-  - Included the catalog result in the public `Result` union.
-- `src/tabdat/cli.py`
-  - Added `--json --list-command-effects` before config/`Executor` setup.
-  - Added explicit coverage for every current `COMMAND_NAMES` entry, deterministic category sorting,
-    and `unknown` fallback for future/unclassified registry names.
-  - Classified possible top-level effects, including delegated `run`/`by`, `estat report`, tuning
-    report writes, and `save`/`export` active-data reads plus output writes.
-- `src/tabdat/formatter.py` and help/docs/tests
-  - Added stable result labeling and terminal formatting.
-  - Documented possible-effect semantics and exact category order in all user-facing help surfaces.
-  - Added registry-coverage, representative mapping, unknown fallback, model-invariant, no-session,
-    ordering, and incompatible-invocation tests.
+- `src/tabdat/config.py`
+  - Updated `TabDatConfig.graph_open` default value to `False`.
+  - Updated docstring to clarify default silent plotting behavior.
+- `src/tabdat/formatter.py`
+  - Updated `format_result` for `PlotResult` to return `Saved plot: {_plot_uri(result.path)}`.
+  - Added `_plot_uri` helper to convert paths into resolved RFC 8089 `file://` URIs (`Path(path).resolve().as_uri()`).
+- `tests/conftest.py`
+  - Added `autouse=True` fixture `prevent_opening_browser` that monkeypatches `tabdat.cli._open_path` to ensure tests never launch browser or viewer processes.
+- `tests/test_config.py`
+  - Added `test_tabdat_config_defaults()` asserting `TabDatConfig().graph_open is False`.
+- `tests/test_cli.py`
+  - Updated plot CLI tests and default config banner assertions to verify `file://` URIs and `graph_open=off`.
+- `integrated_testing/run_e2e.py`
+  - Updated scenarios 3 and 4 to expect `Saved plot: file://...` URIs.
+- `docs/user-guide.md` & `ARCHITECTURE.md`
+  - Documented silent plot generation by default, clickable `file://` links, and optional auto-open enablement via `set graph_open on`.
 
 ## Functional-First Notes
-
-The mapping is a pure registry presentation step. It describes possible command-family effects,
-including delegated and output/artifact behavior, but never inspects active data, evaluates options,
-estimates cost, plans resources, executes commands, or alters session state.
+- Path resolution and URI formatting are deterministic, cross-platform, and standard (`file://` via `Path.resolve().as_uri()`).
+- The test harness is strictly protected against opening external applications during test execution.
 
 ## Validation Commands And Outcomes
-
-- `uv run pytest tests/test_cli.py -k 'json or list_commands or list_command_effects or help_topic or explain' -q`
-  — passed, 58 tests.
-- `uv run pytest tests/test_help.py -k 'run_help or current_commands' -q` — passed, 2 tests.
-- `uv run pytest -q` — passed, 1,205 tests, with 314 existing third-party warnings.
-- `uv run basedpyright` — passed, 0 errors, warnings, or notes.
-- `uv run ruff check .` — passed.
-- `uv run ruff format --check .` — passed, 35 files already formatted.
-- `git diff --check` — passed.
-- `uv run python integrated_testing/run_e2e.py s1_titanic_batch_core s2_interactive_shell_contract
-  s3_taxi_lazy_scale s4_penguins_script_repro s5_titanic_phase13_dogfood
-  s6_canonical_parquet_workflow` — passed with exit code 0; all six scenarios passed and canonical
-  replay stdout matched.
-- Exactly three independent PR reviews completed: findings covered delegated/output-effect semantics,
-  `estat`/tuning-report classifications, registry coverage, canonical ordering documentation, model
-  invariants, and stale handoff text. All findings were fixed and validated; no fourth review started.
+- `uv run pytest` — 1,223 passed, 314 warnings in 26s.
+- `uv run python integrated_testing/run_e2e.py` — all 6 scenarios passed.
+- `uv run basedpyright` — 0 errors, 0 warnings, 0 notes.
+- `uv run python scripts/check_docs_alignment.py` — passed, all links and topics aligned.
+- `uv run ruff check . && uv run ruff format --check .` — all checks passed.
 
 ## Known Limits And Follow-Up Work
-
-Data-dependent effects, resource/state plans, estimates, command execution, scripts, option/argument
-schemas, plugin discovery, interactive JSON mode, full dry-run/explain, repair diagnostics, lineage,
-new exits, and new commands remain separate Phase 24 contracts. The implementation is ready for PR
-merge.
+None. The implementation satisfies all criteria cleanly.

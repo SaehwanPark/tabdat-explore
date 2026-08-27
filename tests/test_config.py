@@ -2,8 +2,15 @@ from pathlib import Path
 
 import pytest
 
-from tabdat.config import find_default_config_path, load_config, load_default_config
+from tabdat.config import TabDatConfig, find_default_config_path, load_config, load_default_config
 from tabdat.errors import TabDatError
+
+
+def test_tabdat_config_defaults() -> None:
+  config = TabDatConfig()
+  assert config.graph_format == "svg"
+  assert config.artifact_dir == Path("artifacts")
+  assert config.graph_open is False
 
 
 def test_load_config_reports_unreadable_files(
