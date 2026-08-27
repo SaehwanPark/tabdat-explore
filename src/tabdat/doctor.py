@@ -98,7 +98,9 @@ def _get_tabdat_version() -> str:
       return metadata.version(name)
     except metadata.PackageNotFoundError:
       pass
-  return "0.23.0"
+  from tabdat import __version__
+
+  return __version__
 
 
 def inspect_environment() -> DoctorResult:

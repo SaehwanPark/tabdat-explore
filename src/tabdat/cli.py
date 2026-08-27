@@ -920,6 +920,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     An integer exit code (0 for success, non-zero for failure).
   """
   parser = argparse.ArgumentParser(prog="tabdat")
+  parser.add_argument("-v", "--version", action="version", version=f"tabdat {__version__}")
   parser.add_argument("-c", "--command", action="append", help="run a command and exit")
   parser.add_argument("-f", "--file", type=Path, help="run a TabDat script file and exit")
   parser.add_argument("--config", type=Path, help="load a TabDat TOML config file")

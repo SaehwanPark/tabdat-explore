@@ -1,17 +1,27 @@
 """Altair-backed artifact rendering for Phase 6 plots."""
 
+from __future__ import annotations
+
 from collections.abc import Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-import altair as alt
 import numpy as np
 
 from tabdat.errors import ExecutionError
 
+if TYPE_CHECKING:
+  import altair as alt
+
 SUPPORTED_PLOT_EXTENSIONS = {".svg", ".png"}
 DEFAULT_PLOT_DIR = Path("artifacts") / "plots"
+
+
+def _get_alt() -> Any:
+  import altair as alt
+
+  return alt
 
 
 def default_plot_path(
@@ -87,6 +97,7 @@ def save_histogram(
   Raises:
     ExecutionError: If Altair fails to compile or write the file.
   """
+  alt = _get_alt()
   chart = (
     _base_chart(rows, (variable,))
     .mark_bar()
@@ -122,6 +133,7 @@ def save_scatter(
   Raises:
     ExecutionError: If Altair fails to compile or write the file.
   """
+  alt = _get_alt()
   chart = (
     _base_chart(rows, (y_variable, x_variable))
     .mark_point()
@@ -151,6 +163,7 @@ def save_bar(
   Raises:
     ExecutionError: If Altair fails to compile or write the file.
   """
+  alt = _get_alt()
   category_order = _bar_category_labels(rows)
   chart_rows = tuple((category, row[1]) for category, row in zip(category_order, rows, strict=True))
   chart = (
@@ -303,6 +316,7 @@ def _base_chart(
   rows: tuple[tuple[object, ...], ...],
   variables: tuple[str, ...],
 ) -> alt.Chart:
+  alt = _get_alt()
   return alt.Chart(alt.Data(values=_rows_to_records(rows, variables)))
 
 

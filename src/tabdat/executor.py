@@ -10,35 +10,6 @@ from typing import TYPE_CHECKING, Any, Literal, SupportsFloat, cast
 
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
-from libpysal.weights import KNN
-from linearmodels.iv import IV2SLS, IVGMM
-from linearmodels.panel import PanelOLS, RandomEffects
-from scipy.optimize import least_squares, minimize
-from scipy.stats import chi2, f, norm, t
-from sklearn.linear_model import (
-  BayesianRidge,
-  ElasticNet,
-  Lasso,
-  Ridge,
-)
-from sklearn.model_selection import KFold
-from spreg import (
-  BaseOLS,
-  GM_Combo,
-  GM_Combo_Het,
-  GM_Error_Het,
-  GM_Lag,
-  LMtests,
-  ML_Error,
-  ML_Lag,
-  MoranRes,
-)
-from statsmodels.discrete.conditional_models import ConditionalLogit
-from statsmodels.discrete.count_model import ZeroInflatedNegativeBinomialP, ZeroInflatedPoisson
-from statsmodels.nonparametric.smoothers_lowess import lowess as statsmodels_lowess
-from statsmodels.stats.diagnostic import linear_reset
-from statsmodels.stats.outliers_influence import OLSInfluence, variance_inflation_factor
 
 if TYPE_CHECKING:
   import arviz
@@ -55,6 +26,23 @@ from tabdat.errors import (
 )
 from tabdat.estimation import CoefficientEstimate
 from tabdat.extension_registry import estimator_adapter_for
+from tabdat.lazy_stats import (
+  get_libpysal_knn,
+  get_linearmodels_iv,
+  get_linearmodels_panel,
+  get_scipy_optimize,
+  get_scipy_stats,
+  get_sklearn_kfold,
+  get_sklearn_linear_models,
+  get_spreg_models,
+  get_statsmodels_api,
+  get_statsmodels_conditional_logit,
+  get_statsmodels_count_models,
+  get_statsmodels_linear_reset,
+  get_statsmodels_lowess,
+  get_statsmodels_ols_influence,
+  get_statsmodels_vif,
+)
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
@@ -1571,6 +1559,8 @@ class Executor:
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
     try:
+      _, _, Lasso, _ = get_sklearn_linear_models()
+
       fitted = Lasso(
         alpha=command.alpha,
         fit_intercept=command.include_intercept,
@@ -1641,6 +1631,8 @@ class Executor:
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
     try:
+      _, _, Lasso, _ = get_sklearn_linear_models()
+
       lasso_fit = Lasso(
         alpha=command.alpha,
         fit_intercept=command.include_intercept,
@@ -1661,7 +1653,7 @@ class Executor:
       include_intercept=command.include_intercept,
     )
     try:
-      fitted = sm.OLS(outcome, refit_design).fit()
+      fitted = get_statsmodels_api().OLS(outcome, refit_design).fit()
       covariance: Literal["nonrobust", "robust"] = "nonrobust"
       if command.robust:
         fitted = fitted.get_robustcov_results(cov_type="HC1")
@@ -1711,6 +1703,8 @@ class Executor:
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
     try:
+      _, _, _, Ridge = get_sklearn_linear_models()
+
       fitted = Ridge(
         alpha=command.alpha,
         fit_intercept=command.include_intercept,
@@ -1780,6 +1774,8 @@ class Executor:
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
     try:
+      _, ElasticNet, _, _ = get_sklearn_linear_models()
+
       fitted = ElasticNet(
         alpha=command.alpha,
         l1_ratio=command.l1_ratio,
@@ -1897,6 +1893,8 @@ class Executor:
         current += fold_size
         X_train, X_val = design[train_idx], design[val_idx]
         y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+        _, _, Lasso, _ = get_sklearn_linear_models()
+
         model = Lasso(alpha=alpha, fit_intercept=command.include_intercept, max_iter=10_000)
         try:
           model.fit(X_train, y_train)
@@ -1909,6 +1907,8 @@ class Executor:
     best_alpha = min(alphas, key=lambda a: mse_results[a])
 
     try:
+      _, _, Lasso, _ = get_sklearn_linear_models()
+
       fitted = Lasso(
         alpha=best_alpha,
         fit_intercept=command.include_intercept,
@@ -1927,21 +1927,21 @@ class Executor:
       coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
 
     report_path = self._get_tuning_report_path("cvlasso", command.outcome, command.predictors)
-    with open(report_path, "w", encoding="utf-8") as f:
-      f.write("Tuning Report for cvlasso\n")
-      f.write("=========================\n")
-      f.write(f"Outcome: {command.outcome}\n")
-      f.write(f"Predictors: {' '.join(command.predictors)}\n")
-      f.write(f"CV Folds: {command.cv}\n")
-      f.write(f"Include Intercept: {command.include_intercept}\n")
-      f.write(f"Observations: {len(outcome)}\n\n")
-      f.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
-      f.write("Grid Search Results:\n")
-      f.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
-      f.write(f"{'-' * 40}\n")
+    with open(report_path, "w", encoding="utf-8") as report_file:
+      report_file.write("Tuning Report for cvlasso\n")
+      report_file.write("=========================\n")
+      report_file.write(f"Outcome: {command.outcome}\n")
+      report_file.write(f"Predictors: {' '.join(command.predictors)}\n")
+      report_file.write(f"CV Folds: {command.cv}\n")
+      report_file.write(f"Include Intercept: {command.include_intercept}\n")
+      report_file.write(f"Observations: {len(outcome)}\n\n")
+      report_file.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
+      report_file.write("Grid Search Results:\n")
+      report_file.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
+      report_file.write(f"{'-' * 40}\n")
       for alpha in alphas:
         sel_label = " (Selected)" if alpha == best_alpha else ""
-        f.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
+        report_file.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
 
     self.state.cvlasso_regression = _CvlassoRegressionState(
       outcome_variable=command.outcome,
@@ -2003,6 +2003,8 @@ class Executor:
         current += fold_size
         X_train, X_val = design[train_idx], design[val_idx]
         y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+        _, _, _, Ridge = get_sklearn_linear_models()
+
         model = Ridge(alpha=alpha, fit_intercept=command.include_intercept, max_iter=10_000)
         try:
           model.fit(X_train, y_train)
@@ -2015,6 +2017,8 @@ class Executor:
     best_alpha = min(alphas, key=lambda a: mse_results[a])
 
     try:
+      _, _, _, Ridge = get_sklearn_linear_models()
+
       fitted = Ridge(
         alpha=best_alpha,
         fit_intercept=command.include_intercept,
@@ -2033,21 +2037,21 @@ class Executor:
       coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
 
     report_path = self._get_tuning_report_path("cvridge", command.outcome, command.predictors)
-    with open(report_path, "w", encoding="utf-8") as f:
-      f.write("Tuning Report for cvridge\n")
-      f.write("=========================\n")
-      f.write(f"Outcome: {command.outcome}\n")
-      f.write(f"Predictors: {' '.join(command.predictors)}\n")
-      f.write(f"CV Folds: {command.cv}\n")
-      f.write(f"Include Intercept: {command.include_intercept}\n")
-      f.write(f"Observations: {len(outcome)}\n\n")
-      f.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
-      f.write("Grid Search Results:\n")
-      f.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
-      f.write(f"{'-' * 40}\n")
+    with open(report_path, "w", encoding="utf-8") as report_file:
+      report_file.write("Tuning Report for cvridge\n")
+      report_file.write("=========================\n")
+      report_file.write(f"Outcome: {command.outcome}\n")
+      report_file.write(f"Predictors: {' '.join(command.predictors)}\n")
+      report_file.write(f"CV Folds: {command.cv}\n")
+      report_file.write(f"Include Intercept: {command.include_intercept}\n")
+      report_file.write(f"Observations: {len(outcome)}\n\n")
+      report_file.write(f"Selected Alpha: {best_alpha:.6f}\n\n")
+      report_file.write("Grid Search Results:\n")
+      report_file.write(f"{'Alpha':<15}{'Mean MSE (across folds)':<25}\n")
+      report_file.write(f"{'-' * 40}\n")
       for alpha in alphas:
         sel_label = " (Selected)" if alpha == best_alpha else ""
-        f.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
+        report_file.write(f"{alpha:<15.6f}{mse_results[alpha]:<25.6f}{sel_label}\n")
 
     self.state.cvridge_regression = _CvridgeRegressionState(
       outcome_variable=command.outcome,
@@ -2118,6 +2122,8 @@ class Executor:
           current += fold_size
           X_train, X_val = design[train_idx], design[val_idx]
           y_train, y_val = outcome_array[train_idx], outcome_array[val_idx]
+          _, ElasticNet, _, _ = get_sklearn_linear_models()
+
           model = ElasticNet(
             alpha=alpha, l1_ratio=l1, fit_intercept=command.include_intercept, max_iter=10_000
           )
@@ -2136,6 +2142,8 @@ class Executor:
           best_l1 = l1
 
     try:
+      _, ElasticNet, _, _ = get_sklearn_linear_models()
+
       fitted = ElasticNet(
         alpha=best_alpha,
         l1_ratio=best_l1,
@@ -2155,23 +2163,24 @@ class Executor:
       coefficients = (CoefficientEstimate(name="intercept", value=intercept), *coefficients)
 
     report_path = self._get_tuning_report_path("cvelasticnet", command.outcome, command.predictors)
-    with open(report_path, "w", encoding="utf-8") as f:
-      f.write("Tuning Report for cvelasticnet\n")
-      f.write("==============================\n")
-      f.write(f"Outcome: {command.outcome}\n")
-      f.write(f"Predictors: {' '.join(command.predictors)}\n")
-      f.write(f"CV Folds: {command.cv}\n")
-      f.write(f"Include Intercept: {command.include_intercept}\n")
-      f.write(f"Observations: {len(outcome)}\n\n")
-      f.write(f"Selected Alpha: {best_alpha:.6f}\n")
-      f.write(f"Selected L1 Ratio: {best_l1:.6f}\n\n")
-      f.write("Grid Search Results:\n")
-      f.write(f"{'Alpha':<15}{'L1 Ratio':<15}{'Mean MSE (across folds)':<25}\n")
-      f.write(f"{'-' * 55}\n")
+    with open(report_path, "w", encoding="utf-8") as report_file:
+      report_file.write("Tuning Report for cvelasticnet\n")
+      report_file.write("==============================\n")
+      report_file.write(f"Outcome: {command.outcome}\n")
+      report_file.write(f"Predictors: {' '.join(command.predictors)}\n")
+      report_file.write(f"CV Folds: {command.cv}\n")
+      report_file.write(f"Include Intercept: {command.include_intercept}\n")
+      report_file.write(f"Observations: {len(outcome)}\n\n")
+      report_file.write(f"Selected Alpha: {best_alpha:.6f}\n")
+      report_file.write(f"Selected L1 Ratio: {best_l1:.6f}\n\n")
+      report_file.write("Grid Search Results:\n")
+      report_file.write(f"{'Alpha':<15}{'L1 Ratio':<15}{'Mean MSE (across folds)':<25}\n")
+      report_file.write(f"{'-' * 55}\n")
       for l1 in l1_ratios:
         for alpha in alphas:
           sel_label = " (Selected)" if alpha == best_alpha and l1 == best_l1 else ""
-          f.write(f"{alpha:<15.6f}{l1:<15.6f}{mse_results[(alpha, l1)]:<25.6f}{sel_label}\n")
+          mse_val = mse_results[(alpha, l1)]
+          report_file.write(f"{alpha:<15.6f}{l1:<15.6f}{mse_val:<25.6f}{sel_label}\n")
 
     self.state.cvelasticnet_regression = _CvelasticnetRegressionState(
       outcome_variable=command.outcome,
@@ -2211,6 +2220,7 @@ class Executor:
     design = np.array(predictors, dtype=float)
     outcome_array = np.array(outcome, dtype=float)
     try:
+      BayesianRidge, *_ = get_sklearn_linear_models()
       fitted = BayesianRidge(
         max_iter=command.n_iter,
         tol=command.tol,
@@ -2724,7 +2734,7 @@ class Executor:
 
       coords_arr = np.array(coords_list, dtype=float)
       try:
-        w = KNN.from_array(coords_arr, k=command.knn)
+        w = get_libpysal_knn().from_array(coords_arr, k=command.knn)
         w.transform = "r"
       except Exception as exc:
         raise ExecutionError("spregress weight matrix construction failed") from exc
@@ -2735,18 +2745,18 @@ class Executor:
     try:
       if command.robust:
         if command.model_type == "lag":
-          fitted = GM_Lag(outcome_array, design, w=w, robust="white")
+          fitted = get_spreg_models()[4](outcome_array, design, w=w, robust="white")
         elif command.model_type == "error":
-          fitted = GM_Error_Het(outcome_array, design, w=w)
+          fitted = get_spreg_models()[3](outcome_array, design, w=w)
         else:
-          fitted = GM_Combo_Het(outcome_array, design, w=w)
+          fitted = get_spreg_models()[2](outcome_array, design, w=w)
       else:
         if command.model_type == "lag":
-          fitted = ML_Lag(outcome_array, design, w=w)
+          fitted = get_spreg_models()[7](outcome_array, design, w=w)
         elif command.model_type == "error":
-          fitted = ML_Error(outcome_array, design, w=w)
+          fitted = get_spreg_models()[6](outcome_array, design, w=w)
         else:
-          fitted = GM_Combo(outcome_array, design, w=w)
+          fitted = get_spreg_models()[1](outcome_array, design, w=w)
     except Exception as exc:
       raise ExecutionError(f"spregress {command.model_type} estimation failed") from exc
 
@@ -2942,7 +2952,7 @@ class Executor:
       dtype=float,
     )
     outcome_array = np.array(outcome, dtype=float)
-    model = sm.QuantReg(outcome_array, design)
+    model = get_statsmodels_api().QuantReg(outcome_array, design)
     covariance = "nonrobust"
     vcov = "iid"
     if command.robust:
@@ -3014,7 +3024,7 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
-    model = sm.Logit(outcome_array, design)
+    model = get_statsmodels_api().Logit(outcome_array, design)
     try:
       if command.robust:
         fitted = model.fit(disp=0, cov_type="HC1")
@@ -3091,7 +3101,7 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
-    model = sm.Probit(outcome_array, design)
+    model = get_statsmodels_api().Probit(outcome_array, design)
     try:
       if command.robust:
         fitted = model.fit(disp=0, cov_type="HC1")
@@ -3188,6 +3198,8 @@ class Executor:
       cov_config["clusters"] = np.array(cluster_values)
     model: Any
     if command.estimator == "gmm":
+      _, IVGMM = get_linearmodels_iv()
+
       model = IVGMM(
         dependent=dependent,
         exog=exog_data,
@@ -3195,6 +3207,8 @@ class Executor:
         instruments=instruments,
       )
     else:
+      IV2SLS, _ = get_linearmodels_iv()
+
       model = IV2SLS(
         dependent=dependent,
         exog=exog_data,
@@ -3276,10 +3290,14 @@ class Executor:
       first_stage_predictors,
       include_intercept=command.include_intercept,
     )
-    first_stage = sm.OLS(
-      np.array(endogenous_values, dtype=float),
-      np.array(first_stage_design, dtype=float),
-    ).fit()
+    first_stage = (
+      get_statsmodels_api()
+      .OLS(
+        np.array(endogenous_values, dtype=float),
+        np.array(first_stage_design, dtype=float),
+      )
+      .fit()
+    )
     first_stage_residuals = tuple(
       endog - fitted
       for endog, fitted in zip(
@@ -3302,10 +3320,14 @@ class Executor:
       second_stage_predictors,
       include_intercept=command.include_intercept,
     )
-    fitted = sm.OLS(
-      np.array(outcomes, dtype=float),
-      np.array(second_stage_design, dtype=float),
-    ).fit()
+    fitted = (
+      get_statsmodels_api()
+      .OLS(
+        np.array(outcomes, dtype=float),
+        np.array(second_stage_design, dtype=float),
+      )
+      .fit()
+    )
     covariance = "nonrobust"
     if command.robust:
       fitted = fitted.get_robustcov_results(cov_type="HC1")
@@ -3442,6 +3464,8 @@ class Executor:
       return cast(np.ndarray, residuals)
 
     try:
+      least_squares = get_scipy_optimize().least_squares
+
       fit = least_squares(residual_fn, x0=initial)
     except Exception as exc:
       raise ExecutionError("nl failed") from exc
@@ -3516,7 +3540,7 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
-    model = sm.Poisson(outcome_array, design)
+    model = get_statsmodels_api().Poisson(outcome_array, design)
     try:
       if command.robust:
         fitted = model.fit(disp=0, cov_type="HC1")
@@ -3588,7 +3612,7 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
-    model = sm.NegativeBinomial(outcome_array, design)
+    model = get_statsmodels_api().NegativeBinomial(outcome_array, design)
     try:
       if command.robust:
         fitted = model.fit(disp=0, cov_type="HC1")
@@ -3678,6 +3702,8 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
+    ZeroInflatedPoisson, _ = get_statsmodels_count_models()
+
     model = ZeroInflatedPoisson(
       endog=outcome_array,
       exog=design,
@@ -3770,6 +3796,8 @@ class Executor:
     )
     outcome_array = np.array(outcomes, dtype=float)
     covariance = "nonrobust"
+    _, ZeroInflatedNegativeBinomialP = get_statsmodels_count_models()
+
     model = ZeroInflatedNegativeBinomialP(
       endog=outcome_array,
       exog=design,
@@ -4146,7 +4174,7 @@ class Executor:
             )
           coords_arr = np.array(coords_list, dtype=float)
           try:
-            w = KNN.from_array(coords_arr, k=knn)
+            w = get_libpysal_knn().from_array(coords_arr, k=knn)
             w.transform = "r"
           except Exception as exc:
             raise ExecutionError("spregress weight matrix construction failed") from exc
@@ -5339,13 +5367,15 @@ class Executor:
     outcome_array = np.array(outcomes, dtype=float).reshape(-1, 1)
 
     try:
+      BaseOLS, *_ = get_spreg_models()
+
       ols_model = BaseOLS(outcome_array, design)
     except Exception as exc:
       raise ExecutionError("BaseOLS model reconstruction failed") from exc
 
     try:
-      m_res = MoranRes(ols_model, w, z=True)
-      lm_res = LMtests(ols_model, w, tests=["lme", "lml", "rlme", "rlml", "sarma"])
+      m_res = get_spreg_models()[8](ols_model, w, z=True)
+      lm_res = get_spreg_models()[5](ols_model, w, tests=["lme", "lml", "rlme", "rlml", "sarma"])
     except Exception as exc:
       raise ExecutionError(f"spatial diagnostics calculation failed: {exc}") from exc
 
@@ -5444,11 +5474,17 @@ class Executor:
     fitted: Any
     try:
       if command.estimator == "fe":
+        PanelOLS, _ = get_linearmodels_panel()
+
+        PanelOLS, _ = get_linearmodels_panel()
+
         fitted = PanelOLS(outcome_series, predictor_frame, entity_effects=True).fit(
           cov_type=cov_type,
           **fit_kwargs,
         )
       else:
+        _, RandomEffects = get_linearmodels_panel()
+
         fitted = RandomEffects(outcome_series, predictor_frame).fit(
           cov_type=cov_type,
           **fit_kwargs,
@@ -5548,6 +5584,8 @@ class Executor:
     if set(outcomes) - allowed:
       raise ExecutionError("xtlogit outcome must be binary with values 0 and 1")
     try:
+      ConditionalLogit = get_statsmodels_conditional_logit()
+
       model = ConditionalLogit(
         np.array(outcomes, dtype=float),
         np.array(predictors, dtype=float),
@@ -5694,6 +5732,8 @@ class Executor:
     if not outcomes:
       raise ExecutionError("lowess requires at least one complete observation")
     try:
+      statsmodels_lowess = get_statsmodels_lowess()
+
       fitted = statsmodels_lowess(
         np.array(outcomes, dtype=float),
         np.array(predictors, dtype=float),
@@ -5771,6 +5811,8 @@ class Executor:
     cov_type = "robust" if command.robust else "unadjusted"
     covariance_label = "robust" if command.robust else "nonrobust"
     try:
+      PanelOLS, _ = get_linearmodels_panel()
+
       fitted = PanelOLS(
         outcome_series,
         predictor_frame,
@@ -5909,7 +5951,7 @@ class Executor:
         raise ExecutionError("drdid failed") from r_exc
     att, se, lci, uci, ps_fit, count_tp, count_tpre, count_up, count_upre = fit
     t_statistic = att / se if se != 0.0 else 0.0
-    p_value = float(norm.sf(abs(t_statistic)) * 2)
+    p_value = float(get_scipy_stats().norm.sf(abs(t_statistic)) * 2)
     coefficients = (
       CoefficientEstimate(
         name="ATT",
@@ -6318,7 +6360,7 @@ class Executor:
 
     if df_resid is not None and df_resid > 0:
       F = W / q
-      p_val = float(1.0 - f.cdf(F, q, df_resid))
+      p_val = float(1.0 - get_scipy_stats().f.cdf(F, q, df_resid))
       return TestResult(
         constraints=tuple(constraint_strings),
         statistic=F,
@@ -6328,7 +6370,7 @@ class Executor:
         is_chi2=False,
       )
     else:
-      p_val = float(1.0 - chi2.cdf(W, q))
+      p_val = float(1.0 - get_scipy_stats().chi2.cdf(W, q))
       return TestResult(
         constraints=tuple(constraint_strings),
         statistic=W,
@@ -6375,13 +6417,13 @@ class Executor:
     else:
       statistic = estimate / standard_error
       if df_resid is not None and df_resid > 0:
-        p_val = float(2.0 * (1.0 - t.cdf(abs(statistic), df_resid)))
-        t_crit = t.ppf(0.975, df_resid)
+        p_val = float(2.0 * (1.0 - get_scipy_stats().t.cdf(abs(statistic), df_resid)))
+        t_crit = get_scipy_stats().t.ppf(0.975, df_resid)
         ci_lower = float(estimate - t_crit * standard_error)
         ci_upper = float(estimate + t_crit * standard_error)
       else:
-        p_val = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
-        z_crit = norm.ppf(0.975)
+        p_val = float(2.0 * (1.0 - get_scipy_stats().norm.cdf(abs(statistic))))
+        z_crit = get_scipy_stats().norm.ppf(0.975)
         ci_lower = float(estimate - z_crit * standard_error)
         ci_upper = float(estimate + z_crit * standard_error)
 
@@ -6428,14 +6470,14 @@ class Executor:
           p_two = math.nan
           p_right = math.nan
         else:
-          t_crit = t.ppf(0.975, n - 1)
+          t_crit = get_scipy_stats().t.ppf(0.975, n - 1)
           ci_lower = float(mean_val - t_crit * std_err)
           ci_upper = float(mean_val + t_crit * std_err)
           t_stat = (mean_val - command.value) / std_err
           df_val = float(n - 1)
-          p_left = float(t.cdf(t_stat, n - 1))
-          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
-          p_right = float(1.0 - t.cdf(t_stat, n - 1))
+          p_left = float(get_scipy_stats().t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - get_scipy_stats().t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - get_scipy_stats().t.cdf(t_stat, n - 1))
       else:
         ci_lower = math.nan
         ci_upper = math.nan
@@ -6517,7 +6559,7 @@ class Executor:
       se_diff = sd_diff / math.sqrt(n) if n > 1 else math.nan
 
       if n > 1:
-        t_crit = t.ppf(0.975, n - 1)
+        t_crit = get_scipy_stats().t.ppf(0.975, n - 1)
         if se1 == 0.0 or math.isnan(se1):
           ci1_l = mean1
           ci1_u = mean1
@@ -6545,9 +6587,9 @@ class Executor:
           cid_u = float(mean_diff + t_crit * se_diff)
           t_stat = mean_diff / se_diff
           df_val = float(n - 1)
-          p_left = float(t.cdf(t_stat, n - 1))
-          p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), n - 1)))
-          p_right = float(1.0 - t.cdf(t_stat, n - 1))
+          p_left = float(get_scipy_stats().t.cdf(t_stat, n - 1))
+          p_two = float(2.0 * (1.0 - get_scipy_stats().t.cdf(abs(t_stat), n - 1)))
+          p_right = float(1.0 - get_scipy_stats().t.cdf(t_stat, n - 1))
       else:
         ci1_l, ci1_u = math.nan, math.nan
         ci2_l, ci2_u = math.nan, math.nan
@@ -6655,14 +6697,14 @@ class Executor:
           df_val = 0.0
 
       if not math.isnan(se_diff) and se_diff > 0.0 and df_val > 0.0:
-        t_crit = t.ppf(0.975, df_val)
+        t_crit = get_scipy_stats().t.ppf(0.975, df_val)
         cid_l = float(mean_diff - t_crit * se_diff)
         cid_u = float(mean_diff + t_crit * se_diff)
 
         t_stat = mean_diff / se_diff
-        p_left = float(t.cdf(t_stat, df_val))
-        p_two = float(2.0 * (1.0 - t.cdf(abs(t_stat), df_val)))
-        p_right = float(1.0 - t.cdf(t_stat, df_val))
+        p_left = float(get_scipy_stats().t.cdf(t_stat, df_val))
+        p_two = float(2.0 * (1.0 - get_scipy_stats().t.cdf(abs(t_stat), df_val)))
+        p_right = float(1.0 - get_scipy_stats().t.cdf(t_stat, df_val))
       elif se_diff == 0.0:
         cid_l = mean_diff
         cid_u = mean_diff
@@ -6683,7 +6725,7 @@ class Executor:
           ci1_l = mean1
           ci1_u = mean1
         else:
-          t_crit1 = t.ppf(0.975, grp1_df)
+          t_crit1 = get_scipy_stats().t.ppf(0.975, grp1_df)
           ci1_l = float(mean1 - t_crit1 * se1)
           ci1_u = float(mean1 + t_crit1 * se1)
       else:
@@ -6695,7 +6737,7 @@ class Executor:
           ci2_l = mean2
           ci2_u = mean2
         else:
-          t_crit2 = t.ppf(0.975, grp2_df)
+          t_crit2 = get_scipy_stats().t.ppf(0.975, grp2_df)
           ci2_l = float(mean2 - t_crit2 * se2)
           ci2_u = float(mean2 + t_crit2 * se2)
       else:
@@ -6706,7 +6748,7 @@ class Executor:
           ci_comb_l = mean_comb
           ci_comb_u = mean_comb
         else:
-          t_crit_comb = t.ppf(0.975, n_comb - 1)
+          t_crit_comb = get_scipy_stats().t.ppf(0.975, n_comb - 1)
           ci_comb_l = float(mean_comb - t_crit_comb * se_comb)
           ci_comb_u = float(mean_comb + t_crit_comb * se_comb)
       else:
@@ -6916,6 +6958,8 @@ def _estat_did_table(did_regression: _DidRegressionState) -> TableResult:
 
 def _estat_ovtest_table(fitted_model: object) -> TableResult:
   try:
+    linear_reset = get_statsmodels_linear_reset()
+
     reset_result = linear_reset(cast(Any, fitted_model), use_f=True)
   except Exception as exc:
     raise ExecutionError("estat ovtest failed for current model") from exc
@@ -6945,6 +6989,8 @@ def _estat_vif_table(
   vif_values: list[float] = []
   for column_index, predictor in enumerate(predictor_names, start=index_offset):
     try:
+      variance_inflation_factor = get_statsmodels_vif()
+
       vif = _to_float_allow_inf(variance_inflation_factor(exog, column_index))
     except Exception as exc:
       raise ExecutionError("estat vif failed for current model") from exc
@@ -7230,7 +7276,7 @@ def _estat_hausman_table(fe_model: object, re_model: object) -> TableResult:
   degrees_of_freedom = int(delta.shape[0])
   if degrees_of_freedom <= 0:
     raise ExecutionError("estat hausman failed for current models")
-  p_value = float(chi2.sf(statistic, degrees_of_freedom))
+  p_value = float(get_scipy_stats().chi2.sf(statistic, degrees_of_freedom))
   return TableResult(
     headers=("Metric", "Value"),
     rows=(
@@ -7336,6 +7382,8 @@ def _cf_residual_confidence_interval(
 
 def _studentized_residuals(fitted_model: object) -> tuple[float, ...] | None:
   try:
+    OLSInfluence = get_statsmodels_ols_influence()
+
     influence = OLSInfluence(cast(Any, fitted_model))
     return _required_float_sequence(getattr(influence, "resid_studentized_internal", None))
   except Exception:
@@ -8078,6 +8126,8 @@ def _fit_xtabond_python(
 ) -> _XtAbondFitResult:
   try:
     exog_data = np.array(exogenous, dtype=float) if exogenous is not None else None
+    _, IVGMM = get_linearmodels_iv()
+
     model = IVGMM(
       dependent=np.array(dependent, dtype=float),
       exog=exog_data,
@@ -8824,7 +8874,7 @@ def _fit_heckman_with_r(
   selection_array = np.array(selection_outcomes, dtype=float)
   covariance = "nonrobust"
   try:
-    selection_model = sm.Probit(selection_array, selection_design)
+    selection_model = get_statsmodels_api().Probit(selection_array, selection_design)
     if robust:
       selection_fit = selection_model.fit(disp=0, cov_type="HC1")
       covariance = "robust"
@@ -8838,8 +8888,8 @@ def _fit_heckman_with_r(
     else:
       selection_fit = selection_model.fit(disp=0)
     xb = np.array(selection_model.predict(selection_fit.params, selection_design, which="linear"))
-    cdf = np.maximum(norm.cdf(xb), 1e-12)
-    imr = norm.pdf(xb) / cdf
+    cdf = np.maximum(get_scipy_stats().norm.cdf(xb), 1e-12)
+    imr = get_scipy_stats().norm.pdf(xb) / cdf
     selected_indexes = [index for index, value in enumerate(selection_outcomes) if value == 1.0]
     if not selected_indexes:
       raise ExecutionError("heckman failed")
@@ -8850,7 +8900,7 @@ def _fit_heckman_with_r(
     outcome_design = np.column_stack(
       [outcome_base, np.array([imr[index] for index in selected_indexes])]
     )
-    outcome_model = sm.OLS(outcome_values, outcome_design)
+    outcome_model = get_statsmodels_api().OLS(outcome_values, outcome_design)
     if robust:
       outcome_fit = outcome_model.fit(cov_type="HC1")
     elif cluster_values is not None:
@@ -9049,7 +9099,7 @@ def _fit_tobit_parametric(
     sigma = math.exp(float(np.clip(log_sigma, -10.0, 10.0)))
     mu = design @ beta
     z = (outcome_array - mu) / sigma
-    logpdf = norm.logpdf(z) - math.log(sigma)
+    logpdf = get_scipy_stats().norm.logpdf(z) - math.log(sigma)
 
     left_mask = outcome_array <= lower_limit
     if upper_limit is None:
@@ -9062,19 +9112,24 @@ def _fit_tobit_parametric(
       log_likelihood[uncensored_mask] = logpdf[uncensored_mask]
     if np.any(left_mask):
       left_z = (lower_limit - mu[left_mask]) / sigma
-      log_likelihood[left_mask] = norm.logcdf(left_z)
+      log_likelihood[left_mask] = get_scipy_stats().norm.logcdf(left_z)
     if np.any(right_mask):
       assert upper_limit is not None
       right_z = (upper_limit - mu[right_mask]) / sigma
-      log_likelihood[right_mask] = np.log(np.maximum(1.0 - norm.cdf(right_z), 1e-12))
+      right_tail = 1.0 - get_scipy_stats().norm.cdf(right_z)
+      log_likelihood[right_mask] = np.log(np.maximum(right_tail, 1e-12))
     return log_likelihood
 
   def objective(params: np.ndarray) -> float:
     return float(-np.sum(observation_log_likelihood(params)))
 
   initial = np.zeros(design.shape[1] + 1, dtype=float)
+  minimize = get_scipy_optimize().minimize
+
   result = minimize(objective, initial, method="BFGS")
   if not result.success:
+    minimize = get_scipy_optimize().minimize
+
     result = minimize(objective, initial, method="L-BFGS-B")
   if not result.success:
     raise ExecutionError("tobit failed")
@@ -9106,7 +9161,7 @@ def _fit_tobit_parametric(
       )
       continue
     statistic = value / se_value
-    p_value = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
+    p_value = float(2.0 * (1.0 - get_scipy_stats().norm.cdf(abs(statistic))))
     coefficients.append(
       CoefficientEstimate(
         name=name,
@@ -9210,8 +9265,12 @@ def _fit_streg_parametric(
     return float(-np.sum(observation_log_likelihood(params)))
 
   initial = np.zeros(design.shape[1] + (0 if distribution == "exponential" else 1), dtype=float)
+  minimize = get_scipy_optimize().minimize
+
   result = minimize(objective, initial, method="BFGS")
   if not result.success:
+    minimize = get_scipy_optimize().minimize
+
     result = minimize(objective, initial, method="L-BFGS-B")
   if not result.success:
     raise ExecutionError("streg failed")
@@ -9250,7 +9309,7 @@ def _fit_streg_parametric(
       )
       continue
     statistic = value / standard_error_value
-    p_value = float(2.0 * (1.0 - norm.cdf(abs(statistic))))
+    p_value = float(2.0 * (1.0 - get_scipy_stats().norm.cdf(abs(statistic))))
     estimates.append(
       CoefficientEstimate(
         name=name,
@@ -9289,12 +9348,12 @@ def _regression_model(
   if estimator == "wls":
     if weights is None:
       raise ExecutionError("regress failed")
-    return sm.WLS(outcome, design, weights=cast(Any, weights))
+    return get_statsmodels_api().WLS(outcome, design, weights=cast(Any, weights))
   if estimator == "gls":
     if weights is None:
       raise ExecutionError("regress failed")
-    return sm.GLS(outcome, design, sigma=cast(Any, weights))
-  return sm.OLS(outcome, design)
+    return get_statsmodels_api().GLS(outcome, design, sigma=cast(Any, weights))
+  return get_statsmodels_api().OLS(outcome, design)
 
 
 def _design_matrix(
@@ -9587,7 +9646,7 @@ def _nl_coefficient_estimates(
     raise ExecutionError("nl failed")
   if len(parameter_names) != len(values) or covariance.shape[0] != covariance.shape[1]:
     raise ExecutionError("nl failed")
-  z_dist = norm()
+  z_dist = get_scipy_stats().norm()
   estimates: list[CoefficientEstimate] = []
   for index, name in enumerate(parameter_names):
     value = float(values[index])
@@ -10041,7 +10100,8 @@ def _drdid_point_and_se(
 
   if method in {"ipw", "aipw"}:
     try:
-      glm = sm.GLM(D, X, family=sm.families.Binomial())
+      sm_api = get_statsmodels_api()
+      glm = sm_api.GLM(D, X, family=sm_api.families.Binomial())
       fit_res = glm.fit()
       ps_fit = fit_res.predict(X)
     except Exception as exc:
@@ -10056,7 +10116,7 @@ def _drdid_point_and_se(
     y_ctrl = delta_y[D == 0]
     w_ctrl = weights[D == 0]
     try:
-      ols = sm.WLS(y_ctrl, X_ctrl, weights=cast(Any, w_ctrl))
+      ols = get_statsmodels_api().WLS(y_ctrl, X_ctrl, weights=cast(Any, w_ctrl))
       ols_res = ols.fit()
       reg_coeff = ols_res.params
       out_delta = X @ reg_coeff
@@ -10154,7 +10214,7 @@ def _drdid_point_and_se(
     inf_func = inf_treat - inf_control
 
   se = float(np.std(inf_func, ddof=0) / np.sqrt(n))
-  critical_value = float(norm.ppf(0.975))
+  critical_value = float(get_scipy_stats().norm.ppf(0.975))
   lci = att - critical_value * se
   uci = att + critical_value * se
   return att, se, lci, uci, ps_fit
@@ -10270,6 +10330,7 @@ def _fit_dml_linear(
   y_tilde = np.zeros(n, dtype=float)
   d_tilde = np.zeros(n, dtype=float)
   nuisance_fits = np.zeros(n, dtype=float)
+  KFold = get_sklearn_kfold()
   kfold = KFold(n_splits=folds, shuffle=True, random_state=seed)
   for train_idx, test_idx in kfold.split(controls):
     train_controls = controls[train_idx]
@@ -10277,11 +10338,15 @@ def _fit_dml_linear(
     y_train = outcome[train_idx]
     d_train = treatment[train_idx]
     try:
+      _, _, Lasso, _ = get_sklearn_linear_models()
+
       outcome_model = Lasso(
         alpha=alpha,
         fit_intercept=include_intercept,
         max_iter=10_000,
       ).fit(train_controls, y_train)
+      _, _, Lasso, _ = get_sklearn_linear_models()
+
       treatment_model = Lasso(
         alpha=alpha,
         fit_intercept=include_intercept,
@@ -10298,7 +10363,7 @@ def _fit_dml_linear(
       "dml orthogonalized treatment variation is near zero; try a smaller alpha or more folds"
     )
   try:
-    fitted = sm.OLS(y_tilde, d_tilde).fit()
+    fitted = get_statsmodels_api().OLS(y_tilde, d_tilde).fit()
     if robust:
       fitted = fitted.get_robustcov_results(cov_type="HC1")
   except Exception as exc:
@@ -10480,3 +10545,21 @@ def _format_constraint_eq(constraint: Expression) -> str:
   if isinstance(constraint, BinaryExpression) and constraint.operator == "-":
     return f"{_format_expression(constraint.left)} = {_format_expression(constraint.right)}"
   return f"{_format_expression(constraint)} = 0"
+
+
+def __getattr__(name: str) -> Any:
+  if name == "ConditionalLogit":
+    return get_statsmodels_conditional_logit()
+  if name == "ZeroInflatedPoisson":
+    return get_statsmodels_count_models()[0]
+  if name == "ZeroInflatedNegativeBinomialP":
+    return get_statsmodels_count_models()[1]
+  if name == "IV2SLS":
+    return get_linearmodels_iv()[0]
+  if name == "IVGMM":
+    return get_linearmodels_iv()[1]
+  if name == "PanelOLS":
+    return get_linearmodels_panel()[0]
+  if name == "RandomEffects":
+    return get_linearmodels_panel()[1]
+  raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
