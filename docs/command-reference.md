@@ -39,6 +39,14 @@ including delegated `run`/`by` behavior and output/artifact writes; they do not 
 execution. This mode is read-only and cannot be combined with command, script, discovery, help-topic,
 or explain execution.
 
+## Model Context Protocol (MCP) Server
+
+Use `tabdat --mcp` or `tabdat-mcp` to launch the TabDat MCP server on standard I/O (stdio). It
+conforms to the Model Context Protocol (JSON-RPC 2.0, protocol version `2024-11-05`), exposing tools,
+dynamic URIs (`tabdat://session/status`, `tabdat://session/schema`, `tabdat://catalog/commands`),
+and prompt templates for AI agents and LLM clients. See [mcp-server.md](mcp-server.md) for configuration
+and integration details.
+
 ## Load and inspect
 
 | Command | Purpose | Minimal invocation |

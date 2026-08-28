@@ -1,33 +1,27 @@
-# Delivery Summary: Fast Startup Optimization & v0.24.0 Release
+# Delivery Summary: TabDat Model Context Protocol (MCP) Server
 
-## Delivered Features & Optimizations
-1. **Lazy Statistical Stack Imports (Strategy 1)**:
-   - Encapsulated heavy third-party statistical engines (`statsmodels`, `libpysal`, `spreg`, `linearmodels`, `scikit-learn`, `scipy.optimize`, `scipy.stats`) in `src/tabdat/lazy_stats.py` and deferred their invocation to execution time in `src/tabdat/executor.py`.
-   - Core CLI commands (`describe`, `summarize`, `codebook`, `use`, `generate`, `status`, `doctor`) no longer suffer from multi-second startup overhead.
-2. **Lazy Visualization Engine (Strategy 2)**:
-   - Defer Altair import in `src/tabdat/visualization.py` until plot generation.
-3. **Fast CLI Argument Handling (Strategy 3)**:
-   - Added `-v`/`--version` support to CLI entrypoint and dynamic package version retrieval in `tabdat doctor`.
-4. **Version Bump to `0.24.0`**:
-   - Bumped version across `src/tabdat/__init__.py`, `pyproject.toml`, and `Formula/tabdat.rb`.
-5. **Startup Performance Test Suite**:
-   - Added `tests/test_startup_performance.py` validating that 0 heavy statistical or visualization packages are eagerly loaded into `sys.modules`.
+## Summary of Changes
+Implemented a full-featured Model Context Protocol (MCP) server for TabDat-Explore conforming to the JSON-RPC 2.0 stdio specification (`2024-11-05`). This allows AI agents (Claude Desktop, Cursor, Antigravity, Goose, Cline, etc.) to use TabDat as a native analytical engine for tabular exploration, transformation, and econometric analysis.
 
-## Changed Files
-- `src/tabdat/__init__.py`
-- `src/tabdat/cli.py`
-- `src/tabdat/doctor.py`
-- `src/tabdat/executor.py`
-- `src/tabdat/lazy_stats.py` (New)
-- `src/tabdat/visualization.py`
-- `Formula/tabdat.rb`
-- `pyproject.toml`
-- `tests/test_startup_performance.py` (New)
-- `_workspace/*`
+### Delivered Components
+1. `src/tabdat/mcp/`:
+   - `types.py`: Pydantic MCP models (Tools, Resources, Prompts, JSON-RPC 2.0 messages).
+   - `tools.py`: 10 MCP tools (`tabdat_execute`, `tabdat_batch`, `tabdat_script`, `tabdat_status`, `tabdat_describe_command`, `tabdat_list_commands`, `tabdat_get_help`, `tabdat_explain`, `tabdat_doctor`, `tabdat_reset_session`).
+   - `resources.py`: Dynamic JSON URIs (`tabdat://session/status`, `tabdat://session/schema`, `tabdat://catalog/commands`).
+   - `prompts.py`: Guided workflow prompts (`eda_workflow`, `econometric_analysis`, `data_cleaning`).
+   - `server.py`: Standard I/O (stdio) server runtime with stateful executor persistence.
+2. CLI Surface:
+   - Added `--mcp` flag to `tabdat` CLI.
+   - Added `tabdat-mcp` entry point to `pyproject.toml`.
+3. Documentation:
+   - Created `docs/mcp-server.md` with client setup guides (Claude Desktop, Cursor, Antigravity).
+   - Updated `docs/command-reference.md`, `README.md`, and `docs/tabdat_forward_roadmap.md`.
+4. Tests:
+   - Added `tests/test_mcp.py` with 11 comprehensive tests.
 
 ## Verification
-- `uv run pytest` -> 1,251 passed
-- `uv run basedpyright` -> 0 errors, 0 warnings
-- `uv run ruff check . && uv run ruff format --check .` -> Clean
-- `uv run python scripts/check_docs_alignment.py` -> Clean
-- `uv run python integrated_testing/run_e2e.py` -> 6/6 scenarios passed
+- Unit & integration tests: `uv run pytest` -> 1,262 passed
+- Type check: `uv run basedpyright` -> 0 errors
+- Lint & format: `uv run ruff check .` & `uv run ruff format --check .` -> clean
+- Docs alignment: `uv run python scripts/check_docs_alignment.py` -> PASSED
+- Integrated E2E: `uv run python integrated_testing/run_e2e.py` -> 6/6 passed
