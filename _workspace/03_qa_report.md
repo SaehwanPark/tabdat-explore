@@ -1,22 +1,19 @@
-# QA Report: TabDat Model Context Protocol (MCP) Server
+# QA Report: GitHub Pages Documentation Migration
 
 ## Status: PASS
 
-## 1. Boundary Verification
-- **Protocol Boundary (JSON-RPC 2.0)**:
-  - `initialize`, `notifications/initialized`, and `ping` conform to MCP specification (version `2024-11-05`).
-  - Standard error codes (`-32700`, `-32600`, `-32601`, `-32602`, `-32603`) properly returned on malformed input or unhandled requests.
-- **Executor & Session Boundary**:
-  - `Executor` instance state is preserved across sequential tool calls (tested: `use` -> `summarize` -> `generate` -> `regress` -> `predict` -> `status`).
-  - State reset via `tabdat_reset_session` clears active datasets, named tables, and estimation states without leaking memory.
-- **CLI & Dispatch Boundary**:
-  - `tabdat --mcp` successfully parses and delegates to `run_mcp_server`.
-  - Mutually exclusive flags prevent conflicting execution modes (e.g. `--mcp` combined with `-c` or `-f`).
-  - Console script `tabdat-mcp` defined in `pyproject.toml`.
+## 1. Boundary & Invariant Audits
+- **Link Integrity**: All relative links across all `.md` files in `docs/` and repository root resolve to existing files and valid markdown header anchors. Verified via `scripts/check_docs_alignment.py`.
+- **Command Coverage**: All 69 executable commands in `tabdat.parser._EXECUTABLE_COMMANDS` are documented with dedicated pages in `docs/commands/*.md` and indexed in `docs/command-reference/index.md` and `docs/command-reference.md`.
+- **MkDocs Strict Build**: `uv run mkdocs build --strict` completes with 0 warnings and 0 errors, validating all internal navigation tabs, tables, code blocks, and markdown extensions.
+- **Continuous Integration**: `.github/workflows/ci.yml` validates MkDocs strict build on every PR and push.
+- **Deployment Pipeline**: `.github/workflows/pages.yml` utilizes GitHub Actions with `upload-pages-artifact@v3` and `deploy-pages@v4` targeting `https://saehwanpark.github.io/tabdat-explore/`.
 
-## 2. Test & Quality Evidence
-- `uv run pytest`: 1,262/1,262 tests passing.
-- `uv run basedpyright`: 0 errors, 0 warnings, 0 notes.
-- `uv run ruff check .` & `uv run ruff format --check .`: Clean across all 52 project files.
-- `uv run python scripts/check_docs_alignment.py`: All documentation links, topic anchors, and command references are 100% verified.
-- `uv run python integrated_testing/run_e2e.py`: All 6 E2E scenarios passing.
+## 2. Test Execution
+- `ruff check .`: PASS
+- `ruff format --check .`: PASS
+- `basedpyright`: PASS (0 errors)
+- `pytest`: PASS (1,262 tests)
+- `check_docs_alignment.py`: PASS
+- `mkdocs build --strict`: PASS
+- `integrated_testing/run_e2e.py`: PASS

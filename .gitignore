@@ -22,3 +22,4 @@ integrated_testing/reports/
 .forge/
 .ruff_cache/
 .mypy_cache/
+site/

@@ -3,7 +3,7 @@
 This guide explains how TabDat behaves in everyday use: sessions, data loading, scripts,
 configuration, plots, and estimation workflows. For a categorized command list, see
 [command-reference.md](command-reference.md). For implementation boundaries, see
-[ARCHITECTURE.md](../ARCHITECTURE.md).
+[ARCHITECTURE.md](architecture.md).
 
 ## Sessions and the data model
 
@@ -167,7 +167,7 @@ data-dependent execution plans.
 ### Canonical Parquet-first workflow
 
 The repository includes a complete first-pass EDA journey in
-[`demos/canonical_parquet_eda.td`](../demos/canonical_parquet_eda.td). It expects a Titanic-shaped
+[`demos/canonical_parquet_eda.td`](https://github.com/SaehwanPark/tabdat-explore/blob/main/demos/canonical_parquet_eda.td). It expects a Titanic-shaped
 Parquet file with `age`, `fare`, `sibsp`, `parch`, and `class` columns, then lazily loads the data,
 inspects structure and missingness, filters and derives a variable, summarizes overall and by
 class, collapses to class-level means, and exports a Parquet summary.
@@ -330,5 +330,5 @@ column names, common options), and command history.
 - [Language semantics](language-semantics.md) — stable identifiers, missing values, expression
   coercion and arithmetic results, write-target, and atomic-failure policy
 - [Project proposal](project_proposal.md) — product vision and target users
-- [CHANGELOG.md](../CHANGELOG.md) — release history
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — technical design for contributors
+- [CHANGELOG.md](https://github.com/SaehwanPark/tabdat-explore/blob/main/CHANGELOG.md) — release history
+- [ARCHITECTURE.md](architecture.md) — technical design for contributors

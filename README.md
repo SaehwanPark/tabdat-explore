@@ -1,7 +1,13 @@
 # TabDat-Explore
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg)](https://saehwanpark.github.io/tabdat-explore/)
+[![CI](https://github.com/SaehwanPark/tabdat-explore/actions/workflows/ci.yml/badge.svg)](https://github.com/SaehwanPark/tabdat-explore/actions)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPLv3+-red.svg)](LICENSE)
+
 TabDat-Explore is a terminal-native exploratory data analysis tool for modern tabular data. It
 feels Stata-inspired, but it is **not** Stata-compatible.
+
+📖 **Documentation Website**: [https://saehwanpark.github.io/tabdat-explore/](https://saehwanpark.github.io/tabdat-explore/)
 
 ## Who it's for
 
@@ -154,6 +160,7 @@ Panel metadata, plot defaults, and other session details are covered in the
 
 ## Learn more
 
+- [Documentation Website](https://saehwanpark.github.io/tabdat-explore/) — full online user guide, searchable command index, and tutorials
 - [User guide](docs/user-guide.md) — sessions, lazy loading, scripts, config, plots, estimation
 - [Command reference](docs/command-reference.md) — categorized command index
 - [Model Context Protocol (MCP) server](docs/mcp-server.md) — AI agent integration for Claude Desktop, Cursor, Antigravity, and Goose

@@ -40,7 +40,7 @@ dependencies = [
 [project.urls]
 Homepage = "https://github.com/SaehwanPark/tabdat-explore"
 Repository = "https://github.com/SaehwanPark/tabdat-explore"
-Documentation = "https://github.com/SaehwanPark/tabdat-explore/blob/main/README.md"
+Documentation = "https://saehwanpark.github.io/tabdat-explore/"
 Issues = "https://github.com/SaehwanPark/tabdat-explore/issues"
 
 [project.scripts]
@@ -53,6 +53,10 @@ dev = [
     "mypy>=1.20.2",
     "pytest>=9.0.1",
     "ruff>=0.15.12",
+]
+docs = [
+    "mkdocs-material>=9.5.0",
+    "pymdown-extensions>=10.7",
 ]
 
 [tool.ruff]
@@ -116,6 +120,7 @@ exclude = [
     "/.antigravitycli",
     "/.forge",
     "/_workspace",
+    "/site",
 ]
 
 [tool.hatch.build.targets.wheel]

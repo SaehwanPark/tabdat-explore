@@ -31,7 +31,7 @@ jobs:
         run: uv python install 3.13
 
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --group docs
 
       - name: Run Ruff Linter
         run: uv run ruff check .
@@ -44,6 +44,9 @@ jobs:
 
       - name: Run Documentation Alignment
         run: uv run python scripts/check_docs_alignment.py
+
+      - name: Run MkDocs Build Check
+        run: uv run mkdocs build --strict
 
       - name: Run Pytest
         run: uv run pytest

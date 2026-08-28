@@ -1,0 +1,165 @@
+site_name: TabDat-Explore
+site_description: Stata-inspired, terminal-native exploratory data analysis for modern tabular data
+site_author: Sae-Hwan Park
+site_url: https://saehwanpark.github.io/tabdat-explore/
+repo_name: SaehwanPark/tabdat-explore
+repo_url: https://github.com/SaehwanPark/tabdat-explore
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: en
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - tables
+  - attr_list
+  - def_list
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
+      - Interactive Shell: getting-started/interactive-shell.md
+      - Quickstart Tutorial: getting-started/quickstart.md
+  - User Guide:
+      - Overview: user-guide/index.md
+      - Sessions & Data Model: user-guide/sessions-and-data.md
+      - Loading & Diagnostics: user-guide/loading-and-diagnostics.md
+      - Scripting & Automation: user-guide/scripting-and-json.md
+      - Estimation Workflows: user-guide/estimation-workflows.md
+      - Visualization & Artifacts: user-guide/visualization.md
+      - SQL & Persistence: user-guide/sql-and-persistence.md
+      - Configuration: user-guide/configuration.md
+      - Unified User Guide: user-guide.md
+  - Command Reference:
+      - Index & Categories: command-reference/index.md
+      - Unified Command Reference: command-reference.md
+      - Commands:
+          - append: commands/append.md
+          - bar: commands/bar.md
+          - bayes: commands/bayes.md
+          - bayes_prefix: commands/bayes_prefix.md
+          - bayesplot: commands/bayesplot.md
+          - by: commands/by.md
+          - cfregress: commands/cfregress.md
+          - codebook: commands/codebook.md
+          - collapse: commands/collapse.md
+          - count: commands/count.md
+          - cvelasticnet: commands/cvelasticnet.md
+          - cvlasso: commands/cvlasso.md
+          - cvridge: commands/cvridge.md
+          - describe: commands/describe.md
+          - did: commands/did.md
+          - dml: commands/dml.md
+          - doctor: commands/doctor.md
+          - drdid: commands/drdid.md
+          - drop: commands/drop.md
+          - elasticnet: commands/elasticnet.md
+          - estat: commands/estat.md
+          - estat_report: commands/estat_report.md
+          - exit: commands/exit.md
+          - export: commands/export.md
+          - generate: commands/generate.md
+          - head: commands/head.md
+          - heckman: commands/heckman.md
+          - histogram: commands/histogram.md
+          - ivregress: commands/ivregress.md
+          - join: commands/join.md
+          - keep: commands/keep.md
+          - lasso: commands/lasso.md
+          - logit: commands/logit.md
+          - lowess: commands/lowess.md
+          - nbreg: commands/nbreg.md
+          - nl: commands/nl.md
+          - panel: commands/panel.md
+          - poisson: commands/poisson.md
+          - postlasso: commands/postlasso.md
+          - predict: commands/predict.md
+          - probit: commands/probit.md
+          - qreg: commands/qreg.md
+          - quit: commands/quit.md
+          - recode: commands/recode.md
+          - regress: commands/regress.md
+          - rename: commands/rename.md
+          - replace: commands/replace.md
+          - reshape: commands/reshape.md
+          - ridge: commands/ridge.md
+          - run: commands/run.md
+          - save: commands/save.md
+          - scatter: commands/scatter.md
+          - select: commands/select.md
+          - set: commands/set.md
+          - spregress: commands/spregress.md
+          - sql: commands/sql.md
+          - status: commands/status.md
+          - streg: commands/streg.md
+          - summarize: commands/summarize.md
+          - tabulate: commands/tabulate.md
+          - tail: commands/tail.md
+          - tobit: commands/tobit.md
+          - use: commands/use.md
+          - xtabond: commands/xtabond.md
+          - xtdata: commands/xtdata.md
+          - xtlogit: commands/xtlogit.md
+          - xtreg: commands/xtreg.md
+          - zinb: commands/zinb.md
+          - zip: commands/zip.md
+  - AI & Protocols:
+      - MCP Server: mcp-server.md
+  - Statistical Rigor:
+      - Validation Matrix: reference-validation-matrix.md
+      - Microeconometrics Topics: microecometrics_topics.md
+  - Architecture & Specifications:
+      - Language Semantics: language-semantics.md
+      - Distribution Strategy ADR: adr/0001-distribution-and-packaging-strategy.md
+      - Active Roadmap: tabdat_forward_roadmap.md
+      - Architecture: architecture.md
+      - Contributing: contributing.md
+      - Team Spec: harness/tabdat/team-spec.md
+  - Development & Historical Specs:
+      - Project Proposal: project_proposal.md
+      - Development Phases: dev_phase.md
+      - Phase 0 Guardrails: phase0_product_guardrails.md
+      - Phase 0 Command Glossary: command_glossary_v0.md
+      - Public Dataset Test Plan: e2e_public_dataset_test_plan.md
+      - Project Feedback (2026-05): project_feedback_20260504.md
