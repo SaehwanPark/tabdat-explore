@@ -954,6 +954,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     metavar="COMMAND",
     help="emit one command's schema; requires --json",
   )
+  parser.add_argument(
+    "--mcp",
+    action="store_true",
+    help="start the TabDat Model Context Protocol (MCP) server on stdio",
+  )
   parser.add_argument("script", nargs="?", type=Path, help="run a TabDat script file and exit")
   args = parser.parse_args(argv)
 
@@ -1012,6 +1017,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     or args.explain
   ):
     parser.error("--describe-command cannot be combined with another execution mode")
+  if args.mcp and (
+    args.command
+    or args.file is not None
+    or args.script is not None
+    or args.list_commands
+    or args.list_command_effects
+    or args.help_topic is not None
+    or args.explain
+    or args.describe_command is not None
+    or args.json
+  ):
+    parser.error("--mcp cannot be combined with another execution mode")
   if args.explain and (args.file is not None or args.script is not None):
     parser.error("--explain requires exactly one -c/--command")
   if args.explain and len(args.command or ()) != 1:
@@ -1051,6 +1068,11 @@ def main(argv: Sequence[str] | None = None) -> int:
   except TabDatError as exc:
     print(f"Error: {exc}", file=sys.stderr)
     return 3 if isinstance(exc.__cause__, FileNotFoundError) or "not found" in str(exc) else 1
+
+  if args.mcp:
+    from tabdat.mcp import run_mcp_server
+
+    return run_mcp_server(config=config)
 
   executor = Executor(config=config)
   try:

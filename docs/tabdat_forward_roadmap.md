@@ -1087,7 +1087,7 @@ Examples:
 - dry-run/explain;
 - provenance/lineage;
 - stronger JSON/JSONL integration;
-- editor/agent integrations.
+- editor/agent integrations (Model Context Protocol / MCP server implemented; see [docs/mcp-server.md](mcp-server.md)).
 
 ### C. Deepen Conventional Statistics
 

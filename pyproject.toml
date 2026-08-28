@@ -45,6 +45,7 @@ Issues = "https://github.com/SaehwanPark/tabdat-explore/issues"
 
 [project.scripts]
 tabdat = "tabdat.cli:main"
+tabdat-mcp = "tabdat.mcp.server:main"
 
 [dependency-groups]
 dev = [
