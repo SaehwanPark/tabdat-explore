@@ -1,19 +1,18 @@
-# QA Report: GitHub Pages Documentation Migration
+# QA Report: MathJax LaTeX Rendering Integration
 
-## Status: PASS
+## Disposition: pass
 
-## 1. Boundary & Invariant Audits
-- **Link Integrity**: All relative links across all `.md` files in `docs/` and repository root resolve to existing files and valid markdown header anchors. Verified via `scripts/check_docs_alignment.py`.
-- **Command Coverage**: All 69 executable commands in `tabdat.parser._EXECUTABLE_COMMANDS` are documented with dedicated pages in `docs/commands/*.md` and indexed in `docs/command-reference/index.md` and `docs/command-reference.md`.
-- **MkDocs Strict Build**: `uv run mkdocs build --strict` completes with 0 warnings and 0 errors, validating all internal navigation tabs, tables, code blocks, and markdown extensions.
-- **Continuous Integration**: `.github/workflows/ci.yml` validates MkDocs strict build on every PR and push.
-- **Deployment Pipeline**: `.github/workflows/pages.yml` utilizes GitHub Actions with `upload-pages-artifact@v3` and `deploy-pages@v4` targeting `https://saehwanpark.github.io/tabdat-explore/`.
+## 1. Boundary & Cross-Surface Checks
+- **MkDocs Configuration (`mkdocs.yml`)**: Correctly registers `pymdownx.arithmatex` with `generic: true` and includes `extra_javascript` paths.
+- **Client Script (`docs/javascripts/mathjax.js`)**: Valid syntax, correctly handles `document$` subscriber for MkDocs Material instant navigation, specifies `ignoreHtmlClass` and `processHtmlClass` matching arithmatex output.
+- **Documentation Migration (`docs/reference-validation-matrix.md`)**: Replaced all `$` delimiters with `\(` / `\)`. Verified in built HTML that MathJax span wrappers are created.
+- **Contributor Guidelines (`CONTRIBUTING.md`, `docs/contributing.md`)**: Clear instructions added for inline `\( .. \)` and display `\\[ .. \\]` notation.
+- **No Unintended Changes**: No codebase logic modified; no version bump applied.
 
 ## 2. Test Execution
-- `ruff check .`: PASS
-- `ruff format --check .`: PASS
-- `basedpyright`: PASS (0 errors)
-- `pytest`: PASS (1,262 tests)
-- `check_docs_alignment.py`: PASS
-- `mkdocs build --strict`: PASS
-- `integrated_testing/run_e2e.py`: PASS
+- `uv run mkdocs build --strict` -> EXIT 0
+- `uv run python scripts/check_docs_alignment.py` -> EXIT 0
+- `uv run ruff check .` -> EXIT 0
+- `uv run ruff format --check .` -> EXIT 0
+- `uv run basedpyright` -> EXIT 0
+- `uv run pytest` -> 1262 passed (EXIT 0)

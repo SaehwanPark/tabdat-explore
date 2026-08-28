@@ -53,6 +53,7 @@ Documentation links and command registries are validated automatically by `pytes
 - Prefer **functional-first** style with typed boundaries (`pydantic`, `basedpyright`) and explicit
   error handling via `tabdat.monads`.
 - Keep command contracts predictable: Stata-inspired ergonomics, not Stata compatibility.
+- For mathematical formulas in documentation, use MathJax syntax: `\( .. \)` for inline math and `\\[ .. \\]` for display math.
 
 Agent-oriented workflows and tooling notes live in [AGENTS.md](AGENTS.md).
 
