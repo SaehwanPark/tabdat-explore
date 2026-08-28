@@ -1,0 +1,420 @@
+# TabDat-Explore Architecture
+
+**See also:** [User guide](user-guide/index.md) for behavior-oriented workflows and session concepts.
+
+TabDat-Explore has completed roadmap Phase 12 estimation substrate work, completed Phase 13 core
+linear econometrics with three `regress`/`predict`/`estat` slices, implemented thirteen Phase 14
+slices (`ivregress` `2sls`/`gmm`, IV diagnostics including `estat endogenous` after `2sls`, panel
+FE/RE starter, `xtdata` transforms, `cfregress` core, and `predict` plus `estat endogenous`
+support after `cfregress`, plus `estat firststage` after `cfregress` and expanded panel report
+semantics), and delivered seven bounded Phase 15 slices (`logit`, `probit`, `estat margins`,
+binary `predict` routing, `tobit`, `heckman`, and `nl`), plus four bounded Phase 16 slices
+(`poisson`, `nbreg`, `zip`, `zinb`, and `streg`), plus seven bounded Phase 17 slices (`qreg`,
+`did`, `xtabond` + `estat did`, `xtabond` lag/instrument controls + expanded `estat did`
+diagnostics, `xtabond` `estat overid` + `predict`, `xtlogit`, and `lowess`).
+It has also completed a bounded Phase 18 extension-governance slice with a typed internal
+extension registry for ingestion and estimator adapters, plus bounded Phase 19 modern-extension
+slices for ML regularization, Bayesian starters, spatial regression, cross-validation wrappers,
+same-sample spatial-lag prediction, post-Lasso inference, general Bayesian MCMC, and posterior
+predictive Bayesian columns plus Bayesian MCMC diagnostic plot artifacts.
+It has also completed Phase 21 (classical hypothesis testing), Phase 22 (advanced spatial models),
+and Phase 23 (data recoding & CSV/Feather/Arrow ingestion format expansion).
+This document records the implemented shell UX, script runner, command-language model, active DuckDB
+relation model, session-local named table registry, lazy and remote load boundary, runtime configuration,
+plot artifact boundary, persistence boundary, join, append, reshape, panel metadata, script primitive
+boundaries, econometrics state, classical testing, and recoding parameters, and the boundaries future
+phases should preserve.
+
+## Documentation Ownership
+
+Last Reviewed: 2026-07-11
+Status: Needs Review
+
+This file should converge on durable components, dependency direction, state transitions, and
+invariants. Its cumulative phase ledger is retained as historical context until deliberately
+migrated. Current command availability belongs in a capability matrix, historical additions in
+`CHANGELOG.md`, and major choices in ADRs. Phase 24 enqueues that migration; it is not complete.
+
+## Target Capability Layers
+
+Last Reviewed: 2026-07-11
+Status: Needs Review
+
+```text
+tabdat-core
+  -> tabdat-stats
+      -> specialized capabilities: bayes | spatial | R | ML
+```
+
+The arrows describe allowed dependency growth: core must not depend on statistical or specialized
+runtimes, and conventional statistics must not require unrelated specialized runtimes. The
+existing typed adapter registry is the intended capability boundary. This is a target constraint,
+not a claim about the current dependency graph or packaging.
+
+Phase 24 must measure install size, cold startup, portability, and import behavior before an ADR
+chooses optional dependency groups or separate distributions. Missing optional capabilities must
+fail at their command boundary with actionable guidance; routine EDA must not import R, Bayesian,
+spatial, or ML stacks.
+
+## Runtime Flow
+
+Last Reviewed: 2026-06-20
+Status: Verified
+
+```text
+CLI Shell / prompt-toolkit UX
+  -> Script Runner when executing files
+  -> Command Parser
+  -> Executor
+  -> DuckDB Backend / Lazy Scan Boundary
+  -> Visualization Artifact Renderer
+  -> Formatter
+  -> Terminal Output
+```
+
+## Component Responsibilities
+
+Last Reviewed: 2026-06-20
+Status: Verified
+
+### CLI Shell
+
+Owns user interaction, command input, script entry points, and terminal output formatting.
+Interactive shell UX lives in `src/tabdat/shell.py` and uses prompt-toolkit for history, inline
+history suggestions, syntax highlighting, and context-aware completions. Repeated `-c` commands
+bypass prompt-toolkit and remain the smoke-testable batch workflow. Script execution is available
+through `tabdat -f <script>`, `tabdat <script>`, and `run <script>`. Config loading happens at
+CLI startup from `--config <path>`, otherwise project-local `.tabdat.toml`, otherwise XDG user
+config at `~/.config/tabdat/config.toml` or `$XDG_CONFIG_HOME/tabdat/config.toml`.
+
+### Script Runner
+
+Owns UTF-8 script file reads, line-oriented script parsing, script-local directive state,
+deterministic metadata output, command echoes, nested `run` path resolution, recursion rejection,
+and file/line diagnostics. Script files support whole-line `#` comments, blank lines, one command
+per line, multiline SQL blocks, script-only `seed <integer>` metadata, script-only
+`let <name> = <value>` macros, and minimal non-nested `if` / `else` / `end` conditionals. `$name`
+macro expansion happens at the script edge before command parsing, condition evaluation, or
+execution. Nested `run` scripts share the parent script's macro and seed state, while each
+top-level script run starts with empty directive state. Script execution shares one executor state
+and disables plot auto-open so runs are reproducible in batch contexts.
+
+### Command Parser
+
+Converts command text into internal command objects. The parser owns tokenization, varlist and
+option parsing, `if` clauses, expression AST construction, and `run <script>` commands. `use
+<path>, lazy` and `use <path>, lazy engine=duckdb|polars` are parsed into typed load-mode fields.
+Phase 13 slices 1-3 add parsed command forms for `regress`, `predict`, and `estat` with
+constrained option sets (`robust`, `cluster(...)`, `noconstant`, `wls(...)`, `gls(...)`, `xb`,
+`residuals`, `residuals|ovtest|vif`). Current Phase 14 parsing adds
+`ivregress 2sls|gmm ... endog(...) iv(...)`, `estat firststage|overid|hausman|endogenous`,
+`xtreg <y> <xvars>, fe|re[, robust cluster(...)]`,
+`xtdata <varlist>, within|between`, and
+`cfregress <y> [exog_vars], endog(...) iv(...)[, robust cluster(...) noconstant]`.
+Phase 15 parsing adds
+`logit|probit <y> <xvars>[, robust cluster(...) noconstant]`, `estat margins`,
+`predict <newvar>[, xb residuals pr spatial_lag]`, and
+`tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(...) noconstant]`.
+Phase 16 parsing adds
+`poisson <y> <xvars>[, robust cluster(...) noconstant]`,
+`nbreg <y> <xvars>[, robust cluster(...) noconstant]`,
+`zip <y> <xvars>, inflate(<zvars>) [robust cluster(...) noconstant]`,
+`zinb <y> <xvars>, inflate(<zvars>) [robust cluster(...) noconstant]`,
+`streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+[robust cluster(...) noconstant]`, and `estat gof`.
+Phase 17 parsing adds
+`qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]` and
+`did <y> [controls], treat(<var>) post(<var>) [robust]`, plus
+`xtabond <y> [xvars] [, robust lags(#) instlag(#)]`, `xtlogit <y> <xvars>, fe [robust]`,
+`lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`, and `estat did`.
+Phase 19 parsing now adds ML/spatial commands including
+`lasso linear <y> <xvars>[, alpha(<num>) noconstant]` and
+`postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`, and
+`dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`.
+`predict` also accepts the Bayesian MCMC-only `posterior_predictive` mode after `bayes:` fits.
+Phase 21 parsing adds classical testing commands `test`, `lincom`, and `ttest` with Stata-style restriction and evaluation options.
+Phase 22 parsing adds `spregress <y> <xvars>[, weights(<path>) model(sarar) ...]` support.
+Phase 23 parsing adds `recode` commands with value replacement rules mapping to `generate(...)` or `replace`, and `use` option parameters `delimiter(<char>)` and `has_header(true|false)`.
+It may represent parsed-only future commands, but execution remains an executor or CLI-edge
+responsibility. Recoverable parser failures compose through PyPI `comp-builders` `Result` values
+exposed by the local `tabdat.monads` boundary. Parser internals convert those values back to
+user-facing `ParseError` exceptions only at the public parser edge.
+
+### Executor
+
+Dispatches executable commands, maintains session state, and coordinates with the backend. For the
+MVP, session state contains one active dataset, a session-local named table registry, and one typed
+runtime config. Parsed-only Phase 2 command forms must fail with an unsupported-command execution
+error until a later command contract defines execution. Runtime `set` commands update session config
+and affect later commands in the same shell, command sequence, or script. `join` and `append`
+validate active state and named-table lookup at the executor boundary before asking the backend to
+materialize the next active relation. `reshape` validates active state at the executor boundary and
+delegates active-dataset wide/long materialization to the backend. `panel` stores session-local
+panel id/time metadata on active dataset snapshots, asks the backend to validate active rows, and
+preserves or clears metadata across state-changing commands according to the command contract.
+Phase 13 slices 1-3 add session-local regression state for the latest fitted linear model, extend
+`regress` execution from OLS to WLS/GLS estimator modes through `statsmodels`, keep `predict` as a
+deterministic dataset-transform command over that state, and expose post-estimation diagnostics via
+`estat residuals|ovtest|vif`. Phase 14 adds `ivregress 2sls|gmm` execution through `linearmodels`,
+IV-focused `estat firststage|overid` plus `estat endogenous` after `2sls`, panel `xtreg` FE/RE plus
+`estat hausman` with bounded covariance constraints, bounded `cfregress` control-function execution
+through Python-first two-stage OLS residual inclusion plus `estat endogenous` over
+residual-inclusion statistics, `estat firststage` after `cfregress`, and panel report structure
+metrics (including balancedness).
+Phase 15 adds bounded binary-choice `logit` and `probit` execution through `statsmodels` with
+nonrobust, HC1 robust, and clustered covariance modes plus deterministic pseudo R-squared output.
+`estat margins` routes to deterministic predictor-level marginal-effects output after the latest
+binary-choice model state. `predict` now routes binary `xb` and `pr` outputs after binary-choice
+fits while preserving existing linear/control-function `predict` paths. Phase 15 also adds bounded
+Tobit estimation through an R adapter boundary (`survival::survreg` via `rpy2`) when Python-first
+direct support is insufficient.
+Phase 16 adds bounded Poisson, negative-binomial, and zero-inflated count estimation through
+`statsmodels`, `predict` routing for `xb`/`residuals` after Poisson/NB/ZI states, and `estat gof`
+post-estimation diagnostics, plus bounded parametric duration/survival `streg` estimation through a
+local MLE path (`weibull|exponential`) with deterministic covariance labeling.
+Phase 17 adds bounded quantile-regression execution through `statsmodels` (`qreg`), plus
+`predict` routing for `xb`/`residuals` and `estat residuals` diagnostics after `qreg`. Phase 17
+also adds a bounded causal starter through two-way fixed-effects DID execution (`did`) with
+required panel metadata and deterministic `predict ... , xb` routing. The latest Phase 17 slices
+add bounded `xtabond` dynamic-panel execution (Python-first with R fallback), configurable lag and
+instrument options, expanded `estat did` diagnostics with deterministic DID cell statistics and raw
+diff-in-diff contrasts, deterministic `estat overid` and `predict ..., xb|residuals` after
+`xtabond`, bounded `xtlogit` fixed-effects nonlinear panel execution, and bounded `lowess`
+semiparametric/nonparametric smoothing transforms.
+Phase 19 currently adds bounded ML and spatial extension slices through `scikit-learn`,
+`statsmodels`, and `spreg`: regularized linear estimators, cross-validated regularization,
+Bayesian-ridge starter estimation, post-Lasso OLS refit inference, and `spregress` lag/error
+estimation with bounded `predict ..., xb` support and same-sample `predict ..., spatial_lag`
+routing after lag-model fits only.
+The general `bayes:` MCMC prefix stores the retained Bambi model and ArviZ inference data so
+`predict ..., posterior_predictive` can append active-dataset posterior predictive mean columns,
+optionally with lower and upper interval columns through `interval [level(<num>)]`, while
+preserving row order. `estat bayes` can report bounded in-terminal MCMC diagnostics, and
+`bayesplot <trace|density|autocorrelation>` can save diagnostic plot artifacts through the shared
+plot artifact boundary.
+Estimation-family state is explicit: running one family clears stale state from the others to
+prevent cross-family `estat` reuse.
+Phase 21 adds Wald/F restriction and joint significance tests (`test`), linear combination parameter calculations (`lincom`), and t-tests (`ttest`) over active variables.
+Phase 22 adds `spregress ... model(sarar)` GMM Combo estimation and dynamic out-of-sample weights matrix reconstruction/alignment for spatial lag prediction.
+Phase 23 executes value/range recoding rules via the `recode` command, ensuring type safety and DuckDB compatibility.
+
+### DuckDB Backend
+
+Owns data access and query execution. Parquet is the primary initial format. Eager loading creates
+a session-local active DuckDB table. Lazy loading creates a DuckDB `read_parquet(...)` scan view so
+load-time projection, filtering, grouping, and terminal query operations can be pushed into DuckDB.
+Local paths and `http://`, `https://`, or `s3://` Parquet URIs share this DuckDB loading boundary.
+Eager Stata `.dta` files are read through `pandas.read_stata(...)` and then staged into the active
+DuckDB table, including remote `http://` and `https://` sources. Lazy loading stays Parquet-only;
+remote credentials and broader remote connectors are not part of the current contract.
+Session transformations replace the active relation for later commands. The optional `polars`
+engine selector now has a bounded real execution slice for local Parquet paths: projection,
+row-filtering, and preview/count commands can stay in a Polars `LazyFrame` boundary while later
+unsupported commands materialize once back into the eager DuckDB relation path. Remote Parquet
+URIs stay on the DuckDB boundary in the current contract. A session-local named table registry
+stores SQL `into` results under safe internal DuckDB relation names; `use <table>` reactivates a
+registered table, while the active relation remains the default target for non-SQL commands.
+`join <table> on <keylist>` joins the active relation to a registered named table using same-name
+equality keys, supports `inner` and `left` joins, suffixes right-side non-key column collisions,
+and materializes the result as the new eager active relation.
+`save` stays Parquet-only, while `export` persists the active dataset to local `.parquet`, `.csv`,
+or `.feather` paths without mutating session state.
+`append <table>` vertically stacks a registered named table under the active relation after strict
+same-column and compatible-type validation, preserving active-dataset column order and
+materializing the result as the new eager active relation. `reshape long <stublist>, i(...) j(...)`
+converts active wide columns named `<stub>_<j_value>` into long rows, while
+`reshape wide <value_vars>, i(...) j(...)` pivots long rows into `<value_var>_<j_value>` columns;
+both replace the active relation with an eager materialized result. `panel <id_var> <time_var>`
+validates that id/time variables exist, contain no missing values, and uniquely identify active
+rows with DuckDB checks. Panel metadata is session-local, stored on `DatasetInfo`, restored through
+named-table activation when the snapshot carries it, and not persisted into Parquet files. No
+persistent registry exists, but `save` / `export` can persist the active relation to local Parquet.
+SQL commands bind the active relation as the user-facing DuckDB view `active`. Initial lazy loads
+report an unknown row count until a live count or materializing operation runs.
+For Phase 13 prediction workflows, the backend materializes linear `xb` or residual expressions into
+new active-dataset columns through the existing active-relation replacement path.
+Phase 22 out-of-sample predictions compute/align/subset spatial weight matrices from `.gal`, `.gwt`, and `.shp` files or coordinate columns.
+Phase 23 ingestion format expansion loads `.csv` datasets with configurable delimiters and headers, and `.feather`/`.arrow` datasets via PyArrow-backed temporary views.
+
+For visualization commands, the backend extracts typed rows or frequency counts from the active
+table. It does not construct charts or write artifact files.
+
+### Visualization Artifact Renderer
+
+Owns Altair chart construction and SVG/PNG artifact writes. Default plot artifacts are written
+under `<artifact_dir>/plots/` using `graph_format`, and explicit `saving(...)` paths create parent
+directories as needed. Interactive shell default plot saves avoid overwriting existing artifacts by
+adding `-2`, `-3`, and later suffixes, while batch and script defaults keep the stable unsuffixed
+path for reproducibility. Plot generation is silent by default, formatting clickable `file://` URI
+links; interactive shell auto-open is a CLI-edge behavior optionally enabled via `graph_open`.
+
+### Formatter
+
+Converts structured command results into deterministic terminal text. The backend should not own
+display formatting.
+
+## Current Repository State
+
+Last Reviewed: 2026-06-20
+Status: Verified
+
+- Product docs are in `docs/project_proposal.md`, `docs/dev_phase.md`, and `docs/phase0_product_guardrails.md`.
+- Initial command scope is in `docs/command_glossary_v0.md`.
+- Package metadata is in `pyproject.toml`.
+- Phase handoff artifacts live under `_workspace/`.
+- Integrated public-dataset E2E tooling lives under `integrated_testing/`; generated datasets,
+  run logs, plots, and Parquet outputs are ignored.
+- Runtime modules live under `src/tabdat/`.
+- Internal extension-registry contracts for ingestion and estimator adapters live in
+  `src/tabdat/extension_registry.py`.
+- Functional helper imports live in `src/tabdat/monads.py`, which re-exports the project-approved
+  PyPI `comp-builders` primitives, including `AsyncResult`, and small edge conversion helpers.
+- Focused tests live under `tests/`.
+- The installed console script is `tabdat`.
+- Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
+- Phase 3 commands are executable: `codebook`, `count`, `head`, `tail`, `keep`, `drop`, `select`,
+  `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
+- `tabulate` supports legacy one-way/two-way frequency tables plus explicit multi-level
+  `rows()`/`columns()` crosstabs, command-level `if`, and single-value cell aggregation with
+  `values()`/`stat()`.
+- The supported `by:` child commands are `summarize`, `count`, and `tabulate`.
+- Phase 4 SQL is executable for result-producing `select` and `with` queries through `sql`.
+- Multiline SQL can be entered with `sql """..."""`.
+- `sql ... into <table>` creates a session-local named table and makes it active.
+- `use <table>` reactivates a registered named table; `use <path>` remains local Parquet loading.
+- `join <table> on <keylist>` joins the active dataset with a registered named table and replaces
+  the active dataset with the joined result.
+- `append <table>` appends a registered named table to the active dataset and replaces the active
+  dataset with the appended result.
+- `reshape long <stublist>, i(<id_vars>) j(<name_var>)` and
+  `reshape wide <value_vars>, i(<id_vars>) j(<name_var>)` reshape only the active dataset and
+  replace it with an eager materialized result.
+- `panel <id_var> <time_var>`, `panel`, and `panel clear` manage session-local panel metadata for
+  the active dataset.
+- Phase 5 prompt-toolkit UX is available for interactive sessions.
+- Phase 6 plot commands are executable: `histogram`, `scatter`, and `bar`.
+- Phase 7 lazy loading is executable through `use <path>, lazy` and
+  `use <path>, lazy engine=duckdb|polars`; plain `use <path>` remains eager.
+- Phase 8 scripting is executable through `tabdat -f <script>`, `tabdat <script>`, and
+  `run <script>`.
+- Script-only `seed <integer>` and `let <name> = <value>` directives are available in script files;
+  `$name` macro references expand in later script entries and nested `run` scripts.
+- Script-only non-nested `if` / `else` / `end` conditionals are available in script files.
+- `use` can load local Parquet paths or DuckDB-readable `http://`, `https://`, and `s3://` Parquet
+  URIs.
+- Phase 9 config is executable through project-local `.tabdat.toml`, XDG user config,
+  `--config <path>`, and runtime `set` commands.
+- Phase 9 persistence is executable through `save <path>[, replace]` and
+  `export <path>[, replace]` for local `.parquet`, `.csv`, and `.feather` files.
+- Phase 13 slices 1-3 are executable through
+  `regress <y> <xvars>[, robust cluster(<var>) noconstant wls(<weight_var>) gls(<sigma_var>)]`
+  plus `predict <newvar>[, xb residuals]` and `estat <residuals|ovtest|vif|report>`.
+- Phase 19 first ML slice is executable through
+  `lasso linear <y> <xvars>[, alpha(<num>) noconstant]` plus `predict <newvar>[, xb]`.
+- Phase 19 post-selection starter is executable through
+  `postlasso linear <y> <xvars>[, alpha(<num>) robust noconstant]`.
+- Phase 19 partial-linear DML starter is executable through
+  `dml linear <y> <controls>, treat(<tvar>) [folds(<int>) alpha(<num>) robust seed(<int>) noconstant]`
+  plus `estat dml`.
+- Phase 19 spatial predictive follow-up is executable through
+  `predict <newvar>[, spatial_lag]` after `spregress <y> <xvars>, [coord(<lat> <lon>) | weights(<path>) id(<id_var>)] model(lag)`.
+- Phase 19 standard spatial autocorrelation diagnostics are executable through `estat spatial, [coord(<lat> <lon>) knn(<k>) | weights(<path>) id(<id_var>)]` after OLS `regress`.
+- Phase 14 IV slices are executable through
+  `ivregress 2sls|gmm <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
+- Phase 14 IV diagnostics are executable through `estat firststage` and `estat overid` after
+  successful `ivregress`, plus `estat endogenous` after successful `ivregress 2sls`.
+- Phase 14 panel starter commands are executable through
+  `xtreg <y> <xvars>, fe|re[, robust cluster(<var>)]` and `estat hausman` after matching FE/RE
+  fits with non-cluster covariance.
+- Phase 14 panel-index transforms are executable through
+  `xtdata <varlist>, within|between` after `panel <id_var> <time_var>`.
+- Phase 14 control-function core is executable through
+  `cfregress <y> [exog_vars], endog(<var>) iv(<vars>)[, robust cluster(<var>) noconstant]`.
+- Phase 14 control-function prediction is executable through
+  `predict <newvar>[, xb residuals]` after successful `cfregress`.
+- Phase 14 control-function endogenous diagnostics are executable through
+  `estat endogenous` after successful `cfregress`.
+- Phase 14 control-function first-stage diagnostics are executable through
+  `estat firststage` after successful `cfregress`.
+- Phase 15 nonlinear estimation core currently includes
+  `logit <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `probit <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `estat margins`,
+  binary `predict` routing via `predict <newvar>[, xb residuals pr]`, and
+  `tobit <y> <xvars>, ll(<num>) [ul(<num>) robust cluster(<var>) noconstant]`, and
+  `heckman <y> <xvars>, selectdep(<var>) select(<vars>) [robust cluster(<var>) noconstant]`, and
+  `nl <y> = <expr>, params(<params>) start(<values>) [robust noconstant]`.
+- Phase 16 specialized likelihood models currently include
+  `poisson <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `nbreg <y> <xvars>[, robust cluster(<var>) noconstant]`,
+  `zip <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,
+  `zinb <y> <xvars>, inflate(<zvars>) [robust cluster(<var>) noconstant]`,
+  `streg <time_var> <xvars>, failure(<event_var>) dist(weibull|exponential)
+  [robust cluster(<var>) noconstant]`,
+  `predict <newvar>[, xb residuals]` after Poisson/NB/ZI model state, and `estat gof`.
+- Phase 17 advanced empirical methods currently include
+  `qreg <y> <xvars>[, quantile(<0,1>) robust noconstant]`,
+  `predict <newvar>[, xb residuals]` after `qreg` model state, `estat residuals` after `qreg`, and
+  `did <y> [controls], treat(<var>) post(<var>) [robust]` with
+  `predict <newvar>[, xb]` after `did` model state, plus
+  `xtabond <y> [xvars] [, robust lags(#) instlag(#)]` with expanded `estat did`,
+  `estat overid`, and `predict <newvar>[, xb residuals]`, plus
+  `xtlogit <y> <xvars>, fe [robust]`, and
+  `lowess <y> <x>, gen(<newvar>) [bandwidth=<0,1>]`.
+- Phase 21 classical hypothesis testing commands `test`, `lincom`, and `ttest` are executable.
+- Phase 22 advanced spatial models command `spregress ... model(sarar)` GMM Combo estimation and out-of-sample prediction are executable.
+- Phase 23 recoding command `recode` and expanded format ingestion (`.csv`, `.feather`, `.arrow`) are executable.
+- `panel` report output includes deterministic panel-structure metrics when panel metadata is set:
+  observation count, entity/time counts, per-entity min/max counts, and balancedness.
+- Plot artifacts support SVG and PNG output through Altair and `vl-convert-python`.
+- Autocomplete reads active dataset and named table metadata from executor state but does not
+  validate or mutate session state.
+- Inline suggestions are history-based and persisted via `~/.tabdat_history`.
+
+## Development Boundaries
+
+Last Reviewed: 2026-06-20
+Status: Verified
+
+- Build vertical slices across parser, executor, backend, CLI output, tests, and docs.
+- Do not add broad command grammar before a command contract needs it.
+- Keep public behavior documented before implementation.
+- For Phase 13+ statistical/econometric commands, use a library-first implementation order:
+  Python libraries first, R libraries via `rpy2` second, and lower-level `numpy`/`scipy`
+  implementations only as the last resort.
+- Import `Result`, `Option`, `Validation`, and `AsyncResult` through `tabdat.monads`; do not import
+  `comp-builders` directly from feature modules unless a future design records a reason to bypass
+  the local boundary.
+- Keep transformation state session-local except for explicit `save` / `export`.
+- Keep chart rendering separate from backend data extraction.
+- Keep script orchestration at the CLI edge; command semantics should still enter through the
+  parser/executor boundary.
+- Keep `seed` and `let` script-only at the script runner edge until a future command contract
+  defines interactive or executor-level semantics.
+- Keep `if` / `else` / `end` script-only at the script runner edge until a future command contract
+  defines richer scripting semantics.
+- Keep remote loading scoped to DuckDB-readable Parquet URIs until credentials, DB connections, or
+  broader remote data access are explicitly designed.
+- Keep named tables session-local until a future persistence/catalog contract exists.
+- Keep `ivregress` (`2sls|gmm`) scoped to one endogenous variable plus one-or-more instruments
+  until broader endogeneity diagnostics and panel-estimation contracts are implemented.
+- Keep `join` scoped to named-table inputs and same-name equality keys until a broader multi-table
+  workflow contract is written.
+- Keep `append` scoped to named-table inputs with strict same-column schemas until a broader stack
+  or union contract is written.
+- Keep `reshape` scoped to active-dataset wide/long forms with required `i(...)` and `j(...)`
+  options until panel metadata, aliases, or broader reshape ergonomics are designed.
+- Keep `panel` scoped to id/time metadata validation and bounded structure reporting
+  (including balancedness summary) until broader estimation commands define additional panel
+  semantics.
+- Keep `xtreg` scoped to panel-metadata-backed FE/RE estimators and `estat hausman` for matching
+  non-cluster model pairs until broader panel-indexing/transformation contracts are written.
+- Keep `xtdata` scoped to deterministic within/between column transforms for numeric variables
+  until broader panel-indexing/transformation contracts are written.
+- Keep `cfregress` diagnostics scoped to bounded `estat endogenous` residual-inclusion output
+  (`test`, `estimate`, `std_error`, `statistic`, `p_value`, `ci_level`, `ci_lower`, `ci_upper`,
+  `distribution`, `df`) until broader control-function diagnostics contracts are written.
+- Keep `engine=polars` bounded to local Parquet lazy projection/filter/count/preview plus explicit
+  eager fallback until a broader Polars-native contract is written.
+- Use 2-space tab size across project files.
+- Run configured linting and formatting proactively before commits.

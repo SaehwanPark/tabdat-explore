@@ -36,7 +36,7 @@ We evaluated multiple distribution options to balance:
 1. **Primary Distribution Channels (Tier 1)**:
    - **One-Command Shell Installer**: `curl -LsSf https://raw.githubusercontent.com/SaehwanPark/tabdat-explore/main/scripts/install.sh | sh` (bootstraps `uv` and installs TabDat as a global tool).
    - **`uv tool` Direct Install**: `uv tool install tabdat-explore` / `uv tool install git+https://github.com/SaehwanPark/tabdat-explore.git`.
-   - **Homebrew Tap**: `brew install SaehwanPark/tabdat/tabdat` using [`Formula/tabdat.rb`](../../Formula/tabdat.rb).
+   - **Homebrew Tap**: `brew install SaehwanPark/tabdat/tabdat` using [`Formula/tabdat.rb`](https://github.com/SaehwanPark/tabdat-explore/blob/main/Formula/tabdat.rb).
 
 2. **Capability Gating & Packaging Boundaries**:
    - The core package bundles modern tabular engines (DuckDB, PyArrow, Polars) and standard econometrics (`statsmodels`, `scipy`).
