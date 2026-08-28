@@ -2,7 +2,21 @@
 
 All notable project changes are tracked here.
 
-## Unreleased
+## [0.24.1] — 2026-08-28
+
+Model Context Protocol (MCP) Server integration for AI agent applications (Claude Desktop, Cursor, Antigravity, Goose, Cline).
+
+### Added
+
+- Added built-in Model Context Protocol (MCP) server conforming to JSON-RPC 2.0 stdio specification (`protocolVersion: "2024-11-05"`):
+  - Submodule `src/tabdat/mcp/` with Pydantic models for tools, resources, prompts, and server runtime.
+  - 10 stateful MCP tools: `tabdat_execute`, `tabdat_batch`, `tabdat_script`, `tabdat_status`, `tabdat_describe_command`, `tabdat_list_commands`, `tabdat_get_help`, `tabdat_explain`, `tabdat_doctor`, `tabdat_reset_session`.
+  - Dynamic JSON URIs: `tabdat://session/status`, `tabdat://session/schema`, `tabdat://catalog/commands`.
+  - Guided prompt templates: `eda_workflow`, `econometric_analysis`, `data_cleaning`.
+- Added CLI `--mcp` flag and `tabdat-mcp` console script entry point.
+- Added comprehensive documentation guide in `docs/mcp-server.md`.
+
+## [0.24.0] — 2026-08-27
 
 ### Added
 

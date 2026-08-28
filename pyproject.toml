@@ -1,6 +1,6 @@
 [project]
 name = "tabdat-explore"
-version = "0.24.0"
+version = "0.24.1"
 description = "Terminal-native exploratory data analysis tool for modern tabular data, Stata-inspired"
 readme = "README.md"
 license = "AGPL-3.0-or-later"

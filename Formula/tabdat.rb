@@ -3,7 +3,7 @@ class Tabdat < Formula
 
   desc "Terminal-native exploratory data analysis tool for modern tabular data"
   homepage "https://github.com/SaehwanPark/tabdat-explore"
-  url "https://github.com/SaehwanPark/tabdat-explore/archive/refs/tags/v0.24.0.tar.gz"
+  url "https://github.com/SaehwanPark/tabdat-explore/archive/refs/tags/v0.24.1.tar.gz"
   license "AGPL-3.0-or-later"
   head "https://github.com/SaehwanPark/tabdat-explore.git", branch: "main"
 
