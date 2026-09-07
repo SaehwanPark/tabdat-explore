@@ -25,3 +25,10 @@
 pre-existing unrelated source/import issues (including duplicate module discovery for
 `scripts/check_docs_alignment.py`); the project CI type gate is `basedpyright`, which passes with
 zero diagnostics above.
+
+## Review loop
+
+Three independent passes over `origin/main...HEAD` covered behavior/state transitions,
+I/O/concurrency/error handling, and documentation/compatibility surfaces. No actionable findings
+were identified. A follow-up pass after the race-safe no-overwrite fix (`45a9cc0`) also passed;
+all hosted CI checks are green.
