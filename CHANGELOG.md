@@ -2,6 +2,14 @@
 
 All notable project changes are tracked here.
 
+## [Unreleased]
+
+### Added
+
+- Added session-local `label` command for Stata/SPSS-inspired variable labels and named value-label
+  dictionaries (`label variable`, `label define`, `label values`, `label list`, `label drop`),
+  surfaced in `describe` and `codebook`.
+
 ## [0.24.1] — 2026-08-28
 
 Model Context Protocol (MCP) Server integration for AI agent applications (Claude Desktop, Cursor, Antigravity, Goose, Cline).

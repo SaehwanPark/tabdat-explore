@@ -73,6 +73,7 @@ paths, and more).
 | `replace` | Replace values in an existing variable | `replace age = . if age < 0` |
 | `rename` | Rename a variable | `rename cost charges` |
 | `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), generate(age_grp)` |
+| `label` | Set session-local variable/value labels | `label variable age "Age in years"` |
 
 Integral `+`, `-`, `*`, and unary minus expressions use exact `DECIMAL(38,0)` results; values beyond
 that width become missing for the affected row rather than wrapping. Decimal-scale, floating-width,

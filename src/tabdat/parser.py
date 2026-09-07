@@ -44,6 +44,7 @@ from tabdat.models import (
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
+  LabelCommand,
   LassoCommand,
   LincomCommand,
   LogitCommand,
@@ -117,6 +118,7 @@ _EXECUTABLE_COMMANDS = {
   "append",
   "reshape",
   "panel",
+  "label",
   "sql",
   "histogram",
   "scatter",
@@ -255,6 +257,8 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_use_result(stripped)
   if command_name == "recode":
     return _parse_recode_result(stripped)
+  if command_name == "label":
+    return _parse_label_result(stripped)
   if command_name == "by":
     return _parse_by_result(stripped)
   if command_name == "test":
@@ -1173,6 +1177,155 @@ def _parse_panel(parts: _CommandParts) -> PanelCommand:
     id_variable=parts.arguments[0],
     time_variable=parts.arguments[1],
   )
+
+
+def _parse_label_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_label(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_label(text: str) -> LabelCommand:
+  tokens = _tokenize(text)
+  if not tokens or not _is_unquoted_identifier(tokens[0], "label"):
+    raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+  body = tokens[1:]
+  if not body:
+    raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+  action_token = body[0]
+  if not _is_unquoted_identifier(action_token):
+    raise ParseError("label subcommand must be an unquoted identifier")
+  action = action_token.text.lower()
+  remainder = body[1:]
+  args_tokens, option_tokens = _split_expression_and_options(remainder)
+  options = _parse_options(option_tokens) if option_tokens else ()
+  option_names = {option.name for option in options}
+
+  if action == "variable":
+    return _parse_label_variable_tokens(args_tokens, option_names, options)
+  if action == "define":
+    return _parse_label_define_tokens(args_tokens, option_names, options)
+  if action == "values":
+    return _parse_label_values_tokens(args_tokens, option_names, options)
+  if action == "list":
+    if option_names:
+      raise ParseError("label list does not accept options")
+    names = tuple(_require_identifier_token(token, "label list").text for token in args_tokens)
+    return LabelCommand(action="list", names=names)
+  if action == "drop":
+    if option_names:
+      raise ParseError("label drop does not accept options")
+    if not args_tokens:
+      raise ParseError("label drop expects at least one label set name")
+    names = tuple(_require_identifier_token(token, "label drop").text for token in args_tokens)
+    return LabelCommand(action="drop", names=names)
+  raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+
+
+def _parse_label_variable_tokens(
+  tokens: tuple[_Token, ...],
+  option_names: set[str],
+  options: tuple[CommandOption, ...],
+) -> LabelCommand:
+  unsupported = option_names - {"clear"}
+  if unsupported:
+    raise ParseError(f"label variable unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(options, "label variable", {"clear"})
+  clear = "clear" in option_names
+  if clear:
+    if len(tokens) != 1 or tokens[0].kind != "identifier":
+      raise ParseError("label variable, clear expects syntax: label variable <varname>, clear")
+    return LabelCommand(action="variable", variable=tokens[0].text, clear=True)
+  if len(tokens) != 2 or tokens[0].kind != "identifier" or tokens[1].kind != "string":
+    raise ParseError('label variable expects syntax: label variable <varname> "text"')
+  return LabelCommand(action="variable", variable=tokens[0].text, text=tokens[1].text)
+
+
+def _parse_label_define_tokens(
+  tokens: tuple[_Token, ...],
+  option_names: set[str],
+  options: tuple[CommandOption, ...],
+) -> LabelCommand:
+  unsupported = option_names - {"replace"}
+  if unsupported:
+    raise ParseError(f"label define unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(options, "label define", {"replace"})
+  if not tokens or tokens[0].kind != "identifier":
+    raise ParseError(
+      'label define expects syntax: label define <lblname> <value> "text" [<value> "text" ...]'
+    )
+  set_name = tokens[0].text
+  stream = _TokenStream(tokens[1:])
+  mappings: list[tuple[int | float | str, str]] = []
+  seen_values: set[int | float | str] = set()
+  while not stream.at_end:
+    value = _parse_label_value_token(stream)
+    if stream.at_end or stream.peek.kind != "string":
+      raise ParseError("label define text must be a quoted string")
+    text = stream.consume().text
+    if value in seen_values:
+      raise ParseError(f"label define duplicate value: {value!r}")
+    seen_values.add(value)
+    mappings.append((value, text))
+  if not mappings:
+    raise ParseError(
+      'label define expects syntax: label define <lblname> <value> "text" [<value> "text" ...]'
+    )
+  return LabelCommand(
+    action="define",
+    set_name=set_name,
+    mappings=tuple(mappings),
+    replace="replace" in option_names,
+  )
+
+
+def _parse_label_values_tokens(
+  tokens: tuple[_Token, ...],
+  option_names: set[str],
+  options: tuple[CommandOption, ...],
+) -> LabelCommand:
+  unsupported = option_names - {"clear"}
+  if unsupported:
+    raise ParseError(f"label values unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(options, "label values", {"clear"})
+  clear = "clear" in option_names
+  if clear:
+    if len(tokens) != 1 or tokens[0].kind != "identifier":
+      raise ParseError("label values, clear expects syntax: label values <varname>, clear")
+    return LabelCommand(action="values", variable=tokens[0].text, clear=True)
+  if len(tokens) != 2 or tokens[0].kind != "identifier" or tokens[1].kind != "identifier":
+    raise ParseError("label values expects syntax: label values <varname> <lblname>")
+  return LabelCommand(action="values", variable=tokens[0].text, set_name=tokens[1].text)
+
+
+def _parse_label_value_token(stream: "_TokenStream") -> int | float | str:
+  token = stream.peek
+  if token.kind == "string":
+    return stream.consume().text
+  if token.kind == "identifier":
+    return stream.consume().text
+  if token.kind == "number":
+    return _coerce_number_token(stream.consume().text)
+  if _is_symbol(token, "-") or _is_symbol(token, "+"):
+    sign = stream.consume().text
+    if stream.at_end or stream.peek.kind != "number":
+      raise ParseError("label define expects a value before each quoted label")
+    number = stream.consume().text
+    return _coerce_number_token(f"{sign}{number}")
+  raise ParseError("label define expects a value before each quoted label")
+
+
+def _coerce_number_token(text: str) -> int | float:
+  if any(marker in text.lower() for marker in (".", "e")):
+    return float(text)
+  return int(text)
+
+
+def _require_identifier_token(token: _Token, command_name: str) -> _Token:
+  if token.kind != "identifier":
+    raise ParseError(f"{command_name} expects identifier arguments")
+  return token
 
 
 def _parse_histogram(parts: _CommandParts) -> HistogramCommand:

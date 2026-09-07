@@ -41,6 +41,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "append",
   "reshape",
   "panel",
+  "label",
   "sql",
   "histogram",
   "scatter",

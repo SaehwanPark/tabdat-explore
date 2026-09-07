@@ -110,11 +110,11 @@ Dataset: data.parquet
 Rows: 3
 Columns: 4
 
-Variable  Type
-age       INTEGER
-bmi       DOUBLE
-sex       VARCHAR
-cost      DOUBLE
+Variable  Type     Label
+age       INTEGER  .
+bmi       DOUBLE   .
+sex       VARCHAR  .
+cost      DOUBLE   .
 
 tabdat> help summarize
 # ... in-app help for summarize ...

@@ -47,6 +47,7 @@ from tabdat.models import (
   HeckmanRegressionResult,
   HelpTopicResult,
   IvRegressionResult,
+  LabelResult,
   LassoRegressionResult,
   LincomResult,
   LoadResult,
@@ -130,6 +131,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   DmlRegressionResult: "DmlRegressionResult",
   CfRegressionResult: "CfRegressionResult",
   PanelResult: "PanelResult",
+  LabelResult: "LabelResult",
   SqlCreateResult: "SqlCreateResult",
   TableResult: "TableResult",
   PlotResult: "PlotResult",
@@ -215,6 +217,10 @@ def format_result(result: Result) -> str:
 
   if isinstance(result, DescribeResult):
     dataset = result.dataset
+    labels = ()
+    if dataset.label_metadata is not None:
+      labels = dataset.label_metadata.variable_labels
+    label_map = {name: text for name, text in labels}
     lines = [
       f"Dataset: {_display_path(dataset.path)}",
       f"Rows: {_row_count(dataset.row_count)}",
@@ -223,8 +229,11 @@ def format_result(result: Result) -> str:
     ]
     lines.extend(
       _table(
-        ("Variable", "Type"),
-        ((column.name, column.data_type) for column in dataset.columns),
+        ("Variable", "Type", "Label"),
+        (
+          (column.name, column.data_type, label_map.get(column.name, "."))
+          for column in dataset.columns
+        ),
       )
     )
     return "\n".join(lines)
@@ -412,6 +421,7 @@ def format_result(result: Result) -> str:
     codebook_rows = (
       (
         row.variable,
+        row.variable_label or ".",
         row.data_type,
         str(row.nonmissing),
         str(row.missing),
@@ -422,7 +432,7 @@ def format_result(result: Result) -> str:
     )
     return "\n".join(
       _table(
-        ("Variable", "Type", "Nonmissing", "Missing", "Distinct", "Examples"),
+        ("Variable", "Label", "Type", "Nonmissing", "Missing", "Distinct", "Examples"),
         codebook_rows,
       )
     )
@@ -1235,6 +1245,9 @@ def format_result(result: Result) -> str:
       )
     )
 
+  if isinstance(result, LabelResult):
+    return _format_label_result(result)
+
   if isinstance(result, SqlCreateResult):
     dataset = result.dataset
     return (
@@ -1267,6 +1280,32 @@ def format_result(result: Result) -> str:
     )
 
   raise TypeError(f"Unsupported result: {type(result).__name__}")
+
+
+def _format_label_result(result: LabelResult) -> str:
+  if result.action != "list":
+    return result.message
+  metadata = result.metadata
+  if metadata is None:
+    return "\n".join((result.message, "Variable labels: none", "Value labels: none"))
+  lines = [result.message, "Variable labels:"]
+  if metadata.variable_labels:
+    lines.extend(f"  {name}: {text}" for name, text in metadata.variable_labels)
+  else:
+    lines.append("  none")
+  lines.append("Value label sets:")
+  if metadata.value_sets:
+    for value_set in metadata.value_sets:
+      lines.append(f"  {value_set.name}")
+      lines.extend(f"    {value!r} -> {text}" for value, text in value_set.mappings)
+  else:
+    lines.append("  none")
+  lines.append("Attachments:")
+  if metadata.attachments:
+    lines.extend(f"  {variable}: {set_name}" for variable, set_name in metadata.attachments)
+  else:
+    lines.append("  none")
+  return "\n".join(lines)
 
 
 def format_result_json(result: Result) -> str:

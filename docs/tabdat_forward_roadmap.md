@@ -1076,7 +1076,9 @@ Examples:
 - data-quality diagnostics;
 - better large-Parquet navigation;
 - more expressive transformations;
-- faster grouped exploration.
+- faster grouped exploration;
+- session-local variable/value labels (data-dictionary UX; first approved deepen-EDA slice while
+  estimator-family expansion remains frozen).
 
 ### B. Deepen Reproducibility and Automation
 

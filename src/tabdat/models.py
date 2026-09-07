@@ -289,6 +289,20 @@ class PanelCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class LabelCommand:
+  """Session-local variable labels and named value-label dictionaries."""
+
+  action: Literal["variable", "define", "values", "list", "drop"]
+  variable: str | None = None
+  text: str | None = None
+  clear: bool = False
+  set_name: str | None = None
+  mappings: tuple[tuple[int | float | str, str], ...] = ()
+  replace: bool = False
+  names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -783,6 +797,7 @@ Command = (
   | AppendCommand
   | ReshapeCommand
   | PanelCommand
+  | LabelCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand
@@ -863,6 +878,23 @@ class PanelMetadata:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class ValueLabelSet:
+  """Named mapping from stored values to display labels."""
+
+  name: str
+  mappings: tuple[tuple[int | float | str, str], ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class LabelMetadata:
+  """Session-local data-dictionary metadata for the active dataset."""
+
+  variable_labels: tuple[tuple[str, str], ...] = ()
+  value_sets: tuple[ValueLabelSet, ...] = ()
+  attachments: tuple[tuple[str, str], ...] = ()
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class PanelStructureSummary:
   """Structural statistics of a panel dataset.
 
@@ -897,6 +929,7 @@ class DatasetInfo:
     execution_mode: The execution engine mode, either 'eager' or 'lazy'.
     lazy_engine: The backing engine used for lazy queries ('duckdb' or 'polars').
     panel_metadata: Optional panel variable keys if panel characteristics are configured.
+    label_metadata: Optional variable/value label dictionary for the active dataset.
   """
 
   path: Path | str
@@ -905,6 +938,7 @@ class DatasetInfo:
   execution_mode: Literal["eager", "lazy"] = "eager"
   lazy_engine: Literal["duckdb", "polars"] | None = None
   panel_metadata: PanelMetadata | None = None
+  label_metadata: LabelMetadata | None = None
 
   @property
   def column_count(self) -> int:
@@ -1074,6 +1108,7 @@ class CodebookRow:
   missing: int
   distinct: int
   examples: tuple[object, ...]
+  variable_label: str | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1492,6 +1527,13 @@ class PanelResult:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class LabelResult:
+  action: Literal["variable", "define", "values", "list", "drop"]
+  message: str
+  metadata: LabelMetadata | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCreateResult:
   table_name: str
   dataset: DatasetInfo
@@ -1627,6 +1669,7 @@ Result = (
   | DmlRegressionResult
   | CfRegressionResult
   | PanelResult
+  | LabelResult
   | SqlCreateResult
   | TableResult
   | PlotResult
