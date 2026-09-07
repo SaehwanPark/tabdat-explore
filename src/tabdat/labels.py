@@ -91,9 +91,15 @@ def save_label_metadata(path: Path, metadata: LabelMetadata, *, replace: bool) -
       temporary_file.write(serialized)
       temporary_file.flush()
       os.fsync(temporary_file.fileno())
-    if normalized.exists() and not replace:
-      raise FileExistsError(normalized)
-    os.replace(temporary_path, normalized)
+    if replace:
+      os.replace(temporary_path, normalized)
+    else:
+      try:
+        os.link(temporary_path, normalized)
+      except FileExistsError:
+        raise
+      finally:
+        temporary_path.unlink(missing_ok=True)
     temporary_path = None
   finally:
     if temporary_path is not None:
