@@ -114,3 +114,44 @@ separate follow-up gates.
 compatibility implementation of Stata/SAS/SPSS signatures. It intentionally has no stored baseline,
 verify/reset subcommands, filtered signatures, algorithm options, metadata-label coverage, or repair
 workflow; scripts can persist and compare its JSON signature explicitly.
+
+---
+
+# Implementation Report: `gsort`
+
+## Contract consumed
+
+- `_workspace/01_product_command-contract.md` (`gsort` section)
+
+## Delivered
+
+- Added typed `SortKey`/`GsortCommand` models and signed-key parsing for omitted, `+`, and `-`
+  directions, including quoted identifiers and deterministic malformed-key errors.
+- Extended the existing stable backend sort with per-key directions, nulls-last behavior, explicit
+  ordinal tie-breaking, and command-specific validation/error labels across DuckDB and Polars-lazy.
+- Added executor dispatch, metadata preservation, transform messages, CLI effect/schema discovery,
+  shell command/column completion, MCP cleaning guidance, packaged help, command docs, user-guide,
+  language semantics, README, architecture/spec/changelog, and navigation updates.
+- Added focused parser, mixed-direction/stability/null-order, unknown-variable atomicity, metadata,
+  eager/DuckDB-lazy/Polars-lazy, CLI human/JSON/schema/help, and shell-completion tests.
+
+## Validation
+
+- `uv run pytest -q tests/test_gsort.py tests/test_sort.py tests/test_shell.py tests/test_cli.py tests/test_mcp.py` — 225 passed.
+- `uv run pytest -q` — 1,341 passed, 314 existing dependency warnings.
+- `uv run ruff check` on changed source/tests — passed.
+- `uv run ruff format --check` on changed source/tests — passed.
+- `uv run basedpyright` on changed source modules — 0 errors, 0 warnings, 0 notes.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `uv build` plus wheel inspection — passed; packaged `tabdat/help/topics/gsort.md` is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-gsort` — not runnable because `mkdocs`
+  is not installed in the current environment.
+- `git diff --check` — passed.
+- `verify_code` — pytest, build, and Ruff stages passed; configured mypy remains blocked by the
+  repository's pre-existing duplicate docs-check module discovery and untyped optional imports.
+
+## Known limits
+
+`gsort` intentionally supports scalar variable keys only. It does not add expression keys, random
+ordering, row filters/options, `by:` execution, or a syntax-compatibility promise for Stata, SAS, or
+SPSS; existing `sort` remains the ascending-only shorthand.

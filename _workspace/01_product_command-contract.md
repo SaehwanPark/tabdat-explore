@@ -293,3 +293,79 @@ A script can record the JSON `signature` and compare it before rerunning a repro
   and MCP EDA guidance remain aligned.
 - Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, wheel
   packaging, and hosted CI.
+
+---
+
+# Command Contract: `gsort`
+
+## Product and roadmap fit
+
+`gsort` extends TabDat's stable ascending `sort` with explicit per-key directions, inspired by Stata's
+`gsort`, SAS `PROC SORT` descending keys, and SPSS `SORT CASES` order directives. It is a bounded
+Phase 24 ordering slice: it adds useful ordering expressiveness while keeping native scalar ordering,
+nulls-last placement, stable ties, eager/lazy parity, and the single-active-dataset model.
+
+## Syntax
+
+```text
+gsort [+|-]varlist
+```
+
+- Each key may begin with `+` for ascending or `-` for descending; an omitted prefix means ascending.
+- Keys are applied left-to-right. Ties preserve their previous active-row order.
+- A backtick-quoted identifier is never interpreted as a direction prefix, so a quoted variable named
+  `` `-score` `` can be addressed literally.
+- The command accepts no options, `if` clause, assignment, or `by:` prefix.
+
+## Semantics
+
+- Requires at least one key and validates all variables before changing the active relation.
+- Numeric, text, boolean, date, timestamp, decimal, and other supported scalar keys use the existing
+  native comparison semantics. Missing/null keys are always placed after nonmissing values, even for
+  descending keys.
+- The sort is stable: rows tied on every requested key retain their prior order. An internal ordinal
+  tie-breaker is used only to make this guarantee explicit and is not retained in the public schema.
+- Eager/DuckDB-lazy and Polars-lazy execution use the backend's native stable sort. Polars-lazy stays
+  lazy; failure leaves the prior plan and session metadata unchanged.
+- The command mutates active row order and records the normal transform result. Schema, labels, panel
+  metadata, and named-table synchronization follow existing `sort` behavior.
+
+## Output
+
+Human output uses the existing transform result:
+
+```text
+Sorted by: -group_id +label
+```
+
+JSON output uses the existing `TransformResult` envelope with the same message and updated dataset.
+
+## Examples
+
+```text
+gsort -date +patient_id
+gsort +site -score
+```
+
+## Invalid forms
+
+- `gsort`: parse error; at least one key is required.
+- `gsort group_id, stable`: parse error; options are unsupported.
+- `gsort group_id if active == true`: parse error; filtering is outside this ordering command.
+- `gsort -`: parse error; a direction prefix must be followed by a variable name.
+- `gsort --score`: parse error; use one optional direction prefix per key.
+- `gsort missing_column`: execution error; unknown variables are rejected before mutation.
+
+## Acceptance
+
+- Parser tests cover omitted/explicit ascending and descending keys, mixed directions, quoted
+  identifiers, and malformed/rejected forms.
+- Backend/executor tests cover stable mixed-direction ordering, nulls-last for ascending and
+  descending keys, unknown-variable atomicity, metadata preservation, and eager/DuckDB-lazy/
+  Polars-lazy behavior.
+- CLI tests cover human/JSON transform output, schema/effects/help, and no-active-dataset errors;
+  shell tests cover command and column completion.
+- Help, command reference/navigation, language semantics, README, architecture/spec/changelog, MCP
+  guidance, and roadmap records remain aligned.
+- Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, wheel
+  packaging, and hosted CI.

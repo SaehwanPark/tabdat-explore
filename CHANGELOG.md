@@ -24,6 +24,8 @@ All notable project changes are tracked here.
   surplus-row, and maximum-copy counts across eager, DuckDB-lazy, and Polars-lazy execution.
 - Added read-only `datasignature` SHA-256 fingerprints for public schema, ordered rows, and cell
   values, with deterministic null/non-finite encoding and Polars-lazy plan preservation.
+- Added `gsort [+|-]varlist` for stable mixed-direction ordering with nulls-last placement,
+  metadata preservation, and eager/DuckDB-lazy/Polars-lazy support.
 
 ## [0.24.1] — 2026-08-28
 

@@ -150,8 +150,9 @@ unknown-variable error and follows the write-validation atomicity policy below.
 - `keep if` and `drop if` preserve the relative order of retained rows. False and missing predicate
   results follow the existing keep/drop policy and never reorder survivors.
 - `sort <varlist>` orders ascending by native scalar values, places nulls last, and preserves prior
-  row order for ties. It preserves columns and session metadata; descending or expression sorting is
-  intentionally left to SQL.
+  row order for ties. `gsort [+|-]varlist` adds explicit per-key directions with the same native
+  comparison, nulls-last, stable-tie, metadata, and eager/lazy rules; it does not support expression
+  keys or random ordering.
 - Column projection and row-preserving value transformations preserve the current row sequence.
 - Grouped or relation-changing commands such as `collapse` establish separate result-sequence
   contracts; this slice does not redefine their later preview order.

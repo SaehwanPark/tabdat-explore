@@ -62,17 +62,21 @@ False or missing predicate results fail the check with deterministic checked/fai
 active datasets pass; options, `if` clauses, assignment, and row-level diagnostics are intentionally
 not supported. Aggregate checks preserve Polars-lazy execution.
 
-## Ordering Rows (`sort`)
+## Ordering Rows (`sort`, `gsort`)
 
-Arrange the active rows by stable ascending native keys before previewing or exporting:
+Arrange the active rows by stable native keys before previewing or exporting:
 
 ```text
 tabdat> sort treatment age
 Sorted by: treatment age
+
+tabdat> gsort -date +patient_id
+Sorted by: -date +patient_id
 ```
 
-Nulls sort last and ties preserve their previous row order. The command preserves labels and panel
-metadata; descending or expression-based ordering remains available through SQL.
+`sort` is ascending-only. `gsort` accepts an optional `+` or `-` prefix per key. Nulls sort last,
+ties preserve their previous row order, and labels/panel metadata are preserved. Expression-based or
+random ordering remains available through SQL and is not part of these commands.
 
 ## Inspecting Execution State (`status`)
 

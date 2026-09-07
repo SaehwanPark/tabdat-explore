@@ -103,6 +103,7 @@ from tabdat.models import (
   Expression,
   FunctionCallExpression,
   GenerateCommand,
+  GsortCommand,
   HeadCommand,
   HeckmanCommand,
   HeckmanRegressionResult,
@@ -160,6 +161,7 @@ from tabdat.models import (
   SetCommand,
   SetResult,
   SortCommand,
+  SortKey,
   SpatialRegressionResult,
   SpregressCommand,
   SqlCommand,
@@ -977,6 +979,20 @@ class Executor:
       next_dataset = self.backend.sort_rows(dataset, command.variables)
       next_dataset = _preserve_panel_metadata(dataset, next_dataset)
       return self._record_transform(f"Sorted by: {' '.join(command.variables)}", next_dataset)
+
+    if isinstance(command, GsortCommand):
+      dataset = self._require_active_dataset("gsort")
+      variables = tuple(key.variable for key in command.keys)
+      directions = tuple(key.descending for key in command.keys)
+      next_dataset = self.backend.sort_rows(
+        dataset,
+        variables,
+        descending=directions,
+        command_name="gsort",
+      )
+      next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+      message = "Sorted by: " + " ".join(_format_gsort_key(key) for key in command.keys)
+      return self._record_transform(message, next_dataset)
 
     if isinstance(command, RenameCommand):
       return self._execute_rename(command)
@@ -6665,6 +6681,7 @@ class Executor:
         ExportCommand,
         LabelCommand,
         SortCommand,
+        GsortCommand,
         EstatCommand,
       ),
     ):
@@ -10251,6 +10268,10 @@ def _setting_display_value(name: str, config: TabDatConfig) -> str:
   if name == "graph_open":
     return "on" if config.graph_open else "off"
   raise ExecutionError(f"unknown setting: {name}")
+
+
+def _format_gsort_key(key: SortKey) -> str:
+  return ("-" if key.descending else "+") + key.variable
 
 
 def _canonical_command_name(command: Command) -> str:

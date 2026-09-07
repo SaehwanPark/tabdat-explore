@@ -97,6 +97,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "exit": ("control",),
   "export": ("read", "write"),
   "generate": ("read", "write"),
+  "gsort": ("read", "write"),
   "head": ("read",),
   "heckman": ("read",),
   "help": ("control",),
@@ -308,6 +309,13 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     syntax="sort varlist",
     help_topic="sort",
     arguments=(ArgumentDescriptor(name="variables", required=True),),
+    options=(),
+  ),
+  "gsort": CommandSchemaResult(
+    name="gsort",
+    syntax="gsort [+|-]varlist",
+    help_topic="gsort",
+    arguments=(ArgumentDescriptor(name="keys", required=True),),
     options=(),
   ),
   "rename": CommandSchemaResult(

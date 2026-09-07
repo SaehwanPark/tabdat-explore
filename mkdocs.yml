@@ -107,6 +107,7 @@ nav:
           - exit: commands/exit.md
           - export: commands/export.md
           - generate: commands/generate.md
+          - gsort: commands/gsort.md
           - head: commands/head.md
           - heckman: commands/heckman.md
           - histogram: commands/histogram.md

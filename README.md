@@ -172,7 +172,7 @@ and `label use labels.json`.
 | Area | Commands | What they help with |
 |------|----------|---------------------|
 | Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `duplicates`, `datasignature`, `head`, `count`, `status`, `doctor` | Open data, check state, profile quality, verify reproducibility, and diagnose environment |
-| Quality and transform | `assert`, `keep`, `drop`, `select`, `sort`, `generate`, `rename`, `recode`, `label` | Validate, filter, order, derive columns, and manage reusable data-dictionary metadata |
+| Quality and transform | `assert`, `keep`, `drop`, `select`, `sort`, `gsort`, `generate`, `rename`, `recode`, `label` | Validate, filter, order, derive columns, and manage reusable data-dictionary metadata |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |
 | ML and causal | `lasso`, `dml`, `bayes`, `spregress`, `drdid`, … | Regularization, Bayesian, spatial, DID |
