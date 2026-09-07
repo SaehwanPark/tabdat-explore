@@ -680,7 +680,7 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- Extending value-label UX: `tabulate` displays attached value labels by default with `nolabel` opt-out.
+- Extending Stata/SPSS-style data-dictionary UX with `encode` / `decode` (string↔labeled integers).
 
 ## Future
 

@@ -304,6 +304,19 @@ class LabelCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class EncodeCommand:
+  source: str
+  generate: str
+  label: str | None = None
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DecodeCommand:
+  source: str
+  generate: str
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class SqlCommand:
   query: str
   into: str | None = None
@@ -799,6 +812,8 @@ Command = (
   | ReshapeCommand
   | PanelCommand
   | LabelCommand
+  | EncodeCommand
+  | DecodeCommand
   | SqlCommand
   | HistogramCommand
   | ScatterCommand

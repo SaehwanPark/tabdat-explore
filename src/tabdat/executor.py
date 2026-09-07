@@ -70,6 +70,7 @@ from tabdat.models import (
   CvridgeCommand,
   CvridgeRegressionResult,
   DatasetInfo,
+  DecodeCommand,
   DescribeCommand,
   DescribeResult,
   DidCommand,
@@ -83,6 +84,7 @@ from tabdat.models import (
   DropCommand,
   ElasticnetCommand,
   ElasticnetRegressionResult,
+  EncodeCommand,
   EstatCommand,
   ExitCommand,
   ExportCommand,
@@ -966,6 +968,12 @@ class Executor:
     if isinstance(command, LabelCommand):
       return self._execute_label(command)
 
+    if isinstance(command, EncodeCommand):
+      return self._execute_encode(command)
+
+    if isinstance(command, DecodeCommand):
+      return self._execute_decode(command)
+
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
 
@@ -1593,6 +1601,72 @@ class Executor:
       message=f"Dropped label set(s): {', '.join(command.names)}",
       metadata=next_metadata,
     )
+
+  def _execute_encode(self, command: EncodeCommand) -> TransformResult:
+    dataset = self._require_active_dataset("encode")
+    values = self.backend.distinct_nonmissing_string_values(dataset, command.source)
+    mapping = tuple((value, index) for index, value in enumerate(values, start=1))
+    next_dataset = self.backend.encode_column(
+      dataset,
+      command.source,
+      command.generate,
+      mapping,
+    )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    set_name = command.label or command.generate
+    label_mappings = tuple((code, text) for text, code in mapping)
+    metadata = dataset.label_metadata or LabelMetadata()
+    existing_sets = {item.name: item for item in metadata.value_sets}
+    existing_sets[set_name] = ValueLabelSet(set_name, label_mappings)
+    variable_labels = dict(metadata.variable_labels)
+    source_label = variable_labels.get(command.source)
+    if source_label is not None:
+      variable_labels[command.generate] = source_label
+    attachments = dict(metadata.attachments)
+    attachments[command.generate] = set_name
+    next_labels = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=tuple(sorted(variable_labels.items())),
+        value_sets=tuple(sorted(existing_sets.values(), key=lambda item: item.name)),
+        attachments=tuple(sorted(attachments.items())),
+      )
+    )
+    next_dataset = replace(next_dataset, label_metadata=next_labels)
+    return self._record_transform(f"Encoded {command.source} -> {command.generate}", next_dataset)
+
+  def _execute_decode(self, command: DecodeCommand) -> TransformResult:
+    dataset = self._require_active_dataset("decode")
+    metadata = dataset.label_metadata
+    if metadata is None:
+      raise ExecutionError(f"decode requires attached value labels on {command.source}")
+    attachments = dict(metadata.attachments)
+    set_name = attachments.get(command.source)
+    if set_name is None:
+      raise ExecutionError(f"decode requires attached value labels on {command.source}")
+    value_sets = {item.name: item for item in metadata.value_sets}
+    value_set = value_sets.get(set_name)
+    if value_set is None:
+      raise ExecutionError(f"decode unknown label set attached to {command.source}: {set_name}")
+    next_dataset = self.backend.decode_column(
+      dataset,
+      command.source,
+      command.generate,
+      value_set.mappings,
+    )
+    next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+    variable_labels = dict(metadata.variable_labels)
+    source_label = variable_labels.get(command.source)
+    if source_label is not None:
+      variable_labels[command.generate] = source_label
+    next_labels = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=tuple(sorted(variable_labels.items())),
+        value_sets=metadata.value_sets,
+        attachments=metadata.attachments,
+      )
+    )
+    next_dataset = replace(next_dataset, label_metadata=next_labels)
+    return self._record_transform(f"Decoded {command.source} -> {command.generate}", next_dataset)
 
   def _record_transform(
     self,

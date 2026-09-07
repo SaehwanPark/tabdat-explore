@@ -23,6 +23,7 @@ from tabdat.models import (
   CvelasticnetCommand,
   CvlassoCommand,
   CvridgeCommand,
+  DecodeCommand,
   DescribeCommand,
   DidCommand,
   DmlCommand,
@@ -30,6 +31,7 @@ from tabdat.models import (
   DrDidCommand,
   DropCommand,
   ElasticnetCommand,
+  EncodeCommand,
   EstatCommand,
   ExitCommand,
   ExportCommand,
@@ -119,6 +121,8 @@ _EXECUTABLE_COMMANDS = {
   "reshape",
   "panel",
   "label",
+  "encode",
+  "decode",
   "sql",
   "histogram",
   "scatter",
@@ -259,6 +263,10 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_recode_result(stripped)
   if command_name == "label":
     return _parse_label_result(stripped)
+  if command_name == "encode":
+    return _parse_encode_result(stripped)
+  if command_name == "decode":
+    return _parse_decode_result(stripped)
   if command_name == "by":
     return _parse_by_result(stripped)
   if command_name == "test":
@@ -1194,6 +1202,59 @@ def _parse_label_result(text: str) -> Result[Command, str]:
     return Ok[Command, str](_parse_label(text))
   except ParseError as exc:
     return Err(str(exc))
+
+
+def _parse_encode_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_encode(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_decode_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_decode(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_encode(text: str) -> EncodeCommand:
+  tokens = _tokenize(text)
+  if not tokens or not _is_unquoted_identifier(tokens[0], "encode"):
+    raise ParseError("encode expects syntax: encode <strvar>, generate(<newvar>)")
+  body = tokens[1:]
+  args_tokens, option_tokens = _split_expression_and_options(body)
+  if len(args_tokens) != 1 or args_tokens[0].kind != "identifier":
+    raise ParseError("encode expects syntax: encode <strvar>, generate(<newvar>)")
+  options = _parse_options(option_tokens) if option_tokens else ()
+  option_names = {option.name for option in options}
+  unsupported = option_names - {"generate", "label"}
+  if unsupported:
+    raise ParseError(f"encode unsupported option: {', '.join(sorted(unsupported))}")
+  generate = _single_identifier_option(options, "generate", "encode")
+  if generate is None:
+    raise ParseError("encode requires generate(<newvar>)")
+  label = _single_identifier_option(options, "label", "encode")
+  return EncodeCommand(source=args_tokens[0].text, generate=generate, label=label)
+
+
+def _parse_decode(text: str) -> DecodeCommand:
+  tokens = _tokenize(text)
+  if not tokens or not _is_unquoted_identifier(tokens[0], "decode"):
+    raise ParseError("decode expects syntax: decode <numvar>, generate(<newvar>)")
+  body = tokens[1:]
+  args_tokens, option_tokens = _split_expression_and_options(body)
+  if len(args_tokens) != 1 or args_tokens[0].kind != "identifier":
+    raise ParseError("decode expects syntax: decode <numvar>, generate(<newvar>)")
+  options = _parse_options(option_tokens) if option_tokens else ()
+  option_names = {option.name for option in options}
+  unsupported = option_names - {"generate"}
+  if unsupported:
+    raise ParseError(f"decode unsupported option: {', '.join(sorted(unsupported))}")
+  generate = _single_identifier_option(options, "generate", "decode")
+  if generate is None:
+    raise ParseError("decode requires generate(<newvar>)")
+  return DecodeCommand(source=args_tokens[0].text, generate=generate)
 
 
 def _parse_label(text: str) -> LabelCommand:
