@@ -230,7 +230,9 @@ rows with DuckDB checks. Panel metadata is session-local, stored on `DatasetInfo
 named-table activation when the snapshot carries it, and not persisted into Parquet files. No
 persistent registry exists, but `save` / `export` can persist the active relation to local Parquet.
 SQL commands bind the active relation as the user-facing DuckDB view `active`. Initial lazy loads
-report an unknown row count until a live count or materializing operation runs.
+report an unknown row count until a live count or materializing operation runs. Data-dictionary
+metadata is session-local by default; `label save` and `label use` cross the explicit persistence
+boundary through deterministic, versioned TabDat JSON without forcing lazy data materialization.
 For Phase 13 prediction workflows, the backend materializes linear `xb` or residual expressions into
 new active-dataset columns through the existing active-relation replacement path.
 Phase 22 out-of-sample predictions compute/align/subset spatial weight matrices from `.gal`, `.gwt`, and `.shp` files or coordinate columns.

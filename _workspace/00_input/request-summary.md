@@ -1,19 +1,9 @@
-# Request Summary: encode / decode (Loop 3)
+# Request Summary
 
-## Goal
-Add Stata/SPSS-inspired `encode` and `decode` for string↔numeric conversion with automatic value-label creation/use.
-
-## Syntax
-```
-encode <strvar>, generate(<newvar>) [label(<lblname>)]
-decode <numvar>, generate(<newvar>)
-```
-
-## Semantics
-- `encode`: string source → new integer codes 1..K for sorted unique nonmissing values; creates/replaces label set (default name = newvar) and attaches it; missing stays missing.
-- `decode`: numeric source with attached value labels → new string column of labels; unmapped nonmissing codes become missing; missing stays missing.
-- Fail if source missing, wrong type, generate target exists, or decode has no attached labels.
-- Preserve panel/label metadata appropriately (new columns get attachments for encode).
-
-## Non-goals
-- In-place encode without generate; SPSS AUTOMATIC RECODE extras; label language.
+- **Objective:** Continue the product catch-up work with one bounded, user-facing slice that helps analysts coming from Stata, SAS, and SPSS without turning TabDat-Explore into a compatibility clone.
+- **Selected slice:** Persist the session-local data dictionary with `label save` / `label use` JSON commands.
+- **Why this slice:** Variable labels and value-label dictionaries are now useful for inspection, tabulation, and encode/decode, but they disappear at the end of a session. Reusable metadata is an expected analyst workflow and a natural extension of the existing label surface.
+- **Roadmap fit:** Phase 24A product-center stabilization and the existing data-dictionary UX; no new estimator family, connector, or broad compatibility work.
+- **Touched surfaces:** parser/model, pure label-document serialization, executor validation and file effects, CLI command schema/effect declaration, help/reference docs, focused unit/executor/CLI tests, implementation and QA reports.
+- **Non-goals:** embedding labels into every output format, importing arbitrary Stata/SAS/SPSS metadata, changing existing `save`/`export` behavior, or introducing a public plugin/API contract.
+- **Constraints:** preserve exact current label semantics; use deterministic versioned JSON; reject malformed/incompatible dictionaries atomically; keep Polars-lazy metadata operations from forcing materialization; maintain the 2-space style and `uv` validation workflow.

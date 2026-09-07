@@ -293,7 +293,7 @@ class PanelCommand:
 class LabelCommand:
   """Session-local variable labels and named value-label dictionaries."""
 
-  action: Literal["variable", "define", "values", "list", "drop"]
+  action: Literal["variable", "define", "values", "list", "drop", "save", "use"]
   variable: str | None = None
   text: str | None = None
   clear: bool = False
@@ -301,6 +301,7 @@ class LabelCommand:
   mappings: tuple[tuple[int | float | str, str], ...] = ()
   replace: bool = False
   names: tuple[str, ...] = ()
+  path: Path | None = None
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1544,7 +1545,7 @@ class PanelResult:
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class LabelResult:
-  action: Literal["variable", "define", "values", "list", "drop"]
+  action: Literal["variable", "define", "values", "list", "drop", "save", "use"]
   message: str
   metadata: LabelMetadata | None = None
 

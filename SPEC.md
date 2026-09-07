@@ -681,6 +681,9 @@ and describe the active work with concise verification criteria.
 ## Present
 
 - Extending Stata/SPSS-style data-dictionary UX with `encode` / `decode` (string↔labeled integers).
+- Added `label save` / `label use` for deterministic, versioned TabDat-native JSON dictionaries;
+  loading validates variable references and value-label attachments atomically without forcing lazy
+  materialization.
 
 ## Future
 

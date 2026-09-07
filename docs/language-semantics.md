@@ -180,6 +180,19 @@ unknown-variable error and follows the write-validation atomicity policy below.
   sequence using the active row-order rules.
 - Reshape row order remains a separate contract.
 
+## Data-dictionary persistence
+
+- `label save <path> [, replace]` writes a deterministic, versioned UTF-8 JSON dictionary for the
+  active dataset's variable labels, value-label sets, and attachments. It does not alter the active
+  data or force a lazy scan.
+- `label use <path>` replaces the active dataset's label metadata only after the file, schema, value
+  mappings, and variable references validate. A malformed or incompatible dictionary leaves the
+  active dataset and existing labels unchanged.
+- TabDat's dictionary format uses `schema_version: 1` and is intentionally TabDat-native; it is not
+  a claim of direct Stata `.dta`, SAS catalog, or SPSS `.sav` metadata compatibility.
+- Label metadata operations preserve a DuckDB- or Polars-lazy execution mode because they operate on
+  schema and session state rather than data values.
+
 ## Write targets
 
 | Command family | Target rule | Failure behavior |

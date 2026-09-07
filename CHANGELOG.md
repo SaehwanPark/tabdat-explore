@@ -12,6 +12,8 @@ All notable project changes are tracked here.
 - `tabulate` now renders attached value labels in category cells and wide headers by default;
   use `, nolabel` to show raw codes.
 - Added `encode` / `decode` for string↔labeled-integer conversion with automatic value-label sets.
+- Added `label save` / `label use` for deterministic, versioned TabDat JSON data-dictionary files;
+  loading validates variable references and attachments atomically and preserves lazy execution.
 
 ## [0.24.1] — 2026-08-28
 

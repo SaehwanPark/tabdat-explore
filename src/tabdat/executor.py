@@ -26,6 +26,11 @@ from tabdat.errors import (
 )
 from tabdat.estimation import CoefficientEstimate
 from tabdat.extension_registry import estimator_adapter_for
+from tabdat.labels import (
+  LabelDictionaryError,
+  load_label_metadata,
+  save_label_metadata,
+)
 from tabdat.lazy_stats import (
   get_libpysal_knn,
   get_linearmodels_iv,
@@ -1460,6 +1465,10 @@ class Executor:
   def _execute_label(self, command: LabelCommand) -> LabelResult:
     dataset = self._require_active_dataset("label")
     metadata = dataset.label_metadata or LabelMetadata()
+    if command.action == "save":
+      return self._execute_label_save(dataset, metadata, command)
+    if command.action == "use":
+      return self._execute_label_use(dataset, command)
     if command.action == "variable":
       return self._execute_label_variable(dataset, metadata, command)
     if command.action == "define":
@@ -1469,6 +1478,65 @@ class Executor:
     if command.action == "list":
       return self._execute_label_list(metadata, command)
     return self._execute_label_drop(dataset, metadata, command)
+
+  def _execute_label_save(
+    self,
+    dataset: DatasetInfo,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    del dataset
+    if command.path is None:
+      raise ExecutionError("label save expects exactly one path")
+    try:
+      save_label_metadata(command.path, metadata, replace=command.replace)
+    except FileExistsError as exc:
+      raise ExecutionError(f"label save target already exists: {command.path}") from exc
+    except (LabelDictionaryError, OSError) as exc:
+      raise ExecutionError(f"label save failed: {command.path}") from exc
+    return LabelResult(
+      action="save",
+      message=f"Saved label dictionary: {command.path}",
+      metadata=metadata,
+    )
+
+  def _execute_label_use(
+    self,
+    dataset: DatasetInfo,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if command.path is None:
+      raise ExecutionError("label use expects exactly one path")
+    try:
+      metadata = load_label_metadata(command.path)
+    except LabelDictionaryError as exc:
+      raise ExecutionError(f"label use failed: {command.path}: {exc}") from exc
+    except (OSError, UnicodeError) as exc:
+      raise ExecutionError(f"label use could not read: {command.path}") from exc
+    self._validate_label_dictionary(dataset, metadata)
+    next_metadata = _normalize_label_metadata(metadata)
+    self._set_active_dataset(replace(dataset, label_metadata=next_metadata))
+    return LabelResult(
+      action="use",
+      message=f"Loaded label dictionary: {command.path}",
+      metadata=next_metadata,
+    )
+
+  def _validate_label_dictionary(self, dataset: DatasetInfo, metadata: LabelMetadata) -> None:
+    _require_columns_exist(
+      "label use",
+      dataset,
+      tuple(name for name, _ in metadata.variable_labels)
+      + tuple(variable for variable, _ in metadata.attachments),
+    )
+    value_set_names = {value_set.name for value_set in metadata.value_sets}
+    missing_sets = sorted(
+      {set_name for _, set_name in metadata.attachments if set_name not in value_set_names}
+    )
+    if missing_sets:
+      raise ExecutionError(
+        f"label use references unknown value label set: {', '.join(missing_sets)}"
+      )
 
   def _execute_label_variable(
     self,
@@ -6542,6 +6610,7 @@ class Executor:
         SetCommand,
         SaveCommand,
         ExportCommand,
+        LabelCommand,
         EstatCommand,
       ),
     ):

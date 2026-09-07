@@ -141,15 +141,16 @@ Saved: transformed.parquet (3 rows, 4 columns)
 tabdat> run analysis.td
 ```
 
-Panel metadata, plot defaults, and other session details are covered in the
-[user guide](docs/user-guide.md).
+Panel metadata, data-dictionary labels, plot defaults, and other session details are covered in the
+[user guide](docs/user-guide.md). Label dictionaries can be reused with `label save labels.json`
+and `label use labels.json`.
 
 ## What you can do
 
 | Area | Commands | What they help with |
 |------|----------|---------------------|
 | Load and inspect | `use`, `describe`, `summarize`, `codebook`, `head`, `count`, `status`, `doctor` | Open data, check state, and diagnose environment |
-| Transform | `keep`, `drop`, `select`, `generate`, `rename`, `recode` | Filter, reshape, and derive columns |
+| Transform | `keep`, `drop`, `select`, `generate`, `rename`, `recode`, `label` | Filter, derive columns, and manage reusable data-dictionary metadata |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |
 | ML and causal | `lasso`, `dml`, `bayes`, `spregress`, `drdid`, … | Regularization, Bayesian, spatial, DID |

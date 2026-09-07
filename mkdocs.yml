@@ -112,6 +112,7 @@ nav:
           - ivregress: commands/ivregress.md
           - join: commands/join.md
           - keep: commands/keep.md
+          - label: commands/label.md
           - lasso: commands/lasso.md
           - logit: commands/logit.md
           - lowess: commands/lowess.md

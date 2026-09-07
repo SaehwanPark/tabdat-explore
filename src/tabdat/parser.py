@@ -1260,10 +1260,10 @@ def _parse_decode(text: str) -> DecodeCommand:
 def _parse_label(text: str) -> LabelCommand:
   tokens = _tokenize(text)
   if not tokens or not _is_unquoted_identifier(tokens[0], "label"):
-    raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+    raise ParseError("label expects syntax: label variable|define|values|list|drop|save|use ...")
   body = tokens[1:]
   if not body:
-    raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+    raise ParseError("label expects syntax: label variable|define|values|list|drop|save|use ...")
   action_token = body[0]
   if not _is_unquoted_identifier(action_token):
     raise ParseError("label subcommand must be an unquoted identifier")
@@ -1291,7 +1291,9 @@ def _parse_label(text: str) -> LabelCommand:
       raise ParseError("label drop expects at least one label set name")
     names = tuple(_require_identifier_token(token, "label drop").text for token in args_tokens)
     return LabelCommand(action="drop", names=names)
-  raise ParseError("label expects syntax: label variable|define|values|list|drop ...")
+  if action in {"save", "use"}:
+    return _parse_label_persistence_tokens(text, action, args_tokens, option_names, options)
+  raise ParseError("label expects syntax: label variable|define|values|list|drop|save|use ...")
 
 
 def _parse_label_variable_tokens(
@@ -1368,6 +1370,33 @@ def _parse_label_values_tokens(
   if len(tokens) != 2 or tokens[0].kind != "identifier" or tokens[1].kind != "identifier":
     raise ParseError("label values expects syntax: label values <varname> <lblname>")
   return LabelCommand(action="values", variable=tokens[0].text, set_name=tokens[1].text)
+
+
+def _parse_label_persistence_tokens(
+  text: str,
+  action: str,
+  tokens: tuple[_Token, ...],
+  option_names: set[str],
+  options: tuple[CommandOption, ...],
+) -> LabelCommand:
+  allowed_options = {"replace"} if action == "save" else set()
+  unsupported = option_names - allowed_options
+  if unsupported:
+    raise ParseError(f"label {action} unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(options, f"label {action}", allowed_options)
+  if not tokens:
+    raise ParseError(f"label {action} expects exactly one path")
+  if tokens[0].kind == "string" and len(tokens) == 1:
+    path_text = tokens[0].text
+  elif all(token.kind in {"identifier", "number", "symbol"} for token in tokens):
+    path_text = text[tokens[0].start : tokens[-1].end]
+  else:
+    raise ParseError(f"label {action} expects exactly one path")
+  return LabelCommand(
+    action=cast(Literal["save", "use"], action),
+    path=Path(path_text),
+    replace="replace" in option_names,
+  )
 
 
 def _parse_label_value_token(stream: "_TokenStream") -> int | float | str:

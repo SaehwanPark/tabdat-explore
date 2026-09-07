@@ -29,6 +29,7 @@ TabDat-Explore includes 69 commands and topics organized into functional categor
 | [`replace`](../commands/replace.md) | Replace values in an existing variable conditionally or unconditionally. |
 | [`rename`](../commands/rename.md) | Rename variables in the active dataset. |
 | [`recode`](../commands/recode.md) | Recode values or ranges into new categories. |
+| [`label`](../commands/label.md) | Define, inspect, and reuse variable/value-label metadata. |
 
 ---
 

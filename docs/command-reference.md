@@ -75,7 +75,7 @@ paths, and more).
 | `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), generate(age_grp)` |
 | `encode` | Encode a string variable to labeled integers | `encode sex, generate(sex_n)` |
 | `decode` | Decode a labeled numeric variable to strings | `decode sex_n, generate(sex_str)` |
-| `label` | Set session-local variable/value labels | `label variable age "Age in years"` |
+| `label` | Set, list, and persist variable/value labels | `label variable age "Age in years"` |
 
 Integral `+`, `-`, `*`, and unary minus expressions use exact `DECIMAL(38,0)` results; values beyond
 that width become missing for the affected row rather than wrapping. Decimal-scale, floating-width,

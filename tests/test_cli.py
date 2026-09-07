@@ -228,6 +228,7 @@ def test_cli_json_lists_declared_command_effects_without_session(monkeypatch, ca
   assert entry_by_name["save"]["effects"] == ["read", "write"]
   assert entry_by_name["run"]["effects"] == ["read", "write", "control", "plot"]
   assert entry_by_name["set"]["effects"] == ["control"]
+  assert entry_by_name["label"]["effects"] == ["read", "write", "control"]
 
 
 def test_command_effect_mapping_covers_current_registry() -> None:
@@ -3951,6 +3952,50 @@ def test_cli_phase_9_reports_invalid_xdg_config(
 
   assert exit_code == 1
   assert "Error: graph_format must be svg or png" in captured.err
+
+
+def test_cli_label_dictionary_save_use_and_json(
+  sample_parquet: Path,
+  tmp_path: Path,
+  capsys,
+) -> None:
+  path = tmp_path / "labels.json"
+  exit_code = main(
+    [
+      "-c",
+      f"use {sample_parquet}",
+      "-c",
+      'label variable age "Age in years"',
+      "-c",
+      'label define sexlbl 0 "Male" 1 "Female"',
+      "-c",
+      "label values sex sexlbl",
+      "-c",
+      f"label save {path}",
+      "-c",
+      "label variable age, clear",
+      "-c",
+      f"label use {path}",
+      "-c",
+      "label list",
+    ]
+  )
+  captured = capsys.readouterr()
+
+  assert exit_code == 0
+  assert f"Saved label dictionary: {path}" in captured.out
+  assert f"Loaded label dictionary: {path}" in captured.out
+  assert "age: Age in years" in captured.out
+  assert captured.err == ""
+
+  json_exit_code = main(["--json", "-c", f"use {sample_parquet}", "-c", f"label use {path}"])
+  json_captured = capsys.readouterr()
+  envelopes = [json.loads(line) for line in json_captured.out.splitlines()]
+
+  assert json_exit_code == 0
+  assert envelopes[-1]["result_type"] == "LabelResult"
+  assert envelopes[-1]["data"]["action"] == "use"
+  assert json_captured.err == ""
 
 
 def test_cli_phase_9_runtime_set_and_save(
