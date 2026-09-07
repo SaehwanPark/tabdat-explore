@@ -1,19 +1,24 @@
-# Delivery Summary: Variable/Value Labels (Loop 1)
+# Delivery Summary: `assert` quality gate
 
 ## Slice
-Session-local Stata/SPSS-inspired `label` command + describe/codebook surfacing.
 
-## Branch
-`feat/variable-value-labels`
+Added the read-only `assert <boolean-expression>` command for deterministic active-row quality checks. True predicates pass; false or missing predicates fail with checked/failed counts. Empty datasets pass. The command preserves the active relation and Polars-lazy execution and remains intentionally TabDat-native rather than Stata/SAS/SPSS-compatible syntax.
 
-## Validation
-- `uv run pytest` (1268 passed)
-- `uv run basedpyright` (touched modules)
-- `uv run ruff check` / `ruff format`
-- `uv run python scripts/check_docs_alignment.py`
+## Surfaces changed
 
-## Next useful loops (suggested)
-1. `tabulate` display of attached value labels
-2. `encode` / `decode` with auto value-label sets
-3. Estimation-sample / `status` remaining Phase 24A transparency items
-4. Factor-variable ergonomics for existing estimators (still not new families)
+- Typed command/result models, parser, DuckDB/Polars-lazy backend, executor, formatter, CLI metadata, and shell completion.
+- Focused tests plus CLI/shell coverage.
+- In-app help, command reference, user guide, language semantics, architecture/spec/changelog, and README.
+- Request, contract, implementation, and QA artifacts under `_workspace/`.
+
+## Verification
+
+- `uv run pytest -q` — 1,310 passed.
+- Ruff lint and formatting checks passed.
+- `uv run basedpyright src tests/test_assert.py` — 0 diagnostics.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `verify_code` build/test/lint passed; mypy remains red only for known pre-existing dependency stubs and duplicate script-module discovery.
+
+## Delivery note
+
+This is one bounded branch/PR slice. No follow-up feature was started.

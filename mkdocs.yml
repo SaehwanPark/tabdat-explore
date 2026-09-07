@@ -82,6 +82,7 @@ nav:
       - Unified Command Reference: command-reference.md
       - Commands:
           - append: commands/append.md
+          - assert: commands/assert.md
           - bar: commands/bar.md
           - bayes: commands/bayes.md
           - bayes_prefix: commands/bayes_prefix.md

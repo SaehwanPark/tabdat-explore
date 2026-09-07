@@ -18,6 +18,8 @@ All notable project changes are tracked here.
   missing percentages, including Polars-lazy aggregate scans that preserve lazy mode.
 - Added stable ascending `sort <varlist>` row ordering with native scalar keys, nulls-last behavior,
   tie stability, metadata preservation, and Polars-lazy plan support.
+- Added read-only `assert <boolean-expression>` quality gates with false/missing failure counts,
+  deterministic errors, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 
 ## [0.24.1] — 2026-08-28
 

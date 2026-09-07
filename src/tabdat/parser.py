@@ -8,6 +8,7 @@ from typing import Any, Literal, NoReturn, cast
 from tabdat.errors import ParseError
 from tabdat.models import (
   AppendCommand,
+  AssertCommand,
   BarCommand,
   BayesCommand,
   BayesPlotCommand,
@@ -101,6 +102,7 @@ from tabdat.monads import Err, Ok, Result, result, result_either
 
 _EXECUTABLE_COMMANDS = {
   "use",
+  "assert",
   "recode",
   "describe",
   "status",
@@ -263,6 +265,8 @@ def _parse_command_result(text: str) -> Result[Command, str]:
     return _parse_help_result(stripped[4:].strip())
   if command_name == "use":
     return _parse_use_result(stripped)
+  if command_name == "assert":
+    return _parse_assert_result(stripped)
   if command_name == "recode":
     return _parse_recode_result(stripped)
   if command_name == "label":
@@ -347,6 +351,13 @@ def _raise_parse_error(message: str) -> NoReturn:
 def _parse_use_result(text: str) -> Result[Command, str]:
   try:
     return Ok[Command, str](_parse_use(text))
+  except ParseError as exc:
+    return Err(str(exc))
+
+
+def _parse_assert_result(text: str) -> Result[Command, str]:
+  try:
+    return Ok[Command, str](_parse_assert(text))
   except ParseError as exc:
     return Err(str(exc))
 
@@ -784,6 +795,39 @@ def parse_expression(text: str) -> Expression:
   if not parser.at_end:
     raise ParseError(f"unsupported token in expression: {parser.peek.text}")
   return expression
+
+
+def _parse_assert(text: str) -> AssertCommand:
+  body = text[len("assert") :].strip()
+  if not body:
+    raise ParseError("assert expects a boolean expression")
+
+  tokens = _tokenize(body)
+  expression_tokens, option_tokens = _split_assert_expression_and_options(tokens)
+  if option_tokens:
+    raise ParseError("assert does not accept options")
+  if any(_is_symbol(token, "=") for token in expression_tokens):
+    raise ParseError("assert does not accept assignment syntax")
+  expression = _ExpressionParser(expression_tokens).parse_all()
+  return AssertCommand(expression=expression)
+
+
+def _split_assert_expression_and_options(
+  tokens: tuple[_Token, ...],
+) -> tuple[tuple[_Token, ...], tuple[_Token, ...]]:
+  depth = 0
+  for index, token in enumerate(tokens):
+    if _is_symbol(token, "("):
+      depth += 1
+    elif _is_symbol(token, ")"):
+      depth -= 1
+    elif _is_unquoted_identifier(token, "if") and depth == 0:
+      raise ParseError("assert does not accept if clauses")
+    elif _is_symbol(token, ",") and depth == 0:
+      if index + 1 == len(tokens):
+        raise ParseError("assert does not accept options")
+      return tokens[:index], tokens[index + 1 :]
+  return tokens, ()
 
 
 def _parse_use(text: str) -> UseCommand:

@@ -56,6 +56,7 @@ and integration details.
 | `summarize` | Compute descriptive statistics | `summarize age bmi` |
 | `codebook` | Profile columns with missingness and sample values | `codebook age sex` |
 | `missing` | Report null-missingness counts and percentages | `missing age income` |
+| `assert` | Validate a boolean quality condition across rows | `assert age >= 0` |
 | `count` | Count rows in the active dataset | `count` |
 | `head` | Preview the first rows | `head` |
 | `tail` | Preview the last rows | `tail` |

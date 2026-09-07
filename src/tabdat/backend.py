@@ -920,6 +920,37 @@ class DuckDBBackend:
       for index, variable in enumerate(requested)
     )
 
+  def assert_rows(self, dataset: DatasetInfo, expression: Expression) -> tuple[int, int]:
+    self.validate_predicate(dataset, expression)
+    if self._polars_lazy_frame is not None:
+      predicate = self._compile_polars_expression(dataset, expression).fill_null(False)
+      try:
+        row = (
+          self._polars_lazy_frame.select(
+            pl.len().alias("__tabdat_checked"),
+            (~predicate).sum().fill_null(0).alias("__tabdat_failed"),
+          )
+          .collect()
+          .row(0)
+        )
+      except (PolarsError, IndexError) as exc:
+        raise ExecutionError("assert failed") from exc
+      return int(cast(int, row[0])), int(cast(int, row[1]))
+
+    condition_sql = self._compile_expression(dataset, expression)
+    row = self._fetch_one(
+      f"""
+      select
+        count(*) as __tabdat_checked,
+        count(*) filter (
+          where ({condition_sql}) is null or not ({condition_sql})
+        ) as __tabdat_failed
+      from {ACTIVE_TABLE}
+      """,
+      "assert",
+    )
+    return int(cast(int, row[0])), int(cast(int, row[1]))
+
   def preview_rows(
     self,
     limit: int,
