@@ -4,8 +4,9 @@ import json
 
 import pytest
 
+from tabdat import __version__
 from tabdat.cli import main
-from tabdat.doctor import inspect_environment
+from tabdat.doctor import _get_tabdat_version, inspect_environment
 from tabdat.errors import ParseError
 from tabdat.executor import Executor
 from tabdat.formatter import format_result, format_result_json
@@ -15,6 +16,14 @@ from tabdat.models import (
   DoctorResult,
 )
 from tabdat.parser import parse_command
+
+
+def test_tabdat_version_falls_back_when_distribution_metadata_is_empty(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  monkeypatch.setattr("tabdat.doctor.metadata.version", lambda name: None)
+
+  assert _get_tabdat_version() == __version__
 
 
 def test_inspect_environment_structure() -> None:

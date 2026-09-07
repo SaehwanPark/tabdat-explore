@@ -31,6 +31,7 @@ from tabdat.models import (
   DoctorCommand,
   DrDidCommand,
   DropCommand,
+  DuplicatesCommand,
   ElasticnetCommand,
   EncodeCommand,
   EstatCommand,
@@ -110,6 +111,7 @@ _EXECUTABLE_COMMANDS = {
   "summarize",
   "codebook",
   "missing",
+  "duplicates",
   "count",
   "head",
   "tail",
@@ -568,6 +570,16 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if parts.condition is not None or parts.options:
       raise ParseError("missing does not accept if clauses or options")
     return MissingCommand(variables=parts.arguments)
+
+  if parts.name == "duplicates":
+    if parts.expression is not None:
+      raise ParseError("duplicates does not accept assignment syntax")
+    if parts.condition is not None or parts.options:
+      raise ParseError("duplicates does not accept if clauses or options")
+    variables = parts.arguments
+    if variables and variables[0].lower() == "report" and not parts.argument_quoted[0]:
+      variables = variables[1:]
+    return DuplicatesCommand(variables=variables)
 
   if parts.name == "count":
     has_unsupported_parts = (

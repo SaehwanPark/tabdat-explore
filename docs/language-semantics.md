@@ -58,6 +58,11 @@ unknown-variable error and follows the write-validation atomicity policy below.
   predicates pass; false and missing predicates fail. Empty datasets pass, and failures report
   deterministic checked/failed counts while preserving the session data state. Aggregate checks keep
   Polars-lazy sessions lazy.
+- `duplicates [report] [varlist]` groups rows by all public columns or the requested key variables.
+  Null key values compare equal for this report. It reports total rows, unique groups, duplicate
+  groups, rows in duplicate groups, surplus rows, and maximum group size without changing data.
+  Empty datasets return zero counts; aggregate reports preserve Polars-lazy sessions. Listing,
+  tagging, and dropping duplicate rows are intentionally not part of this command contract.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 

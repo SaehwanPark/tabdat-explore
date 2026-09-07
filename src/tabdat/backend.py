@@ -920,6 +920,59 @@ class DuckDBBackend:
       for index, variable in enumerate(requested)
     )
 
+  def duplicate_counts(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+  ) -> tuple[int, int, int, int, int, int]:
+    """Return deterministic duplicate-group counts for the requested key columns.
+
+    Null key values are grouped together intentionally. The Polars path collects only the
+    aggregate result, so a read-only report does not cross the lazy/eager boundary.
+    """
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    requested = variables or tuple(column.name for column in dataset.columns)
+    _require_columns("duplicates", column_types, requested)
+    if not requested:
+      raise ExecutionError("duplicates requires at least one key variable")
+    if self._polars_lazy_frame is not None:
+      return self._polars_duplicate_counts(requested)
+
+    key_sql = ", ".join(_quote_identifier(variable) for variable in requested)
+    grouped_sql = f"""
+      select {key_sql}, count(*) as __tabdat_duplicate_count
+      from {ACTIVE_TABLE}
+      group by {key_sql}
+    """
+    row = self._fetch_one(
+      f"""
+      with __tabdat_duplicate_groups as ({grouped_sql})
+      select
+        coalesce(sum(__tabdat_duplicate_count), 0) as __tabdat_total_rows,
+        count(*) as __tabdat_unique_groups,
+        count(*) filter (where __tabdat_duplicate_count > 1) as __tabdat_duplicate_groups,
+        coalesce(
+          sum(__tabdat_duplicate_count) filter (where __tabdat_duplicate_count > 1),
+          0
+        ) as __tabdat_duplicate_rows,
+        coalesce(
+          sum(__tabdat_duplicate_count - 1) filter (where __tabdat_duplicate_count > 1),
+          0
+        ) as __tabdat_extra_rows,
+        coalesce(max(__tabdat_duplicate_count), 0) as __tabdat_max_copies
+      from __tabdat_duplicate_groups
+      """,
+      "duplicates",
+    )
+    return (
+      int(cast(int, row[0])),
+      int(cast(int, row[1])),
+      int(cast(int, row[2])),
+      int(cast(int, row[3])),
+      int(cast(int, row[4])),
+      int(cast(int, row[5])),
+    )
+
   def assert_rows(self, dataset: DatasetInfo, expression: Expression) -> tuple[int, int]:
     self.validate_predicate(dataset, expression)
     if self._polars_lazy_frame is not None:
@@ -1891,6 +1944,48 @@ class DuckDBBackend:
       std_dev=std_dev,
       minimum=minimum,
       maximum=maximum,
+    )
+
+  def _polars_duplicate_counts(
+    self,
+    variables: tuple[str, ...],
+  ) -> tuple[int, int, int, int, int, int]:
+    lazy_frame = self._require_polars_lazy_frame("duplicates")
+    try:
+      grouped = lazy_frame.group_by(list(variables)).agg(pl.len().alias("__tabdat_duplicate_count"))
+      count_column = pl.col("__tabdat_duplicate_count")
+      duplicate_count = count_column > 1
+      row = (
+        grouped.select(
+          count_column.sum().fill_null(0).alias("__tabdat_total_rows"),
+          count_column.len().alias("__tabdat_unique_groups"),
+          duplicate_count.sum().fill_null(0).alias("__tabdat_duplicate_groups"),
+          pl.when(duplicate_count)
+          .then(count_column)
+          .otherwise(0)
+          .sum()
+          .fill_null(0)
+          .alias("__tabdat_duplicate_rows"),
+          pl.when(duplicate_count)
+          .then(count_column - 1)
+          .otherwise(0)
+          .sum()
+          .fill_null(0)
+          .alias("__tabdat_extra_rows"),
+          count_column.max().fill_null(0).alias("__tabdat_max_copies"),
+        )
+        .collect()
+        .row(0)
+      )
+    except (PolarsError, IndexError) as exc:
+      raise ExecutionError("duplicates failed") from exc
+    return (
+      int(cast(int, row[0])),
+      int(cast(int, row[1])),
+      int(cast(int, row[2])),
+      int(cast(int, row[3])),
+      int(cast(int, row[4])),
+      int(cast(int, row[5])),
     )
 
   def _polars_missingness(

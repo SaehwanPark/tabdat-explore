@@ -20,6 +20,8 @@ All notable project changes are tracked here.
   tie stability, metadata preservation, and Polars-lazy plan support.
 - Added read-only `assert <boolean-expression>` quality gates with false/missing failure counts,
   deterministic errors, and eager/DuckDB-lazy/Polars-lazy aggregate support.
+- Added read-only `duplicates [report] [varlist]` quality reports with null-aware duplicate-group,
+  surplus-row, and maximum-copy counts across eager, DuckDB-lazy, and Polars-lazy execution.
 
 ## [0.24.1] — 2026-08-28
 

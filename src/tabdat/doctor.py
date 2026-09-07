@@ -93,9 +93,11 @@ def _check_r_capability() -> DoctorCapabilityItem:
 
 
 def _get_tabdat_version() -> str:
-  for name in ("tabdat-explore-dev", "tabdat-explore", "tabdat"):
+  for name in ("tabdat-explore", "tabdat-explore-dev", "tabdat"):
     try:
-      return metadata.version(name)
+      version = metadata.version(name)
+      if version is not None:
+        return version
     except metadata.PackageNotFoundError:
       pass
   from tabdat import __version__

@@ -29,3 +29,49 @@ Hosted CI and strict MkDocs build were not run locally. Existing project notes r
 ## Recommended next action
 
 Commit and publish this bounded slice as one PR, then stop without starting another feature.
+
+---
+
+# QA Report: `duplicates` quality report
+
+## Verdict
+
+`pass` — no blocking cross-boundary mismatch found for the bounded duplicate-report slice.
+
+## Boundaries checked
+
+- **Contract → parser:** `duplicates`, `duplicates report`, and `duplicates report <varlist>` map to
+  one read-only command; quoted `` `report` `` remains a variable; options, `if`, and assignment
+  forms are rejected.
+- **Parser → executor:** requested/default key variables are preserved, active-dataset requirements
+  use existing errors, and dispatch occurs before any write/materialization path.
+- **Executor → backend:** DuckDB and Polars-lazy aggregate paths return the same six-count shape;
+  null keys group together, empty/no-duplicate inputs are deterministic, and unknown keys preserve
+  session state.
+- **Backend → output:** `DuplicatesResult` emits the documented human lines and versioned JSON
+  envelope; command effect/schema metadata and help use the same syntax.
+- **CLI/shell/MCP/docs:** command catalog/effects/schema discovery, `report` and column completion,
+  packaged help, unified/indexed references, language semantics, README, architecture/spec/changelog,
+  and the MCP data-quality prompt all include the feature.
+- **Tests → claims:** focused coverage spans parser rejection, null grouping, default/requested keys,
+  empty/no-duplicate cases, state preservation, eager/DuckDB-lazy/Polars-lazy execution, CLI human/
+  JSON/error behavior, help/schema, and completions.
+
+## Evidence
+
+- Full suite: `uv run pytest -q` — 1,322 passed, 314 existing dependency warnings.
+- Focused suite: `uv run pytest -q tests/test_duplicates.py tests/test_doctor.py tests/test_mcp.py tests/test_shell.py` — 52 passed.
+- `uv run ruff check .` — passed.
+- `uv run ruff format --check .` — passed.
+- `uv run basedpyright src` — 0 diagnostics.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `uv build` plus wheel inspection — passed; packaged duplicate help is present.
+- `verify_code` — pytest, build, and Ruff passed; mypy remains red only on the documented
+  pre-existing untyped imports and duplicate docs-check module discovery.
+
+## Residual risk
+
+The report intentionally has no row-level listing, tagging, dropping, fuzzy matching, or machine
+compatibility promise. The repository's configured mypy stage may still report its documented
+pre-existing third-party import/module-discovery issues; hosted CI and strict MkDocs builds were not
+run locally.

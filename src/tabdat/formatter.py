@@ -43,6 +43,7 @@ from tabdat.models import (
   DoctorCapabilityItem,
   DoctorResult,
   DrDidRegressionResult,
+  DuplicatesResult,
   ElasticnetRegressionResult,
   ExportResult,
   HeckmanRegressionResult,
@@ -102,6 +103,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   SummarizeResult: "SummarizeResult",
   CodebookResult: "CodebookResult",
   MissingResult: "MissingResult",
+  DuplicatesResult: "DuplicatesResult",
   CountResult: "CountResult",
   PreviewResult: "PreviewResult",
   TransformResult: "TransformResult",
@@ -455,6 +457,21 @@ def format_result(result: Result) -> str:
     )
     return "\n".join(
       _table(("Variable", "Type", "Total", "Missing", "Nonmissing", "Missing %"), missing_rows)
+    )
+
+  if isinstance(result, DuplicatesResult):
+    key_variables = " ".join(result.variables) if result.variables else "(none)"
+    return "\n".join(
+      (
+        "Duplicates report",
+        f"Key variables: {key_variables}",
+        f"Rows: {result.total_rows}",
+        f"Unique groups: {result.unique_groups}",
+        f"Duplicate groups: {result.duplicate_groups}",
+        f"Rows in duplicate groups: {result.duplicate_rows}",
+        f"Extra duplicate rows: {result.extra_rows}",
+        f"Maximum copies: {result.max_copies}",
+      )
     )
 
   if isinstance(result, AssertResult):

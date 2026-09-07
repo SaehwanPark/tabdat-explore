@@ -99,8 +99,8 @@ def handle_get_prompt(name: str, arguments: dict[str, Any] | None = None) -> MCP
       "Recommended TabDat steps:\n"
       f"1. Load and inspect structure: `use {file_path}` followed by `describe` and `count`.\n"
       "2. Summarize numerical distributions: `summarize` (or `summarize <vars>`).\n"
-      "3. Inspect missingness and unique values: `missing`, `codebook`, and `tabulate "
-      "<categorical_var>`.\n"
+      "3. Inspect missingness, duplicates, and unique values: `missing`, `duplicates`, `codebook`, "
+      "and `tabulate <categorical_var>`.\n"
       "4. Visualize key distributions: `histogram <var>` or `scatter <y> <x>`.\n"
       "5. Provide a clear synthesis of findings and data quality notes."
     )
@@ -160,7 +160,8 @@ def handle_get_prompt(name: str, arguments: dict[str, Any] | None = None) -> MCP
     task = args.get("task_description", "<cleaning_tasks>")
     prompt_text = (
       f"Please perform the following data cleaning task on `{file_path}`:\n{task}\n\n"
-      "Use TabDat commands (`keep`, `drop`, `generate`, `replace`, `recode`, `rename`, `export`)."
+      "Use TabDat commands (`assert`, `duplicates`, `keep`, `drop`, `generate`, "
+      "`replace`, `recode`, `rename`, `export`)."
     )
     return MCPGetPromptResult(
       description=f"Data Cleaning Workflow on {file_path}",

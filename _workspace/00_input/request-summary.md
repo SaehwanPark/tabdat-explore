@@ -1,9 +1,28 @@
-# Request Summary: `assert` quality gate
+# Request summary
 
-- **Objective:** Continue product catch-up with one bounded, user-facing data-quality slice that helps analysts coming from Stata, SAS, and SPSS without turning TabDat-Explore into a compatibility clone.
-- **Selected slice:** Add a read-only `assert <boolean-expression>` command for active-row quality gates.
-- **Why this slice:** It complements the delivered `missing` profiler with a deterministic validation primitive for scripted terminal EDA and data-quality checks, while avoiding estimator-family expansion.
-- **Roadmap fit:** Phase 24A / Deepen Terminal EDA and data-quality diagnostics; no new estimator family, connector, GUI, or broad compatibility surface.
-- **Touched surfaces:** command model/parser, DuckDB and Polars-lazy predicate aggregation, executor result/error handling, formatter, CLI effect/schema, shell completion, help/reference/user semantics/docs, focused parser/backend/executor/CLI/JSON/lazy tests, implementation and QA reports.
-- **Non-goals:** row filtering, generated flags, row-level diagnostics, loops/control flow, assignment, options, `if`, by-groups, custom missing-value rules, or native Stata/SAS/SPSS compatibility.
-- **Constraints:** predicates reuse TabDat's existing expression and missing semantics; true rows pass, false or missing predicate rows fail; empty datasets pass; failure reports deterministic failed/checked counts and leaves the active dataset/session relation unchanged; aggregate scans preserve Polars-lazy mode; maintain 2-space style and `uv` validation workflow.
+The active goal is to improve TabDat with useful, modernized capabilities inspired by current Stata, SAS, and SPSS workflows without sacrificing TabDat's Parquet-first, terminal-native, reproducible, typed, and explicit-semantics design.
+
+## Completed prior slice
+
+The previous bounded slice delivered a read-only `assert <boolean-expression>` quality gate for active-row validation, with deterministic false/missing counts, eager/DuckDB-lazy/Polars-lazy aggregate support, and no state mutation.
+
+## Current bounded slice
+
+Add a read-only `duplicates` data-quality report. Duplicate detection is a common Stata `duplicates report`, SAS `PROC SORT`/`NODUPKEY`, and SPSS duplicate-case workflow, and complements the existing `missing` and `assert` quality commands without adding an estimator family or broad compatibility surface.
+
+## Phase fit
+
+This is a bounded Phase 24 product-center stabilization/data-quality slice. It defines deterministic null-aware grouping, preserves eager/DuckDB-lazy/Polars-lazy behavior, and does not add mutation, random sampling, or backend-specific dependencies.
+
+## Touched surfaces
+
+- parser/model command contract;
+- DuckDB and Polars-lazy aggregate backend;
+- executor dispatch and lazy-materialization allowlist;
+- human/JSON result formatting, command effects, schema discovery, and shell completion;
+- in-app help, command references, language semantics, MCP workflow guidance, spec/changelog records;
+- focused parser/backend/executor/CLI tests.
+
+## Non-goals
+
+Do not implement `duplicates list`, `duplicates drop`, `duplicates tag`, fuzzy matching, approximate matching, row-level duplicate output, or a new estimator/data-source family in this slice.

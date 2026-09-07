@@ -1,6 +1,6 @@
 # Command Reference Index
 
-TabDat-Explore includes 76 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
+TabDat-Explore includes 78 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
 
 ---
 
@@ -12,6 +12,7 @@ TabDat-Explore includes 76 commands and topics organized into functional categor
 | [`summarize`](../commands/summarize.md) | Descriptive statistics (count, mean, std dev, min, max) for numeric variables. |
 | [`codebook`](../commands/codebook.md) | Detailed variable profiling with missingness and unique sample values. |
 | [`missing`](../commands/missing.md) | Compact null-missingness counts and percentages. |
+| [`duplicates`](../commands/duplicates.md) | Report repeated key groups without changing rows. |
 | [`assert`](../commands/assert.md) | Validate a boolean quality condition across rows. |
 | [`count`](../commands/count.md) | Count rows in the active dataset. |
 | [`head`](../commands/head.md) | Preview the first rows of the active dataset. |
