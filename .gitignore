@@ -23,3 +23,5 @@ integrated_testing/reports/
 .ruff_cache/
 .mypy_cache/
 site/
+
+docs/_etc/
