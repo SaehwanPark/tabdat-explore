@@ -18,4 +18,5 @@ slice is not a frozen estimator expansion, and write `_workspace/01_product_comm
 
 When weekly (or provider-equivalent) usage is greater than 97% remaining ≤ 3%, wrap the current
 slice, open/merge the PR if ready, clear the goal, and stop. Composer/Cursor-model usage is
-`codexbar --provider cursor` → `usage.secondary.usedPercent`.
+`codexbar --provider cursor` → `usage.secondary.usedPercent`. Also treat Cursor `primary` ≥ 97%
+as a hard wrap signal when it is the tighter remaining budget.
