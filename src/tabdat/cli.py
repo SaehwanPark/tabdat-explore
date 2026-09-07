@@ -344,7 +344,7 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
   ),
   "label": CommandSchemaResult(
     name="label",
-    syntax='label variable|define|values|list|drop ...',
+    syntax="label variable|define|values|list|drop ...",
     help_topic="label",
     arguments=(
       ArgumentDescriptor(name="subcommand", required=True),
