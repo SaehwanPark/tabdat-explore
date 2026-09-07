@@ -251,6 +251,7 @@ class TabulateCommand:
   row_percent: bool = False
   column_percent: bool = False
   include_missing: bool = False
+  nolabel: bool = False
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)

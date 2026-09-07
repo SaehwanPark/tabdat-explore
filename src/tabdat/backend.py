@@ -2,7 +2,7 @@
 
 import math
 import tempfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal, cast
@@ -1303,6 +1303,7 @@ class DuckDBBackend:
     column_percent: bool,
     include_missing: bool,
     by_variables: tuple[str, ...] = (),
+    category_labels: dict[str, dict[object, str]] | None = None,
   ) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
     self.validate_tabulate(
       dataset,
@@ -1325,11 +1326,17 @@ class DuckDBBackend:
       include_missing=include_missing,
       by_variables=by_variables,
     )
+    labels = category_labels or {}
     if not column_variables:
+      display_rows = _relabel_long_dimension_rows(
+        long_rows,
+        dimension_variables=by_variables + row_variables,
+        category_labels=labels,
+      )
       if value_variable is None:
-        return by_variables + row_variables + ("Count", "Percent"), long_rows
+        return by_variables + row_variables + ("Count", "Percent"), display_rows
       value_header = statistic or "Value"
-      return by_variables + row_variables + (value_header,), long_rows
+      return by_variables + row_variables + (value_header,), display_rows
     return _tabulate_wide_result(
       long_rows,
       by_variables=by_variables,
@@ -1339,6 +1346,7 @@ class DuckDBBackend:
       include_column_percent=column_percent,
       value_header="Count" if value_variable is None else statistic or "Value",
       missing_cell_value=0 if value_variable is None or statistic == "count" else None,
+      category_labels=labels,
     )
 
   def validate_tabulate(
@@ -2446,6 +2454,62 @@ def _tabulate_aggregate_sql(
   raise ExecutionError("tabulate values() and stat() must be specified together")
 
 
+def _relabel_long_dimension_rows(
+  long_rows: tuple[tuple[object, ...], ...],
+  *,
+  dimension_variables: tuple[str, ...],
+  category_labels: dict[str, dict[object, str]],
+) -> tuple[tuple[object, ...], ...]:
+  width = len(dimension_variables)
+  if width == 0 or not category_labels:
+    return long_rows
+  return tuple(
+    _display_dimension_values(row[:width], dimension_variables, category_labels) + row[width:]
+    for row in long_rows
+  )
+
+
+def _display_dimension_values(
+  values: tuple[object, ...],
+  variables: tuple[str, ...],
+  category_labels: dict[str, dict[object, str]],
+) -> tuple[object, ...]:
+  return tuple(
+    _display_category_value(value, category_labels.get(variable))
+    for variable, value in zip(variables, values, strict=True)
+  )
+
+
+def _display_category_value(
+  value: object,
+  lookup: Mapping[object, str] | None,
+) -> object:
+  if value is None or lookup is None:
+    return value
+  labeled = _match_value_label(lookup, value)
+  return value if labeled is None else labeled
+
+
+def _match_value_label(lookup: Mapping[object, str], value: object) -> str | None:
+  if value in lookup:
+    return lookup[value]
+  if isinstance(value, bool):
+    return None
+  if isinstance(value, (int, float, Decimal)):
+    if isinstance(value, float) and math.isnan(value):
+      return None
+    if isinstance(value, Decimal) and value.is_nan():
+      return None
+    as_float = float(value)
+    if as_float.is_integer():
+      as_int = int(as_float)
+      if as_int in lookup:
+        return lookup[as_int]
+    if as_float in lookup:
+      return lookup[as_float]
+  return None
+
+
 def _tabulate_wide_result(
   long_rows: tuple[tuple[object, ...], ...],
   *,
@@ -2456,13 +2520,16 @@ def _tabulate_wide_result(
   include_column_percent: bool,
   value_header: str,
   missing_cell_value: object,
+  category_labels: dict[str, dict[object, str]] | None = None,
 ) -> tuple[tuple[str, ...], tuple[tuple[object, ...], ...]]:
+  labels = category_labels or {}
   index_width = len(by_variables) + len(row_variables)
   column_width = len(column_variables)
   column_start = index_width
   value_index = column_start + column_width
   row_percent_index = value_index + 1
   column_percent_index = row_percent_index + (1 if include_row_percent else 0)
+  index_variables = by_variables + row_variables
 
   column_keys = tuple(
     sorted(
@@ -2499,13 +2566,15 @@ def _tabulate_wide_result(
     + row_variables
     + _wide_value_headers(
       column_keys,
+      column_variables=column_variables,
+      category_labels=labels,
       value_header=value_header,
       include_row_percent=include_row_percent,
       include_column_percent=include_column_percent,
     )
   )
   rows = tuple(
-    index_key
+    _display_dimension_values(index_key, index_variables, labels)
     + _wide_row_cells(
       index_key,
       column_keys,
@@ -2582,12 +2651,18 @@ def _tabulate_cell_key(
 def _wide_value_headers(
   column_keys: tuple[tuple[object, ...], ...],
   *,
+  column_variables: tuple[str, ...],
+  category_labels: dict[str, dict[object, str]],
   value_header: str,
   include_row_percent: bool,
   include_column_percent: bool,
 ) -> tuple[str, ...]:
   headers: list[str] = []
-  for label in _column_key_labels(column_keys):
+  for label in _column_key_labels(
+    column_keys,
+    column_variables=column_variables,
+    category_labels=category_labels,
+  ):
     headers.append(f"{label} {value_header}")
     if include_row_percent:
       headers.append(f"{label} Row %")
@@ -2618,12 +2693,36 @@ def _wide_row_cells(
   return tuple(cells)
 
 
-def _column_key_label(column_key: tuple[object, ...]) -> str:
-  return " | ".join("missing" if value is None else str(value) for value in column_key)
+def _column_key_label(
+  column_key: tuple[object, ...],
+  *,
+  column_variables: tuple[str, ...],
+  category_labels: dict[str, dict[object, str]],
+) -> str:
+  parts: list[str] = []
+  for variable, value in zip(column_variables, column_key, strict=True):
+    if value is None:
+      parts.append("missing")
+      continue
+    displayed = _display_category_value(value, category_labels.get(variable))
+    parts.append(str(displayed))
+  return " | ".join(parts)
 
 
-def _column_key_labels(column_keys: tuple[tuple[object, ...], ...]) -> tuple[str, ...]:
-  base_labels = tuple(_column_key_label(column_key) for column_key in column_keys)
+def _column_key_labels(
+  column_keys: tuple[tuple[object, ...], ...],
+  *,
+  column_variables: tuple[str, ...],
+  category_labels: dict[str, dict[object, str]],
+) -> tuple[str, ...]:
+  base_labels = tuple(
+    _column_key_label(
+      column_key,
+      column_variables=column_variables,
+      category_labels=category_labels,
+    )
+    for column_key in column_keys
+  )
   label_counts: dict[str, int] = {}
   for label in base_labels:
     label_counts[label] = label_counts.get(label, 0) + 1

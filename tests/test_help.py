@@ -65,6 +65,8 @@ def test_help_topics_document_explicit_missing_values() -> None:
   assert "native ordering" in load_help_topic("tabulate")
   assert "Missing values are excluded by default" in load_help_topic("tabulate")
   assert "disambiguated" in load_help_topic("tabulate")
+  assert "nolabel" in load_help_topic("tabulate")
+  assert "value labels" in load_help_topic("tabulate")
   assert "descending count" in load_help_topic("bar")
   assert "missing displays as `<missing>`" in load_help_topic("bar")
   assert "literal category label" in load_help_topic("bar")

@@ -20,10 +20,15 @@ and booleans false before true; numeric labels are not ordered by rendered text.
 Rendered multi-key labels are disambiguated when missing or separator text would otherwise make
 distinct categories look identical.
 
+When a dimension variable has attached value labels (`label values`), category cells and wide
+column headers show those labels by default. Use `nolabel` to display raw codes instead. Sorting
+and aggregation still use the underlying stored values.
+
 Examples:
 - `tabulate sex`
 - `tabulate sex outcome, row col`
 - `tabulate sex if age >= 18`
+- `tabulate sex, nolabel`
 - `tabulate, rows(region sex) columns(outcome year)`
 - `tabulate, rows(region) columns(sex) values(cost) stat(mean)`
 - `by region: tabulate, rows(sex) columns(outcome) values(cost) stat(sum)`
