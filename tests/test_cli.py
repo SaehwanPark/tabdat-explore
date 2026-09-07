@@ -229,6 +229,7 @@ def test_cli_json_lists_declared_command_effects_without_session(monkeypatch, ca
   assert entry_by_name["run"]["effects"] == ["read", "write", "control", "plot"]
   assert entry_by_name["set"]["effects"] == ["control"]
   assert entry_by_name["label"]["effects"] == ["read", "write", "control"]
+  assert entry_by_name["missing"]["effects"] == ["read"]
 
 
 def test_command_effect_mapping_covers_current_registry() -> None:

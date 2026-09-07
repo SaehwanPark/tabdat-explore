@@ -1,23 +1,27 @@
-# QA Report: label dictionary persistence
+# QA Report: `missing` null-missingness report
 
 ## Verdict
 
-`pass`
+`pass` (local implementation checks and focused review complete)
 
 ## Evidence
 
-- Focused label/parser, dictionary serialization/executor, and CLI coverage passed.
-- Full `uv run pytest` passed.
+- Focused parser, eager/lazy backend, executor atomic-error, CLI human/JSON, shell completion, MCP,
+  and docs-alignment coverage passed.
+- Full `uv run pytest -q` passed: 1,293 tests, with only existing statistical/backend dependency
+  warnings.
 - Ruff lint and formatting checks passed.
 - `basedpyright src` reported 0 errors, 0 warnings, and 0 notes.
 - Documentation and command-alignment verification passed.
+- Empty datasets return zero missing percentage; unknown variables fail before scanning; DuckDB and
+  Polars-lazy results preserve requested/schema order and lazy session metadata.
 
-## Review notes
+## Review loop
 
-- `label use` validates schema, metadata shape, mappings, variable references, and value-label attachments before state replacement.
-- `label save` uses deterministic JSON and atomic temporary-file replacement, refusing accidental overwrite without `replace`.
-- Metadata-only save/use operations preserve Polars lazy mode and do not force a data scan.
-- The persisted format is explicitly documented as TabDat-native rather than direct Stata/SAS/SPSS file compatibility.
+Three independent passes over the branch diff covered command/state behavior, backend null/count
+semantics and lazy execution, and user-facing/machine-interface/docs alignment. No actionable
+findings were identified. The Polars empty-dataset path was manually exercised after the focused
+suite and returned a zero-row, zero-percent result without changing lazy mode.
 
 ## Harness note
 
@@ -25,10 +29,3 @@
 pre-existing unrelated source/import issues (including duplicate module discovery for
 `scripts/check_docs_alignment.py`); the project CI type gate is `basedpyright`, which passes with
 zero diagnostics above.
-
-## Review loop
-
-Three independent passes over `origin/main...HEAD` covered behavior/state transitions,
-I/O/concurrency/error handling, and documentation/compatibility surfaces. No actionable findings
-were identified. A follow-up pass after the race-safe no-overwrite fix (`45a9cc0`) also passed;
-all hosted CI checks are green.

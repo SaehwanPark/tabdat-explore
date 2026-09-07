@@ -14,6 +14,8 @@ All notable project changes are tracked here.
 - Added `encode` / `decode` for string↔labeled-integer conversion with automatic value-label sets.
 - Added `label save` / `label use` for deterministic, versioned TabDat JSON data-dictionary files;
   loading validates variable references and attachments atomically and preserves lazy execution.
+- Added read-only `missing [varlist]` profiling for explicit-null counts, nonmissing counts, and
+  missing percentages, including Polars-lazy aggregate scans that preserve lazy mode.
 
 ## [0.24.1] — 2026-08-28
 

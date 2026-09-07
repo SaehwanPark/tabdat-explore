@@ -117,6 +117,8 @@ from tabdat.models import (
   LogitCommand,
   LogitRegressionResult,
   LowessCommand,
+  MissingCommand,
+  MissingResult,
   NbregCommand,
   NbregRegressionResult,
   NlCommand,
@@ -897,6 +899,10 @@ class Executor:
         replace(row, variable_label=label_map.get(row.variable)) for row in codebook_rows
       )
       return CodebookResult(rows=enriched)
+
+    if isinstance(command, MissingCommand):
+      dataset = self._require_active_dataset("missing")
+      return MissingResult(rows=self.backend.missingness(dataset, command.variables))
 
     if isinstance(command, CountCommand):
       dataset = self._require_active_dataset("count")
@@ -6601,6 +6607,7 @@ class Executor:
       (
         DescribeCommand,
         CountCommand,
+        MissingCommand,
         HeadCommand,
         TailCommand,
         TestCommand,

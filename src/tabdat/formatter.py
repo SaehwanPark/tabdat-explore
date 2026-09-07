@@ -52,6 +52,7 @@ from tabdat.models import (
   LincomResult,
   LoadResult,
   LogitRegressionResult,
+  MissingResult,
   NbregRegressionResult,
   NlRegressionResult,
   PanelResult,
@@ -98,6 +99,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   DoctorResult: "DoctorResult",
   SummarizeResult: "SummarizeResult",
   CodebookResult: "CodebookResult",
+  MissingResult: "MissingResult",
   CountResult: "CountResult",
   PreviewResult: "PreviewResult",
   TransformResult: "TransformResult",
@@ -435,6 +437,22 @@ def format_result(result: Result) -> str:
         ("Variable", "Label", "Type", "Nonmissing", "Missing", "Distinct", "Examples"),
         codebook_rows,
       )
+    )
+
+  if isinstance(result, MissingResult):
+    missing_rows = (
+      (
+        row.variable,
+        row.data_type,
+        str(row.total),
+        str(row.missing),
+        str(row.nonmissing),
+        _format_number(row.missing_percent),
+      )
+      for row in result.rows
+    )
+    return "\n".join(
+      _table(("Variable", "Type", "Total", "Missing", "Nonmissing", "Missing %"), missing_rows)
     )
 
   if isinstance(result, CountResult):

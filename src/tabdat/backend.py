@@ -37,6 +37,7 @@ from tabdat.models import (
   Expression,
   FunctionCallExpression,
   IdentifierExpression,
+  MissingRow,
   NullExpression,
   NumberExpression,
   PanelMetadata,
@@ -885,6 +886,38 @@ class DuckDBBackend:
 
     return tuple(
       self._codebook_variable(variable, column_types[variable]) for variable in requested
+    )
+
+  def missingness(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> tuple[MissingRow, ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    requested = variables or tuple(column.name for column in dataset.columns)
+    _require_columns("missing", column_types, requested)
+    if self._polars_lazy_frame is not None:
+      return self._polars_missingness(requested, column_types)
+
+    select_items = ['count(*) as "__tabdat_total"']
+    for index, variable in enumerate(requested):
+      quoted_variable = _quote_identifier(variable)
+      select_items.append(
+        f"count({quoted_variable}) as {_quote_identifier(f'__tabdat_nonmissing_{index}')}"
+      )
+    sql = f"select {', '.join(select_items)} from {ACTIVE_TABLE}"
+    try:
+      row = self._connection.execute(sql).fetchone()
+    except duckdb.Error as exc:
+      raise ExecutionError("missing failed") from exc
+    if row is None:
+      raise ExecutionError("missing failed")
+
+    total = int(row[0])
+    return tuple(
+      _missing_row(
+        variable,
+        column_types[variable],
+        total=total,
+        nonmissing=int(row[index + 1]),
+      )
+      for index, variable in enumerate(requested)
     )
 
   def preview_rows(
@@ -1788,6 +1821,30 @@ class DuckDBBackend:
       maximum=maximum,
     )
 
+  def _polars_missingness(
+    self,
+    variables: tuple[str, ...],
+    column_types: dict[str, str],
+  ) -> tuple[MissingRow, ...]:
+    lazy_frame = self._require_polars_lazy_frame("missing")
+    expressions = [pl.len().alias("__tabdat_total")]
+    for index, variable in enumerate(variables):
+      expressions.append(pl.col(variable).count().alias(f"__tabdat_nonmissing_{index}"))
+    try:
+      row = lazy_frame.select(expressions).collect().row(0)
+    except (PolarsError, IndexError) as exc:
+      raise ExecutionError("missing failed") from exc
+    total = int(row[0])
+    return tuple(
+      _missing_row(
+        variable,
+        column_types[variable],
+        total=total,
+        nonmissing=int(row[index + 1]),
+      )
+      for index, variable in enumerate(variables)
+    )
+
   def _codebook_variable(self, variable: str, data_type: str) -> CodebookRow:
     quoted_variable = _quote_identifier(variable)
     profile_sql = f"""
@@ -2438,6 +2495,25 @@ class DuckDBBackend:
       self._connection.execute("rollback")
     except duckdb.Error:
       pass
+
+
+def _missing_row(
+  variable: str,
+  data_type: str,
+  *,
+  total: int,
+  nonmissing: int,
+) -> MissingRow:
+  missing = total - nonmissing
+  missing_percent = 0.0 if total == 0 else (missing / total) * 100.0
+  return MissingRow(
+    variable=variable,
+    data_type=data_type,
+    total=total,
+    missing=missing,
+    nonmissing=nonmissing,
+    missing_percent=missing_percent,
+  )
 
 
 def _is_numeric_type(data_type: str) -> bool:

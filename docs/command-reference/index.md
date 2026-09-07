@@ -1,6 +1,6 @@
 # Command Reference Index
 
-TabDat-Explore includes 69 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
+TabDat-Explore includes 75 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
 
 ---
 
@@ -11,6 +11,7 @@ TabDat-Explore includes 69 commands and topics organized into functional categor
 | [`describe`](../commands/describe.md) | Show dataset shape, variable names, and DuckDB/Arrow data types. |
 | [`summarize`](../commands/summarize.md) | Descriptive statistics (count, mean, std dev, min, max) for numeric variables. |
 | [`codebook`](../commands/codebook.md) | Detailed variable profiling with missingness and unique sample values. |
+| [`missing`](../commands/missing.md) | Compact null-missingness counts and percentages. |
 | [`count`](../commands/count.md) | Count rows in the active dataset. |
 | [`head`](../commands/head.md) | Preview the first rows of the active dataset. |
 | [`tail`](../commands/tail.md) | Preview the last rows of the active dataset. |

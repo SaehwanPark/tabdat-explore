@@ -274,8 +274,8 @@ Status: Verified
 - Focused tests live under `tests/`.
 - The installed console script is `tabdat`.
 - Phase 2 expression ASTs now compile to DuckDB SQL for Phase 3 transformations.
-- Phase 3 commands are executable: `codebook`, `count`, `head`, `tail`, `keep`, `drop`, `select`,
-  `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
+- Phase 3 commands are executable: `codebook`, `missing`, `count`, `head`, `tail`, `keep`, `drop`,
+  `select`, `rename`, `generate`, `replace`, `tabulate`, `collapse`, and supported `by:` forms.
 - `tabulate` supports legacy one-way/two-way frequency tables plus explicit multi-level
   `rows()`/`columns()` crosstabs, command-level `if`, and single-value cell aggregation with
   `values()`/`stat()`.

@@ -49,6 +49,11 @@ unknown-variable error and follows the write-validation atomicity policy below.
   conditions preserve the existing value.
 - `summarize` counts nonmissing numeric values; its means, minima, and maxima ignore missing values.
   `codebook` reports nonmissing and missing counts explicitly.
+- `missing [varlist]` reports total, missing, nonmissing, and missing-percentage counts for each
+  requested column. It uses explicit nulls only; empty strings and user-defined sentinel codes remain
+  nonmissing. With no varlist, schema order is used; requested order is preserved.
+- `missing` reports `0.0` percent for columns in an empty dataset and performs a bounded aggregate
+  scan without converting a Polars-lazy session to eager mode.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 
