@@ -110,7 +110,6 @@ _COLUMN_COMMANDS = {
   "bar",
   "reshape",
   "panel",
-  "label",
   "regress",
   "lasso",
   "postlasso",
