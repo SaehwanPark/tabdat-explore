@@ -686,6 +686,8 @@ and describe the active work with concise verification criteria.
   materialization.
 - Added read-only `missing [varlist]` profiling for explicit-null counts and percentages, including
   bounded Polars-lazy aggregation without eager-mode conversion.
+- Added stable ascending `sort <varlist>` ordering with native scalar keys, nulls-last placement,
+  stable ties, metadata preservation, and Polars-lazy plan support.
 
 ## Future
 

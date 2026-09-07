@@ -1,79 +1,65 @@
-# Command Contract: `missing`
+# Command Contract: `sort`
 
 ## Product and roadmap fit
 
-`missing` is a compact, TabDat-native data-quality report inspired by Stata's `misstable summarize`
-and the missingness/frequency workflows analysts use in SAS and SPSS. It is a bounded terminal-EDA
-feature, not a native compatibility layer.
+`sort` is a stable, ascending active-row ordering command inspired by Stata `sort`, SAS `PROC SORT`,
+and SPSS `SORT CASES BY`. It is TabDat-native and intentionally does not promise native compatibility.
 
 ## Syntax
 
 ```text
-missing [varlist]
+sort <varlist>
 ```
 
-With no varlist, all active dataset columns are reported in schema order. With a varlist, columns are
-reported in exactly the order requested. The command accepts no options, conditions, or assignment
-syntax.
+At least one existing column is required. Columns are sorted ascending in the order listed. The
+command accepts no options, conditions, expressions, or assignment syntax.
 
 ## Semantics
 
-- Requires an active dataset.
-- A missing value is an explicit null under TabDat's existing missingness policy; empty strings and
-  user-defined numeric sentinel codes are not treated as missing by this command.
-- Each requested column reports total rows, missing rows, nonmissing rows, and missing percentage.
-- `missing percentage = missing / total * 100`; an empty dataset reports `0.0` percent rather than
-  dividing by zero.
-- Unknown variables fail before any result is returned and leave active data/session state unchanged.
-- The result preserves requested/schema column order and is deterministic for a fixed active relation.
-- DuckDB eager/lazy and Polars-lazy execution return the same rows. Polars-lazy computes the aggregate
-  without switching execution mode or replacing the lazy frame; the command may scan source data but
-  does not force materialization into eager state.
-- Existing `codebook`, filtering, and estimator missingness behavior is unchanged.
+- Requires an active dataset and at least one variable.
+- Each sort key uses native scalar ordering: numeric values numerically, strings lexicographically,
+  and booleans false before true. Nulls sort last for every key.
+- Ties preserve the prior active row order (stable sort), including rows tied on all requested keys.
+- Sorting does not change columns or values. Variable/value labels, panel metadata, and internal
+  estimation-sample state remain attached to the active dataset.
+- DuckDB eager/lazy and Polars-lazy execution agree on output order. Polars-lazy updates the lazy
+  plan without converting the session to eager state.
+- Unknown variables fail before the active dataset or metadata changes.
+- A successful sort records `sort` as the last operation and reports the resulting dataset.
 
-## Structured result
+## Output
 
-Human output is a table with these columns:
+Human output:
 
 ```text
-Variable  Type  Total  Missing  Nonmissing  Missing %
+Sorted by: group age
+Rows: 3, Columns: 4
 ```
 
-JSON emits a versioned `MissingResult` envelope whose rows contain:
-
-```json
-{
-  "variable": "age",
-  "data_type": "INTEGER",
-  "total": 5,
-  "missing": 1,
-  "nonmissing": 4,
-  "missing_percent": 20.0
-}
-```
+The structured result is the existing `TransformResult` with message `Sorted by: <varlist>` and the
+updated `DatasetInfo`; JSON therefore uses the existing transform result envelope.
 
 ## Examples
 
 ```text
 use survey.parquet, lazy engine=polars
-missing
-missing age income
+sort treatment age
+head
 ```
 
 ## Invalid forms
 
-- `missing, ...` or `missing if ...`: parse error.
-- `missing age, ...`: parse error.
-- `missing unknown_column`: execution error.
-- `missing` without an active dataset: execution error.
+- `sort`: parse error; a varlist is required.
+- `sort age, stable` or `sort age if age > 0`: parse error.
+- `sort missing_column`: execution error; active state is unchanged.
 
 ## Acceptance
 
-- Parser tests cover no varlist, ordered varlists, and rejected options/conditions.
-- Backend/executor tests cover eager results, empty datasets, unknown variables, DuckDB-lazy and
-  Polars-lazy execution, and unchanged lazy execution state.
-- CLI tests cover human output, JSON result envelopes, and error behavior.
-- Help, command reference/navigation, command schema, shell completion, and declared read effect are
-  aligned.
+- Parser tests cover ordered varlists, required arguments, and rejected options/conditions.
+- Backend/executor tests cover numeric/text/boolean/null ordering, stable ties, metadata preservation,
+  unknown-variable atomicity, and DuckDB/Polars-lazy behavior.
+- CLI tests cover human output, JSON transform envelopes, and errors.
+- Help, command reference/navigation, language semantics, command schema/effects, and shell completion
+  are aligned.
 - Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, and
   hosted CI.

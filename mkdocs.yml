@@ -136,6 +136,7 @@ nav:
           - save: commands/save.md
           - scatter: commands/scatter.md
           - select: commands/select.md
+          - sort: commands/sort.md
           - set: commands/set.md
           - spregress: commands/spregress.md
           - sql: commands/sql.md

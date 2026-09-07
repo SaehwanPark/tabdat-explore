@@ -999,6 +999,47 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def sort_rows(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("sort", column_types, variables)
+    ordinal_name = "__tabdat_sort_ordinal"
+    if self._polars_lazy_frame is not None:
+      try:
+        schema_names = set(self._polars_lazy_frame.collect_schema())
+        while ordinal_name in schema_names:
+          ordinal_name += "_"
+        sort_columns = [*variables, ordinal_name]
+        self._polars_lazy_frame = (
+          self._polars_lazy_frame.with_row_index(ordinal_name)
+          .sort(
+            by=sort_columns,
+            descending=[False] * len(sort_columns),
+            nulls_last=True,
+            maintain_order=True,
+          )
+          .drop(ordinal_name)
+        )
+      except PolarsError as exc:
+        raise ExecutionError("sort failed") from exc
+      return self.active_dataset_info(dataset.path)
+
+    while self._has_internal_column(ordinal_name):
+      ordinal_name += "_"
+    sort_sql = ", ".join(f"{_quote_identifier(variable)} asc nulls last" for variable in variables)
+    sort_sql = f"{sort_sql}, {_quote_identifier(ordinal_name)} asc"
+    self._replace_active(
+      f"""
+      select * exclude ({_quote_identifier(ordinal_name)})
+      from (
+        select row_number() over () as {_quote_identifier(ordinal_name)}, *
+        from {ACTIVE_TABLE}
+      ) as __tabdat_sort_rows
+      order by {sort_sql}
+      """,
+      "sort",
+    )
+    return self.active_dataset_info(dataset.path)
+
   def filter_rows(
     self,
     dataset: DatasetInfo,

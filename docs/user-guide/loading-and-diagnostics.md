@@ -49,6 +49,18 @@ With no varlist, every active column is reported in schema order. The command tr
 as missing; empty strings and user-defined sentinel values remain nonmissing. A Polars-lazy session
 stays lazy while the aggregate scan runs. Use `codebook` for distinct counts and examples.
 
+## Ordering Rows (`sort`)
+
+Arrange the active rows by stable ascending native keys before previewing or exporting:
+
+```text
+tabdat> sort treatment age
+Sorted by: treatment age
+```
+
+Nulls sort last and ties preserve their previous row order. The command preserves labels and panel
+metadata; descending or expression-based ordering remains available through SQL.
+
 ## Inspecting Execution State (`status`)
 
 Run `status` at any time to inspect backend execution mode, materialization status, and active relation details without triggering computation:

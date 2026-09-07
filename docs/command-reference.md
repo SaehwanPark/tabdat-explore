@@ -73,6 +73,7 @@ paths, and more).
 | `generate` | Create a new variable from an expression | `generate bmi_sq = bmi^2` |
 | `replace` | Replace values in an existing variable | `replace age = . if age < 0` |
 | `rename` | Rename a variable | `rename cost charges` |
+| `sort` | Stable-sort active rows by ascending keys | `sort treatment age` |
 | `recode` | Recode values or ranges into new categories | `recode age (18/64=1) (65/max=2), generate(age_grp)` |
 | `encode` | Encode a string variable to labeled integers | `encode sex, generate(sex_n)` |
 | `decode` | Decode a labeled numeric variable to strings | `decode sex_n, generate(sex_str)` |

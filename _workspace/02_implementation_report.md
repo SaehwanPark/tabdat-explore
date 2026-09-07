@@ -1,4 +1,4 @@
-# Implementation Report: `missing` null-missingness report
+# Implementation Report: stable `sort` row ordering
 
 ## Contract
 
@@ -6,20 +6,19 @@
 
 ## Delivered
 
-- Added `missing [varlist]` command parsing, typed command/result models, executor dispatch, CLI
-  schema/effect metadata, and shell column/command completion.
-- Added DuckDB eager/lazy and Polars-lazy aggregate implementations reporting total, missing,
-  nonmissing, and missing percentage while preserving Polars lazy execution state.
-- Added deterministic terminal and JSON output, explicit-null semantics, empty-dataset handling, and
-  pre-scan unknown-variable validation.
-- Updated MCP EDA guidance, in-app help, command reference/navigation, user guide, language semantics,
-  README, architecture/spec/changelog records, and focused parser/backend/executor/CLI/shell/MCP tests.
+- Added `sort <varlist>` parsing, typed command support, executor dispatch, CLI schema/effect
+  metadata, and shell command/column completion.
+- Added stable ascending native-key ordering with nulls last and preserved tie order for DuckDB and
+  Polars-lazy execution. Polars updates its lazy plan without eager conversion.
+- Preserved all columns, variable/value labels, panel metadata, and existing transform result/JSON
+  semantics.
+- Updated in-app help, command reference/navigation, language/user-guide docs, README,
+  architecture/spec/changelog records, and focused parser/backend/executor/CLI/shell tests.
 
 ## Validation
 
-- `uv run pytest tests/test_missing.py tests/test_shell.py tests/test_cli.py tests/test_docs_alignment.py` — 211 passed.
-- `uv run pytest tests/test_mcp.py tests/test_missing.py` — 20 passed.
-- `uv run pytest -q` — 1,293 passed (320 warnings from existing statistical/backend dependencies).
+- `uv run pytest tests/test_sort.py tests/test_shell.py tests/test_cli.py tests/test_docs_alignment.py` — 209 passed.
+- `uv run pytest -q` — 1,300 passed (320 warnings from existing statistical/backend dependencies).
 - `uv run ruff check .` — passed.
 - `uv run ruff format --check .` — passed.
 - `uv run basedpyright src` — 0 errors, 0 warnings, 0 notes.
@@ -27,5 +26,5 @@
 
 ## Notes
 
-The command reports explicit nulls only. Empty strings and user-defined sentinel values remain
-nonmissing; missingness patterns and imputation remain out of scope.
+Descending and expression-based sorting remain intentionally available through SQL rather than adding
+another command option surface.

@@ -153,6 +153,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SetResult,
+  SortCommand,
   SpatialRegressionResult,
   SpregressCommand,
   SqlCommand,
@@ -934,6 +935,12 @@ class Executor:
 
     if isinstance(command, SelectCommand):
       return self._execute_select(command)
+
+    if isinstance(command, SortCommand):
+      dataset = self._require_active_dataset("sort")
+      next_dataset = self.backend.sort_rows(dataset, command.variables)
+      next_dataset = _preserve_panel_metadata(dataset, next_dataset)
+      return self._record_transform(f"Sorted by: {' '.join(command.variables)}", next_dataset)
 
     if isinstance(command, RenameCommand):
       return self._execute_rename(command)
@@ -6618,6 +6625,7 @@ class Executor:
         SaveCommand,
         ExportCommand,
         LabelCommand,
+        SortCommand,
         EstatCommand,
       ),
     ):
