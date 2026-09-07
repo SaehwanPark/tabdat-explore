@@ -38,6 +38,7 @@ def test_completer_suggests_command_names() -> None:
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
     status_completions = _completion_texts(TabdatCompleter(executor), "stat")
     missing_completions = _completion_texts(TabdatCompleter(executor), "miss")
+    assert_completions = _completion_texts(TabdatCompleter(executor), "ass")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sor")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
   finally:
@@ -49,6 +50,7 @@ def test_completer_suggests_command_names() -> None:
   assert panel_completions == ["panel"]
   assert status_completions == ["status"]
   assert missing_completions == ["missing"]
+  assert assert_completions == ["assert"]
   assert sort_completions == ["sort"]
   assert help_completions == ["help"]
 
@@ -69,6 +71,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
     executor.execute(UseCommand(sample_parquet))
     completions = _completion_texts(TabdatCompleter(executor), "summarize b")
     missing_completions = _completion_texts(TabdatCompleter(executor), "missing c")
+    assert_completions = _completion_texts(TabdatCompleter(executor), "assert c")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sort c")
     panel_completions = _completion_texts(TabdatCompleter(executor), "panel s")
   finally:
@@ -76,6 +79,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
 
   assert completions == ["bmi"]
   assert missing_completions == ["cost"]
+  assert assert_completions == ["cost"]
   assert sort_completions == ["cost"]
   assert panel_completions == ["sex"]
 

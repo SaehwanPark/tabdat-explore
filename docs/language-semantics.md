@@ -54,6 +54,10 @@ unknown-variable error and follows the write-validation atomicity policy below.
   nonmissing. With no varlist, schema order is used; requested order is preserved.
 - `missing` reports `0.0` percent for columns in an empty dataset and performs a bounded aggregate
   scan without converting a Polars-lazy session to eager mode.
+- `assert <boolean-expression>` checks every active row without replacing the active relation. True
+  predicates pass; false and missing predicates fail. Empty datasets pass, and failures report
+  deterministic checked/failed counts while preserving the session data state. Aggregate checks keep
+  Polars-lazy sessions lazy.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 

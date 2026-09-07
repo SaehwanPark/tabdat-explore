@@ -688,6 +688,8 @@ and describe the active work with concise verification criteria.
   bounded Polars-lazy aggregation without eager-mode conversion.
 - Added stable ascending `sort <varlist>` ordering with native scalar keys, nulls-last placement,
   stable ties, metadata preservation, and Polars-lazy plan support.
+- Added read-only `assert <boolean-expression>` quality gates with false/missing failures,
+  deterministic checked/failed diagnostics, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 
 ## Future
 

@@ -19,6 +19,7 @@ from tabdat.models import DatasetInfo
 
 COMMAND_NAMES: tuple[str, ...] = (
   "use",
+  "assert",
   "recode",
   "help",
   "describe",
@@ -98,6 +99,7 @@ COMMAND_NAMES: tuple[str, ...] = (
 _BY_CHILD_COMMAND_NAMES = ("summarize", "count", "tabulate")
 
 _COLUMN_COMMANDS = {
+  "assert",
   "recode",
   "summarize",
   "codebook",

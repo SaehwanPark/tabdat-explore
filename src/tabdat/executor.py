@@ -51,6 +51,8 @@ from tabdat.lazy_stats import (
 from tabdat.models import (
   ActivateResult,
   AppendCommand,
+  AssertCommand,
+  AssertResult,
   BarCommand,
   BayesCommand,
   BayesMcmcEstimate,
@@ -904,6 +906,13 @@ class Executor:
     if isinstance(command, MissingCommand):
       dataset = self._require_active_dataset("missing")
       return MissingResult(rows=self.backend.missingness(dataset, command.variables))
+
+    if isinstance(command, AssertCommand):
+      dataset = self._require_active_dataset("assert")
+      checked, failed = self.backend.assert_rows(dataset, command.expression)
+      if failed:
+        raise ExecutionError(f"assertion failed: {failed} of {checked} rows failed")
+      return AssertResult(checked=checked, failed=failed)
 
     if isinstance(command, CountCommand):
       dataset = self._require_active_dataset("count")
@@ -6615,6 +6624,7 @@ class Executor:
         DescribeCommand,
         CountCommand,
         MissingCommand,
+        AssertCommand,
         HeadCommand,
         TailCommand,
         TestCommand,

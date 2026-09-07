@@ -184,6 +184,13 @@ class MissingCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class AssertCommand:
+  """Command to validate a boolean predicate across every active row."""
+
+  expression: Expression
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class CountCommand:
   """Command to display the total number of rows in the active dataset."""
 
@@ -812,6 +819,7 @@ Command = (
   | SummarizeCommand
   | CodebookCommand
   | MissingCommand
+  | AssertCommand
   | CountCommand
   | HeadCommand
   | TailCommand
@@ -1162,6 +1170,12 @@ class MissingRow:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class MissingResult:
   rows: tuple[MissingRow, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class AssertResult:
+  checked: int
+  failed: int
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1685,6 +1699,7 @@ Result = (
   | SummarizeResult
   | CodebookResult
   | MissingResult
+  | AssertResult
   | CountResult
   | PreviewResult
   | TransformResult

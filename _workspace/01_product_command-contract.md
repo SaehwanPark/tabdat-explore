@@ -1,64 +1,91 @@
-# Command Contract: `sort`
+# Command Contract: `assert`
 
 ## Product and roadmap fit
 
-`sort` is a stable, ascending active-row ordering command inspired by Stata `sort`, SAS `PROC SORT`,
-and SPSS `SORT CASES BY`. It is TabDat-native and intentionally does not promise native compatibility.
+`assert` is a read-only active-row quality gate inspired by Stata `assert`, SAS data checks, and
+SPSS validation workflows. It is TabDat-native and intentionally does not promise native compatibility.
+It extends terminal EDA/data-quality work without expanding estimator families.
 
 ## Syntax
 
 ```text
-sort <varlist>
+assert <boolean-expression>
 ```
 
-At least one existing column is required. Columns are sorted ascending in the order listed. The
-command accepts no options, conditions, expressions, or assignment syntax.
+The expression uses TabDat's existing identifiers, literals, comparison/arithmetic operators,
+parentheses, and supported functions. The command accepts no options, `if` clause, assignment, or
+by-prefix.
 
 ## Semantics
 
-- Requires an active dataset and at least one variable.
-- Each sort key uses native scalar ordering: numeric values numerically, strings lexicographically,
-  and booleans false before true. Nulls sort last for every key.
-- Ties preserve the prior active row order (stable sort), including rows tied on all requested keys.
-- Sorting does not change columns or values. Variable/value labels, panel metadata, and internal
-  estimation-sample state remain attached to the active dataset.
-- DuckDB eager/lazy and Polars-lazy execution agree on output order. Polars-lazy updates the lazy
-  plan without converting the session to eager state.
-- Unknown variables fail before the active dataset or metadata changes.
-- A successful sort records `sort` as the last operation and reports the resulting dataset.
+- Requires an active dataset and one syntactically valid boolean expression.
+- A row passes when the predicate evaluates to true. False or missing/null predicate results count as
+  failures. This makes missing checks explicit rather than silently passing unknown values.
+- The command checks every active row. An empty active dataset passes with `checked = 0` and
+  `failed = 0`.
+- A successful command returns `AssertResult(checked, failed=0)` and records the usual command history
+  operation; it does not replace or mutate the active relation, schema, labels, panel metadata, or
+  named-table contents.
+- A failed command raises `ExecutionError` with deterministic checked and failed counts. The active
+  relation and session data state remain unchanged; the command does not emit a successful result.
+- DuckDB eager/lazy and Polars-lazy execution use aggregate scans. Polars-lazy remains lazy and is not
+  replaced by an eager frame.
+- Existing expression type, identifier, arithmetic, null, and function semantics are reused. A
+  predicate must infer to boolean or null; unknown variables and unsupported expressions fail before
+  the aggregate query.
 
 ## Output
 
-Human output:
+Human success output:
 
 ```text
-Sorted by: group age
-Rows: 3, Columns: 4
+assertion passed: 3 rows
 ```
 
-The structured result is the existing `TransformResult` with message `Sorted by: <varlist>` and the
-updated `DatasetInfo`; JSON therefore uses the existing transform result envelope.
+The structured result is:
+
+```json
+{
+  "schema_version": 1,
+  "result_type": "AssertResult",
+  "data": {"checked": 3, "failed": 0}
+}
+```
+
+Failure uses the existing error envelope/type with a deterministic message such as:
+
+```text
+assertion failed: 1 of 3 rows failed
+```
 
 ## Examples
 
 ```text
 use survey.parquet, lazy engine=polars
-sort treatment age
-head
+assert age >= 0
+assert bmi != null
 ```
+
+The second example intentionally fails for rows whose BMI is null; use `bmi == null` when checking
+for missing values explicitly.
 
 ## Invalid forms
 
-- `sort`: parse error; a varlist is required.
-- `sort age, stable` or `sort age if age > 0`: parse error.
-- `sort missing_column`: execution error; active state is unchanged.
+- `assert`: parse error; a predicate is required.
+- `assert age`: execution error; predicates must be boolean or null.
+- `assert age > 0, strict`: parse error; options are unsupported.
+- `assert age > 0 if sex == "F"`: parse error; `if` clauses are unsupported.
+- `assert age = 0`: parse error; assignment syntax is unsupported.
+- `assert missing > 0`: execution error; unknown variables are rejected.
 
 ## Acceptance
 
-- Parser tests cover ordered varlists, required arguments, and rejected options/conditions.
-- Backend/executor tests cover numeric/text/boolean/null ordering, stable ties, metadata preservation,
-  unknown-variable atomicity, and DuckDB/Polars-lazy behavior.
-- CLI tests cover human output, JSON transform envelopes, and errors.
+- Parser tests cover comparison/function/quoted-identifier expressions, required predicates, and
+  rejected options, `if`, and assignment forms.
+- Backend/executor tests cover true/false/missing rows, empty datasets, non-boolean predicates,
+  unknown variables, deterministic failure counts, unchanged state, and eager/DuckDB-lazy/
+  Polars-lazy execution.
+- CLI tests cover human success/failure, JSON success/error envelopes, and no-active-dataset errors.
 - Help, command reference/navigation, language semantics, command schema/effects, and shell completion
   are aligned.
 - Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, and

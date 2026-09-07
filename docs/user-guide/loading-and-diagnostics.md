@@ -49,6 +49,19 @@ With no varlist, every active column is reported in schema order. The command tr
 as missing; empty strings and user-defined sentinel values remain nonmissing. A Polars-lazy session
 stays lazy while the aggregate scan runs. Use `codebook` for distinct counts and examples.
 
+## Quality Gates (`assert`)
+
+Use `assert` to validate a boolean condition across every active row without changing the dataset:
+
+```text
+tabdat> assert age >= 0
+assertion passed: 100 rows
+```
+
+False or missing predicate results fail the check with deterministic checked/failed counts. Empty
+active datasets pass; options, `if` clauses, assignment, and row-level diagnostics are intentionally
+not supported. Aggregate checks preserve Polars-lazy execution.
+
 ## Ordering Rows (`sort`)
 
 Arrange the active rows by stable ascending native keys before previewing or exporting:

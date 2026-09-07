@@ -230,6 +230,7 @@ def test_cli_json_lists_declared_command_effects_without_session(monkeypatch, ca
   assert entry_by_name["set"]["effects"] == ["control"]
   assert entry_by_name["label"]["effects"] == ["read", "write", "control"]
   assert entry_by_name["missing"]["effects"] == ["read"]
+  assert entry_by_name["assert"]["effects"] == ["read"]
   assert entry_by_name["sort"]["effects"] == ["read", "write"]
 
 

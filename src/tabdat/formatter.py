@@ -24,6 +24,7 @@ from tabdat.errors import (
 )
 from tabdat.models import (
   ActivateResult,
+  AssertResult,
   BayesMcmcResult,
   BayesRegressionResult,
   CfRegressionResult,
@@ -94,6 +95,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   CommandExplainResult: "CommandExplainResult",
   LoadResult: "LoadResult",
   ActivateResult: "ActivateResult",
+  AssertResult: "AssertResult",
   DescribeResult: "DescribeResult",
   StatusResult: "StatusResult",
   DoctorResult: "DoctorResult",
@@ -454,6 +456,9 @@ def format_result(result: Result) -> str:
     return "\n".join(
       _table(("Variable", "Type", "Total", "Missing", "Nonmissing", "Missing %"), missing_rows)
     )
+
+  if isinstance(result, AssertResult):
+    return f"assertion passed: {result.checked} rows"
 
   if isinstance(result, CountResult):
     return f"Rows: {result.row_count}"

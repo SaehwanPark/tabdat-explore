@@ -70,6 +70,7 @@ OutputFormat = Literal["terminal", "json"]
 _EFFECT_CATEGORY_RANK = {category: index for index, category in enumerate(EFFECT_CATEGORY_ORDER)}
 _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "append": ("read", "write"),
+  "assert": ("read",),
   "bar": ("read", "plot"),
   "bayes": ("read",),
   "bayesplot": ("read", "plot"),
@@ -235,6 +236,13 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     syntax="missing [varlist]",
     help_topic="missing",
     arguments=(ArgumentDescriptor(name="variables", required=False),),
+    options=(),
+  ),
+  "assert": CommandSchemaResult(
+    name="assert",
+    syntax="assert <boolean-expression>",
+    help_topic="assert",
+    arguments=(ArgumentDescriptor(name="expression", required=True),),
     options=(),
   ),
   "count": CommandSchemaResult(
