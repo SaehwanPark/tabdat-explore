@@ -101,7 +101,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "ivregress": ("read",),
   "join": ("read", "write"),
   "keep": ("read", "write"),
-  "label": ("control",),
+  "label": ("read", "write", "control"),
   "lasso": ("read",),
   "lincom": ("read",),
   "logit": ("read",),
@@ -363,7 +363,7 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
   ),
   "label": CommandSchemaResult(
     name="label",
-    syntax="label variable|define|values|list|drop ...",
+    syntax="label variable|define|values|list|drop|save|use ...",
     help_topic="label",
     arguments=(
       ArgumentDescriptor(name="subcommand", required=True),

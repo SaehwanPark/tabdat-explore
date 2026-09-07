@@ -46,3 +46,20 @@ If the destination file already exists, TabDat prevents accidental overwrites un
 tabdat> save cleaned_cohort.parquet, replace
 Overwritten: cleaned_cohort.parquet (15000 rows, 12 columns)
 ```
+
+## Reusing data-dictionary labels
+
+Variable labels and value-label sets can be saved separately as a deterministic, versioned TabDat JSON
+file and applied to another active dataset with matching columns:
+
+```text
+tabdat> label save labels.json, replace
+Saved label dictionary: labels.json
+tabdat> label use labels.json
+Loaded label dictionary: labels.json
+```
+
+`label use` validates every variable and value-label attachment before changing the active metadata.
+Malformed dictionaries and mismatched datasets fail atomically. This JSON format is TabDat-native; it
+is inspired by familiar Stata/SAS/SPSS data-dictionary workflows and is not a claim of direct native
+`.dta`, SAS catalog, or `.sav` compatibility.

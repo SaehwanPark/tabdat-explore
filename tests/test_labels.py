@@ -61,6 +61,15 @@ def test_parse_label_commands() -> None:
     names=("sexlbl", "other"),
   )
   assert parse_command("label drop sexlbl") == LabelCommand(action="drop", names=("sexlbl",))
+  assert parse_command("label save labels.json, replace") == LabelCommand(
+    action="save",
+    path=Path("labels.json"),
+    replace=True,
+  )
+  assert parse_command('label use "labels with space.json"') == LabelCommand(
+    action="use",
+    path=Path("labels with space.json"),
+  )
 
 
 def test_parse_label_rejects_invalid_forms() -> None:
@@ -70,8 +79,12 @@ def test_parse_label_rejects_invalid_forms() -> None:
     parse_command("label define sexlbl 0 Male")
   with pytest.raises(ParseError, match="at least one label set name"):
     parse_command("label drop")
-  with pytest.raises(ParseError, match="variable\\|define\\|values\\|list\\|drop"):
+  with pytest.raises(ParseError, match="variable\\|define\\|values\\|list\\|drop\\|save\\|use"):
     parse_command("label note age")
+  with pytest.raises(ParseError, match="label use unsupported option"):
+    parse_command("label use labels.json, replace")
+  with pytest.raises(ParseError, match="label save expects exactly one path"):
+    parse_command("label save")
 
 
 def test_label_variable_define_values_list_and_describe(sample_parquet: Path) -> None:
