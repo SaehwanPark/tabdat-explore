@@ -85,6 +85,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "describe": ("read",),
   "doctor": ("read",),
   "duplicates": ("read",),
+  "datasignature": ("read",),
   "did": ("read",),
   "dml": ("read",),
   "drdid": ("read",),
@@ -244,6 +245,13 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     syntax="duplicates [report] [varlist]",
     help_topic="duplicates",
     arguments=(ArgumentDescriptor(name="variables", required=False),),
+    options=(),
+  ),
+  "datasignature": CommandSchemaResult(
+    name="datasignature",
+    syntax="datasignature",
+    help_topic="datasignature",
+    arguments=(),
     options=(),
   ),
   "assert": CommandSchemaResult(

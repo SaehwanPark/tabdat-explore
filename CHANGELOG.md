@@ -22,6 +22,8 @@ All notable project changes are tracked here.
   deterministic errors, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 - Added read-only `duplicates [report] [varlist]` quality reports with null-aware duplicate-group,
   surplus-row, and maximum-copy counts across eager, DuckDB-lazy, and Polars-lazy execution.
+- Added read-only `datasignature` SHA-256 fingerprints for public schema, ordered rows, and cell
+  values, with deterministic null/non-finite encoding and Polars-lazy plan preservation.
 
 ## [0.24.1] — 2026-08-28
 

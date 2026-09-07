@@ -139,6 +139,13 @@ Rows in duplicate groups: 2
 Extra duplicate rows: 1
 Maximum copies: 2
 
+tabdat> datasignature
+Data signature
+Algorithm: sha256
+Rows: 3
+Columns: 4
+Signature: <64 lowercase hexadecimal characters>
+
 tabdat> sql select sex, avg(bmi) as mean_bmi from active group by sex order by sex
 sex  mean_bmi
 F    25
@@ -164,7 +171,7 @@ and `label use labels.json`.
 
 | Area | Commands | What they help with |
 |------|----------|---------------------|
-| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `duplicates`, `head`, `count`, `status`, `doctor` | Open data, check state, profile quality, and diagnose environment |
+| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `duplicates`, `datasignature`, `head`, `count`, `status`, `doctor` | Open data, check state, profile quality, verify reproducibility, and diagnose environment |
 | Quality and transform | `assert`, `keep`, `drop`, `select`, `sort`, `generate`, `rename`, `recode`, `label` | Validate, filter, order, derive columns, and manage reusable data-dictionary metadata |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |

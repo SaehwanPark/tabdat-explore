@@ -191,6 +191,13 @@ class DuplicatesCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class DatasignatureCommand:
+  """Command to fingerprint the active dataset for reproducibility checks."""
+
+  pass
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class AssertCommand:
   """Command to validate a boolean predicate across every active row."""
 
@@ -827,6 +834,7 @@ Command = (
   | CodebookCommand
   | MissingCommand
   | DuplicatesCommand
+  | DatasignatureCommand
   | AssertCommand
   | CountCommand
   | HeadCommand
@@ -1189,6 +1197,14 @@ class DuplicatesResult:
   duplicate_rows: int
   extra_rows: int
   max_copies: int
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DatasignatureResult:
+  algorithm: Literal["sha256"]
+  signature: str
+  row_count: int
+  column_count: int
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1719,6 +1735,7 @@ Result = (
   | CodebookResult
   | MissingResult
   | DuplicatesResult
+  | DatasignatureResult
   | AssertResult
   | CountResult
   | PreviewResult

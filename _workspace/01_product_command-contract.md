@@ -193,3 +193,103 @@ duplicates id name
   `SPEC.md`, architecture, and changelog remain aligned.
 - Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, and
   the repository verification profile.
+
+---
+
+# Command Contract: `datasignature`
+
+## Product and roadmap fit
+
+`datasignature` is a read-only reproducibility and data-integrity fingerprint inspired by Stata 19
+`datasignature`, SAS `PROC COMPARE`, and SPSS validation workflows. It gives terminal analysts a
+small, machine-readable way to record whether the active data values and schema changed, without
+adding a proprietary metadata store, mutating the dataset, or claiming compatibility with those
+products. It is a bounded Phase 24 stabilization improvement: a deterministic trust primitive rather
+than a new estimator or broad comparison framework.
+
+## Syntax
+
+```text
+datasignature
+```
+
+The command accepts no varlist, options, `if` clause, assignment, or `by:` prefix.
+
+## Semantics
+
+- Requires an active dataset and scans all public columns in schema order.
+- The SHA-256 signature covers a versioned TabDat framing header, canonicalized public column names
+  and logical types, active row order, and every cell value. Nulls, booleans, strings, numbers,
+  temporal values, decimals, bytes, and nested list/tuple/dict values use explicit deterministic
+  encodings; non-finite floats receive explicit tokens.
+- Schema and row order are intentionally included because TabDat treats the active relation's ordered
+  sequence as meaningful. Session-local variable/value labels, panel metadata, source path, backend,
+  and execution mode are not part of the signature.
+- The signature is a full read-only scan. Eager and DuckDB-lazy use bounded Python row batches;
+  Polars-lazy uses `collect_batches` and leaves the original lazy plan active. No active relation,
+  labels, panel metadata, named tables, or materialization state is changed.
+- The result also reports the scanned row and public-column counts. Empty datasets are valid and
+  return a schema-dependent signature with zero rows.
+- This is a TabDat-native fingerprint, not a byte-for-byte Parquet checksum: equivalent data stored
+  in supported execution modes should produce the same signature, while changing a value, schema,
+  null, or row order should change it.
+
+## Output
+
+Human success output:
+
+```text
+Data signature
+Algorithm: sha256
+Rows: 3
+Columns: 4
+Signature: <64 lowercase hexadecimal characters>
+```
+
+The structured result is:
+
+```json
+{
+  "schema_version": 1,
+  "result_type": "DatasignatureResult",
+  "data": {
+    "algorithm": "sha256",
+    "signature": "<64 lowercase hexadecimal characters>",
+    "row_count": 3,
+    "column_count": 4
+  }
+}
+```
+
+## Examples
+
+```text
+use survey.parquet, lazy engine=polars
+datasignature
+```
+
+A script can record the JSON `signature` and compare it before rerunning a reproducible analysis.
+
+## Invalid forms
+
+- `datasignature age`: parse error; the command fingerprints the complete active dataset.
+- `datasignature, fast`: parse error; algorithm shortcuts and machine-dependent modes are outside the
+  initial contract.
+- `datasignature if age > 0`: parse error; filtered signatures are not defined.
+- `datasignature = value`: parse error; the command is read-only.
+- `datasignature` without an active dataset: execution error with the standard no-active-dataset
+  behavior.
+
+## Acceptance
+
+- Parser tests cover the exact no-argument form and reject varlists, options, conditions, and
+  assignment syntax.
+- Backend/executor tests cover deterministic signatures, null/non-finite/temporal values, schema and
+  row-order sensitivity, empty datasets, unchanged state, equivalent eager/DuckDB-lazy/Polars-lazy
+  signatures, and unknown/no-active failure behavior.
+- CLI tests cover human output, JSON envelope, no-active-dataset errors, command schema/effects/help,
+  and shell completion.
+- Help, command reference/navigation, user-guide reproducibility guidance, architecture/spec/changelog,
+  and MCP EDA guidance remain aligned.
+- Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, wheel
+  packaging, and hosted CI.

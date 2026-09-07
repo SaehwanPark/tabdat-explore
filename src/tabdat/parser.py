@@ -24,6 +24,7 @@ from tabdat.models import (
   CvelasticnetCommand,
   CvlassoCommand,
   CvridgeCommand,
+  DatasignatureCommand,
   DecodeCommand,
   DescribeCommand,
   DidCommand,
@@ -112,6 +113,7 @@ _EXECUTABLE_COMMANDS = {
   "codebook",
   "missing",
   "duplicates",
+  "datasignature",
   "count",
   "head",
   "tail",
@@ -580,6 +582,18 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if variables and variables[0].lower() == "report" and not parts.argument_quoted[0]:
       variables = variables[1:]
     return DuplicatesCommand(variables=variables)
+
+  if parts.name == "datasignature":
+    if (
+      parts.arguments
+      or parts.condition is not None
+      or parts.options
+      or parts.expression is not None
+    ):
+      raise ParseError(
+        "datasignature does not accept arguments, if clauses, options, or assignment syntax"
+      )
+    return DatasignatureCommand()
 
   if parts.name == "count":
     has_unsupported_parts = (

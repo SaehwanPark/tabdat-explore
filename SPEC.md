@@ -692,6 +692,9 @@ and describe the active work with concise verification criteria.
   deterministic checked/failed diagnostics, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 - Added read-only `duplicates [report] [varlist]` reports with null-aware duplicate-group and
   surplus-row counts, empty-dataset behavior, and eager/DuckDB-lazy/Polars-lazy aggregate support.
+- Added read-only `datasignature` SHA-256 fingerprints for public schema, ordered rows, and cell
+  values, with explicit null/non-finite framing, deterministic cross-engine scans, and Polars-lazy
+  plan preservation.
 
 ## Future
 

@@ -77,6 +77,8 @@ from tabdat.models import (
   CvridgeCommand,
   CvridgeRegressionResult,
   DatasetInfo,
+  DatasignatureCommand,
+  DatasignatureResult,
   DecodeCommand,
   DescribeCommand,
   DescribeResult,
@@ -920,6 +922,16 @@ class Executor:
         duplicate_rows=counts[3],
         extra_rows=counts[4],
         max_copies=counts[5],
+      )
+
+    if isinstance(command, DatasignatureCommand):
+      dataset = self._require_active_dataset("datasignature")
+      signature, row_count = self.backend.datasignature(dataset)
+      return DatasignatureResult(
+        algorithm="sha256",
+        signature=signature,
+        row_count=row_count,
+        column_count=dataset.column_count,
       )
 
     if isinstance(command, AssertCommand):
@@ -6640,6 +6652,7 @@ class Executor:
         CountCommand,
         MissingCommand,
         DuplicatesCommand,
+        DatasignatureCommand,
         AssertCommand,
         HeadCommand,
         TailCommand,

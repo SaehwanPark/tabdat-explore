@@ -36,6 +36,21 @@ Set random seeds for reproducible estimation and sampling:
 seed 42
 ```
 
+### Data Signatures
+
+Use `datasignature` to record a deterministic, TabDat-native SHA-256 fingerprint before a
+reproducible analysis:
+
+```text
+use datasets/cohort_2026.parquet, lazy engine=polars
+datasignature
+```
+
+The signature covers public schema, active row order, and cell values, including explicit null and
+non-finite encodings. It excludes source paths, execution engines, and session-local labels. Save the
+JSON result's `signature` in a run manifest and compare it before rerunning an analysis. The command
+is read-only and preserves Polars-lazy plans.
+
 ### Macros & String Interpolation
 Define macros with `let` and interpolate them with `$name`:
 ```stata

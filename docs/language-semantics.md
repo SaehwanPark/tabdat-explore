@@ -63,6 +63,10 @@ unknown-variable error and follows the write-validation atomicity policy below.
   groups, rows in duplicate groups, surplus rows, and maximum group size without changing data.
   Empty datasets return zero counts; aggregate reports preserve Polars-lazy sessions. Listing,
   tagging, and dropping duplicate rows are intentionally not part of this command contract.
+- `datasignature` computes a versioned SHA-256 fingerprint of public schema, active row order, and
+  cell values with explicit null/non-finite encodings. It excludes source path, backend, execution
+  mode, and session-local labels. The scan is read-only, preserves Polars-lazy plans, and returns a
+  valid schema-dependent signature for an empty dataset.
 - `tabulate` and `bar` omit missing categories by default. Their `missing` option includes missing
   categories where the command supports it; bar charts display that category as `<missing>`.
 
