@@ -99,6 +99,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "ivregress": ("read",),
   "join": ("read", "write"),
   "keep": ("read", "write"),
+  "label": ("control",),
   "lasso": ("read",),
   "lincom": ("read",),
   "logit": ("read",),
@@ -340,6 +341,19 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="time_variable", required=False),
     ),
     options=(),
+  ),
+  "label": CommandSchemaResult(
+    name="label",
+    syntax='label variable|define|values|list|drop ...',
+    help_topic="label",
+    arguments=(
+      ArgumentDescriptor(name="subcommand", required=True),
+      ArgumentDescriptor(name="arguments", required=False),
+    ),
+    options=(
+      OptionDescriptor(name="clear", required=False),
+      OptionDescriptor(name="replace", required=False),
+    ),
   ),
   "sql": CommandSchemaResult(
     name="sql",

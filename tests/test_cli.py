@@ -77,7 +77,9 @@ def test_cli_runs_phase_1_commands(sample_parquet: Path, capsys) -> None:
   assert exit_code == 0
   assert "Loaded:" in captured.out
   assert "Rows: 3" in captured.out
-  assert "Variable  Type" in captured.out
+  assert "Variable" in captured.out
+  assert "Type" in captured.out
+  assert "Label" in captured.out
   assert "Variable  Count  Mean" in captured.out
   assert "age       3      42" in captured.out
   assert captured.err == ""

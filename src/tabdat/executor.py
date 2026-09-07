@@ -99,6 +99,9 @@ from tabdat.models import (
   IvRegressionResult,
   JoinCommand,
   KeepCommand,
+  LabelCommand,
+  LabelMetadata,
+  LabelResult,
   LassoCommand,
   LassoRegressionResult,
   LincomCommand,
@@ -165,6 +168,7 @@ from tabdat.models import (
   TtestResult,
   UnaryExpression,
   UseCommand,
+  ValueLabelSet,
   XtAbondCommand,
   XtAbondRegressionResult,
   XtDataCommand,
@@ -881,7 +885,11 @@ class Executor:
     if isinstance(command, CodebookCommand):
       dataset = self._require_active_dataset("codebook")
       codebook_rows = self.backend.codebook(dataset, command.variables)
-      return CodebookResult(rows=codebook_rows)
+      label_map = _variable_label_map(dataset.label_metadata)
+      enriched = tuple(
+        replace(row, variable_label=label_map.get(row.variable)) for row in codebook_rows
+      )
+      return CodebookResult(rows=enriched)
 
     if isinstance(command, CountCommand):
       dataset = self._require_active_dataset("count")
@@ -953,6 +961,9 @@ class Executor:
     if isinstance(command, PanelCommand):
       return self._execute_panel(command)
 
+    if isinstance(command, LabelCommand):
+      return self._execute_label(command)
+
     if isinstance(command, SqlCommand):
       return self._execute_sql(command)
 
@@ -1023,6 +1034,7 @@ class Executor:
         execution_mode="eager",
         lazy_engine=None,
         panel_metadata=dataset.panel_metadata,
+        label_metadata=dataset.label_metadata,
       )
       return SaveResult(command.path, saved_dataset)
 
@@ -1036,6 +1048,7 @@ class Executor:
         execution_mode="eager",
         lazy_engine=None,
         panel_metadata=dataset.panel_metadata,
+        label_metadata=dataset.label_metadata,
       )
       return ExportResult(command.path, exported_dataset)
 
@@ -1196,7 +1209,11 @@ class Executor:
       if dataset is None:
         raise UnknownTableError(f"unknown table: {table_name}")
       activated = self.backend.activate_named_table(table_name)
-      activated = replace(activated, panel_metadata=dataset.panel_metadata)
+      activated = replace(
+        activated,
+        panel_metadata=dataset.panel_metadata,
+        label_metadata=dataset.label_metadata,
+      )
       self._set_active_dataset(activated, active_table_name=table_name)
       return ActivateResult(table_name=table_name, dataset=activated)
 
@@ -1429,6 +1446,151 @@ class Executor:
     updated = replace(dataset, panel_metadata=metadata)
     self._set_active_dataset(updated)
     return PanelResult(action="set", metadata=metadata)
+
+  def _execute_label(self, command: LabelCommand) -> LabelResult:
+    dataset = self._require_active_dataset("label")
+    metadata = dataset.label_metadata or LabelMetadata()
+    if command.action == "variable":
+      return self._execute_label_variable(dataset, metadata, command)
+    if command.action == "define":
+      return self._execute_label_define(dataset, metadata, command)
+    if command.action == "values":
+      return self._execute_label_values(dataset, metadata, command)
+    if command.action == "list":
+      return self._execute_label_list(metadata, command)
+    return self._execute_label_drop(dataset, metadata, command)
+
+  def _execute_label_variable(
+    self,
+    dataset: DatasetInfo,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if command.variable is None:
+      raise ExecutionError("label variable expects a variable name")
+    _require_columns_exist("label", dataset, (command.variable,))
+    labels = dict(metadata.variable_labels)
+    if command.clear:
+      labels.pop(command.variable, None)
+      message = f"Cleared variable label for {command.variable}"
+    else:
+      if command.text is None:
+        raise ExecutionError("label variable expects quoted text")
+      labels[command.variable] = command.text
+      message = f"Labeled variable {command.variable}"
+    next_metadata = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=tuple(sorted(labels.items())),
+        value_sets=metadata.value_sets,
+        attachments=metadata.attachments,
+      )
+    )
+    self._set_active_dataset(replace(dataset, label_metadata=next_metadata))
+    return LabelResult(action="variable", message=message, metadata=next_metadata)
+
+  def _execute_label_define(
+    self,
+    dataset: DatasetInfo,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if command.set_name is None:
+      raise ExecutionError("label define expects a label set name")
+    existing = {item.name: item for item in metadata.value_sets}
+    if command.set_name in existing and not command.replace:
+      raise ExecutionError(f"label define set already exists: {command.set_name} (use , replace)")
+    existing[command.set_name] = ValueLabelSet(command.set_name, command.mappings)
+    next_metadata = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=metadata.variable_labels,
+        value_sets=tuple(sorted(existing.values(), key=lambda item: item.name)),
+        attachments=metadata.attachments,
+      )
+    )
+    self._set_active_dataset(replace(dataset, label_metadata=next_metadata))
+    verb = "Replaced" if command.replace else "Defined"
+    return LabelResult(
+      action="define",
+      message=f"{verb} value label set {command.set_name}",
+      metadata=next_metadata,
+    )
+
+  def _execute_label_values(
+    self,
+    dataset: DatasetInfo,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if command.variable is None:
+      raise ExecutionError("label values expects a variable name")
+    _require_columns_exist("label", dataset, (command.variable,))
+    attachments = dict(metadata.attachments)
+    if command.clear:
+      attachments.pop(command.variable, None)
+      message = f"Cleared value labels for {command.variable}"
+    else:
+      if command.set_name is None:
+        raise ExecutionError("label values expects a label set name")
+      set_names = {item.name for item in metadata.value_sets}
+      if command.set_name not in set_names:
+        raise ExecutionError(f"label values unknown label set: {command.set_name}")
+      attachments[command.variable] = command.set_name
+      message = f"Attached value label set {command.set_name} to {command.variable}"
+    next_metadata = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=metadata.variable_labels,
+        value_sets=metadata.value_sets,
+        attachments=tuple(sorted(attachments.items())),
+      )
+    )
+    self._set_active_dataset(replace(dataset, label_metadata=next_metadata))
+    return LabelResult(action="values", message=message, metadata=next_metadata)
+
+  def _execute_label_list(
+    self,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if command.names:
+      wanted = set(command.names)
+      available = {item.name for item in metadata.value_sets}
+      missing = sorted(wanted - available)
+      if missing:
+        raise ExecutionError(f"label list unknown label set: {', '.join(missing)}")
+      filtered = LabelMetadata(
+        variable_labels=metadata.variable_labels,
+        value_sets=tuple(item for item in metadata.value_sets if item.name in wanted),
+        attachments=tuple(pair for pair in metadata.attachments if pair[1] in wanted),
+      )
+      return LabelResult(action="list", message="Label dictionary", metadata=filtered)
+    return LabelResult(action="list", message="Label dictionary", metadata=metadata)
+
+  def _execute_label_drop(
+    self,
+    dataset: DatasetInfo,
+    metadata: LabelMetadata,
+    command: LabelCommand,
+  ) -> LabelResult:
+    if not command.names:
+      raise ExecutionError("label drop expects at least one label set name")
+    available = {item.name for item in metadata.value_sets}
+    missing = sorted(set(command.names) - available)
+    if missing:
+      raise ExecutionError(f"label drop unknown label set: {', '.join(missing)}")
+    drop_names = set(command.names)
+    next_metadata = _normalize_label_metadata(
+      LabelMetadata(
+        variable_labels=metadata.variable_labels,
+        value_sets=tuple(item for item in metadata.value_sets if item.name not in drop_names),
+        attachments=tuple(pair for pair in metadata.attachments if pair[1] not in drop_names),
+      )
+    )
+    self._set_active_dataset(replace(dataset, label_metadata=next_metadata))
+    return LabelResult(
+      action="drop",
+      message=f"Dropped label set(s): {', '.join(command.names)}",
+      metadata=next_metadata,
+    )
 
   def _record_transform(
     self,
@@ -6214,7 +6376,11 @@ class Executor:
       return
     if self.state.active_table_name is not None:
       updated = self.backend.store_active_as_named_table(self.state.active_table_name)
-      updated = replace(updated, panel_metadata=dataset.panel_metadata)
+      updated = replace(
+        updated,
+        panel_metadata=dataset.panel_metadata,
+        label_metadata=dataset.label_metadata,
+      )
       self.state.active_dataset = updated
       self.state.tables[self.state.active_table_name] = updated
       return
@@ -6311,7 +6477,11 @@ class Executor:
     dataset = self._require_active_dataset("materialize")
     self.backend.begin_polars_materialization()
     materialized = self.backend.materialize_polars_lazy(dataset.path)
-    materialized = replace(materialized, panel_metadata=dataset.panel_metadata)
+    materialized = replace(
+      materialized,
+      panel_metadata=dataset.panel_metadata,
+      label_metadata=dataset.label_metadata,
+    )
     self.state.active_dataset = materialized
     self._pending_materialization_reason = "polars_fallback"
 
@@ -9911,11 +10081,14 @@ def _use_table_name(command: UseCommand) -> str:
 def _preserve_panel_metadata(previous: DatasetInfo, next_dataset: DatasetInfo) -> DatasetInfo:
   metadata = previous.panel_metadata
   if metadata is None:
-    return next_dataset
-  next_columns = {column.name for column in next_dataset.columns}
-  if metadata.id_variable in next_columns and metadata.time_variable in next_columns:
-    return replace(next_dataset, panel_metadata=metadata)
-  return replace(next_dataset, panel_metadata=None)
+    preserved = next_dataset
+  else:
+    next_columns = {column.name for column in next_dataset.columns}
+    if metadata.id_variable in next_columns and metadata.time_variable in next_columns:
+      preserved = replace(next_dataset, panel_metadata=metadata)
+    else:
+      preserved = replace(next_dataset, panel_metadata=None)
+  return _preserve_label_metadata(previous, preserved)
 
 
 def _rename_panel_metadata(
@@ -9926,10 +10099,77 @@ def _rename_panel_metadata(
 ) -> DatasetInfo:
   metadata = previous.panel_metadata
   if metadata is None:
+    renamed = next_dataset
+  else:
+    id_variable = new_name if metadata.id_variable == old_name else metadata.id_variable
+    time_variable = new_name if metadata.time_variable == old_name else metadata.time_variable
+    renamed = replace(next_dataset, panel_metadata=PanelMetadata(id_variable, time_variable))
+  return _rename_label_metadata(previous, renamed, old_name, new_name)
+
+
+def _preserve_label_metadata(previous: DatasetInfo, next_dataset: DatasetInfo) -> DatasetInfo:
+  metadata = previous.label_metadata
+  if metadata is None:
     return next_dataset
-  id_variable = new_name if metadata.id_variable == old_name else metadata.id_variable
-  time_variable = new_name if metadata.time_variable == old_name else metadata.time_variable
-  return replace(next_dataset, panel_metadata=PanelMetadata(id_variable, time_variable))
+  next_columns = {column.name for column in next_dataset.columns}
+  variable_labels = tuple(pair for pair in metadata.variable_labels if pair[0] in next_columns)
+  attachments = tuple(pair for pair in metadata.attachments if pair[0] in next_columns)
+  next_metadata = _normalize_label_metadata(
+    LabelMetadata(
+      variable_labels=variable_labels,
+      value_sets=metadata.value_sets,
+      attachments=attachments,
+    )
+  )
+  return replace(next_dataset, label_metadata=next_metadata)
+
+
+def _rename_label_metadata(
+  previous: DatasetInfo,
+  next_dataset: DatasetInfo,
+  old_name: str,
+  new_name: str,
+) -> DatasetInfo:
+  metadata = previous.label_metadata
+  if metadata is None:
+    return next_dataset
+  variable_labels = tuple(
+    (new_name if name == old_name else name, text) for name, text in metadata.variable_labels
+  )
+  attachments = tuple(
+    (new_name if name == old_name else name, set_name) for name, set_name in metadata.attachments
+  )
+  next_metadata = _normalize_label_metadata(
+    LabelMetadata(
+      variable_labels=variable_labels,
+      value_sets=metadata.value_sets,
+      attachments=attachments,
+    )
+  )
+  return replace(next_dataset, label_metadata=next_metadata)
+
+
+def _normalize_label_metadata(metadata: LabelMetadata) -> LabelMetadata | None:
+  if not metadata.variable_labels and not metadata.value_sets and not metadata.attachments:
+    return None
+  return metadata
+
+
+def _variable_label_map(metadata: LabelMetadata | None) -> dict[str, str]:
+  if metadata is None:
+    return {}
+  return dict(metadata.variable_labels)
+
+
+def _require_columns_exist(
+  command_name: str,
+  dataset: DatasetInfo,
+  variables: tuple[str, ...],
+) -> None:
+  available = {column.name for column in dataset.columns}
+  missing = [name for name in variables if name not in available]
+  if missing:
+    raise UnknownVariableError(f"{command_name} unknown variable: {', '.join(missing)}")
 
 
 def _touches_panel_metadata(metadata: PanelMetadata | None, variable: str) -> bool:

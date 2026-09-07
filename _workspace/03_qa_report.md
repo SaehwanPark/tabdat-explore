@@ -1,18 +1,15 @@
-# QA Report: MathJax LaTeX Rendering Integration
+# QA Report: Variable/Value Labels
 
-## Disposition: pass
+## Verdict
+`pass`
 
-## 1. Boundary & Cross-Surface Checks
-- **MkDocs Configuration (`mkdocs.yml`)**: Correctly registers `pymdownx.arithmatex` with `generic: true` and includes `extra_javascript` paths.
-- **Client Script (`docs/javascripts/mathjax.js`)**: Valid syntax, correctly handles `document$` subscriber for MkDocs Material instant navigation, specifies `ignoreHtmlClass` and `processHtmlClass` matching arithmatex output.
-- **Documentation Migration (`docs/reference-validation-matrix.md`)**: Replaced all `$` delimiters with `\(` / `\)`. Verified in built HTML that MathJax span wrappers are created.
-- **Contributor Guidelines (`CONTRIBUTING.md`, `docs/contributing.md`)**: Clear instructions added for inline `\( .. \)` and display `\\[ .. \\]` notation.
-- **No Unintended Changes**: No codebase logic modified; no version bump applied.
+## Boundary checks
+- Contract ↔ parser: all contracted forms parse; invalid forms error
+- Parser ↔ executor: LabelCommand actions mutate LabelMetadata atomically
+- Executor ↔ formatter: describe/codebook show variable labels; label list/drop messages stable
+- Registry ↔ docs: command-reference, help topic, effects, schema aligned (docs alignment script pass)
+- Tests: focused + full suite green (1268)
 
-## 2. Test Execution
-- `uv run mkdocs build --strict` -> EXIT 0
-- `uv run python scripts/check_docs_alignment.py` -> EXIT 0
-- `uv run ruff check .` -> EXIT 0
-- `uv run ruff format --check .` -> EXIT 0
-- `uv run basedpyright` -> EXIT 0
-- `uv run pytest` -> 1262 passed (EXIT 0)
+## Residual risks
+- Value labels are stored but not yet rendered in `tabulate` (explicit non-goal)
+- Empty-after-clear metadata normalization is `None`; partial drops keep LabelMetadata

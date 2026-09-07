@@ -1,17 +1,31 @@
-# Implementation Report: MathJax LaTeX Math Support
+# Implementation Report: Variable/Value Labels
 
-## 1. Summary of Changes
-- Added `pymdownx.arithmatex` with `generic: true` to `mkdocs.yml`.
-- Added `extra_javascript` configuration in `mkdocs.yml` pointing to `javascripts/mathjax.js` and `https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js`.
-- Created `docs/javascripts/mathjax.js` configuring MathJax TeX input for `\(` / `\)` inline and `\[` / `\]` display delimiters, and subscribed to `document$` for page transition re-rendering.
-- Migrated mathematical formulas in `docs/reference-validation-matrix.md` to `\( ... \)`.
-- Updated `CONTRIBUTING.md` and `docs/contributing.md` with guidelines on MathJax LaTeX mathematical notation.
+## Contract consumed
+`_workspace/01_product_command-contract.md`
 
-## 2. Validation Performed
-1. `uv run python scripts/check_docs_alignment.py`: Passed (all links and anchors valid).
-2. `uv run mkdocs build --strict`: Passed without warnings or broken links.
-3. Verified HTML output in `site/reference-validation-matrix/index.html` contains `<span class="arithmatex">\( ... \)</span>` elements and MathJax script dependencies.
-4. `uv run ruff check .`: Passed (0 errors).
-5. `uv run ruff format --check .`: Passed (53 files formatted).
-6. `uv run basedpyright`: Passed (0 errors, 0 warnings, 0 notes).
-7. `uv run pytest`: 1262 tests passed.
+## Files changed
+- `src/tabdat/models.py` — `LabelCommand`, `LabelMetadata`, `ValueLabelSet`, `LabelResult`; `DatasetInfo.label_metadata`; `CodebookRow.variable_label`
+- `src/tabdat/parser.py` — token-based `label` parsing
+- `src/tabdat/executor.py` — label execution + metadata preserve/rename on dataset transforms
+- `src/tabdat/formatter.py` — describe/codebook Label column; `LabelResult` formatting
+- `src/tabdat/shell.py`, `src/tabdat/cli.py` — command registry, effects, schema
+- `src/tabdat/help/topics/label.md`
+- `docs/command-reference.md`, `docs/tabdat_forward_roadmap.md`, `SPEC.md`, `CHANGELOG.md`, `LESSONS.md`
+- `tests/test_labels.py`, `tests/test_cli.py`
+
+## Notes by boundary
+- Parser: dedicated tokenizer path (like `recode`) so quoted label text and signed values work.
+- Executor: session metadata only; no backend queries beyond schema existence checks.
+- Preserve helpers extended so panel + label metadata travel together across transforms.
+
+## Validation
+- `uv run pytest tests/test_labels.py` — pass
+- `uv run pytest` — 1268 passed
+- `uv run ruff check` / `ruff format` on touched modules — pass
+- `uv run basedpyright` on touched modules — 0 errors
+- `uv run python scripts/check_docs_alignment.py` — pass
+
+## Known gaps / follow-ups
+- Labeled `tabulate` cell display
+- Persist labels into Parquet / `.dta` round-trip
+- `encode` / `decode` convenience commands
