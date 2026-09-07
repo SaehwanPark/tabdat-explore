@@ -69,3 +69,48 @@
 rows, perform fuzzy/approximate matching, accept row filters/options, or establish a cross-tool
 compatibility promise. The existing verification profile's configured mypy stage and hosted CI remain
 separate follow-up gates.
+
+---
+
+# Implementation Report: `datasignature`
+
+## Contract consumed
+
+- `_workspace/01_product_command-contract.md` (`datasignature` section)
+
+## Delivered
+
+- Added typed `DatasignatureCommand`/`DatasignatureResult` models and exact no-argument parsing.
+- Added a versioned SHA-256 framing algorithm covering canonical public schema, active row order, and
+  cell values with explicit null, non-finite, temporal, decimal, binary, and nested-value encodings.
+- Added bounded eager/DuckDB-lazy row scans and Polars `collect_batches` scanning while preserving
+  the original Polars lazy plan and excluding the internal estimation-sample column.
+- Added executor dispatch, deterministic human/JSON formatting, CLI effect/schema discovery, shell
+  completion, MCP reproducibility guidance, packaged help, command docs, user-guide guidance,
+  language semantics, README, architecture/spec/changelog, and navigation updates.
+- Added focused parser, deterministic digest, row-order/schema sensitivity, null/non-finite/temporal/
+  decimal cross-engine, empty-dataset, eager/DuckDB-lazy/Polars-lazy, state-preservation, CLI,
+  schema/help/effect, and shell-completion coverage.
+
+## Validation
+
+- `uv run pytest -q tests/test_datasignature.py tests/test_duplicates.py tests/test_shell.py tests/test_cli.py tests/test_mcp.py` — 232 passed.
+- `uv run pytest -q` — 1,333 passed, 314 existing dependency warnings.
+- `uv run ruff check .` — passed.
+- `uv run ruff format --check .` — passed.
+- `uv run basedpyright` on changed source modules — 0 errors, 0 warnings, 0 notes.
+- `uv run python scripts/check_docs_alignment.py` — passed (links, command reference, and help-topic alignment).
+- `uv build` plus wheel inspection — passed; packaged `tabdat/help/topics/datasignature.md` is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-datasignature` — not runnable because
+  `mkdocs` is not installed in the current environment.
+- `git diff --check` — passed.
+- `verify_code` — pytest, build, and Ruff stages passed; the configured mypy stage remains blocked by
+  the repository's pre-existing duplicate `scripts/check_docs_alignment.py` module discovery (and
+  untyped optional imports when that discovery error is bypassed).
+
+## Known limits
+
+`datasignature` is a TabDat-native logical-data fingerprint, not a byte-level Parquet checksum or a
+compatibility implementation of Stata/SAS/SPSS signatures. It intentionally has no stored baseline,
+verify/reset subcommands, filtered signatures, algorithm options, metadata-label coverage, or repair
+workflow; scripts can persist and compare its JSON signature explicitly.

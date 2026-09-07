@@ -86,3 +86,65 @@ The report intentionally has no row-level listing, tagging, dropping, fuzzy matc
 compatibility promise. The repository's configured mypy stage may still report its documented
 pre-existing third-party import/module-discovery issues; hosted CI and strict MkDocs builds were not
 run locally.
+
+---
+
+# QA Report: `datasignature`
+
+## Verdict
+
+`pass` — no blocking cross-boundary mismatch found for the bounded reproducibility-fingerprint slice.
+
+## Boundaries checked
+
+- **Contract → parser:** exact no-argument `datasignature` syntax is executable; varlists, options,
+  `if`, and assignment forms fail deterministically.
+- **Parser → executor:** the typed command is dispatched before mutation paths, requires an active
+  dataset, and participates in the existing command-history/error lifecycle.
+- **Executor → backend:** public schema and row count are carried into a typed result; eager and
+  DuckDB-lazy scans use bounded Arrow batches, while Polars-lazy uses bounded `collect_batches` and
+  retains the original lazy plan.
+- **Backend → output:** the versioned SHA-256 framing covers ordered public schema and values with
+  explicit null/non-finite/temporal/decimal/nested encodings; human and JSON outputs share the same
+  `DatasignatureResult`.
+- **CLI/shell/help/MCP/docs:** command effects/schema discovery, completion, packaged help, command
+  references, language semantics, reproducibility guidance, MCP EDA workflow, README,
+  architecture/spec/changelog, and navigation are aligned.
+- **Tests → claims:** focused coverage includes exact digest determinism, row-order/schema changes,
+  null/non-finite/temporal/decimal values, empty data, state preservation, all execution modes,
+  human/JSON/error output, schema/effects/help, and completion.
+
+## Independent review loop
+
+Three local review passes were completed against the complete base-to-HEAD change:
+
+1. **Execution correctness:** parser routing, executor lifecycle, Arrow/Polars scan behavior,
+   lazy-plan preservation, error cleanup, and deterministic framing — no actionable findings.
+2. **Public contract coherence:** typed model/result union, JSON labels, CLI metadata, help,
+   completion, MCP guidance, docs, and roadmap/spec records — no actionable findings.
+3. **Boundary/edge review:** identifier quoting, timezone normalization, null/non-finite values,
+   nested values, batch memory bounds, row-order sensitivity, and packaging resources — no
+   actionable findings.
+
+## Evidence
+
+- `uv run pytest -q` — 1,333 passed, 314 existing dependency warnings.
+- Focused command/neighbor suite — 232 passed.
+- `uv run ruff check .` — passed.
+- `uv run ruff format --check .` — passed.
+- `uv run basedpyright` on changed source modules — 0 diagnostics.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `uv build` plus wheel inspection — passed; packaged `datasignature` help is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-datasignature` — unavailable because
+  `mkdocs` is not installed locally.
+- `git diff --check` — passed.
+- `verify_code` — pytest, build, and Ruff stages passed; configured mypy remains blocked by the
+  repository's pre-existing duplicate `scripts/check_docs_alignment.py` module discovery (with
+  untyped optional imports reported when that discovery error is bypassed).
+
+## Residual risk
+
+The signature is a TabDat-native logical-data fingerprint, not a byte-level Parquet checksum or a
+compatibility implementation of Stata/SAS/SPSS baseline/compare workflows. Hosted CI and strict
+MkDocs validation remain external gates; the full repository tests and documentation alignment pass
+locally.

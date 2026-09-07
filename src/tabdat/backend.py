@@ -1,11 +1,14 @@
 """DuckDB-backed dataset operations."""
 
+import hashlib
 import math
+import re
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal, Protocol, cast
 from urllib.error import URLError
 from urllib.parse import urlparse
 
@@ -121,6 +124,11 @@ ACTIVE_TABLE = "__tabdat_active"
 ACTIVE_VIEW = "active"
 NEXT_ACTIVE_TABLE = "__tabdat_next"
 NEXT_ACTIVE_VIEW = "__tabdat_next_view"
+_SIGNATURE_BATCH_SIZE = 65_536
+
+
+class _SignatureDigest(Protocol):
+  def update(self, data: bytes, /) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -972,6 +980,46 @@ class DuckDBBackend:
       int(cast(int, row[4])),
       int(cast(int, row[5])),
     )
+
+  def datasignature(self, dataset: DatasetInfo) -> tuple[str, int]:
+    """Return a versioned SHA-256 fingerprint and row count for public active data.
+
+    The scan is intentionally row-order preserving and excludes TabDat's internal estimation
+    column. Eager/DuckDB-lazy rows are consumed in bounded batches; a Polars-lazy plan is
+    collected in bounded batches without replacing the plan stored on the backend.
+    """
+    public_columns = tuple(column.name for column in dataset.columns)
+    digest = hashlib.sha256()
+    _initialize_signature(digest, dataset.columns)
+    row_count = 0
+
+    if self._polars_lazy_frame is not None:
+      lazy_frame = self._require_polars_lazy_frame("datasignature")
+      try:
+        batches = lazy_frame.select(list(public_columns)).collect_batches(
+          chunk_size=_SIGNATURE_BATCH_SIZE,
+          maintain_order=True,
+        )
+        for frame in batches:
+          for row in frame.iter_rows(named=False):
+            _update_signature_row(digest, row)
+            row_count += 1
+      except (PolarsError, ValueError) as exc:
+        raise ExecutionError("datasignature failed") from exc
+      return digest.hexdigest(), row_count
+
+    try:
+      reader = self._connection.execute(
+        f"select {_select_list(public_columns)} from {ACTIVE_TABLE}"
+      ).to_arrow_reader(_SIGNATURE_BATCH_SIZE)
+      for batch in reader:
+        for values in batch.to_pylist():
+          row = tuple(values[name] for name in public_columns)
+          _update_signature_row(digest, row)
+          row_count += 1
+    except Exception as exc:
+      raise ExecutionError("datasignature failed") from exc
+    return digest.hexdigest(), row_count
 
   def assert_rows(self, dataset: DatasetInfo, expression: Expression) -> tuple[int, int]:
     self.validate_predicate(dataset, expression)
@@ -2662,6 +2710,129 @@ class DuckDBBackend:
       self._connection.execute("rollback")
     except duckdb.Error:
       pass
+
+
+def _initialize_signature(digest: _SignatureDigest, columns: Sequence[ColumnInfo]) -> None:
+  digest.update(b"tabdat-datasignature/v1\x00")
+  _update_signature_token(digest, b"schema")
+  for column in columns:
+    _update_signature_token(digest, b"column")
+    _update_signature_token(digest, _signature_text(column.name))
+    _update_signature_token(
+      digest,
+      _signature_text(_canonical_signature_type(column.data_type)),
+    )
+
+
+def _update_signature_row(digest: _SignatureDigest, row: Sequence[object]) -> None:
+  _update_signature_token(digest, b"row")
+  for value in row:
+    _update_signature_token(digest, _signature_value(value))
+
+
+def _update_signature_token(digest: _SignatureDigest, token: bytes) -> None:
+  digest.update(len(token).to_bytes(8, "big"))
+  digest.update(token)
+
+
+def _signature_text(value: str) -> bytes:
+  return b"T" + value.encode("utf-8")
+
+
+def _signature_value(value: object) -> bytes:
+  if value is None:
+    return b"N"
+  if isinstance(value, bool):
+    return b"B1" if value else b"B0"
+  if isinstance(value, int):
+    return b"I" + str(value).encode("ascii")
+  if isinstance(value, float):
+    if math.isnan(value):
+      return b"Fnan"
+    if math.isinf(value):
+      return b"Finf" if value > 0 else b"F-inf"
+    return b"F" + value.hex().encode("ascii")
+  if isinstance(value, Decimal):
+    return b"D" + format(value, "f").encode("ascii")
+  if isinstance(value, datetime):
+    normalized = value.astimezone(UTC) if value.tzinfo is not None else value
+    return b"Z" + normalized.isoformat().encode("utf-8")
+  if isinstance(value, date):
+    return b"A" + value.isoformat().encode("ascii")
+  if isinstance(value, time):
+    return b"H" + value.isoformat().encode("ascii")
+  if isinstance(value, str):
+    return b"S" + value.encode("utf-8")
+  if isinstance(value, (bytes, bytearray, memoryview)):
+    return b"Y" + bytes(value)
+  if isinstance(value, (list, tuple)):
+    parts = [b"L", str(len(value)).encode("ascii")]
+    parts.extend(_signature_part(_signature_value(item)) for item in value)
+    return b"".join(parts)
+  if isinstance(value, Mapping):
+    entries = sorted(
+      (
+        _signature_value(key),
+        _signature_value(item),
+      )
+      for key, item in value.items()
+    )
+    parts = [b"M", str(len(entries)).encode("ascii")]
+    parts.extend(_signature_part(key) + _signature_part(item) for key, item in entries)
+    return b"".join(parts)
+  type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+  return b"R" + type_name.encode("utf-8") + b":" + repr(value).encode("utf-8")
+
+
+def _signature_part(value: bytes) -> bytes:
+  return len(value).to_bytes(8, "big") + value
+
+
+def _canonical_signature_type(data_type: str) -> str:
+  normalized = "".join(data_type.upper().split())
+  aliases = {
+    "TINYINT": "INT8",
+    "SMALLINT": "INT16",
+    "INTEGER": "INT32",
+    "BIGINT": "INT64",
+    "HUGEINT": "INT128",
+    "UTINYINT": "UINT8",
+    "USMALLINT": "UINT16",
+    "UINTEGER": "UINT32",
+    "UBIGINT": "UINT64",
+    "UHUGEINT": "UINT128",
+    "FLOAT": "FLOAT32",
+    "REAL": "FLOAT32",
+    "DOUBLE": "FLOAT64",
+    "BOOLEAN": "BOOL",
+    "BOOL": "BOOL",
+    "VARCHAR": "STRING",
+    "TEXT": "STRING",
+    "CATEGORICAL": "STRING",
+    "ENUM": "STRING",
+  }
+  if normalized in aliases:
+    return aliases[normalized]
+  if normalized.startswith("DECIMAL(PRECISION="):
+    match = re.fullmatch(r"DECIMAL\(PRECISION=(\d+),SCALE=(\d+)\)", normalized)
+    if match is not None:
+      return f"DECIMAL({match.group(1)},{match.group(2)})"
+  if normalized.startswith("DATETIME(TIME_UNIT="):
+    unit_match = re.search(r"TIME_UNIT='?([A-Z]+)'?", normalized)
+    timezone_match = re.search(r"TIME_ZONE='?([^,')]+)'?", normalized)
+    if unit_match is not None:
+      timezone = timezone_match.group(1) if timezone_match is not None else "NONE"
+      timezone_suffix = "" if timezone == "NONE" else "_TZ"
+      return f"TIMESTAMP_{unit_match.group(1)}{timezone_suffix}"
+  if normalized in {"DATETIME", "TIMESTAMP"}:
+    return "TIMESTAMP_US"
+  if normalized in {"TIMESTAMPTZ", "TIMESTAMPWITHTIMEZONE"}:
+    return "TIMESTAMP_US_TZ"
+  if normalized.startswith("LIST(") and normalized.endswith(")"):
+    return f"LIST({_canonical_signature_type(normalized[5:-1])})"
+  if normalized.endswith("[]"):
+    return f"LIST({_canonical_signature_type(normalized[:-2])})"
+  return normalized
 
 
 def _missing_row(

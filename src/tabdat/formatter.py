@@ -37,6 +37,7 @@ from tabdat.models import (
   CvelasticnetRegressionResult,
   CvlassoRegressionResult,
   CvridgeRegressionResult,
+  DatasignatureResult,
   DescribeResult,
   DidRegressionResult,
   DmlRegressionResult,
@@ -104,6 +105,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   CodebookResult: "CodebookResult",
   MissingResult: "MissingResult",
   DuplicatesResult: "DuplicatesResult",
+  DatasignatureResult: "DatasignatureResult",
   CountResult: "CountResult",
   PreviewResult: "PreviewResult",
   TransformResult: "TransformResult",
@@ -471,6 +473,17 @@ def format_result(result: Result) -> str:
         f"Rows in duplicate groups: {result.duplicate_rows}",
         f"Extra duplicate rows: {result.extra_rows}",
         f"Maximum copies: {result.max_copies}",
+      )
+    )
+
+  if isinstance(result, DatasignatureResult):
+    return "\n".join(
+      (
+        "Data signature",
+        f"Algorithm: {result.algorithm}",
+        f"Rows: {result.row_count}",
+        f"Columns: {result.column_count}",
+        f"Signature: {result.signature}",
       )
     )
 

@@ -98,11 +98,12 @@ def handle_get_prompt(name: str, arguments: dict[str, Any] | None = None) -> MCP
       f"Please perform an exploratory data analysis on `{file_path}`{focus_str}.\n\n"
       "Recommended TabDat steps:\n"
       f"1. Load and inspect structure: `use {file_path}` followed by `describe` and `count`.\n"
-      "2. Summarize numerical distributions: `summarize` (or `summarize <vars>`).\n"
-      "3. Inspect missingness, duplicates, and unique values: `missing`, `duplicates`, `codebook`, "
+      "2. Record a reproducibility baseline: `datasignature`.\n"
+      "3. Summarize numerical distributions: `summarize` (or `summarize <vars>`).\n"
+      "4. Inspect missingness, duplicates, and unique values: `missing`, `duplicates`, `codebook`, "
       "and `tabulate <categorical_var>`.\n"
-      "4. Visualize key distributions: `histogram <var>` or `scatter <y> <x>`.\n"
-      "5. Provide a clear synthesis of findings and data quality notes."
+      "5. Visualize key distributions: `histogram <var>` or `scatter <y> <x>`.\n"
+      "6. Provide a clear synthesis of findings and data quality notes."
     )
     return MCPGetPromptResult(
       description=f"EDA Workflow for {file_path}",

@@ -209,6 +209,10 @@ for product-readiness work, not a portability guarantee.
 
 ### Reproducibility helpers
 
+Run `datasignature` after loading data to record a deterministic SHA-256 fingerprint of the public
+schema, active row order, and cell values. Its JSON `signature` can be stored in a run manifest;
+source paths, execution engines, and session-local labels are intentionally excluded.
+
 Script-only directives:
 
 ```stata

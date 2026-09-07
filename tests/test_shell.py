@@ -40,6 +40,7 @@ def test_completer_suggests_command_names() -> None:
     missing_completions = _completion_texts(TabdatCompleter(executor), "miss")
     duplicates_completions = _completion_texts(TabdatCompleter(executor), "dup")
     duplicates_report_completions = _completion_texts(TabdatCompleter(executor), "duplicates r")
+    datasignature_completions = _completion_texts(TabdatCompleter(executor), "datas")
     assert_completions = _completion_texts(TabdatCompleter(executor), "ass")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sor")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
@@ -54,6 +55,7 @@ def test_completer_suggests_command_names() -> None:
   assert missing_completions == ["missing"]
   assert duplicates_completions == ["duplicates"]
   assert duplicates_report_completions == ["report"]
+  assert datasignature_completions == ["datasignature"]
   assert assert_completions == ["assert"]
   assert sort_completions == ["sort"]
   assert help_completions == ["help"]

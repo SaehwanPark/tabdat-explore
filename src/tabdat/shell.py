@@ -29,6 +29,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "codebook",
   "missing",
   "duplicates",
+  "datasignature",
   "count",
   "head",
   "tail",
