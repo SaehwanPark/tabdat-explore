@@ -76,6 +76,7 @@ from tabdat.models import (
   ScatterCommand,
   SelectCommand,
   SetCommand,
+  SortCommand,
   SpregressCommand,
   SqlCommand,
   StatusCommand,
@@ -114,6 +115,7 @@ _EXECUTABLE_COMMANDS = {
   "drop",
   "select",
   "rename",
+  "sort",
   "generate",
   "replace",
   "tabulate",
@@ -585,6 +587,13 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if not parts.arguments:
       raise ParseError("select expects at least one variable")
     return SelectCommand(variables=parts.arguments)
+
+  if parts.name == "sort":
+    if parts.condition is not None or parts.options or parts.expression is not None:
+      raise ParseError("sort only accepts a variable list")
+    if not parts.arguments:
+      raise ParseError("sort expects at least one variable")
+    return SortCommand(variables=parts.arguments)
 
   if parts.name == "rename":
     if parts.condition is not None or parts.options or parts.expression is not None:

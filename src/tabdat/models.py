@@ -236,6 +236,13 @@ class RenameCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SortCommand:
+  """Command to stably sort the active rows by ascending native keys."""
+
+  variables: tuple[str, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class GenerateCommand:
   variable: str
   expression: Expression
@@ -812,6 +819,7 @@ Command = (
   | DropCommand
   | SelectCommand
   | RenameCommand
+  | SortCommand
   | GenerateCommand
   | ReplaceCommand
   | TabulateCommand

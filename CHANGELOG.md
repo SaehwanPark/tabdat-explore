@@ -16,6 +16,8 @@ All notable project changes are tracked here.
   loading validates variable references and attachments atomically and preserves lazy execution.
 - Added read-only `missing [varlist]` profiling for explicit-null counts, nonmissing counts, and
   missing percentages, including Polars-lazy aggregate scans that preserve lazy mode.
+- Added stable ascending `sort <varlist>` row ordering with native scalar keys, nulls-last behavior,
+  tie stability, metadata preservation, and Polars-lazy plan support.
 
 ## [0.24.1] — 2026-08-28
 
