@@ -69,6 +69,17 @@ Commit and publish this bounded slice as one PR, then stop without starting anot
 - `verify_code` — pytest, build, and Ruff passed; mypy remains red only on the documented
   pre-existing untyped imports and duplicate docs-check module discovery.
 
+## Independent review loop
+
+Three local review passes were completed against the base-to-HEAD diff:
+
+1. **Execution correctness:** parser routing, aggregate SQL/Polars metrics, null/empty behavior,
+   lazy preservation, and failure/state paths — no actionable findings.
+2. **Public contract coherence:** result typing/JSON, CLI effects/schema, completion, help, docs,
+   MCP guidance, and roadmap/spec alignment — no actionable findings.
+3. **Boundary/edge review:** identifier quoting, SQL injection surface, packaging resources,
+   performance shape, and regression coverage — no actionable findings.
+
 ## Residual risk
 
 The report intentionally has no row-level listing, tagging, dropping, fuzzy matching, or machine
