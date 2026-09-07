@@ -184,6 +184,13 @@ class MissingCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class DuplicatesCommand:
+  """Command to report duplicate key groups without changing the active dataset."""
+
+  variables: tuple[str, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class AssertCommand:
   """Command to validate a boolean predicate across every active row."""
 
@@ -819,6 +826,7 @@ Command = (
   | SummarizeCommand
   | CodebookCommand
   | MissingCommand
+  | DuplicatesCommand
   | AssertCommand
   | CountCommand
   | HeadCommand
@@ -1170,6 +1178,17 @@ class MissingRow:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class MissingResult:
   rows: tuple[MissingRow, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class DuplicatesResult:
+  variables: tuple[str, ...]
+  total_rows: int
+  unique_groups: int
+  duplicate_groups: int
+  duplicate_rows: int
+  extra_rows: int
+  max_copies: int
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1699,6 +1718,7 @@ Result = (
   | SummarizeResult
   | CodebookResult
   | MissingResult
+  | DuplicatesResult
   | AssertResult
   | CountResult
   | PreviewResult

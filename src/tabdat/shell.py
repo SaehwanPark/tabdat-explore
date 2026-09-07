@@ -28,6 +28,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "summarize",
   "codebook",
   "missing",
+  "duplicates",
   "count",
   "head",
   "tail",
@@ -104,6 +105,7 @@ _COLUMN_COMMANDS = {
   "summarize",
   "codebook",
   "missing",
+  "duplicates",
   "keep",
   "drop",
   "select",
@@ -263,6 +265,15 @@ class TabdatCompleter(Completer):
     command_name = stripped.split(maxsplit=1)[0].lower()
     if command_name in {"use", "join", "append"}:
       yield from _matching_completions(self._executor.state.tables.keys(), word)
+      return
+
+    if command_name == "duplicates":
+      if not re.match(r"^duplicates\s+report(?:\s|$)", stripped, re.IGNORECASE):
+        yield from _matching_completions(("report",), word)
+      yield from _matching_completions(
+        _column_names(self._executor.state.active_dataset),
+        word,
+      )
       return
 
     if command_name == "sql":

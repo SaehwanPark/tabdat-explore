@@ -690,6 +690,8 @@ and describe the active work with concise verification criteria.
   stable ties, metadata preservation, and Polars-lazy plan support.
 - Added read-only `assert <boolean-expression>` quality gates with false/missing failures,
   deterministic checked/failed diagnostics, and eager/DuckDB-lazy/Polars-lazy aggregate support.
+- Added read-only `duplicates [report] [varlist]` reports with null-aware duplicate-group and
+  surplus-row counts, empty-dataset behavior, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 
 ## Future
 

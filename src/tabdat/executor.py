@@ -89,6 +89,8 @@ from tabdat.models import (
   DrDidCommand,
   DrDidRegressionResult,
   DropCommand,
+  DuplicatesCommand,
+  DuplicatesResult,
   ElasticnetCommand,
   ElasticnetRegressionResult,
   EncodeCommand,
@@ -906,6 +908,19 @@ class Executor:
     if isinstance(command, MissingCommand):
       dataset = self._require_active_dataset("missing")
       return MissingResult(rows=self.backend.missingness(dataset, command.variables))
+
+    if isinstance(command, DuplicatesCommand):
+      dataset = self._require_active_dataset("duplicates")
+      counts = self.backend.duplicate_counts(dataset, command.variables)
+      return DuplicatesResult(
+        variables=command.variables or tuple(column.name for column in dataset.columns),
+        total_rows=counts[0],
+        unique_groups=counts[1],
+        duplicate_groups=counts[2],
+        duplicate_rows=counts[3],
+        extra_rows=counts[4],
+        max_copies=counts[5],
+      )
 
     if isinstance(command, AssertCommand):
       dataset = self._require_active_dataset("assert")
@@ -6624,6 +6639,7 @@ class Executor:
         DescribeCommand,
         CountCommand,
         MissingCommand,
+        DuplicatesCommand,
         AssertCommand,
         HeadCommand,
         TailCommand,

@@ -24,3 +24,48 @@
 ## Known limits
 
 `assert` intentionally has no options, `if`, `by`, assignment, row filtering, custom missing-value rules, or row-level diagnostics. Descending/expression sorting and richer workflows remain outside this slice.
+
+---
+
+# Implementation Report: `duplicates` quality report
+
+## Contract consumed
+
+- `_workspace/01_product_command-contract.md` (`duplicates` section)
+
+## Delivered
+
+- Added typed `DuplicatesCommand`/`DuplicatesResult` models and `duplicates [report] [varlist]`
+  parsing, including the quoted-identifier escape for a column literally named `report`.
+- Added DuckDB and Polars-lazy aggregate duplicate grouping with null-equal key semantics,
+  deterministic total/unique/duplicate/surplus/max-copy counts, empty-dataset handling, and no
+  active-relation mutation.
+- Preserved Polars-lazy plans by allowing duplicate reports through the read-only aggregate path;
+  unknown keys fail before any materialization or state update.
+- Added executor dispatch, human/JSON formatting, command effect/schema discovery, shell command,
+  `report`, and column completions, MCP data-quality prompt guidance, packaged help, command docs,
+  language semantics, README, architecture/spec/changelog, and command-reference navigation.
+- Fixed environment diagnostics to fall back to `tabdat.__version__` when broken distribution
+  metadata returns `None`; added a regression test for that packaging edge case.
+- Added focused parser, aggregate backend/executor, null/empty/no-duplicate, eager/DuckDB-lazy/
+  Polars-lazy, state-preservation, CLI, schema/help, and shell-completion tests.
+
+## Validation
+
+- `uv run pytest -q` — passed (1,322 tests; 314 existing dependency warnings).
+- `uv run pytest -q tests/test_duplicates.py tests/test_doctor.py tests/test_mcp.py tests/test_shell.py` — 52 passed.
+- `uv run ruff check .` — passed.
+- `uv run ruff format --check .` — passed (62 files already formatted).
+- `uv run basedpyright src` — 0 errors, 0 warnings, 0 notes.
+- `uv run python scripts/check_docs_alignment.py` — passed (links, command reference, and help-topic alignment).
+- `uv build` plus wheel inspection — passed; packaged `tabdat/help/topics/duplicates.md` is present.
+- `verify_code` — pytest, build, and Ruff stages passed; configured mypy remains red only on the
+  repository's pre-existing untyped imports (`arviz`, `bambi`, `libpysal`) and duplicate
+  `scripts/check_docs_alignment.py` module discovery.
+
+## Known limits
+
+`duplicates` intentionally reports aggregate counts only. It does not list, tag, or drop duplicate
+rows, perform fuzzy/approximate matching, accept row filters/options, or establish a cross-tool
+compatibility promise. The existing verification profile's configured mypy stage and hosted CI remain
+separate follow-up gates.

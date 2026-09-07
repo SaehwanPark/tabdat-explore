@@ -111,6 +111,26 @@ use summary
 file. An explicit `order by` sequence is preserved; `use <table>` restores that sequence. Add
 tie-breaker keys when ordered values can tie.
 
+### Duplicate-key quality checks
+
+Use `duplicates` to audit repeated key combinations before joins, reshapes, or exports:
+
+```text
+tabdat> duplicates report patient_id visit_date
+Duplicates report
+Key variables: patient_id visit_date
+Rows: 100
+Unique groups: 97
+Duplicate groups: 2
+Rows in duplicate groups: 5
+Extra duplicate rows: 3
+Maximum copies: 3
+```
+
+With no varlist, all public columns define the key. Null key values compare equal for this report,
+and the command is read-only; it does not list, tag, or drop rows. Aggregate execution preserves a
+Polars-lazy plan.
+
 ## Scripts
 
 TabDat scripts use the `.td` extension. Run them with:

@@ -38,6 +38,8 @@ def test_completer_suggests_command_names() -> None:
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
     status_completions = _completion_texts(TabdatCompleter(executor), "stat")
     missing_completions = _completion_texts(TabdatCompleter(executor), "miss")
+    duplicates_completions = _completion_texts(TabdatCompleter(executor), "dup")
+    duplicates_report_completions = _completion_texts(TabdatCompleter(executor), "duplicates r")
     assert_completions = _completion_texts(TabdatCompleter(executor), "ass")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sor")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
@@ -50,6 +52,8 @@ def test_completer_suggests_command_names() -> None:
   assert panel_completions == ["panel"]
   assert status_completions == ["status"]
   assert missing_completions == ["missing"]
+  assert duplicates_completions == ["duplicates"]
+  assert duplicates_report_completions == ["report"]
   assert assert_completions == ["assert"]
   assert sort_completions == ["sort"]
   assert help_completions == ["help"]
@@ -71,6 +75,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
     executor.execute(UseCommand(sample_parquet))
     completions = _completion_texts(TabdatCompleter(executor), "summarize b")
     missing_completions = _completion_texts(TabdatCompleter(executor), "missing c")
+    duplicates_completions = _completion_texts(TabdatCompleter(executor), "duplicates c")
     assert_completions = _completion_texts(TabdatCompleter(executor), "assert c")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sort c")
     panel_completions = _completion_texts(TabdatCompleter(executor), "panel s")
@@ -79,6 +84,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
 
   assert completions == ["bmi"]
   assert missing_completions == ["cost"]
+  assert duplicates_completions == ["cost"]
   assert assert_completions == ["cost"]
   assert sort_completions == ["cost"]
   assert panel_completions == ["sex"]
@@ -92,16 +98,16 @@ def test_completer_suggests_tabulate_options(sample_parquet: Path) -> None:
   finally:
     executor.close()
 
-    assert completions == [
-      "rows(",
-      "columns(",
-      "values(",
-      "stat(",
-      "row",
-      "col",
-      "missing",
-      "nolabel",
-    ]
+  assert completions == [
+    "rows(",
+    "columns(",
+    "values(",
+    "stat(",
+    "row",
+    "col",
+    "missing",
+    "nolabel",
+  ]
 
 
 def test_completer_suggests_bayesplot_kinds_and_options(sample_parquet: Path) -> None:
