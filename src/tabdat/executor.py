@@ -933,6 +933,7 @@ class Executor:
 
     if isinstance(command, TabulateCommand):
       dataset = self._require_active_dataset("tabulate")
+      category_labels = {} if command.nolabel else _category_label_lookups(dataset.label_metadata)
       headers, table_rows = self.backend.tabulate(
         dataset,
         command.row_variables,
@@ -943,6 +944,7 @@ class Executor:
         row_percent=command.row_percent,
         column_percent=command.column_percent,
         include_missing=command.include_missing,
+        category_labels=category_labels,
       )
       return TableResult(headers=headers, rows=table_rows)
 
@@ -6430,6 +6432,9 @@ class Executor:
       )
       if duplicate_dimensions:
         raise ExecutionError(f"by tabulate duplicate variable: {duplicate_dimensions[0]}")
+      category_labels = (
+        {} if command.command.nolabel else _category_label_lookups(dataset.label_metadata)
+      )
       headers, table_rows = self.backend.tabulate(
         dataset,
         command.command.row_variables,
@@ -6441,6 +6446,7 @@ class Executor:
         column_percent=command.command.column_percent,
         include_missing=command.command.include_missing,
         by_variables=command.groups,
+        category_labels=category_labels,
       )
       return TableResult(headers=headers, rows=table_rows)
     raise ExecutionError("by only supports summarize, count, and tabulate")
@@ -10159,6 +10165,24 @@ def _variable_label_map(metadata: LabelMetadata | None) -> dict[str, str]:
   if metadata is None:
     return {}
   return dict(metadata.variable_labels)
+
+
+def _category_label_lookups(
+  metadata: LabelMetadata | None,
+) -> dict[str, dict[object, str]]:
+  if metadata is None:
+    return {}
+  lookups: dict[str, dict[object, str]] = {}
+  sets = {item.name: item.mappings for item in metadata.value_sets}
+  for variable, set_name in metadata.attachments:
+    mapping = sets.get(set_name)
+    if mapping is None:
+      continue
+    labeled: dict[object, str] = {}
+    for key, text in mapping:
+      labeled[key] = text
+    lookups[variable] = labeled
+  return lookups
 
 
 def _require_columns_exist(

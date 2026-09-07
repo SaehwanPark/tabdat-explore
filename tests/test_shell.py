@@ -80,7 +80,16 @@ def test_completer_suggests_tabulate_options(sample_parquet: Path) -> None:
   finally:
     executor.close()
 
-  assert completions == ["rows(", "columns(", "values(", "stat(", "row", "col", "missing"]
+    assert completions == [
+      "rows(",
+      "columns(",
+      "values(",
+      "stat(",
+      "row",
+      "col",
+      "missing",
+      "nolabel",
+    ]
 
 
 def test_completer_suggests_bayesplot_kinds_and_options(sample_parquet: Path) -> None:
@@ -111,7 +120,16 @@ def test_completer_suggests_tabulate_options_after_compact_comma(
   finally:
     executor.close()
 
-  assert all_options == ["rows(", "columns(", "values(", "stat(", "row", "col", "missing"]
+  assert all_options == [
+    "rows(",
+    "columns(",
+    "values(",
+    "stat(",
+    "row",
+    "col",
+    "missing",
+    "nolabel",
+  ]
   assert row_option == ["rows(", "row"]
   assert row_start_positions == [-1, -1]
 

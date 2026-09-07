@@ -142,7 +142,7 @@ _COLUMN_COMMANDS = {
 }
 _USE_OPTIONS = ("lazy", "engine(", "delimiter(", "has_header(")
 _RECODE_OPTIONS = ("generate(", "replace")
-_TABULATE_OPTIONS = ("rows(", "columns(", "values(", "stat(", "row", "col", "missing")
+_TABULATE_OPTIONS = ("rows(", "columns(", "values(", "stat(", "row", "col", "missing", "nolabel")
 _COLLAPSE_OPTIONS = ("by(",)
 _HISTOGRAM_OPTIONS = ("bins=", "saving(", "noopen")
 _SCATTER_OPTIONS = ("saving(", "noopen")

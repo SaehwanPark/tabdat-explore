@@ -680,9 +680,7 @@ and describe the active work with concise verification criteria.
 
 ## Present
 
-- Implementing session-local variable/value labels (`label`) as a deepen-terminal-EDA slice:
-  - Stata/SPSS-inspired data-dictionary metadata without estimator expansion or broad compatibility
-  - `describe`/`codebook` surfacing; Parquet persistence and labeled `tabulate` deferred
+- Extending value-label UX: `tabulate` displays attached value labels by default with `nolabel` opt-out.
 
 ## Future
 

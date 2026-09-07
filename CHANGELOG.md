@@ -9,6 +9,8 @@ All notable project changes are tracked here.
 - Added session-local `label` command for Stata/SPSS-inspired variable labels and named value-label
   dictionaries (`label variable`, `label define`, `label values`, `label list`, `label drop`),
   surfaced in `describe` and `codebook`.
+- `tabulate` now renders attached value labels in category cells and wide headers by default;
+  use `, nolabel` to show raw codes.
 
 ## [0.24.1] — 2026-08-28
 

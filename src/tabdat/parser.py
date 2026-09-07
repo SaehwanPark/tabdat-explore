@@ -941,11 +941,20 @@ def _parse_tabulate(parts: _CommandParts) -> TabulateCommand:
     raise ParseError("tabulate does not accept assignment syntax")
 
   option_names = {option.name for option in parts.options}
-  unsupported = option_names - {"row", "col", "missing", "rows", "columns", "values", "stat"}
+  unsupported = option_names - {
+    "row",
+    "col",
+    "missing",
+    "nolabel",
+    "rows",
+    "columns",
+    "values",
+    "stat",
+  }
   if unsupported:
     raise ParseError(f"tabulate unsupported option: {', '.join(sorted(unsupported))}")
   for option in parts.options:
-    if option.name in {"row", "col", "missing"} and option.value is not True:
+    if option.name in {"row", "col", "missing", "nolabel"} and option.value is not True:
       raise ParseError(f"tabulate option {option.name} does not accept a value")
 
   explicit_rows = _single_identifier_tuple_option(parts.options, "rows", "tabulate")
@@ -991,6 +1000,7 @@ def _parse_tabulate(parts: _CommandParts) -> TabulateCommand:
     row_percent="row" in option_names,
     column_percent="col" in option_names,
     include_missing="missing" in option_names,
+    nolabel="nolabel" in option_names,
   )
 
 
