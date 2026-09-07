@@ -145,7 +145,7 @@ expected_exit_code: 0
 expected_stdout_contains:
   - "Loaded: artifacts/e2e/data/titanic.parquet"
   - "Rows:"
-  - "Variable  Type"
+  - "Variable" / "Type" / "Label"
   - "Variable  Count  Mean"
   - "Nonmissing"
   - "Distinct"

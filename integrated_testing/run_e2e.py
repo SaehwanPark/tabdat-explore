@@ -208,7 +208,9 @@ def s1_titanic_batch_core() -> ScenarioResult:
     stdout_contains=(
       "Loaded: artifacts/e2e/data/titanic.parquet",
       "Rows:",
-      "Variable  Type",
+      "Variable",
+      "Type",
+      "Label",
       "Variable  Count  Mean",
       "Nonmissing",
       "Distinct",
