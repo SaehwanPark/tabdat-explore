@@ -1,9 +1,7 @@
-# QA Report: Tabulate Value Labels
+# QA Report: encode / decode
 
 ## Verdict
-`pass` (local focused checks)
+`pass` (focused local tests)
 
-## Notes
-- Labels are display-only; ordering remains on raw values.
-- `nolabel` restores codes.
-- Full pytest deferred in wrap-up due to usage stop; CI will gate the PR.
+## Note
+CI will gate the PR; agentic loop stopped on secondary usage ≥ 98.5%.

@@ -1,19 +1,11 @@
-# Implementation Report: Tabulate Value-Label Display
+# Implementation Report: encode / decode
 
 ## Contract
 `_workspace/01_product_command-contract.md`
 
-## Changes
-- Parser/shell: `nolabel` flag on `tabulate`
-- Executor: builds category label lookups from session label metadata
-- Backend: display-only remapping for one-way cells and wide headers/index values
-- Help, CHANGELOG, SPEC, tests
-
 ## Validation
-- `uv run pytest tests/test_tabulate_labels.py` (+ shell/help updates)
-- `uv run basedpyright` on touched modules
-- `uv run ruff check/format`
-- `uv run python scripts/check_docs_alignment.py`
+- `uv run pytest tests/test_encode_decode.py` (6 passed)
+- ruff / basedpyright / docs alignment on wrap-up
 
-## Stop note
-Cursor primary usage exceeded 97%; wrapping Loop 2 and clearing the long-running goal per `codexbar.md` / user stop rule.
+## Stop
+Cursor secondary usage reached ~99.9% (>= 98.5% stop). Wrapping Loop 3 PR and clearing goal.

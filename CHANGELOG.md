@@ -11,6 +11,7 @@ All notable project changes are tracked here.
   surfaced in `describe` and `codebook`.
 - `tabulate` now renders attached value labels in category cells and wide headers by default;
   use `, nolabel` to show raw codes.
+- Added `encode` / `decode` for string↔labeled-integer conversion with automatic value-label sets.
 
 ## [0.24.1] — 2026-08-28
 

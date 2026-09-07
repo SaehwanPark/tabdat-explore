@@ -87,6 +87,8 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "dml": ("read",),
   "drdid": ("read",),
   "drop": ("read", "write"),
+  "encode": ("read", "write"),
+  "decode": ("read", "write"),
   "elasticnet": ("read",),
   "estat": ("read", "plot"),
   "exit": ("control",),
@@ -166,6 +168,23 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
       ArgumentDescriptor(name="rules", required=True),
     ),
     options=(OptionDescriptor(name="generate", required=False),),
+  ),
+  "encode": CommandSchemaResult(
+    name="encode",
+    syntax="encode strvar, generate(newvar)",
+    help_topic="encode",
+    arguments=(ArgumentDescriptor(name="source", required=True),),
+    options=(
+      OptionDescriptor(name="generate", required=True),
+      OptionDescriptor(name="label", required=False),
+    ),
+  ),
+  "decode": CommandSchemaResult(
+    name="decode",
+    syntax="decode numvar, generate(newvar)",
+    help_topic="decode",
+    arguments=(ArgumentDescriptor(name="source", required=True),),
+    options=(OptionDescriptor(name="generate", required=True),),
   ),
   "help": CommandSchemaResult(
     name="help",

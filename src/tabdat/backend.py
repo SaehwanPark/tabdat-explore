@@ -1035,6 +1035,87 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
+  def encode_column(
+    self,
+    dataset: DatasetInfo,
+    source: str,
+    target: str,
+    mapping: tuple[tuple[str, int], ...],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("encode", column_types, (source,))
+    if target in column_types:
+      raise ExecutionError(f"encode target already exists: {target}")
+    if _expression_domain_for_data_type(column_types[source]) != "string":
+      raise TypeMismatchExecutionError(f"encode requires a string variable: {source}")
+    quoted_source = _quote_identifier(source)
+    quoted_target = _quote_identifier(target)
+    if not mapping:
+      case_sql = "cast(null as bigint)"
+    else:
+      whens = " ".join(
+        f"when {quoted_source} = {_quote_literal(value)} then {code}" for value, code in mapping
+      )
+      case_sql = f"case {whens} else null end"
+    self._replace_active(
+      f"select *, {case_sql} as {quoted_target} from {ACTIVE_TABLE}",
+      "encode",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def decode_column(
+    self,
+    dataset: DatasetInfo,
+    source: str,
+    target: str,
+    mapping: tuple[tuple[object, str], ...],
+  ) -> DatasetInfo:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("decode", column_types, (source,))
+    if target in column_types:
+      raise ExecutionError(f"decode target already exists: {target}")
+    if not _is_numeric_type(column_types[source]):
+      raise TypeMismatchExecutionError(f"decode requires a numeric variable: {source}")
+    quoted_source = _quote_identifier(source)
+    quoted_target = _quote_identifier(target)
+    if not mapping:
+      case_sql = "cast(null as varchar)"
+    else:
+      whens: list[str] = []
+      for value, text in mapping:
+        if isinstance(value, bool):
+          literal = "TRUE" if value else "FALSE"
+        elif isinstance(value, (int, float, Decimal)):
+          literal = str(value)
+        else:
+          literal = _quote_literal(str(value))
+        whens.append(f"when {quoted_source} = {literal} then {_quote_literal(text)}")
+      case_sql = f"case {' '.join(whens)} else null end"
+    self._replace_active(
+      f"select *, {case_sql} as {quoted_target} from {ACTIVE_TABLE}",
+      "decode",
+    )
+    return self.active_dataset_info(dataset.path)
+
+  def distinct_nonmissing_string_values(
+    self,
+    dataset: DatasetInfo,
+    variable: str,
+  ) -> tuple[str, ...]:
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    _require_columns("encode", column_types, (variable,))
+    quoted = _quote_identifier(variable)
+    rows = self._fetch_table(
+      f"""
+      select distinct cast({quoted} as varchar) as value
+      from {ACTIVE_TABLE}
+      where {quoted} is not null
+      order by value
+      """,
+      "encode",
+    )
+    return tuple(str(row[0]) for row in rows)
+
   def validate_generate(
     self,
     dataset: DatasetInfo,
