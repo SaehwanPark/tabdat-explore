@@ -51,6 +51,7 @@ from tabdat.models import (
   LincomCommand,
   LogitCommand,
   LowessCommand,
+  MissingCommand,
   NbregCommand,
   NlCommand,
   NullExpression,
@@ -105,6 +106,7 @@ _EXECUTABLE_COMMANDS = {
   "doctor",
   "summarize",
   "codebook",
+  "missing",
   "count",
   "head",
   "tail",
@@ -546,6 +548,13 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if parts.condition is not None or parts.options:
       raise ParseError("codebook does not accept if clauses or options")
     return CodebookCommand(variables=parts.arguments)
+
+  if parts.name == "missing":
+    if parts.expression is not None:
+      raise ParseError("missing does not accept assignment syntax")
+    if parts.condition is not None or parts.options:
+      raise ParseError("missing does not accept if clauses or options")
+    return MissingCommand(variables=parts.arguments)
 
   if parts.name == "count":
     has_unsupported_parts = (

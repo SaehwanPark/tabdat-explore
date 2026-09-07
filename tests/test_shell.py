@@ -37,6 +37,7 @@ def test_completer_suggests_command_names() -> None:
     reshape_completions = _completion_texts(TabdatCompleter(executor), "resh")
     panel_completions = _completion_texts(TabdatCompleter(executor), "pan")
     status_completions = _completion_texts(TabdatCompleter(executor), "stat")
+    missing_completions = _completion_texts(TabdatCompleter(executor), "miss")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
   finally:
     executor.close()
@@ -46,6 +47,7 @@ def test_completer_suggests_command_names() -> None:
   assert reshape_completions == ["reshape"]
   assert panel_completions == ["panel"]
   assert status_completions == ["status"]
+  assert missing_completions == ["missing"]
   assert help_completions == ["help"]
 
 
@@ -64,11 +66,13 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
   try:
     executor.execute(UseCommand(sample_parquet))
     completions = _completion_texts(TabdatCompleter(executor), "summarize b")
+    missing_completions = _completion_texts(TabdatCompleter(executor), "missing c")
     panel_completions = _completion_texts(TabdatCompleter(executor), "panel s")
   finally:
     executor.close()
 
   assert completions == ["bmi"]
+  assert missing_completions == ["cost"]
   assert panel_completions == ["sex"]
 
 

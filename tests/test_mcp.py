@@ -219,6 +219,7 @@ def test_mcp_prompts_list_and_get() -> None:
     p_data = json.loads(p_res_str)["result"]
     assert "EDA Workflow" in p_data["description"]
     assert "age income" in p_data["messages"][0]["content"]["text"]
+    assert "`missing`" in p_data["messages"][0]["content"]["text"]
 
     # Get econometric_analysis prompt
     get_econ = json.dumps(

@@ -124,6 +124,11 @@ Variable  Count  Mean  Std Dev  Min  Max
 age       3      42    12       30   54
 bmi       3      25    2.5      22.5  27.5
 
+tabdat> missing age bmi
+Variable  Type     Total  Missing  Nonmissing  Missing %
+age       INTEGER  3      0        3           0
+bmi       DOUBLE   3      0        3           0
+
 tabdat> sql select sex, avg(bmi) as mean_bmi from active group by sex order by sex
 sex  mean_bmi
 F    25
@@ -149,7 +154,7 @@ and `label use labels.json`.
 
 | Area | Commands | What they help with |
 |------|----------|---------------------|
-| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `head`, `count`, `status`, `doctor` | Open data, check state, and diagnose environment |
+| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `head`, `count`, `status`, `doctor` | Open data, check state, and diagnose environment |
 | Transform | `keep`, `drop`, `select`, `generate`, `rename`, `recode`, `label` | Filter, derive columns, and manage reusable data-dictionary metadata |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |

@@ -34,6 +34,21 @@ Active dataset: large_dataset.parquet (lazy scan)
 
 ---
 
+## Missingness Overview (`missing`)
+
+Use `missing` for a compact null-missingness scan before filtering or modeling:
+
+```text
+tabdat> missing age income
+Variable  Type     Total  Missing  Nonmissing  Missing %
+age       INTEGER  100    4        96          4
+income    DOUBLE   100    12       88          12
+```
+
+With no varlist, every active column is reported in schema order. The command treats explicit nulls
+as missing; empty strings and user-defined sentinel values remain nonmissing. A Polars-lazy session
+stays lazy while the aggregate scan runs. Use `codebook` for distinct counts and examples.
+
 ## Inspecting Execution State (`status`)
 
 Run `status` at any time to inspect backend execution mode, materialization status, and active relation details without triggering computation:

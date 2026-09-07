@@ -684,6 +684,8 @@ and describe the active work with concise verification criteria.
 - Added `label save` / `label use` for deterministic, versioned TabDat-native JSON dictionaries;
   loading validates variable references and value-label attachments atomically without forcing lazy
   materialization.
+- Added read-only `missing [varlist]` profiling for explicit-null counts and percentages, including
+  bounded Polars-lazy aggregation without eager-mode conversion.
 
 ## Future
 

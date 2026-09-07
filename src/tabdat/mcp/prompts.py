@@ -99,7 +99,8 @@ def handle_get_prompt(name: str, arguments: dict[str, Any] | None = None) -> MCP
       "Recommended TabDat steps:\n"
       f"1. Load and inspect structure: `use {file_path}` followed by `describe` and `count`.\n"
       "2. Summarize numerical distributions: `summarize` (or `summarize <vars>`).\n"
-      "3. Inspect unique values and missingness: `codebook` and `tabulate <categorical_var>`.\n"
+      "3. Inspect missingness and unique values: `missing`, `codebook`, and `tabulate "
+      "<categorical_var>`.\n"
       "4. Visualize key distributions: `histogram <var>` or `scatter <y> <x>`.\n"
       "5. Provide a clear synthesis of findings and data quality notes."
     )

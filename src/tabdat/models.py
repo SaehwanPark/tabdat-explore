@@ -177,6 +177,13 @@ class CodebookCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class MissingCommand:
+  """Command to display null-missingness counts and percentages by column."""
+
+  variables: tuple[str, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class CountCommand:
   """Command to display the total number of rows in the active dataset."""
 
@@ -797,6 +804,7 @@ Command = (
   | DoctorCommand
   | SummarizeCommand
   | CodebookCommand
+  | MissingCommand
   | CountCommand
   | HeadCommand
   | TailCommand
@@ -1131,6 +1139,21 @@ class CodebookRow:
 @dataclass(frozen=True, config=_MODEL_CONFIG)
 class CodebookResult:
   rows: tuple[CodebookRow, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class MissingRow:
+  variable: str
+  data_type: str
+  total: int
+  missing: int
+  nonmissing: int
+  missing_percent: float
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class MissingResult:
+  rows: tuple[MissingRow, ...]
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1653,6 +1676,7 @@ Result = (
   | DoctorResult
   | SummarizeResult
   | CodebookResult
+  | MissingResult
   | CountResult
   | PreviewResult
   | TransformResult
