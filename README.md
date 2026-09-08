@@ -139,6 +139,14 @@ Rows in duplicate groups: 2
 Extra duplicate rows: 1
 Maximum copies: 2
 
+tabdat> isid patient_id visit, missok
+isid passed
+Key variables: patient_id visit
+Rows checked: 3
+Unique groups: 3
+Rows with missing keys: 0
+Missing keys allowed: yes
+
 tabdat> datasignature
 Data signature
 Algorithm: sha256
@@ -171,7 +179,7 @@ and `label use labels.json`.
 
 | Area | Commands | What they help with |
 |------|----------|---------------------|
-| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `duplicates`, `datasignature`, `head`, `count`, `status`, `doctor` | Open data, check state, profile quality, verify reproducibility, and diagnose environment |
+| Load and inspect | `use`, `describe`, `summarize`, `codebook`, `missing`, `duplicates`, `isid`, `datasignature`, `head`, `count`, `status`, `doctor` | Open data, check state, profile quality, verify keys and reproducibility, and diagnose environment |
 | Quality and transform | `assert`, `keep`, `drop`, `select`, `sort`, `gsort`, `generate`, `rename`, `recode`, `label` | Validate, filter, order, derive columns, and manage reusable data-dictionary metadata |
 | Summarize | `tabulate`, `collapse`, `by` | Frequencies, crosstabs, and grouped stats |
 | Model | `regress`, `logit`, `ivregress`, `xtreg`, `qreg`, … | Linear, binary, IV, panel, and more |

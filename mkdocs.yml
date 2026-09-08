@@ -120,6 +120,7 @@ nav:
           - lowess: commands/lowess.md
           - missing: commands/missing.md
           - duplicates: commands/duplicates.md
+          - isid: commands/isid.md
           - datasignature: commands/datasignature.md
           - nbreg: commands/nbreg.md
           - nl: commands/nl.md

@@ -29,6 +29,7 @@ COMMAND_NAMES: tuple[str, ...] = (
   "codebook",
   "missing",
   "duplicates",
+  "isid",
   "datasignature",
   "count",
   "head",
@@ -108,6 +109,7 @@ _COLUMN_COMMANDS = {
   "codebook",
   "missing",
   "duplicates",
+  "isid",
   "keep",
   "drop",
   "select",
@@ -347,6 +349,7 @@ class TabdatCompleter(Completer):
       "cfregress",
       "lowess",
       "predict",
+      "isid",
     } and _is_after_comma(text):
       yield from _option_completions(command_name, word)
       return
@@ -467,6 +470,8 @@ def _option_completions(command_name: str, word: str) -> Iterable[Completion]:
     yield from _matching_completions(_SCATTER_OPTIONS, word)
   if command_name == "bar":
     yield from _matching_completions(_BAR_OPTIONS, word)
+  if command_name == "isid":
+    yield from _matching_completions(("missok",), word)
   if command_name == "regress":
     yield from _matching_completions(_REGRESS_OPTIONS, word)
   if command_name == "lasso":

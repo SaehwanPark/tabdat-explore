@@ -49,6 +49,7 @@ from tabdat.models import (
   ExportResult,
   HeckmanRegressionResult,
   HelpTopicResult,
+  IsidResult,
   IvRegressionResult,
   LabelResult,
   LassoRegressionResult,
@@ -105,6 +106,7 @@ RESULT_TYPE_LABELS: dict[type[object], str] = {
   CodebookResult: "CodebookResult",
   MissingResult: "MissingResult",
   DuplicatesResult: "DuplicatesResult",
+  IsidResult: "IsidResult",
   DatasignatureResult: "DatasignatureResult",
   CountResult: "CountResult",
   PreviewResult: "PreviewResult",
@@ -473,6 +475,18 @@ def format_result(result: Result) -> str:
         f"Rows in duplicate groups: {result.duplicate_rows}",
         f"Extra duplicate rows: {result.extra_rows}",
         f"Maximum copies: {result.max_copies}",
+      )
+    )
+
+  if isinstance(result, IsidResult):
+    return "\n".join(
+      (
+        "isid passed",
+        f"Key variables: {' '.join(result.variables)}",
+        f"Rows checked: {result.total_rows}",
+        f"Unique groups: {result.unique_groups}",
+        f"Rows with missing keys: {result.missing_key_rows}",
+        f"Missing keys allowed: {'yes' if result.missok else 'no'}",
       )
     )
 

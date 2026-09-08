@@ -47,6 +47,23 @@ def _write_empty_fixture(path: Path) -> None:
     connection.close()
 
 
+def _write_alias_collision_fixture(path: Path) -> None:
+  connection = duckdb.connect(database=":memory:")
+  try:
+    connection.execute(
+      """
+      copy (
+        select * from (
+          values (1), (1), (2)
+        ) as duplicate_data("__tabdat_duplicate_count")
+      ) to ? (format parquet)
+      """,
+      [str(path)],
+    )
+  finally:
+    connection.close()
+
+
 def test_parse_duplicates_forms() -> None:
   assert parse_command("duplicates") == DuplicatesCommand(variables=())
   assert parse_command("duplicates report id") == DuplicatesCommand(variables=("id",))
@@ -124,6 +141,34 @@ def test_duplicates_empty_dataset_returns_zero_counts(tmp_path: Path) -> None:
     duplicate_rows=0,
     extra_rows=0,
     max_copies=0,
+  )
+
+
+@pytest.mark.parametrize("lazy_engine", [None, "duckdb", "polars"])
+def test_duplicates_handles_internal_count_alias_collision(
+  tmp_path: Path,
+  lazy_engine: Literal["duckdb", "polars"] | None,
+) -> None:
+  path = tmp_path / "duplicates_alias_collision.parquet"
+  _write_alias_collision_fixture(path)
+  executor = Executor()
+  try:
+    if lazy_engine is None:
+      executor.execute(UseCommand(path))
+    else:
+      executor.execute(UseCommand(path, execution_mode="lazy", lazy_engine=lazy_engine))
+    result = executor.execute(DuplicatesCommand(variables=("__tabdat_duplicate_count",)))
+  finally:
+    executor.close()
+
+  assert result == DuplicatesResult(
+    variables=("__tabdat_duplicate_count",),
+    total_rows=3,
+    unique_groups=2,
+    duplicate_groups=1,
+    duplicate_rows=2,
+    extra_rows=1,
+    max_copies=2,
   )
 
 

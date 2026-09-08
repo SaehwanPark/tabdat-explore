@@ -203,3 +203,57 @@ Three local review passes were completed against the complete base-to-HEAD chang
 `gsort` is intentionally scalar-key-only and does not claim Stata/SAS/SPSS syntax compatibility.
 Hosted CI and strict MkDocs validation remain external gates; repository-wide mypy retains its
 pre-existing configuration failures.
+
+---
+
+# QA Report: `isid`
+
+## Verdict
+
+`pass` — no blocking cross-boundary mismatch found for the bounded key-uniqueness slice.
+
+## Boundaries checked
+
+- **Contract → parser:** required key varlist, quoted identifiers, `missok` flag semantics, and
+  rejection of conditions, assignments, unknown options, and valued flags are aligned.
+- **Parser → executor:** typed key/flag state is dispatched before any mutation; missing-key and
+  duplicate-key failures are deterministic and leave the prior state unchanged.
+- **Executor → backend:** key validation precedes aggregation, null-containing groups are counted
+  consistently, `missok` permits missing rows without permitting repeated combinations, and aggregate
+  aliases avoid collisions with public key names.
+- **Backend → output:** DuckDB and Polars-lazy aggregate paths share counts; Polars remains lazy;
+  `IsidResult` drives human and JSON output.
+- **CLI/shell/help/MCP/docs:** effect/schema metadata, command/column completion, packaged help,
+  command references, language semantics, user guide, MCP guidance, README, architecture, spec,
+  roadmap, changelog, and navigation are aligned.
+- **Tests → claims:** focused coverage includes parser failures, unique/duplicate/missing/empty
+  data, unknown-key atomicity, all execution modes, CLI output/schema/help, and completion.
+
+## Independent review loop
+
+Three read-only review passes were completed. Two adversarial passes independently identified a
+hard-coded aggregate-alias collision risk for public columns named like the internal count alias; the
+backend now derives collision-safe names and regression tests cover eager, DuckDB-lazy, and
+Polars-lazy paths. The contract/integration pass found no other actionable findings.
+
+## Evidence
+
+- `uv run pytest -q tests/test_isid.py tests/test_duplicates.py` — 34 passed.
+- `uv run pytest -q tests/test_isid.py tests/test_shell.py` — 38 passed.
+- `uv run pytest -q tests/test_isid.py tests/test_duplicates.py tests/test_assert.py tests/test_gsort.py tests/test_sort.py tests/test_shell.py tests/test_cli.py tests/test_mcp.py` — 269 passed.
+- `uv run pytest -q` — 1,364 passed, 314 existing dependency warnings.
+- `uv run ruff check` and `uv run ruff format --check` on changed source/tests — passed.
+- `uv run basedpyright` on changed source modules — 0 diagnostics.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `verify_code` — pytest, build, and Ruff stages passed; configured mypy remains blocked by the
+  repository's pre-existing duplicate docs-check module discovery and untyped optional imports.
+- `uv build` plus wheel inspection — passed; packaged `tabdat/help/topics/isid.md` is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-isid` — unavailable because `mkdocs` is
+  not installed locally.
+- `git diff --check` — passed.
+
+## Residual risk
+
+`isid` is intentionally a scalar-key uniqueness gate, not a duplicate listing/repair framework or a
+Stata/SAS/SPSS compatibility implementation. Strict MkDocs validation remains unavailable locally
+because `mkdocs` is not installed; configured repository-wide mypy retains pre-existing failures.

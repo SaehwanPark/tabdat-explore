@@ -191,6 +191,14 @@ class DuplicatesCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class IsidCommand:
+  """Command to assert that key variables uniquely identify active rows."""
+
+  variables: tuple[str, ...]
+  missok: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class DatasignatureCommand:
   """Command to fingerprint the active dataset for reproducibility checks."""
 
@@ -849,6 +857,7 @@ Command = (
   | CodebookCommand
   | MissingCommand
   | DuplicatesCommand
+  | IsidCommand
   | DatasignatureCommand
   | AssertCommand
   | CountCommand
@@ -1213,6 +1222,15 @@ class DuplicatesResult:
   duplicate_rows: int
   extra_rows: int
   max_copies: int
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class IsidResult:
+  variables: tuple[str, ...]
+  total_rows: int
+  unique_groups: int
+  missing_key_rows: int
+  missok: bool
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
@@ -1751,6 +1769,7 @@ Result = (
   | CodebookResult
   | MissingResult
   | DuplicatesResult
+  | IsidResult
   | DatasignatureResult
   | AssertResult
   | CountResult

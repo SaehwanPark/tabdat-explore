@@ -181,6 +181,7 @@ Complete the remaining semantic and transparency work needed for TabDat to behav
 - [ ] Define missing behavior in grouped operations.
 - [ ] Define missing category placement in tabulations and plots.
 - [x] Define null-aware duplicate-key grouping for the read-only `duplicates` quality report.
+- [x] Add the read-only `isid varlist [, missok]` key-uniqueness gate with explicit null-key semantics.
 - [ ] Add cross-engine tests for all supported missingness rules.
 
 ### Coercion and Arithmetic

@@ -85,6 +85,7 @@ _COMMAND_EFFECTS: dict[str, tuple[EffectCategory, ...]] = {
   "describe": ("read",),
   "doctor": ("read",),
   "duplicates": ("read",),
+  "isid": ("read",),
   "datasignature": ("read",),
   "did": ("read",),
   "dml": ("read",),
@@ -247,6 +248,13 @@ _COMMAND_SCHEMAS: dict[str, CommandSchemaResult] = {
     help_topic="duplicates",
     arguments=(ArgumentDescriptor(name="variables", required=False),),
     options=(),
+  ),
+  "isid": CommandSchemaResult(
+    name="isid",
+    syntax="isid varlist [, missok]",
+    help_topic="isid",
+    arguments=(ArgumentDescriptor(name="variables", required=True),),
+    options=(OptionDescriptor(name="missok", required=False),),
   ),
   "datasignature": CommandSchemaResult(
     name="datasignature",
