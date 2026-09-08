@@ -96,11 +96,13 @@ nav:
           - cvlasso: commands/cvlasso.md
           - cvridge: commands/cvridge.md
           - describe: commands/describe.md
+          - decode: commands/decode.md
           - did: commands/did.md
           - dml: commands/dml.md
           - doctor: commands/doctor.md
           - drdid: commands/drdid.md
           - drop: commands/drop.md
+          - encode: commands/encode.md
           - elasticnet: commands/elasticnet.md
           - estat: commands/estat.md
           - estat_report: commands/estat_report.md

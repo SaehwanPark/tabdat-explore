@@ -2,7 +2,9 @@
 
 All notable project changes are tracked here.
 
-## [Unreleased]
+## [0.25.0] — 2026-09-07
+
+Data management, validation gates, variable/value labels, row ordering, and documentation platform.
 
 ### Added
 
@@ -28,6 +30,7 @@ All notable project changes are tracked here.
   metadata preservation, and eager/DuckDB-lazy/Polars-lazy support.
 - Added read-only `isid varlist [, missok]` key-uniqueness gates with explicit missing-key behavior,
   deterministic failures, and eager/DuckDB-lazy/Polars-lazy aggregate support.
+- Migrated user manuals and documentation site to GitHub Pages with MkDocs Material, automated deployment workflows, and MathJax LaTeX math rendering support.
 
 ## [0.24.1] — 2026-08-28
 
