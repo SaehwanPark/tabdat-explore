@@ -63,6 +63,10 @@ unknown-variable error and follows the write-validation atomicity policy below.
   groups, rows in duplicate groups, surplus rows, and maximum group size without changing data.
   Empty datasets return zero counts; aggregate reports preserve Polars-lazy sessions. Listing,
   tagging, and dropping duplicate rows are intentionally not part of this command contract.
+- `isid varlist [, missok]` checks that each key combination occurs at most once without changing
+  data. Null key values compare equal for duplicate grouping; without `missok`, any null key row
+  fails, while `missok` permits such rows only when their complete key combination is unique. Empty
+  datasets pass and aggregate checks preserve Polars-lazy sessions.
 - `datasignature` computes a versioned SHA-256 fingerprint of public schema, active row order, and
   cell values with explicit null/non-finite encodings. It excludes source path, backend, execution
   mode, and session-local labels. The scan is read-only, preserves Polars-lazy plans, and returns a

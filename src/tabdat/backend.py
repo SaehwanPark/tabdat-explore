@@ -943,12 +943,14 @@ class DuckDBBackend:
     _require_columns("duplicates", column_types, requested)
     if not requested:
       raise ExecutionError("duplicates requires at least one key variable")
+    count_name = _unique_internal_name("__tabdat_duplicate_count", set(requested))
+    quoted_count_name = _quote_identifier(count_name)
     if self._polars_lazy_frame is not None:
       return self._polars_duplicate_counts(requested)
 
     key_sql = ", ".join(_quote_identifier(variable) for variable in requested)
     grouped_sql = f"""
-      select {key_sql}, count(*) as __tabdat_duplicate_count
+      select {key_sql}, count(*) as {quoted_count_name}
       from {ACTIVE_TABLE}
       group by {key_sql}
     """
@@ -956,18 +958,18 @@ class DuckDBBackend:
       f"""
       with __tabdat_duplicate_groups as ({grouped_sql})
       select
-        coalesce(sum(__tabdat_duplicate_count), 0) as __tabdat_total_rows,
+        coalesce(sum({quoted_count_name}), 0) as __tabdat_total_rows,
         count(*) as __tabdat_unique_groups,
-        count(*) filter (where __tabdat_duplicate_count > 1) as __tabdat_duplicate_groups,
+        count(*) filter (where {quoted_count_name} > 1) as __tabdat_duplicate_groups,
         coalesce(
-          sum(__tabdat_duplicate_count) filter (where __tabdat_duplicate_count > 1),
+          sum({quoted_count_name}) filter (where {quoted_count_name} > 1),
           0
         ) as __tabdat_duplicate_rows,
         coalesce(
-          sum(__tabdat_duplicate_count - 1) filter (where __tabdat_duplicate_count > 1),
+          sum({quoted_count_name} - 1) filter (where {quoted_count_name} > 1),
           0
         ) as __tabdat_extra_rows,
-        coalesce(max(__tabdat_duplicate_count), 0) as __tabdat_max_copies
+        coalesce(max({quoted_count_name}), 0) as __tabdat_max_copies
       from __tabdat_duplicate_groups
       """,
       "duplicates",
@@ -979,6 +981,61 @@ class DuckDBBackend:
       int(cast(int, row[3])),
       int(cast(int, row[4])),
       int(cast(int, row[5])),
+    )
+
+  def isid_counts(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+  ) -> tuple[int, int, int, int, int]:
+    """Return aggregate key-uniqueness counts without changing the active relation.
+
+    Null key values form ordinary duplicate groups. The caller decides whether any row with a null
+    key is acceptable (`missok`) after the aggregate scan completes.
+    """
+    column_types = {column.name: column.data_type for column in dataset.columns}
+    if not variables:
+      raise ExecutionError("isid expects at least one key variable")
+    _require_columns("isid", column_types, variables)
+    if self._polars_lazy_frame is not None:
+      return self._polars_isid_counts(variables)
+
+    count_name = _unique_internal_name("__tabdat_isid_count", set(variables))
+    quoted_count_name = _quote_identifier(count_name)
+    key_sql = ", ".join(_quote_identifier(variable) for variable in variables)
+    missing_condition = " or ".join(
+      f"{_quote_identifier(variable)} is null" for variable in variables
+    )
+    grouped_sql = f"""
+      select {key_sql}, count(*) as {quoted_count_name}
+      from {ACTIVE_TABLE}
+      group by {key_sql}
+    """
+    row = self._fetch_one(
+      f"""
+      with __tabdat_isid_groups as ({grouped_sql})
+      select
+        coalesce(sum({quoted_count_name}), 0) as __tabdat_total_rows,
+        count(*) as __tabdat_unique_groups,
+        count(*) filter (where {quoted_count_name} > 1) as __tabdat_duplicate_groups,
+        coalesce(
+          sum({quoted_count_name}) filter (where {quoted_count_name} > 1),
+          0
+        ) as __tabdat_duplicate_rows,
+        coalesce(
+          sum({quoted_count_name}) filter (where {missing_condition}),
+          0
+        ) as __tabdat_missing_key_rows
+      from __tabdat_isid_groups
+      """,
+      "isid",
+    )
+    return (
+      int(cast(int, row[0])),
+      int(cast(int, row[1])),
+      int(cast(int, row[2])),
+      int(cast(int, row[3])),
+      int(cast(int, row[4])),
     )
 
   def datasignature(self, dataset: DatasetInfo) -> tuple[str, int]:
@@ -2009,14 +2066,59 @@ class DuckDBBackend:
       maximum=maximum,
     )
 
+  def _polars_isid_counts(
+    self,
+    variables: tuple[str, ...],
+  ) -> tuple[int, int, int, int, int]:
+    lazy_frame = self._require_polars_lazy_frame("isid")
+    try:
+      count_name = _unique_internal_name("__tabdat_isid_count", set(variables))
+      grouped = lazy_frame.group_by(list(variables)).agg(pl.len().alias(count_name))
+      count_column = pl.col(count_name)
+      duplicate_group = count_column > 1
+      missing_group = pl.col(variables[0]).is_null()
+      for variable in variables[1:]:
+        missing_group = missing_group | pl.col(variable).is_null()
+      row = (
+        grouped.select(
+          count_column.sum().fill_null(0).alias("__tabdat_total_rows"),
+          count_column.len().alias("__tabdat_unique_groups"),
+          duplicate_group.sum().fill_null(0).alias("__tabdat_duplicate_groups"),
+          pl.when(duplicate_group)
+          .then(count_column)
+          .otherwise(0)
+          .sum()
+          .fill_null(0)
+          .alias("__tabdat_duplicate_rows"),
+          pl.when(missing_group)
+          .then(count_column)
+          .otherwise(0)
+          .sum()
+          .fill_null(0)
+          .alias("__tabdat_missing_key_rows"),
+        )
+        .collect()
+        .row(0)
+      )
+    except (PolarsError, IndexError) as exc:
+      raise ExecutionError("isid failed") from exc
+    return (
+      int(cast(int, row[0])),
+      int(cast(int, row[1])),
+      int(cast(int, row[2])),
+      int(cast(int, row[3])),
+      int(cast(int, row[4])),
+    )
+
   def _polars_duplicate_counts(
     self,
     variables: tuple[str, ...],
   ) -> tuple[int, int, int, int, int, int]:
     lazy_frame = self._require_polars_lazy_frame("duplicates")
     try:
-      grouped = lazy_frame.group_by(list(variables)).agg(pl.len().alias("__tabdat_duplicate_count"))
-      count_column = pl.col("__tabdat_duplicate_count")
+      count_name = _unique_internal_name("__tabdat_duplicate_count", set(variables))
+      grouped = lazy_frame.group_by(list(variables)).agg(pl.len().alias(count_name))
+      count_column = pl.col(count_name)
       duplicate_count = count_column > 1
       row = (
         grouped.select(

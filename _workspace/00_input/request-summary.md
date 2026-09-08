@@ -7,33 +7,33 @@ The active goal is to improve TabDat with useful, modernized capabilities inspir
 - `assert <boolean-expression>` quality gates with deterministic false/missing counts and eager/DuckDB-lazy/Polars-lazy aggregate support.
 - `duplicates [report] [varlist]` data-quality reports with null-aware grouping and eager/DuckDB-lazy/Polars-lazy aggregate support.
 - `datasignature` reproducibility fingerprints with canonical cross-engine SHA-256 scans and Polars-lazy plan preservation.
+- `gsort [+|-]varlist` stable mixed-direction ordering with nulls-last behavior and eager/DuckDB-lazy/Polars-lazy support.
 
 ## Current bounded slice
 
-Add `gsort [+|-]varlist` for stable per-key ascending/descending ordering. Directional sorting is a
-compact Stata `gsort` feature also familiar from SAS descending sort keys and SPSS sort-case
-workflows, and it extends the existing native, nulls-last, deterministic `sort` contract without
-adding an estimator family or broad compatibility surface.
+Add `isid varlist [, missok]` as a read-only key-uniqueness quality gate. It is a compact Stata
+`isid` feature with parallels to SAS key checks and SPSS duplicate-ID validation, and it complements
+`duplicates` by turning key integrity into a deterministic, scriptable assertion without mutating the
+active dataset or adding an estimator family.
 
 ## Phase fit
 
-This is a bounded Phase 24 product-center stabilization/ordering slice. It defines explicit per-key
-ascending/descending semantics, stable ties, and nulls-last behavior; preserves eager/DuckDB-lazy/
-Polars-lazy behavior; and does not add random sampling, estimator families, or backend-specific
-dependencies.
+This is a bounded Phase 24 product-center stabilization/data-quality slice. It defines explicit
+composite-key uniqueness and missing-key semantics, preserves eager/DuckDB-lazy/Polars-lazy behavior,
+and avoids broad validation frameworks, row-level tagging, mutation, or backend-specific dependencies.
 
 ## Touched surfaces
 
-- parser/model command contract and direction-key validation;
-- DuckDB and Polars-lazy stable sorting backend;
-- executor dispatch and lazy-materialization allowlist;
-- human/JSON transform output, command effects, schema discovery, and shell/column completion;
+- parser/model command contract and `missok` flag validation;
+- DuckDB and Polars-lazy aggregate key validation;
+- executor dispatch, typed result/error behavior, and lazy-materialization allowlist;
+- human/JSON output, command effects, schema discovery, and shell/column completion;
 - in-app help, command references, language semantics, MCP guidance, user-guide/spec/changelog
   records;
 - focused parser/backend/executor/CLI tests.
 
 ## Non-goals
 
-Do not change existing ascending `sort` syntax, add descending expressions to unrelated commands,
-implement random ordering, add row filters/options, support `by: gsort`, introduce a new estimator or
-data-source family, or claim Stata/SAS/SPSS syntax compatibility.
+Do not add row filters, duplicate listing/tagging/dropping, automatic repair, `by: isid`, arbitrary
+validation rules, a stored key registry, a broad SPSS/SAS validation framework, a new estimator or
+data-source family, or a syntax-compatibility claim for Stata/SAS/SPSS.

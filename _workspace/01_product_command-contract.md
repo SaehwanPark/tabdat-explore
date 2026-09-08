@@ -369,3 +369,106 @@ gsort +site -score
   guidance, and roadmap records remain aligned.
 - Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, wheel
   packaging, and hosted CI.
+
+
+---
+
+# Command Contract: `isid`
+
+## Product and roadmap fit
+
+`isid` is a read-only key-uniqueness quality gate inspired by Stata `isid`, SAS key-validation
+workflows, and SPSS duplicate-ID validation. It complements TabDat's `duplicates` report by making a
+key invariant directly assertable in a deterministic script, while remaining TabDat-native rather
+than a syntax-compatibility promise.
+
+## Syntax
+
+```text
+isid varlist [, missok]
+```
+
+- At least one public key variable is required; key order is preserved in the typed result and output.
+- `missok` is the only supported flag. It allows incomplete key rows to participate in the uniqueness
+  check, but does not allow repeated missing-key combinations.
+- The command accepts no `if` clause, assignment, `by:` prefix, or other options.
+- Existing backtick-quoted identifiers are supported by the normal varlist grammar.
+
+## Semantics
+
+- Requires an active dataset and validates every key before scanning.
+- A key combination is unique when it occurs at most once. Null values compare equal for duplicate
+  grouping, so repeated null-containing combinations are duplicate keys.
+- Without `missok`, any row with a null in any key variable fails even when that incomplete key occurs
+  only once. With `missok`, null-containing rows are allowed only when their complete key combination
+  remains unique.
+- An empty active dataset passes with zero rows and zero unique groups.
+- Success is read-only: active rows, schema, labels, panel metadata, named tables, and lazy-plan
+  state remain unchanged; normal command history records `isid`.
+- Eager/DuckDB-lazy and Polars-lazy execution use aggregate scans. Polars-lazy remains lazy and does
+  not replace its active plan.
+
+## Output
+
+Human success output:
+
+```text
+isid passed
+Key variables: patient_id visit
+Rows checked: 3
+Unique groups: 3
+Rows with missing keys: 0
+Missing keys allowed: no
+```
+
+The structured result is:
+
+```json
+{
+  "schema_version": 1,
+  "result_type": "IsidResult",
+  "data": {
+    "variables": ["patient_id", "visit"],
+    "total_rows": 3,
+    "unique_groups": 3,
+    "missing_key_rows": 0,
+    "missok": false
+  }
+}
+```
+
+Failure uses the existing error envelope with deterministic command-level messages. It reports
+missing-key and duplicate-key reasons without mutating the active state.
+
+## Examples
+
+```text
+use visits.parquet, lazy engine=polars
+isid patient_id visit
+isid patient_id visit, missok
+```
+
+The first form requires every key component to be present; the second allows incomplete keys only when
+those key combinations are unique.
+
+## Invalid forms
+
+- `isid`: parse error; at least one key variable is required.
+- `isid patient_id if active == true`: parse error; row filters are outside this quality gate.
+- `isid patient_id, report`: parse error; only `missok` is supported.
+- `isid patient_id, missok(true)`: parse error; `missok` is a flag, not a valued option.
+- `isid missing_column`: execution error; unknown keys are rejected before scanning or mutation.
+
+## Acceptance
+
+- Parser tests cover required keys, quoted identifiers, `missok`, and rejection of conditions,
+  assignments, unknown options, and valued flags.
+- Backend/executor tests cover unique composite keys, duplicate keys, default/missok missing behavior,
+  empty datasets, unknown-variable atomicity, metadata preservation, and eager/DuckDB-lazy/
+  Polars-lazy behavior.
+- CLI tests cover human/JSON success, deterministic failures, schema/effects/help, and no-active errors;
+  shell tests cover command and column completion.
+- Help, command reference/navigation, language semantics, user guide, README, architecture/spec,
+  changelog, MCP guidance, and roadmap records remain aligned.
+- Validate with focused tests, full `pytest`, docs alignment, Ruff, formatting, basedpyright, wheel
+  packaging, and hosted CI.

@@ -26,6 +26,8 @@ All notable project changes are tracked here.
   values, with deterministic null/non-finite encoding and Polars-lazy plan preservation.
 - Added `gsort [+|-]varlist` for stable mixed-direction ordering with nulls-last placement,
   metadata preservation, and eager/DuckDB-lazy/Polars-lazy support.
+- Added read-only `isid varlist [, missok]` key-uniqueness gates with explicit missing-key behavior,
+  deterministic failures, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 
 ## [0.24.1] — 2026-08-28
 

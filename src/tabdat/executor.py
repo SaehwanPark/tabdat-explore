@@ -109,6 +109,8 @@ from tabdat.models import (
   HeckmanRegressionResult,
   HistogramCommand,
   IdentifierExpression,
+  IsidCommand,
+  IsidResult,
   IvRegressCommand,
   IvRegressionResult,
   JoinCommand,
@@ -924,6 +926,29 @@ class Executor:
         duplicate_rows=counts[3],
         extra_rows=counts[4],
         max_copies=counts[5],
+      )
+
+    if isinstance(command, IsidCommand):
+      dataset = self._require_active_dataset("isid")
+      counts = self.backend.isid_counts(dataset, command.variables)
+      duplicate_groups = counts[2]
+      duplicate_rows = counts[3]
+      missing_key_rows = counts[4]
+      failures: list[str] = []
+      if not command.missok and missing_key_rows:
+        failures.append(
+          f"{missing_key_rows} rows have missing key values (use , missok to permit them)"
+        )
+      if duplicate_groups:
+        failures.append(f"{duplicate_rows} rows are in {duplicate_groups} duplicate key groups")
+      if failures:
+        raise ExecutionError("isid failed: " + "; ".join(failures))
+      return IsidResult(
+        variables=command.variables,
+        total_rows=counts[0],
+        unique_groups=counts[1],
+        missing_key_rows=missing_key_rows,
+        missok=command.missok,
       )
 
     if isinstance(command, DatasignatureCommand):
@@ -6668,6 +6693,7 @@ class Executor:
         CountCommand,
         MissingCommand,
         DuplicatesCommand,
+        IsidCommand,
         DatasignatureCommand,
         AssertCommand,
         HeadCommand,

@@ -40,6 +40,7 @@ def test_completer_suggests_command_names() -> None:
     missing_completions = _completion_texts(TabdatCompleter(executor), "miss")
     duplicates_completions = _completion_texts(TabdatCompleter(executor), "dup")
     duplicates_report_completions = _completion_texts(TabdatCompleter(executor), "duplicates r")
+    isid_completions = _completion_texts(TabdatCompleter(executor), "isid")
     datasignature_completions = _completion_texts(TabdatCompleter(executor), "datas")
     gsort_completions = _completion_texts(TabdatCompleter(executor), "gsor")
     assert_completions = _completion_texts(TabdatCompleter(executor), "ass")
@@ -56,6 +57,7 @@ def test_completer_suggests_command_names() -> None:
   assert missing_completions == ["missing"]
   assert duplicates_completions == ["duplicates"]
   assert duplicates_report_completions == ["report"]
+  assert isid_completions == ["isid"]
   assert datasignature_completions == ["datasignature"]
   assert gsort_completions == ["gsort"]
   assert assert_completions == ["assert"]
@@ -80,6 +82,8 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
     completions = _completion_texts(TabdatCompleter(executor), "summarize b")
     missing_completions = _completion_texts(TabdatCompleter(executor), "missing c")
     duplicates_completions = _completion_texts(TabdatCompleter(executor), "duplicates c")
+    isid_completions = _completion_texts(TabdatCompleter(executor), "isid c")
+    isid_options = _completion_texts(TabdatCompleter(executor), "isid patient_id, ")
     gsort_completions = _completion_texts(TabdatCompleter(executor), "gsort c")
     assert_completions = _completion_texts(TabdatCompleter(executor), "assert c")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sort c")
@@ -90,6 +94,8 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
   assert completions == ["bmi"]
   assert missing_completions == ["cost"]
   assert duplicates_completions == ["cost"]
+  assert isid_completions == ["cost"]
+  assert isid_options == ["missok"]
   assert gsort_completions == ["cost"]
   assert assert_completions == ["cost"]
   assert sort_completions == ["cost"]

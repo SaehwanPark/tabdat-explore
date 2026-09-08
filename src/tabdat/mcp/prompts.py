@@ -161,8 +161,8 @@ def handle_get_prompt(name: str, arguments: dict[str, Any] | None = None) -> MCP
     task = args.get("task_description", "<cleaning_tasks>")
     prompt_text = (
       f"Please perform the following data cleaning task on `{file_path}`:\n{task}\n\n"
-      "Use TabDat commands (`assert`, `duplicates`, `keep`, `drop`, `sort`, `gsort`, `generate`, "
-      "`replace`, `recode`, `rename`, `export`)."
+      "Use TabDat commands (`assert`, `duplicates`, `isid`, `keep`, `drop`, `sort`, `gsort`, "
+      "`generate`, `replace`, `recode`, `rename`, `export`)."
     )
     return MCPGetPromptResult(
       description=f"Data Cleaning Workflow on {file_path}",

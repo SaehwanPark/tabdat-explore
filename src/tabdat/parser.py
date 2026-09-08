@@ -47,6 +47,7 @@ from tabdat.models import (
   HelpCommand,
   HistogramCommand,
   IdentifierExpression,
+  IsidCommand,
   IvRegressCommand,
   JoinCommand,
   KeepCommand,
@@ -115,6 +116,7 @@ _EXECUTABLE_COMMANDS = {
   "codebook",
   "missing",
   "duplicates",
+  "isid",
   "datasignature",
   "count",
   "head",
@@ -585,6 +587,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if variables and variables[0].lower() == "report" and not parts.argument_quoted[0]:
       variables = variables[1:]
     return DuplicatesCommand(variables=variables)
+
+  if parts.name == "isid":
+    return _parse_isid(parts)
 
   if parts.name == "datasignature":
     if (
@@ -2995,6 +3000,19 @@ def _parse_gsort(parts: _CommandParts) -> GsortCommand:
       raise ParseError("gsort expects a variable after each direction prefix")
     keys.append(SortKey(variable=variable, descending=descending))
   return GsortCommand(keys=tuple(keys))
+
+
+def _parse_isid(parts: _CommandParts) -> IsidCommand:
+  if parts.condition is not None or parts.expression is not None:
+    raise ParseError("isid only accepts a variable list and missok option")
+  if not parts.arguments:
+    raise ParseError("isid expects at least one key variable")
+  option_names = {option.name for option in parts.options}
+  unsupported = option_names - {"missok"}
+  if unsupported:
+    raise ParseError(f"isid unsupported option: {', '.join(sorted(unsupported))}")
+  _require_flag_options(parts.options, "isid", {"missok"})
+  return IsidCommand(variables=parts.arguments, missok="missok" in option_names)
 
 
 def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:

@@ -155,3 +155,47 @@ workflow; scripts can persist and compare its JSON signature explicitly.
 `gsort` intentionally supports scalar variable keys only. It does not add expression keys, random
 ordering, row filters/options, `by:` execution, or a syntax-compatibility promise for Stata, SAS, or
 SPSS; existing `sort` remains the ascending-only shorthand.
+
+---
+
+# Implementation Report: `isid`
+
+## Contract consumed
+
+- `_workspace/01_product_command-contract.md` (`isid` section)
+
+## Delivered
+
+- Added typed `IsidCommand`/`IsidResult` models and `isid varlist [, missok]` parsing with strict
+  valued-flag and unsupported-option errors.
+- Added DuckDB and Polars-lazy aggregate key scans reporting total rows, unique groups, duplicate
+  groups/rows, and rows with any missing key component. Internal aggregate aliases are collision-safe
+  even when users have similarly named public key columns. Null-containing combinations are grouped
+  deterministically; `missok` controls only whether missing-key rows are permitted.
+- Added executor failure diagnostics, read-only state preservation, human/JSON formatting, CLI effect
+  and schema metadata, shell command/column completion, MCP data-cleaning guidance, packaged help,
+  command docs, language semantics, user-guide, README, architecture/spec/roadmap/changelog, and
+  navigation updates.
+- Added focused parser, unique/duplicate/missing/empty/unknown-key, eager/DuckDB-lazy/Polars-lazy,
+  state-preservation, CLI human/JSON/error/schema/help, and shell-completion tests.
+
+## Validation
+
+- `uv run pytest -q tests/test_isid.py tests/test_duplicates.py` — 34 passed.
+- `uv run pytest -q tests/test_isid.py tests/test_shell.py` — 38 passed.
+- `uv run pytest -q tests/test_isid.py tests/test_duplicates.py tests/test_assert.py tests/test_gsort.py tests/test_sort.py tests/test_shell.py tests/test_cli.py tests/test_mcp.py` — 269 passed.
+- `uv run pytest -q` — 1,364 passed, 314 existing dependency warnings.
+- `uv run ruff check` on changed source/tests — passed.
+- `uv run ruff format --check` on changed source/tests — passed.
+- `uv run basedpyright` on changed source modules — 0 errors, 0 warnings, 0 notes.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `uv build` plus wheel inspection — passed; packaged `tabdat/help/topics/isid.md` is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-isid` — not runnable because `mkdocs`
+  is not installed in the current environment.
+- `git diff --check` — passed.
+
+## Known limits
+
+`isid` intentionally validates scalar composite keys only. It does not list, tag, drop, repair, or
+store key metadata; it has no row filters, `by:` execution, broad validation rules, or compatibility
+promise for Stata, SAS, or SPSS.

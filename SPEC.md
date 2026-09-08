@@ -698,6 +698,8 @@ and describe the active work with concise verification criteria.
 - Added `gsort [+|-]varlist` for stable per-key ascending/descending ordering with nulls-last
   placement, explicit direction parsing, metadata preservation, and eager/DuckDB-lazy/Polars-lazy
   support.
+- Added read-only `isid varlist [, missok]` key-uniqueness gates with explicit null-key semantics,
+  deterministic failures, and eager/DuckDB-lazy/Polars-lazy aggregate support.
 
 ## Future
 

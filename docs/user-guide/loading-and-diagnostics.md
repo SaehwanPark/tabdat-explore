@@ -62,6 +62,28 @@ False or missing predicate results fail the check with deterministic checked/fai
 active datasets pass; options, `if` clauses, assignment, and row-level diagnostics are intentionally
 not supported. Aggregate checks preserve Polars-lazy execution.
 
+## Key Integrity (`duplicates`, `isid`)
+
+Use `duplicates` to inspect repeated key groups and `isid` to turn uniqueness into a deterministic
+quality gate:
+
+```text
+tabdat> isid patient_id visit
+isid passed
+Key variables: patient_id visit
+Rows checked: 100
+Unique groups: 100
+Rows with missing keys: 0
+Missing keys allowed: no
+
+tabdat> isid patient_id visit, missok
+```
+
+`isid` fails when a key combination repeats. Without `missok`, any null key component also fails;
+with `missok`, incomplete keys are allowed only when their complete combinations remain unique. Both
+commands are read-only aggregate scans and preserve Polars-lazy execution. Use `duplicates report`
+for duplicate-group counts when a uniqueness check fails.
+
 ## Ordering Rows (`sort`, `gsort`)
 
 Arrange the active rows by stable native keys before previewing or exporting:
