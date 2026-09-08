@@ -126,7 +126,7 @@ Run `doctor` to check installed optional libraries, engine versions, and environ
 
 ```text
 tabdat> doctor
-TabDat 0.24.1 Environment Diagnostics
+TabDat 0.25.0 Environment Diagnostics
 
 Core Capabilities:
   DuckDB        ✓ duckdb 1.4.3

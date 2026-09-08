@@ -1,6 +1,6 @@
 # Command Reference Index
 
-TabDat-Explore includes 81 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
+TabDat-Explore includes 82 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
 
 ---
 
@@ -37,6 +37,8 @@ TabDat-Explore includes 81 commands and topics organized into functional categor
 | [`gsort`](../commands/gsort.md) | Stable-sort active rows by explicit ascending/descending keys. |
 | [`recode`](../commands/recode.md) | Recode values or ranges into new categories. |
 | [`label`](../commands/label.md) | Define, inspect, and reuse variable/value-label metadata. |
+| [`encode`](../commands/encode.md) | Encode string variable into labeled numeric integers. |
+| [`decode`](../commands/decode.md) | Decode labeled numeric variable back to string labels. |
 
 ---
 
