@@ -41,6 +41,7 @@ def test_completer_suggests_command_names() -> None:
     duplicates_completions = _completion_texts(TabdatCompleter(executor), "dup")
     duplicates_report_completions = _completion_texts(TabdatCompleter(executor), "duplicates r")
     datasignature_completions = _completion_texts(TabdatCompleter(executor), "datas")
+    gsort_completions = _completion_texts(TabdatCompleter(executor), "gsor")
     assert_completions = _completion_texts(TabdatCompleter(executor), "ass")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sor")
     help_completions = _completion_texts(TabdatCompleter(executor), "hel")
@@ -56,6 +57,7 @@ def test_completer_suggests_command_names() -> None:
   assert duplicates_completions == ["duplicates"]
   assert duplicates_report_completions == ["report"]
   assert datasignature_completions == ["datasignature"]
+  assert gsort_completions == ["gsort"]
   assert assert_completions == ["assert"]
   assert sort_completions == ["sort"]
   assert help_completions == ["help"]
@@ -78,6 +80,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
     completions = _completion_texts(TabdatCompleter(executor), "summarize b")
     missing_completions = _completion_texts(TabdatCompleter(executor), "missing c")
     duplicates_completions = _completion_texts(TabdatCompleter(executor), "duplicates c")
+    gsort_completions = _completion_texts(TabdatCompleter(executor), "gsort c")
     assert_completions = _completion_texts(TabdatCompleter(executor), "assert c")
     sort_completions = _completion_texts(TabdatCompleter(executor), "sort c")
     panel_completions = _completion_texts(TabdatCompleter(executor), "panel s")
@@ -87,6 +90,7 @@ def test_completer_suggests_active_dataset_columns(sample_parquet: Path) -> None
   assert completions == ["bmi"]
   assert missing_completions == ["cost"]
   assert duplicates_completions == ["cost"]
+  assert gsort_completions == ["cost"]
   assert assert_completions == ["cost"]
   assert sort_completions == ["cost"]
   assert panel_completions == ["sex"]

@@ -148,3 +148,58 @@ The signature is a TabDat-native logical-data fingerprint, not a byte-level Parq
 compatibility implementation of Stata/SAS/SPSS baseline/compare workflows. Hosted CI and strict
 MkDocs validation remain external gates; the full repository tests and documentation alignment pass
 locally.
+
+---
+
+# QA Report: `gsort`
+
+## Verdict
+
+`pass` — no blocking cross-boundary mismatch found for the bounded directional-sort slice.
+
+## Boundaries checked
+
+- **Contract → parser:** signed keys, omitted ascending prefixes, quoted identifiers, no-argument and
+  malformed-key failures, and rejection of options/`if`/assignment forms are aligned.
+- **Parser → executor:** typed direction keys are dispatched before mutation; the executor builds a
+  stable transform message and preserves existing panel/label metadata behavior.
+- **Executor → backend:** direction vectors match key vectors, all variables validate before mutation,
+  nulls remain last for both directions, and an ordinal tie-breaker preserves prior order for ties.
+- **Backend → output:** existing `TransformResult` semantics are reused for human/JSON output; eager,
+  DuckDB-lazy, and Polars-lazy paths share the same key semantics, with Polars remaining lazy.
+- **CLI/shell/help/MCP/docs:** effect/schema metadata, command and column completion, packaged help,
+  command references, language semantics, user guide, MCP guidance, README, architecture/spec,
+  changelog, and navigation are aligned.
+- **Tests → claims:** focused coverage includes parser forms, stable mixed-direction/null ordering,
+  unknown-variable atomicity, metadata preservation, all execution modes, CLI output/schema/help,
+  and completion.
+
+## Independent review loop
+
+Three local review passes were completed against the complete base-to-HEAD change:
+
+1. **Execution correctness:** parser tokenization, direction validation, backend SQL/Polars ordering,
+   null placement, tie stability, lazy materialization, and failure state — no actionable findings.
+2. **Public contract coherence:** typed command/result surfaces, transform messages, CLI metadata,
+   help/completion, MCP guidance, docs, and roadmap/spec alignment — no actionable findings.
+3. **Boundary/edge review:** quoted sign-like identifiers, duplicate keys, unknown variables,
+   metadata preservation, SQL identifier quoting, and cross-engine output order — no actionable
+   findings.
+
+## Evidence
+
+- Focused suite: `uv run pytest -q tests/test_gsort.py tests/test_sort.py tests/test_shell.py tests/test_cli.py tests/test_mcp.py` — 225 passed.
+- Full suite: `uv run pytest -q` — 1,341 passed, 314 existing dependency warnings.
+- `uv run ruff check .` and `uv run ruff format --check .` — passed on the changed tree.
+- `uv run basedpyright` on changed source modules — 0 diagnostics.
+- `uv run python scripts/check_docs_alignment.py` — passed.
+- `uv build` plus wheel inspection — passed; packaged `gsort` help is present.
+- `uv run mkdocs build --strict --site-dir /tmp/tabdat-site-gsort` — unavailable because `mkdocs` is
+  not installed locally.
+- `git diff --check` — passed.
+
+## Residual risk
+
+`gsort` is intentionally scalar-key-only and does not claim Stata/SAS/SPSS syntax compatibility.
+Hosted CI and strict MkDocs validation remain external gates; repository-wide mypy retains its
+pre-existing configuration failures.

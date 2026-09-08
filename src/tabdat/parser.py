@@ -41,6 +41,7 @@ from tabdat.models import (
   Expression,
   FunctionCallExpression,
   GenerateCommand,
+  GsortCommand,
   HeadCommand,
   HeckmanCommand,
   HelpCommand,
@@ -80,6 +81,7 @@ from tabdat.models import (
   SelectCommand,
   SetCommand,
   SortCommand,
+  SortKey,
   SpregressCommand,
   SqlCommand,
   StatusCommand,
@@ -122,6 +124,7 @@ _EXECUTABLE_COMMANDS = {
   "select",
   "rename",
   "sort",
+  "gsort",
   "generate",
   "replace",
   "tabulate",
@@ -631,6 +634,9 @@ def _build_command_from_parts(parts: _CommandParts) -> Command:
     if not parts.arguments:
       raise ParseError("sort expects at least one variable")
     return SortCommand(variables=parts.arguments)
+
+  if parts.name == "gsort":
+    return _parse_gsort(parts)
 
   if parts.name == "rename":
     if parts.condition is not None or parts.options or parts.expression is not None:
@@ -2969,6 +2975,28 @@ def _require_flag_options(
       raise ParseError(f"{command_name} option {option.name} does not accept a value")
 
 
+def _parse_gsort(parts: _CommandParts) -> GsortCommand:
+  if parts.condition is not None or parts.options or parts.expression is not None:
+    raise ParseError("gsort only accepts a signed variable list")
+  if not parts.arguments:
+    raise ParseError("gsort expects at least one variable")
+
+  keys: list[SortKey] = []
+  for variable, quoted in zip(parts.arguments, parts.argument_quoted, strict=True):
+    descending = False
+    if not quoted and variable[:1] in {"+", "-"}:
+      descending = variable[0] == "-"
+      variable = variable[1:]
+      if not variable:
+        raise ParseError("gsort expects a variable after each direction prefix")
+      if variable[:1] in {"+", "-"}:
+        raise ParseError("gsort keys must use at most one + or - prefix")
+    if not variable:
+      raise ParseError("gsort expects a variable after each direction prefix")
+    keys.append(SortKey(variable=variable, descending=descending))
+  return GsortCommand(keys=tuple(keys))
+
+
 def _parse_preview_limit(parts: _CommandParts, command_name: str) -> int:
   if parts.condition is not None or parts.options or parts.expression is not None:
     raise ParseError(f"{command_name} does not accept if clauses, options, or assignment syntax")
@@ -3038,7 +3066,10 @@ def _parse_command_parts(tokens: tuple[_Token, ...]) -> _CommandParts:
       options = _parse_options(option_tokens) if option_tokens else options
       stream.advance_to_end()
       break
-    argument, quoted = _parse_argument(stream, allow_symbols=name in {"save", "export", "set"})
+    argument, quoted = _parse_argument(
+      stream,
+      allow_symbols=name in {"save", "export", "set", "gsort"},
+    )
     arguments.append(argument)
     argument_quoted.append(quoted)
 

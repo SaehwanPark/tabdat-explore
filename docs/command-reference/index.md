@@ -1,6 +1,6 @@
 # Command Reference Index
 
-TabDat-Explore includes 79 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
+TabDat-Explore includes 80 commands and topics organized into functional categories. Click any command name to view its syntax, options, and examples.
 
 ---
 
@@ -33,6 +33,7 @@ TabDat-Explore includes 79 commands and topics organized into functional categor
 | [`replace`](../commands/replace.md) | Replace values in an existing variable conditionally or unconditionally. |
 | [`rename`](../commands/rename.md) | Rename variables in the active dataset. |
 | [`sort`](../commands/sort.md) | Stable-sort active rows by ascending native keys. |
+| [`gsort`](../commands/gsort.md) | Stable-sort active rows by explicit ascending/descending keys. |
 | [`recode`](../commands/recode.md) | Recode values or ranges into new categories. |
 | [`label`](../commands/label.md) | Define, inspect, and reuse variable/value-label metadata. |
 

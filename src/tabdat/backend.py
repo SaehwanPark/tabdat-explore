@@ -1131,9 +1131,21 @@ class DuckDBBackend:
     )
     return self.active_dataset_info(dataset.path)
 
-  def sort_rows(self, dataset: DatasetInfo, variables: tuple[str, ...]) -> DatasetInfo:
+  def sort_rows(
+    self,
+    dataset: DatasetInfo,
+    variables: tuple[str, ...],
+    *,
+    descending: tuple[bool, ...] | None = None,
+    command_name: str = "sort",
+  ) -> DatasetInfo:
     column_types = {column.name: column.data_type for column in dataset.columns}
-    _require_columns("sort", column_types, variables)
+    if not variables:
+      raise ExecutionError(f"{command_name} expects at least one variable")
+    directions = descending if descending is not None else (False,) * len(variables)
+    if len(directions) != len(variables):
+      raise ExecutionError(f"{command_name} sort direction count does not match variables")
+    _require_columns(command_name, column_types, variables)
     ordinal_name = "__tabdat_sort_ordinal"
     if self._polars_lazy_frame is not None:
       try:
@@ -1145,19 +1157,22 @@ class DuckDBBackend:
           self._polars_lazy_frame.with_row_index(ordinal_name)
           .sort(
             by=sort_columns,
-            descending=[False] * len(sort_columns),
+            descending=[*directions, False],
             nulls_last=True,
             maintain_order=True,
           )
           .drop(ordinal_name)
         )
       except PolarsError as exc:
-        raise ExecutionError("sort failed") from exc
+        raise ExecutionError(f"{command_name} failed") from exc
       return self.active_dataset_info(dataset.path)
 
     while self._has_internal_column(ordinal_name):
       ordinal_name += "_"
-    sort_sql = ", ".join(f"{_quote_identifier(variable)} asc nulls last" for variable in variables)
+    sort_sql = ", ".join(
+      f"{_quote_identifier(variable)} {'desc' if is_descending else 'asc'} nulls last"
+      for variable, is_descending in zip(variables, directions, strict=True)
+    )
     sort_sql = f"{sort_sql}, {_quote_identifier(ordinal_name)} asc"
     self._replace_active(
       f"""
@@ -1168,7 +1183,7 @@ class DuckDBBackend:
       ) as __tabdat_sort_rows
       order by {sort_sql}
       """,
-      "sort",
+      command_name,
     )
     return self.active_dataset_info(dataset.path)
 

@@ -264,6 +264,21 @@ class SortCommand:
 
 
 @dataclass(frozen=True, config=_MODEL_CONFIG)
+class SortKey:
+  """One stable sort key and its requested direction."""
+
+  variable: str
+  descending: bool = False
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
+class GsortCommand:
+  """Command to stably sort active rows by explicit per-key directions."""
+
+  keys: tuple[SortKey, ...]
+
+
+@dataclass(frozen=True, config=_MODEL_CONFIG)
 class GenerateCommand:
   variable: str
   expression: Expression
@@ -844,6 +859,7 @@ Command = (
   | SelectCommand
   | RenameCommand
   | SortCommand
+  | GsortCommand
   | GenerateCommand
   | ReplaceCommand
   | TabulateCommand

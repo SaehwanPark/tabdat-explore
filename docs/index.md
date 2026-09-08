@@ -100,7 +100,7 @@ file:///Users/username/project/artifacts/plots/scatter-income-age.png
 - [**Installation & Quickstart**](getting-started/installation.md): All installation methods and prerequisites.
 - [**Interactive Shell**](getting-started/interactive-shell.md): Autocomplete, history, and REPL features.
 - [**User Guide**](user-guide/index.md): In-depth guides for sessions, diagnostics, scripting, and estimation.
-- [**Command Reference**](command-reference/index.md): Complete index and detailed reference for all 79 commands.
+- [**Command Reference**](command-reference/index.md): Complete index and detailed reference for all 80 commands.
 - [**MCP Server Guide**](mcp-server.md): Setting up TabDat with Claude Desktop, Cursor, and AI agents.
 - [**Statistical Validation Matrix**](reference-validation-matrix.md): Validated numerical precision against reference packages.
 - [**Language Semantics**](language-semantics.md): Grammar, missing values, and expression coercion.

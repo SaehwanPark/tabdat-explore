@@ -695,6 +695,9 @@ and describe the active work with concise verification criteria.
 - Added read-only `datasignature` SHA-256 fingerprints for public schema, ordered rows, and cell
   values, with explicit null/non-finite framing, deterministic cross-engine scans, and Polars-lazy
   plan preservation.
+- Added `gsort [+|-]varlist` for stable per-key ascending/descending ordering with nulls-last
+  placement, explicit direction parsing, metadata preservation, and eager/DuckDB-lazy/Polars-lazy
+  support.
 
 ## Future
 
